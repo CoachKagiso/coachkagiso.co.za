@@ -29,6 +29,10 @@ export async function POST(request: Request) {
   const amount = Number(fields.amount_gross || fields.amount || service.amount);
   const now = new Date().toISOString();
 
+  if (Math.abs(amount - service.amount) > 0.01) {
+    return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
+  }
+
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from('payments').upsert(
     {
