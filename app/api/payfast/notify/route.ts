@@ -10,6 +10,13 @@ export async function POST(request: Request) {
   const fields = Object.fromEntries(params.entries());
 
   if (!validatePayFastSignature(fields)) {
+    console.warn('PayFast ITN rejected: invalid signature', {
+      fieldNames: Object.keys(fields).sort(),
+      hasSignature: Boolean(fields.signature),
+      paymentId: fields.m_payment_id || fields.pf_payment_id || null,
+      serviceSlug: fields.custom_str1 || null,
+      paymentStatus: fields.payment_status || null,
+    });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -19,6 +26,11 @@ export async function POST(request: Request) {
   const service = asyncServices[serviceSlug as keyof typeof asyncServices];
 
   if (!paymentId || !service) {
+    console.warn('PayFast ITN rejected: missing payment data', {
+      hasPaymentId: Boolean(paymentId),
+      serviceSlug: serviceSlug || null,
+      paymentStatus: paymentStatus || null,
+    });
     return NextResponse.json({ error: 'Missing payment data' }, { status: 400 });
   }
 
@@ -30,6 +42,12 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
 
   if (Math.abs(amount - service.amount) > 0.01) {
+    console.warn('PayFast ITN rejected: amount mismatch', {
+      paymentId,
+      serviceSlug: service.slug,
+      receivedAmount: amount,
+      expectedAmount: service.amount,
+    });
     return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
   }
 

@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import type { AsyncService } from '@/lib/buying-flow';
 
+type IntakeService = Omit<AsyncService, 'confirmationBody'>;
+
 type IntakeFormProps = {
-  service: AsyncService;
+  service: IntakeService;
   paymentId: string;
 };
 

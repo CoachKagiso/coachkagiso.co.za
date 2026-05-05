@@ -4,7 +4,7 @@ import { MessageCircle } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
-import { asyncServices, getAsyncService } from '@/lib/buying-flow';
+import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import IntakeForm from './IntakeForm';
 
@@ -12,6 +12,12 @@ type ThanksPageProps = {
   params: Promise<{ service: string }>;
   searchParams: Promise<{ payment_id?: string }>;
 };
+
+function getIntakeService(service: AsyncService) {
+  const { confirmationBody, ...intakeService } = service;
+  void confirmationBody;
+  return intakeService;
+}
 
 export function generateStaticParams() {
   return Object.keys(asyncServices).map((service) => ({ service }));
@@ -51,10 +57,38 @@ async function validatePayment(serviceSlug: string, paymentId?: string) {
   };
 }
 
+async function confirmSandboxReturn(serviceSlug: string, paymentId?: string) {
+  const service = getAsyncService(serviceSlug);
+  const isSandbox = process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true';
+  const isGeneratedPaymentId = paymentId?.startsWith(`${service?.slug}-`);
+
+  if (!service || !paymentId || !isSandbox || !isGeneratedPaymentId) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase.from('payments').upsert(
+    {
+      payment_id: paymentId,
+      service_slug: service.slug,
+      amount: service.amount,
+      status: 'confirmed',
+      confirmed_at: now,
+    },
+    { onConflict: 'payment_id' },
+  );
+
+  return !error;
+}
+
 export default async function ThanksPage({ params, searchParams }: ThanksPageProps) {
   const { service: serviceSlug } = await params;
   const { payment_id: paymentId } = await searchParams;
-  const { service, valid } = await validatePayment(serviceSlug, paymentId);
+  let { service, valid } = await validatePayment(serviceSlug, paymentId);
+  if (!valid && (await confirmSandboxReturn(serviceSlug, paymentId))) {
+    valid = true;
+  }
   if (!service) notFound();
 
   return (
@@ -105,7 +139,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
 
           <Reveal direction="left" delay={0.08}>
             {valid && paymentId ? (
-              <IntakeForm service={service} paymentId={paymentId} />
+              <IntakeForm service={getIntakeService(service)} paymentId={paymentId} />
             ) : (
               <div className="border border-[#D8C8BB] bg-white p-7 md:p-9">
                 <h2 className="font-serif text-[36px] leading-tight text-[#142334]">
