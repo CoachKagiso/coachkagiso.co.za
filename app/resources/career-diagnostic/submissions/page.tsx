@@ -4,13 +4,17 @@ import {
   ArrowUpRight,
   CalendarClock,
   CheckCircle2,
+  CircleAlert,
+  CreditCard,
   Download,
   FileText,
   LockKeyhole,
   Mail,
+  PackageCheck,
   RefreshCcw,
   Search,
   UserRoundCheck,
+  WalletCards,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -24,6 +28,7 @@ import {
   type DiagnosticLeadStatus,
   type DiagnosticSubmission,
 } from '@/lib/diagnostic-submissions';
+import { listClientOperations, type ClientOperation } from '@/lib/client-operations';
 import { getDiagnosticAdminKey } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +81,10 @@ function formatShortDate(value?: string | null) {
   }).format(new Date(value));
 }
 
+function formatMoney(value: number) {
+  return `R${value.toLocaleString('en-ZA')}`;
+}
+
 function getTopArchetype(submissions: DiagnosticSubmission[]) {
   const counts = submissions.reduce<Record<string, number>>((acc, submission) => {
     acc[submission.archetype_key] = (acc[submission.archetype_key] || 0) + 1;
@@ -111,6 +120,15 @@ function getStatusClass(status: DiagnosticLeadStatus) {
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
+  return 'border-[#D8C8BB] bg-white text-[#142334]';
+}
+
+function getDeliveryStateClass(state: ClientOperation['deliveryState']) {
+  if (state === 'delivered') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
+  if (state === 'overdue' || state === 'failed') return 'border-[#C98672] bg-[#FFF5F2] text-[#7A2F22]';
+  if (state === 'due_soon') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (state === 'in_progress') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
+  if (state === 'cancelled') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';
 }
 
@@ -260,6 +278,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     followUp,
     query: q,
   });
+  const operations = await listClientOperations();
   const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
     selectedFilter === 'all' ? '' : `&archetype=${selectedFilter}`
@@ -284,6 +303,24 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     count: submissions.filter((submission) => submission.lead_status === statusOption.value).length,
   }));
   const conversionReady = submissions.filter((submission) => revenueStatuses.includes(submission.lead_status)).length;
+  const confirmedOperations = operations.filter((operation) => operation.payment.status === 'confirmed');
+  const totalRevenue = confirmedOperations.reduce((total, operation) => total + operation.payment.amount, 0);
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthlyRevenue = confirmedOperations
+    .filter((operation) => new Date(operation.payment.confirmed_at || operation.payment.created_at).getTime() >= monthStart.getTime())
+    .reduce((total, operation) => total + operation.payment.amount, 0);
+  const waitingForIntake = operations.filter((operation) => operation.deliveryState === 'waiting_for_intake');
+  const activeDeliveryQueue = operations
+    .filter((operation) => ['ready', 'in_progress', 'due_soon', 'overdue'].includes(operation.deliveryState))
+    .slice(0, 8);
+  const operationalAlerts = operations.filter((operation) => operation.alertLabel).slice(0, 6);
+  const operationServiceCounts = confirmedOperations.reduce<Record<string, number>>((acc, operation) => {
+    acc[operation.serviceTitle] = (acc[operation.serviceTitle] || 0) + operation.payment.amount;
+    return acc;
+  }, {});
+  const maxOperationRevenue = Math.max(1, ...Object.values(operationServiceCounts));
 
   return (
     <>
@@ -426,6 +463,181 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     </div>
                   );
                 })}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="pb-10">
+          <div className="mx-auto max-w-[1240px] px-6 lg:px-8">
+            <Reveal>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Revenue', formatMoney(totalRevenue), WalletCards],
+                  ['This month', formatMoney(monthlyRevenue), CreditCard],
+                  ['Waiting intake', String(waitingForIntake.length), CircleAlert],
+                  ['Delivery queue', String(activeDeliveryQueue.length), PackageCheck],
+                ].map(([label, value, Icon]) => {
+                  const StatIcon = Icon as typeof WalletCards;
+                  return (
+                    <div key={String(label)} className="border border-[#D8C8BB] bg-white p-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                          {String(label)}
+                        </p>
+                        <StatIcon className="h-4 w-4 text-[#C9AD98]" />
+                      </div>
+                      <p className="mt-4 font-serif text-[31px] leading-tight text-[#142334]">
+                        {String(value)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="pb-10">
+          <div className="mx-auto grid max-w-[1240px] gap-5 px-6 lg:grid-cols-[1.2fr_0.8fr] lg:px-8">
+            <Reveal>
+              <div className="border border-[#D8C8BB] bg-white">
+                <div className="border-b border-[#D8C8BB] px-6 py-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                    Client delivery queue
+                  </p>
+                  <h2 className="mt-2 font-serif text-[36px] leading-tight">Paid work that needs movement</h2>
+                </div>
+                {activeDeliveryQueue.length === 0 ? (
+                  <div className="p-6 text-[15px] leading-relaxed text-[#142334]/70">
+                    No paid delivery work is active yet. Once PayFast confirms a payment and the intake arrives, it will appear here.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[#D8C8BB]">
+                    {activeDeliveryQueue.map((operation) => {
+                      const redirectTo = `/resources/career-diagnostic/submissions?key=${encodeURIComponent(key || '')}`;
+
+                      return (
+                        <div key={operation.payment.payment_id} className="grid gap-5 px-6 py-5 lg:grid-cols-[1fr_0.72fr_auto] lg:items-center">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <p className="font-serif text-[28px] leading-none text-[#142334]">
+                                {operation.payment.buyer_name || operation.intake?.form_data.fullName || 'Client'}
+                              </p>
+                              <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.17em] ${getDeliveryStateClass(operation.deliveryState)}`}>
+                                {operation.deliveryLabel}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/68">
+                              {operation.serviceTitle} - {operation.amountLabel}
+                            </p>
+                            <p className="mt-2 text-[12px] text-[#142334]/58">
+                              {operation.payment.buyer_email || operation.intake?.form_data.email || 'No email saved'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A09086]">
+                              Delivery due
+                            </p>
+                            <p className="mt-2 font-serif text-[26px] leading-tight text-[#142334]">
+                              {formatShortDate(operation.deliveryDueAt)}
+                            </p>
+                            {operation.alertLabel && (
+                              <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#C98672]">
+                                {operation.alertLabel}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2 lg:justify-end">
+                            {operation.intake?.cv_file_url && (
+                              <a
+                                href={operation.intake.cv_file_url}
+                                className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                              >
+                                File <ArrowUpRight className="h-4 w-4" />
+                              </a>
+                            )}
+                            <form action={`/api/operations/payments/${encodeURIComponent(operation.payment.payment_id)}`} method="post">
+                              <input type="hidden" name="key" value={key || ''} />
+                              <input type="hidden" name="redirectTo" value={redirectTo} />
+                              <input type="hidden" name="delivery_status" value="in_progress" />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                              >
+                                Start
+                              </button>
+                            </form>
+                            <form action={`/api/operations/payments/${encodeURIComponent(operation.payment.payment_id)}`} method="post">
+                              <input type="hidden" name="key" value={key || ''} />
+                              <input type="hidden" name="redirectTo" value={redirectTo} />
+                              <input type="hidden" name="delivery_status" value="delivered" />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                              >
+                                Delivered
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Reveal>
+
+            <Reveal>
+              <div className="grid gap-5">
+                <div className="border border-[#D8C8BB] bg-white p-6">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                    Operational alerts
+                  </p>
+                  {operationalAlerts.length === 0 ? (
+                    <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
+                      No payment or intake alerts yet.
+                    </p>
+                  ) : (
+                    <div className="mt-5 grid gap-3">
+                      {operationalAlerts.map((operation) => (
+                        <div key={operation.payment.payment_id} className="border-b border-[#142334]/10 pb-3">
+                          <p className="text-[13px] font-semibold uppercase tracking-[0.15em] text-[#C98672]">
+                            {operation.alertLabel}
+                          </p>
+                          <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/72">
+                            {operation.payment.buyer_name || 'Client'} - {operation.serviceTitle}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border border-[#D8C8BB] bg-white p-6">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                    Revenue by service
+                  </p>
+                  {Object.keys(operationServiceCounts).length === 0 ? (
+                    <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
+                      Revenue will appear after the first confirmed payment.
+                    </p>
+                  ) : (
+                    <div className="mt-5 grid gap-4">
+                      {Object.entries(operationServiceCounts).map(([serviceName, amount]) => (
+                        <div key={serviceName}>
+                          <div className="flex items-center justify-between gap-4 text-[14px]">
+                            <span>{serviceName}</span>
+                            <span className="font-serif text-[22px] leading-none">{formatMoney(amount)}</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
+                            <div className="h-full bg-[#C9AD98]" style={{ width: `${(amount / maxOperationRevenue) * 100}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </Reveal>
           </div>

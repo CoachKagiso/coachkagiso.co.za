@@ -53,3 +53,25 @@ create index if not exists diagnostic_submissions_next_follow_up_at_idx
 
 -- The Next.js API route writes with the Supabase service role key.
 -- Do not add anon insert policies unless you intentionally move writes to the browser.
+
+alter table public.payments
+  add column if not exists delivery_status text not null default 'not_started',
+  add column if not exists delivery_notes text,
+  add column if not exists delivered_at timestamptz,
+  add column if not exists delivery_status_updated_at timestamptz;
+
+alter table public.payments
+  drop constraint if exists payments_delivery_status_check;
+
+alter table public.payments
+  add constraint payments_delivery_status_check
+  check (delivery_status in ('not_started', 'in_progress', 'delivered', 'cancelled'));
+
+create index if not exists payments_delivery_status_idx
+  on public.payments (delivery_status);
+
+create index if not exists payments_intake_submitted_at_idx
+  on public.payments (intake_submitted_at);
+
+create index if not exists payments_confirmed_at_idx
+  on public.payments (confirmed_at desc);

@@ -50,6 +50,12 @@ Create the following tables in Supabase:
 - buyer_name (text)
 - created_at (timestamp)
 - confirmed_at (timestamp)
+- intake_submitted_at (timestamp, nullable)
+- intake_reminder_sent_at (timestamp, nullable)
+- delivery_status (text - not_started/in_progress/delivered/cancelled)
+- delivery_notes (text, nullable)
+- delivered_at (timestamp, nullable)
+- delivery_status_updated_at (timestamp, nullable)
 ```
 
 `intake_submissions` table:
