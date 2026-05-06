@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight } from 'lucide-react';
+import { FaqJsonLd } from '@/app/JsonLd';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import BookingContent from './BookingContent';
 import { bookingPages, type BookingSlug } from '@/lib/buying-flow';
@@ -49,8 +51,18 @@ export default async function BookPage({ params }: BookPageProps) {
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
+      <FaqJsonLd items={page.faqs.map((item) => ({ question: item.question, answer: item.answer }))} />
       <Navbar />
       <BookingContent booking={booking} page={page} calUrl={calUrl} />
+      <PageFaq
+        eyebrow="Before you book"
+        title="A few things worth knowing first."
+        description="These are the questions that usually come up right before someone books a session."
+        items={page.faqs}
+        ctaHref="/contact"
+        ctaLabel="Ask before booking"
+        backgroundClassName="bg-white"
+      />
       <Footer />
     </main>
   );

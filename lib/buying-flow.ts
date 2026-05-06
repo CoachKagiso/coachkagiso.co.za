@@ -11,6 +11,11 @@ export type IntakeField = {
   options?: string[];
 };
 
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
+
 export type AsyncService = {
   slug: AsyncServiceSlug;
   title: string;
@@ -23,8 +28,17 @@ export type AsyncService = {
   requiresCvUpload: boolean;
   cvInstruction?: string;
   fields: IntakeField[];
+  faqs: FaqItem[];
   confirmationSubject: string;
   confirmationBody: (firstName: string) => string;
+};
+
+export type BookingPageConfig = {
+  title: string;
+  envKey: string;
+  fallbackUrl: string;
+  description: string;
+  faqs: FaqItem[];
 };
 
 export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
@@ -57,6 +71,24 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
         type: 'textarea',
         required: true,
         maxLength: 900,
+      },
+    ],
+    faqs: [
+      {
+        question: 'What do I get in a CV Review?',
+        answer: 'You get expert feedback on what is working, what is weakening your positioning, and what to fix first. It is feedback, not a rewrite.',
+      },
+      {
+        question: 'How quickly will I get it back?',
+        answer: 'Within 48 hours after payment and brief submission.',
+      },
+      {
+        question: 'Do I need to upload my CV right away?',
+        answer: 'Yes, either upload it in the brief form or choose the email option and send it straight after submitting.',
+      },
+      {
+        question: 'Can I upgrade later to the full revamp?',
+        answer: 'Yes. If you decide you want the full rewrite after the review, the review naturally leads into that next step.',
       },
     ],
     confirmationSubject: 'Your CV Review is in motion',
@@ -109,6 +141,24 @@ Kagiso`,
         maxLength: 900,
       },
     ],
+    faqs: [
+      {
+        question: 'What is included in the CV Revamp?',
+        answer: 'A full rewrite of your CV in Word and PDF, plus a walkthrough explaining the thinking behind the changes.',
+      },
+      {
+        question: 'How long does the rewrite take?',
+        answer: 'Your delivery window is 5 working days once your brief and CV are in.',
+      },
+      {
+        question: 'Do you write for South African employers and ATS systems?',
+        answer: 'Yes. The rewrite is shaped for recruiter clarity, role alignment, and ATS-friendly structure.',
+      },
+      {
+        question: 'What if I forget something after I submit?',
+        answer: 'Reply to your confirmation email or WhatsApp Kagiso with your order reference and the extra detail.',
+      },
+    ],
     confirmationSubject: 'Your CV Revamp is in motion',
     confirmationBody: (firstName) => `Hi ${firstName},
 
@@ -156,6 +206,24 @@ Kagiso`,
         maxLength: 1200,
       },
     ],
+    faqs: [
+      {
+        question: 'Is this cover letter generic or custom?',
+        answer: 'It is written for one specific role and tailored to the job description, company language, and your positioning.',
+      },
+      {
+        question: 'What do you need from me?',
+        answer: 'The job title, company, job description, and enough context to understand why you fit the role.',
+      },
+      {
+        question: 'Do I need to send my CV too?',
+        answer: 'Yes. Upload it in the brief form or choose the email option and send it right after submitting.',
+      },
+      {
+        question: 'When will I receive it?',
+        answer: 'Within 5 working days after your brief is complete.',
+      },
+    ],
     confirmationSubject: 'Your Cover Letter is in motion',
     confirmationBody: (firstName) => `Hi ${firstName},
 
@@ -201,6 +269,24 @@ Kagiso`,
         type: 'radio',
         required: true,
         options: ['Job hunting now', 'Building for the long game', 'Both'],
+      },
+    ],
+    faqs: [
+      {
+        question: 'What parts of my LinkedIn get improved?',
+        answer: 'Your headline, about section, experience positioning, and recruiter-facing language all get sharpened.',
+      },
+      {
+        question: 'Do I need to be actively job hunting for this to help?',
+        answer: 'No. It works both for immediate job search and for longer-term visibility.',
+      },
+      {
+        question: 'Will you log into my LinkedIn profile?',
+        answer: 'No. Kagiso writes the optimised copy and guidance for you to update on your side.',
+      },
+      {
+        question: 'When will I get the finished work?',
+        answer: 'Within 5 working days after the brief is submitted.',
       },
     ],
     confirmationSubject: 'Your LinkedIn Optimisation is in motion',
@@ -259,6 +345,24 @@ Kagiso`,
         maxLength: 900,
       },
     ],
+    faqs: [
+      {
+        question: 'Why choose the bundle instead of buying separately?',
+        answer: 'Because your CV and LinkedIn are written together to tell the same story, and you save money compared to purchasing both on their own.',
+      },
+      {
+        question: 'What do I receive?',
+        answer: 'A full CV revamp, LinkedIn optimisation copy, and aligned messaging across both assets.',
+      },
+      {
+        question: 'Do I still need to upload my CV?',
+        answer: 'Yes. Upload it in the brief form or choose the email option and send it after you submit.',
+      },
+      {
+        question: 'How long does the bundle take?',
+        answer: 'The turnaround is 7 working days once your brief and file are in.',
+      },
+    ],
     confirmationSubject: 'Your CV + LinkedIn Bundle is in motion',
     confirmationBody: (firstName) => `Hi ${firstName},
 
@@ -271,30 +375,86 @@ Kagiso`,
   },
 };
 
-export const bookingPages: Record<BookingSlug, { title: string; envKey: string; fallbackUrl: string; description: string }> = {
+export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
   discovery: {
     title: 'Free Discovery Call',
     envKey: 'NEXT_PUBLIC_CAL_DISCOVERY_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/discovery-call',
     description: 'A short conversation to understand what you need and whether working together makes sense.',
+    faqs: [
+      {
+        question: 'What happens on the discovery call?',
+        answer: 'You talk through where you are, what feels stuck, and what kind of support would actually help next.',
+      },
+      {
+        question: 'Do I need to decide on a package before booking?',
+        answer: 'No. The call is there to create clarity before you commit to anything.',
+      },
+      {
+        question: 'Will I be pressured to buy something?',
+        answer: 'No. If there is a fit, Kagiso will explain the next step. If not, she will say so honestly.',
+      },
+    ],
   },
   clarity: {
     title: 'Career Clarity Session',
     envKey: 'NEXT_PUBLIC_CAL_CLARITY_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/career-clarity',
     description: 'Book your 75-minute clarity session and choose a time that works for you.',
+    faqs: [
+      {
+        question: 'What do I leave with after the clarity session?',
+        answer: 'Direction, decisions, and a practical action plan rather than vague motivation.',
+      },
+      {
+        question: 'Who is this session best for?',
+        answer: 'Professionals who feel stuck, are considering a pivot, or know they want change but need a clearer next move.',
+      },
+      {
+        question: 'How should I prepare?',
+        answer: 'Come with the honest version of what is not working. You do not need polished answers before the session.',
+      },
+    ],
   },
   'glow-up': {
     title: 'Glow Up VIP Package',
     envKey: 'NEXT_PUBLIC_CAL_GLOW_UP_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/glow-up-vip',
     description: 'Book your kick-off session for the full 30-day support package.',
+    faqs: [
+      {
+        question: 'What does the Glow Up package include?',
+        answer: 'It combines your key career assets and structured support so you are not left trying to execute everything alone.',
+      },
+      {
+        question: 'Is this for someone actively job hunting?',
+        answer: 'Yes, especially if you need deeper support across positioning, materials, and momentum.',
+      },
+      {
+        question: 'What happens after I book?',
+        answer: 'You will get the kick-off session booked first, then the rest of the support flows from that starting point.',
+      },
+    ],
   },
   masterclass: {
     title: 'Saturday Masterclass',
     envKey: 'NEXT_PUBLIC_CAL_MASTERCLASS_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/saturday-masterclass',
     description: 'Choose an upcoming Saturday Masterclass session and hold your spot.',
+    faqs: [
+      {
+        question: 'Who is the masterclass for?',
+        answer: 'It is for professionals who want structured group coaching with practical takeaways they can use immediately.',
+      },
+      {
+        question: 'Is it interactive or just teaching?',
+        answer: 'It is interactive. You will learn, reflect, and leave with a clearer plan than you started with.',
+      },
+      {
+        question: 'What happens if I cannot attend live?',
+        answer: 'Use the booking page to choose a session you can commit to. If you are unsure, message before booking so expectations are clear.',
+      },
+    ],
   },
 };
 

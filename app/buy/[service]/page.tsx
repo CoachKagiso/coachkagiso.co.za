@@ -3,8 +3,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowUpRight, CheckCircle2, Clock3, FileText, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
+import { FaqJsonLd } from '@/app/JsonLd';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService } from '@/lib/buying-flow';
 import { createPayFastCheckoutFields, getPayFastProcessUrl } from '@/lib/payfast';
@@ -46,6 +48,7 @@ export default async function BuyPage({ params }: BuyPageProps) {
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
+      <FaqJsonLd items={service.faqs.map((item) => ({ question: item.question, answer: item.answer }))} />
       <Navbar />
 
       <section className="relative overflow-hidden bg-[#E4D8CB] pt-[124px] pb-20 lg:pb-28">
@@ -169,6 +172,16 @@ export default async function BuyPage({ params }: BuyPageProps) {
           </Reveal>
         </div>
       </section>
+
+      <PageFaq
+        eyebrow="Before you buy"
+        title="Questions people usually ask before paying."
+        description="These are the practical concerns that tend to come up right before someone commits. If yours is different, ask before you pay."
+        items={service.faqs}
+        ctaHref="/contact"
+        ctaLabel="Ask before you pay"
+        backgroundClassName="bg-white"
+      />
 
       <Footer />
     </main>

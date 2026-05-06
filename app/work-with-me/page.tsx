@@ -9,8 +9,10 @@ import {
   Layers3,
   UsersRound,
 } from 'lucide-react';
+import { FaqJsonLd } from '@/app/JsonLd';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import ParallaxWord from '@/components/ParallaxWord';
 import WorkTrackNav from '@/components/WorkTrackNav';
@@ -218,9 +220,29 @@ const tracks: Track[] = [
   },
 ];
 
+const workWithMeFaqs = [
+  {
+    question: 'How do I know which service is right for me?',
+    answer: 'Use where you are right now as the guide. If you need sharper career materials, start with the service pages. If you feel stuck or unclear, start with the clarity path.',
+  },
+  {
+    question: 'Can I start small and upgrade later?',
+    answer: 'Yes. Many people begin with a lower-risk service like the CV Review, then move into a fuller rewrite or a bigger package once they have momentum.',
+  },
+  {
+    question: 'Are these services only for people in finance?',
+    answer: 'No. The work is grounded in strong positioning, clear communication, and practical career strategy across professional industries.',
+  },
+  {
+    question: 'What if I still need help choosing?',
+    answer: 'Book the discovery call or send a message. Kagiso can point you to the most useful next step without pushing you into the wrong package.',
+  },
+];
+
 export default function WorkWithMePage() {
   return (
     <main className="min-h-screen overflow-x-clip bg-[#FCFBFA] text-[#142334]">
+      <FaqJsonLd items={workWithMeFaqs.map((item) => ({ question: item.question, answer: item.answer }))} />
       <Navbar />
 
       <section className="relative overflow-hidden bg-[#E4D8CB] pt-[124px] pb-20 lg:pb-28">
@@ -379,6 +401,16 @@ export default function WorkWithMePage() {
           </section>
         );
       })}
+
+      <PageFaq
+        eyebrow="Before you commit"
+        title="The questions people usually ask at this stage."
+        description="This page is where people compare options, hesitate, and decide what kind of support feels right. These answers are here to make that easier."
+        items={workWithMeFaqs}
+        ctaHref="/contact"
+        ctaLabel="Ask a question"
+        backgroundClassName="bg-white"
+      />
 
       <section className="relative overflow-hidden bg-white py-20 lg:py-28">
         <GeoArchPattern className="absolute -right-20 top-10 h-[420px] w-[520px] opacity-[0.12] text-[#142334] pointer-events-none" />
