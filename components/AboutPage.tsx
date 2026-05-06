@@ -8,14 +8,17 @@ const beliefs = [
   {
     title: 'Hard work alone is not enough.',
     body: 'You can be talented, consistent, and still invisible to the people making decisions. The work has to be seen.',
+    hover: { x: -14, y: 0 },
   },
   {
     title: 'Talent without visibility is private potential.',
     body: 'Your next move needs the right conversations, the right skills, and a clearer way of presenting who you are becoming.',
+    hover: { x: 0, y: -14 },
   },
   {
     title: 'Your career does not exist in a vacuum.',
     body: 'Confidence, energy, time, faith, family, and strategy all shape how you move. Coaching has to look at the whole person.',
+    hover: { x: 14, y: 0 },
   },
 ];
 
@@ -213,9 +216,10 @@ export default function AboutPage() {
                 key={belief.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
+                whileHover={belief.hover}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.08 }}
-                className="py-10 md:py-14 md:px-8 border-b md:border-b-0 md:border-r last:border-r-0 border-[#142334]/15"
+                transition={{ duration: 0.35, delay: index * 0.08, ease: 'easeOut' }}
+                className="py-10 md:py-14 md:px-8 border-b md:border-b-0 md:border-r last:border-r-0 border-[#142334]/15 will-change-transform"
               >
                 <span className="font-display text-[54px] text-[#C9AD98] leading-none">0{index + 1}</span>
                 <h3 className="mt-5 font-serif text-[28px] leading-tight">{belief.title}</h3>
