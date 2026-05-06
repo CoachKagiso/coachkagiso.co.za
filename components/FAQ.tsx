@@ -64,11 +64,15 @@ export default function FAQ() {
           <div className="border-t border-[#142334]/15">
             {faqs.map((faq, index) => (
               <details key={faq.q} className="group border-b border-[#142334]/15 [&_summary::-webkit-details-marker]:hidden" open={index === 0}>
-                <summary className="grid grid-cols-[auto_1fr_auto] gap-5 items-center py-7 cursor-pointer">
+                <motion.summary
+                  whileHover={{ x: 12 }}
+                  transition={{ duration: 0.28, ease: 'easeOut' }}
+                  className="grid grid-cols-[auto_1fr_auto] gap-5 items-center py-7 cursor-pointer will-change-transform"
+                >
                   <span className="font-display text-[38px] leading-none text-[#C9AD98]">0{index + 1}</span>
                   <span className="font-serif text-[24px] md:text-[30px] leading-tight text-[#142334]">{faq.q}</span>
                   <ChevronDown className="h-5 w-5 text-[#C9AD98] transition-transform duration-300 group-open:rotate-180" />
-                </summary>
+                </motion.summary>
                 <div className="pb-8 pl-[64px] pr-10 text-[16px] md:text-[17px] leading-relaxed text-[#142334]/75">
                   {faq.a}
                 </div>
