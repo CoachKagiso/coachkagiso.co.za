@@ -656,8 +656,8 @@ export const insights: Insight[] = [
     tags: ['LinkedIn', 'Personal Brand', 'Visibility'],
     readTime: '11 min read',
     date: 'May 2026',
-    image: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?q=80&w=1400&auto=format&fit=crop',
-    imageAlt: 'Professional working on a laptop in a warm modern office',
+    image: '/images/insights/linkedin-optimisation-playbook.jpg',
+    imageAlt: 'LinkedIn profile open on a laptop in a warm professional workspace',
     leadMagnet: {
       eyebrow: 'Free LinkedIn headline builder',
       title: 'Want headline examples you can adapt before you rewrite yours?',
