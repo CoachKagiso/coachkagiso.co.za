@@ -84,7 +84,7 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
       {
         question: 'Can I upgrade later to the full revamp?',
-        answer: 'Yes. If you decide you want the full rewrite after the review, the review naturally leads into that next step.',
+        answer: 'Yes. If you want Kagiso to do the rewrite after the review, your R150 review fee is credited toward the R400 CV Revamp, so you only pay the R250 difference.',
       },
     ],
     confirmationSubject: 'Your CV Review is in motion',
@@ -94,7 +94,7 @@ Got your CV. I'll record your review and have it back to you within 48 hours.
 
 When the Loom video lands in your inbox, watch it once through, then watch it again with your CV open and make the changes as I call them out. Most people find that takes about 30 minutes.
 
-If you want a full rewrite after the review, the CV Revamp at R400 picks up where the review leaves off, with R150 credit applied since you've already paid for the review.
+If you want a full rewrite after the review, the CV Revamp picks up where the review leaves off. Your R150 review fee is credited, so you only pay the R250 difference.
 
 Talk soon,
 Kagiso`,

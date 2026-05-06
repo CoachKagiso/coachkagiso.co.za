@@ -83,7 +83,7 @@ const tracks: Track[] = [
         title: '48-Hour CV Review',
         price: 'R150',
         tagline: 'Your CV, my expert eye. Back in under 48 hours.',
-        body: "Send me your current CV. I'll record a 5-minute video walking you through what's broken, what's working, and what to fix first. This is feedback, not a rewrite.",
+        body: "Send me your current CV. I'll record a 5-minute video walking you through what's broken, what's working, and what to fix first. This is feedback, not a rewrite. If you later want Kagiso to do the full rewrite, your R150 is credited toward the CV Revamp and you only pay the R250 difference.",
         items: [
           '5-minute Loom video review delivered within 48 hours',
           '3 specific fixes you can apply yourself',

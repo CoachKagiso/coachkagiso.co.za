@@ -107,6 +107,17 @@ export default async function BuyPage({ params }: BuyPageProps) {
                 })}
               </div>
 
+              {service.slug === 'cv-review' && (
+                <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
+                  <p className="text-[15px] leading-relaxed text-[#142334]/72">
+                    If the review confirms you want Kagiso to do the rewrite, your R150 review fee carries over to the CV Revamp. You would only pay the R250 difference.
+                  </p>
+                  <Link href="/buy/cv-revamp" className="mt-3 inline-flex text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] hover:text-[#142334]">
+                    View the CV Revamp <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
+
               {(service.slug === 'cv-revamp' || service.slug === 'linkedin') && (
                 <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
                   <p className="text-[15px] leading-relaxed text-[#142334]/72">
