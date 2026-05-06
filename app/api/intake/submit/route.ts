@@ -91,6 +91,15 @@ export async function POST(request: Request) {
   const fullName = values.fullName;
   const email = values.email;
   const whatsapp = values.whatsapp;
+  const briefAcknowledgement = String(formData.get('brief_acknowledgement') || '') === 'yes';
+
+  if (!briefAcknowledgement) {
+    return NextResponse.json(
+      { error: 'Please confirm that your information is accurate before submitting' },
+      { status: 400 },
+    );
+  }
+
   let signedCvUrl = '';
   const cvEmailFallback = String(formData.get('cv_email_fallback') || '') === 'yes';
   const cvDeliveryMethod =
@@ -144,6 +153,8 @@ export async function POST(request: Request) {
     service_slug: service.slug,
     form_data: {
       ...values,
+      briefAcknowledgement: true,
+      briefAcknowledgedAt: new Date().toISOString(),
       cvDeliveryMethod,
     },
     cv_file_url: signedCvUrl || null,

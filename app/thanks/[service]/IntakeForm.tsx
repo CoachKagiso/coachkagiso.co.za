@@ -217,6 +217,20 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
           </p>
         )}
 
+        <label className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4 text-[13px] leading-relaxed text-[#142334]/72">
+          <input
+            type="checkbox"
+            name="brief_acknowledgement"
+            value="yes"
+            required
+            className="mt-1 h-4 w-4 shrink-0 accent-[#142334]"
+          />
+          <span>
+            I confirm that the information and files I&apos;m sharing are true and accurate to the best of my
+            knowledge, and I understand Kagiso will rely on this brief to complete the work.
+          </span>
+        </label>
+
         <button
           type="submit"
           disabled={status === 'submitting'}
