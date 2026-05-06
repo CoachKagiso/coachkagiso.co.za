@@ -9,14 +9,17 @@ const audiences = [
   {
     title: 'Past entry-level, stuck in the same role',
     body: 'You have put in the years. You are earning more than you did as a grad, but the title has not moved. The problem is not your work. It is that your work is not visible to the people who decide.',
+    hover: { x: -14, y: 0 },
   },
   {
     title: 'Qualified, but cannot find a way in',
     body: 'You have the degree and the grades, but your applications keep disappearing. You need a CV that actually gets opened and a way into rooms you did not know existed.',
+    hover: { x: 0, y: -14 },
   },
   {
     title: 'Ready to pivot, not start over',
     body: 'You are done with your industry, but you are not trying to start again at the bottom. You need a bridge from where you are to where you are going.',
+    hover: { x: 14, y: 0 },
   },
 ];
 
@@ -53,11 +56,14 @@ export default function WhoIWorkWith() {
 
         <div className="grid md:grid-cols-3 gap-0 relative border-y border-[#142334]/15">
           {audiences.map((audience, index) => (
-            <Reveal
+            <motion.div
               key={audience.title}
-              delay={index * 0.09}
-              direction={index === 0 ? 'right' : index === 2 ? 'left' : 'up'}
-              className={`relative py-12 md:py-14 md:px-8 ${
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              whileHover={audience.hover}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35, delay: index * 0.09, ease: 'easeOut' }}
+              className={`relative py-12 md:py-14 md:px-8 will-change-transform ${
                 index === 1 ? 'border-y md:border-y-0 md:border-x border-[#142334]/15' : ''
               }`}
             >
@@ -68,7 +74,7 @@ export default function WhoIWorkWith() {
               <p className="mt-6 font-sans text-[16.5px] text-[#142334]/76 leading-relaxed font-normal">
                 {audience.body}
               </p>
-            </Reveal>
+            </motion.div>
           ))}
         </div>
 
