@@ -91,8 +91,8 @@ export const insights: Insight[] = [
     tags: ['LinkedIn', 'Recruiters', 'Visibility'],
     readTime: '4 min read',
     date: 'May 2026',
-    image: 'https://images.unsplash.com/photo-1611944212129-29977ae1398c?q=80&w=1400&auto=format&fit=crop',
-    imageAlt: 'Professional reviewing LinkedIn and career notes on a laptop',
+    image: '/images/insights/linkedin-headline-article.jpg',
+    imageAlt: 'Laptop open to LinkedIn with notebook and coffee in a warm workspace',
     pullQuote:
       'LinkedIn is a search engine before it is a social network. If your headline does not contain the words recruiters search for, you are harder to find.',
     visualBreak: {
@@ -211,8 +211,8 @@ export const insights: Insight[] = [
     tags: ['Career Planning', 'Clarity', 'Strategy'],
     readTime: '7 min read',
     date: 'May 2026',
-    image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1400&auto=format&fit=crop',
-    imageAlt: 'Professional reflecting during a career planning conversation',
+    image: '/images/insights/career-planning-when-stuck.jpg',
+    imageAlt: 'Professional reflecting at a desk during career planning',
     leadMagnet: {
       eyebrow: 'Free personal brand audit',
       title: 'Need a starting point before you make a career move?',
@@ -1255,8 +1255,8 @@ export const insights: Insight[] = [
     tags: ['Leadership', 'Management', 'Career Growth'],
     readTime: '10 min read',
     date: 'May 2026',
-    image: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1400&auto=format&fit=crop',
-    imageAlt: 'Professionals in a warm one-on-one workplace conversation',
+    image: '/images/insights/first-time-manager-guide.jpeg',
+    imageAlt: 'Two professionals in a bright office conversation about leadership and growth',
     featured: true,
     leadMagnet: {
       eyebrow: 'Free leadership checklist',
