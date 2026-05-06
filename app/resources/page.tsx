@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   ArrowUpRight,
+  ClipboardCheck,
+  Compass,
+  Download,
   Mail,
   Sparkles,
 } from 'lucide-react';
@@ -25,10 +28,61 @@ export const metadata: Metadata = {
   },
 };
 
-const upcomingResources = [
-  'SA CV Checklist',
-  'LinkedIn About Prompts',
-  'Interview Story Bank',
+const resourcePaths = [
+  {
+    eyebrow: 'Start here',
+    title: '5-Minute Career Diagnostic',
+    description:
+      'Use this first when you want clarity on what kind of support fits your season before you spend time guessing.',
+    href: '/resources/career-diagnostic',
+    cta: 'Take the diagnostic',
+    icon: Sparkles,
+    highlights: ['10 questions', 'Instant result', 'Matched next step'],
+    theme: 'dark' as const,
+  },
+  {
+    eyebrow: 'Use a tool',
+    title: 'Career tools',
+    description:
+      'Interactive assessments for visibility, positioning, and career decision-making when you need more than generic advice.',
+    href: '/resources/tools',
+    cta: 'Browse tools',
+    icon: ClipboardCheck,
+    highlights: ['Diagnostics', 'Visibility checks', 'Practical next steps'],
+    theme: 'light' as const,
+  },
+  {
+    eyebrow: 'Download something',
+    title: 'Free downloads',
+    description:
+      'Checklists, prompt guides, and manager kits for the moments when you need structure, language, or something tangible to work through.',
+    href: '/resources/downloads',
+    cta: 'Browse downloads',
+    icon: Download,
+    highlights: ['Checklists', 'Prompt guides', 'Manager kits'],
+    theme: 'light' as const,
+  },
+];
+
+const availableNow = [
+  {
+    label: 'Diagnostic',
+    title: '5-Minute Career Diagnostic',
+    note: 'A fast assessment for clarity, visibility, and next-step direction.',
+    href: '/resources/career-diagnostic',
+  },
+  {
+    label: 'Download',
+    title: 'First 90 Days Checklist',
+    note: 'A promotion operating kit for new managers and first-time leaders.',
+    href: '/resources/downloads#first-90-days-checklist',
+  },
+  {
+    label: 'Download',
+    title: 'SA LinkedIn Headline Builder',
+    note: 'A headline rewrite guide with formulas, examples, and keyword cues.',
+    href: '/resources/downloads#linkedin-headline-builder',
+  },
 ];
 
 export default function ResourcesPage() {
@@ -50,11 +104,21 @@ export default function ResourcesPage() {
               Resources
             </p>
             <h1 className="mt-7 font-serif text-[52px] md:text-[86px] leading-[0.94] font-medium">
-              Practical tools for the career move you are trying to make.
+              Choose the format that helps you move.
             </h1>
             <p className="mt-7 max-w-2xl text-[18px] leading-relaxed text-[#142334]/76">
-              This is where you come when you need more than inspiration. Start with the audit, download a focused resource, or use the Resources menu to choose the support that fits where you are.
+              This hub is for practical support, not article reading. Start with a diagnostic, open a tool, or download something useful depending on what kind of help you need right now.
             </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {['Start with clarity', 'Use a practical tool', 'Download and apply'].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-[#142334]/15 bg-white/35 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#142334]/72"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
           </Reveal>
         </div>
       </section>
@@ -62,60 +126,116 @@ export default function ResourcesPage() {
       <section className="relative bg-white py-20 lg:py-28">
         <GeoArchPattern className="absolute -left-24 top-10 h-[430px] w-[540px] opacity-[0.1] text-[#142334] pointer-events-none" />
         <div className="max-w-[1180px] mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-[1fr_0.72fr] gap-12 lg:gap-16 items-stretch">
-            <Reveal direction="right">
-              <div className="relative h-full bg-[#142334] p-8 md:p-10 text-white">
-                <Sparkles className="h-8 w-8 text-[#C9AD98]" />
-                <p className="mt-8 text-[12px] uppercase tracking-[0.24em] font-semibold text-[#C9AD98]">
-                  Featured resource
-                </p>
-                <h2 className="mt-4 max-w-2xl font-serif text-[44px] md:text-[64px] leading-[0.98]">
-                  5-Minute Career Diagnostic
-                </h2>
-                <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-white/74">
-                  A focused assessment for South African professionals who feel stuck, stalling, or ready to pivot and need to know what kind of support fits the season they are in.
-                </p>
+          <Reveal className="max-w-2xl">
+            <p className="text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
+              Choose your route
+            </p>
+            <h2 className="mt-4 font-serif text-[42px] md:text-[58px] leading-[0.98]">
+              One hub. Three useful ways in.
+            </h2>
+            <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-[#142334]/72">
+              The menu is the shortcut when you already know what you want. This page is the calmer version when you need help choosing the right resource first.
+            </p>
+          </Reveal>
 
-                <div className="mt-9 grid sm:grid-cols-3 gap-3 border-y border-white/12 py-6">
-                  {['10 questions', 'Instant result', 'Matched next step'].map((item) => (
-                    <span key={item} className="text-[12px] uppercase tracking-[0.14em] text-white/68">
-                      {item}
-                    </span>
-                  ))}
-                </div>
+          <div className="mt-12 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+            {resourcePaths.map((path, index) => {
+              const Icon = path.icon;
+              const isDark = path.theme === 'dark';
 
-                <Link
-                  href="/resources/career-diagnostic"
-                  className="mt-9 inline-flex items-center gap-2 rounded-full bg-[#C9AD98] px-7 py-3.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
+              return (
+                <Reveal
+                  key={path.title}
+                  direction={index === 0 ? 'right' : 'left'}
+                  delay={index === 0 ? 0 : 0.06 * index}
+                  className={index === 0 ? 'lg:row-span-2' : ''}
                 >
-                  Take the diagnostic <ArrowUpRight className="h-4 w-4" />
-                </Link>
+                  <article
+                    className={`h-full ${isDark ? 'bg-[#142334] text-white' : 'border border-[#D8C8BB] bg-[#F7F1EC] text-[#142334]'} p-8 md:p-10`}
+                  >
+                    <Icon className={`h-8 w-8 ${isDark ? 'text-[#C9AD98]' : 'text-[#A98974]'}`} />
+                    <p className={`mt-8 text-[12px] uppercase tracking-[0.24em] font-semibold ${isDark ? 'text-[#C9AD98]' : 'text-[#A98974]'}`}>
+                      {path.eyebrow}
+                    </p>
+                    <h3 className="mt-4 max-w-2xl font-serif text-[40px] md:text-[58px] leading-[0.98]">
+                      {path.title}
+                    </h3>
+                    <p className={`mt-5 max-w-xl text-[17px] leading-relaxed ${isDark ? 'text-white/72' : 'text-[#142334]/72'}`}>
+                      {path.description}
+                    </p>
+
+                    <div className={`mt-8 grid gap-3 sm:grid-cols-3 ${isDark ? 'border-y border-white/12' : 'border-y border-[#142334]/12'} py-6`}>
+                      {path.highlights.map((item) => (
+                        <span
+                          key={item}
+                          className={`text-[11px] uppercase tracking-[0.16em] ${isDark ? 'text-white/68' : 'text-[#142334]/62'}`}
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+
+                    <Link
+                      href={path.href}
+                      className={`mt-8 inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[12px] font-semibold uppercase tracking-[0.17em] transition ${
+                        isDark
+                          ? 'bg-[#C9AD98] text-[#142334] hover:bg-white'
+                          : 'border border-[#142334]/18 bg-white text-[#142334] hover:bg-[#142334] hover:text-[#F7F1EC]'
+                      }`}
+                    >
+                      {path.cta} <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </article>
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#FCFBFA] py-20 lg:py-24">
+        <div className="max-w-[1180px] mx-auto px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.7fr_1fr] lg:items-start">
+            <Reveal direction="right">
+              <div>
+                <Compass className="h-8 w-8 text-[#C9AD98]" />
+                <p className="mt-7 text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
+                  Available now
+                </p>
+                <h2 className="mt-4 font-serif text-[42px] md:text-[56px] leading-[0.98]">
+                  Open the resources that are ready today.
+                </h2>
+                <p className="mt-5 max-w-md text-[16px] leading-relaxed text-[#142334]/72">
+                  No filler shelf, no article detour. Just the live tools and downloads someone can use immediately.
+                </p>
               </div>
             </Reveal>
 
-            <Reveal direction="left" delay={0.08}>
-              <div className="h-full border border-[#D8C8BB] bg-[#F7F1EC] p-8 md:p-10">
-                <p className="text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
-                  Coming soon
-                </p>
-                <h3 className="mt-4 font-serif text-[38px] leading-tight">
-                  More free resources are being shaped.
-                </h3>
-                <p className="mt-5 text-[16px] leading-relaxed text-[#142334]/72">
-                  These will become downloadable tools as the library grows. For now, they show the direction of the resource hub without pretending everything is ready.
-                </p>
-                <div className="mt-8 space-y-3">
-                  {upcomingResources.map((resource) => (
-                    <div key={resource} className="flex items-center justify-between gap-4 border-t border-[#142334]/12 pt-4">
-                      <span className="font-serif text-[23px]">{resource}</span>
-                      <span className="rounded-full border border-[#C9AD98]/60 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[#A09086]">
-                        Soon
-                      </span>
+            <div className="border-y border-[#142334]/12">
+              {availableNow.map((item, index) => (
+                <Reveal key={item.title} delay={index * 0.06}>
+                  <Link
+                    href={item.href}
+                    className="group grid gap-4 border-b border-[#142334]/12 py-6 last:border-b-0 md:grid-cols-[120px_1fr_auto] md:items-center"
+                  >
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A98974]">
+                      {item.label}
+                    </span>
+                    <div>
+                      <h3 className="font-serif text-[28px] leading-tight transition group-hover:text-[#A98974]">
+                        {item.title}
+                      </h3>
+                      <p className="mt-2 text-[15px] leading-relaxed text-[#142334]/68">
+                        {item.note}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
+                    <span className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#142334]">
+                      Open <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    </span>
+                  </Link>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -172,13 +292,14 @@ export default function ResourcesPage() {
           <Reveal>
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <p className="font-serif text-[34px] md:text-[44px] leading-tight">
-                Your career matters. Let&apos;s build it.
+                Want support beyond the free layer?
               </p>
               <div className="flex flex-wrap gap-3">
                 {[
-                  ['Read insights', '/insights'],
+                  ['Work with me', '/work-with-me'],
+                  ['Browse tools', '/resources/tools'],
+                  ['Browse downloads', '/resources/downloads'],
                   ['Book a call', '/book/discovery'],
-                  ['Return home', '/'],
                 ].map(([label, href]) => (
                   <Link
                     key={label}
