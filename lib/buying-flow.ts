@@ -79,10 +79,6 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
         answer: 'You get expert feedback on what is working, what is weakening your positioning, and what to fix first. It is feedback, not a rewrite.',
       },
       {
-        question: 'How quickly will I get it back?',
-        answer: 'Within 48 hours after payment and brief submission.',
-      },
-      {
         question: 'Do I need to upload my CV right away?',
         answer: 'Yes, either upload it in the brief form or choose the email option and send it straight after submitting.',
       },
@@ -145,10 +141,6 @@ Kagiso`,
       {
         question: 'What is included in the CV Revamp?',
         answer: 'A full rewrite of your CV in Word and PDF, plus a walkthrough explaining the thinking behind the changes.',
-      },
-      {
-        question: 'How long does the rewrite take?',
-        answer: 'Your delivery window is 5 working days once your brief and CV are in.',
       },
       {
         question: 'Do you write for South African employers and ATS systems?',
@@ -219,10 +211,6 @@ Kagiso`,
         question: 'Do I need to send my CV too?',
         answer: 'Yes. Upload it in the brief form or choose the email option and send it right after submitting.',
       },
-      {
-        question: 'When will I receive it?',
-        answer: 'Within 5 working days after your brief is complete.',
-      },
     ],
     confirmationSubject: 'Your Cover Letter is in motion',
     confirmationBody: (firstName) => `Hi ${firstName},
@@ -283,10 +271,6 @@ Kagiso`,
       {
         question: 'Will you log into my LinkedIn profile?',
         answer: 'No. Kagiso writes the optimised copy and guidance for you to update on your side.',
-      },
-      {
-        question: 'When will I get the finished work?',
-        answer: 'Within 5 working days after the brief is submitted.',
       },
     ],
     confirmationSubject: 'Your LinkedIn Optimisation is in motion',
@@ -357,10 +341,6 @@ Kagiso`,
       {
         question: 'Do I still need to upload my CV?',
         answer: 'Yes. Upload it in the brief form or choose the email option and send it after you submit.',
-      },
-      {
-        question: 'How long does the bundle take?',
-        answer: 'The turnaround is 7 working days once your brief and file are in.',
       },
     ],
     confirmationSubject: 'Your CV + LinkedIn Bundle is in motion',

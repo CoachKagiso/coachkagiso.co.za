@@ -233,10 +233,6 @@ const workWithMeFaqs = [
     question: 'Are these services only for people in finance?',
     answer: 'No. The work is grounded in strong positioning, clear communication, and practical career strategy across professional industries.',
   },
-  {
-    question: 'What if I still need help choosing?',
-    answer: 'Book the discovery call or send a message. Kagiso can point you to the most useful next step without pushing you into the wrong package.',
-  },
 ];
 
 export default function WorkWithMePage() {
