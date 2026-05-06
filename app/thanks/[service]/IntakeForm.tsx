@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, FileCheck2, ShieldCheck } from 'lucide-react';
 import type { AsyncService } from '@/lib/buying-flow';
 
 type IntakeService = Omit<AsyncService, 'confirmationBody'>;
@@ -51,20 +51,50 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
 
   if (status === 'success' || status === 'duplicate') {
     return (
-      <div className="border border-[#D8C8BB] bg-white p-7 md:p-9">
+      <div className="border border-[#D8C8BB] bg-white p-7 shadow-[0_24px_70px_rgba(20,35,52,0.08)] md:p-9">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#C9AD98]/20 text-[#142334]">
           <CheckCircle2 className="h-7 w-7" />
         </div>
         <h2 className="mt-6 font-serif text-[36px] leading-tight text-[#142334]">
-          {status === 'duplicate' ? 'Already submitted.' : "Thanks. I've got everything."}
+          {status === 'duplicate' ? 'Your brief is already in.' : 'Your brief is safely in.'}
         </h2>
         <p className="mt-4 text-[17px] leading-relaxed text-[#142334]/72">{message}</p>
+        <p className="mt-5 border-t border-[#142334]/10 pt-5 text-[13px] leading-relaxed text-[#142334]/55">
+          Keep an eye on your inbox. If Kagiso needs one quick clarification, she&apos;ll email you directly.
+        </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 border border-[#D8C8BB] bg-white p-6 md:p-8">
+    <form onSubmit={handleSubmit} className="border border-[#D8C8BB] bg-white p-6 shadow-[0_24px_70px_rgba(20,35,52,0.08)] md:p-8">
+      <div className="border-b border-[#142334]/10 pb-6">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#C9AD98]">
+          Client brief
+        </p>
+        <h2 className="mt-3 font-serif text-[34px] leading-tight text-[#142334]">
+          Give Kagiso the useful context.
+        </h2>
+        <p className="mt-3 text-[15px] leading-relaxed text-[#142334]/65">
+          The better the brief, the sharper the delivery. Clear answers are more useful than perfect answers.
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
+            <p className="text-[13px] leading-relaxed text-[#142334]/65">
+              Your details stay private and are only used to complete this order.
+            </p>
+          </div>
+          <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
+            <FileCheck2 className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
+            <p className="text-[13px] leading-relaxed text-[#142334]/65">
+              PDF or Word uploads are accepted where your service needs a CV.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-7 space-y-6">
       {service.fields.map((field) => (
         <div key={field.name} className="space-y-2">
           <label htmlFor={field.name} className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#142334]">
@@ -153,10 +183,11 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
       <button
         type="submit"
         disabled={status === 'submitting'}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] px-8 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] px-8 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white shadow-[0_14px_30px_rgba(20,35,52,0.18)] transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {status === 'submitting' ? 'Sending...' : 'Send my details'} <ArrowUpRight className="h-4 w-4" />
+        {status === 'submitting' ? 'Securing your brief...' : 'Submit my brief'} <ArrowUpRight className="h-4 w-4" />
       </button>
+      </div>
     </form>
   );
 }

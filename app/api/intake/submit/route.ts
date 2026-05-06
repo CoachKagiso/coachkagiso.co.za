@@ -8,6 +8,7 @@ import {
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const INTAKE_ACCESS_WINDOW_DAYS = 14;
 const ALLOWED_TYPES = [
   'application/pdf',
   'application/msword',
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const confirmedAt = payment?.confirmed_at ? new Date(payment.confirmed_at).getTime() : 0;
-  const isRecent = confirmedAt > Date.now() - 30 * 60 * 1000;
+  const isRecent = confirmedAt > Date.now() - INTAKE_ACCESS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
   if (
     paymentError ||
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       duplicate: true,
       message:
-        "It looks like you've already submitted. If you need to make changes, email hello@coachkagiso.co.za",
+        "Your brief is already safely submitted. If you need to add anything, email hello@coachkagiso.co.za and include your order reference.",
     });
   }
 
@@ -147,6 +148,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    message: `Got it. Kagiso will be in touch within ${service.turnaround}.`,
+    message: `Your brief is safely in. Kagiso will review it and deliver within ${service.turnaround}. A confirmation email is on its way.`,
   });
 }

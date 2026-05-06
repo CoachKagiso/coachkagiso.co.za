@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowUpRight, CheckCircle2, MessageCircle } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Clock3, FileText, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
@@ -69,24 +69,39 @@ export default async function BuyPage({ params }: BuyPageProps) {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28">
+      <section className="py-16 lg:py-24">
         <div className="mx-auto grid max-w-[1120px] gap-10 px-6 lg:grid-cols-[0.9fr_0.62fr] lg:px-8">
           <Reveal direction="right">
             <div className="border border-[#D8C8BB] bg-white p-7 md:p-9">
               <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
-                What happens next
+                Purchase flow
+              </p>
+              <h2 className="mt-4 font-serif text-[40px] leading-tight text-[#142334]">
+                A clear handoff after checkout.
+              </h2>
+              <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/68">
+                You will pay securely through PayFast, then return to a private intake page connected to this order.
               </p>
               <div className="mt-7 space-y-5">
                 {[
-                  'Complete secure payment through PayFast.',
-                  'Return to the intake page with your payment reference.',
-                  'Send Kagiso the details she needs to deliver the work.',
-                ].map((step, index) => (
-                  <div key={step} className="flex gap-4 border-t border-[#142334]/10 pt-5">
-                    <span className="font-serif text-[25px] text-[#C9AD98]">0{index + 1}</span>
-                    <p className="text-[16px] leading-relaxed text-[#142334]/72">{step}</p>
-                  </div>
-                ))}
+                  { icon: LockKeyhole, title: 'Secure payment', detail: 'Complete checkout through PayFast using card, EFT, PayShap, or supported options.' },
+                  { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
+                  { icon: Clock3, title: 'Delivery starts', detail: `Your ${service.turnaround} turnaround begins once the brief and required file are submitted.` },
+                ].map((step, index) => {
+                  const Icon = step.icon;
+                  return (
+                    <div key={step.title} className="flex gap-4 border-t border-[#142334]/10 pt-5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F7F1EC] text-[#C9AD98]">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#142334]/45">Step 0{index + 1}</p>
+                        <p className="mt-1 text-[16px] font-semibold text-[#142334]">{step.title}</p>
+                        <p className="mt-1 text-[15px] leading-relaxed text-[#142334]/68">{step.detail}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {(service.slug === 'cv-revamp' || service.slug === 'linkedin') && (
@@ -103,7 +118,7 @@ export default async function BuyPage({ params }: BuyPageProps) {
           </Reveal>
 
           <Reveal direction="left" delay={0.08}>
-            <div className="bg-[#142334] p-7 text-white md:p-8">
+            <div className="bg-[#142334] p-7 text-white shadow-[0_24px_70px_rgba(20,35,52,0.18)] md:p-8">
               <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
                 Your investment
               </p>
@@ -113,6 +128,14 @@ export default async function BuyPage({ params }: BuyPageProps) {
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
                 Turnaround: {service.turnaround}. Payment is processed securely by PayFast.
               </p>
+              <div className="mt-6 border border-white/12 bg-white/[0.04] p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
+                  <p className="text-[13px] leading-relaxed text-white/68">
+                    After payment, your order reference unlocks the intake page. You will also receive a confirmation email after submitting your brief.
+                  </p>
+                </div>
+              </div>
 
               <form action={getPayFastProcessUrl()} method="post" className="mt-8">
                 {Object.entries(fields).map(([key, value]) => (
