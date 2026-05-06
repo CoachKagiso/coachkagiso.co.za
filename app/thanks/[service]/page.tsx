@@ -152,6 +152,36 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
                   })}
                 </div>
               </div>
+              <div className="mt-5 border border-[#D8C8BB] bg-white p-6 md:p-7">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
+                  Before you submit
+                </p>
+                <div className="mt-5 space-y-4">
+                  {[
+                    {
+                      question: 'When does my turnaround start?',
+                      answer: 'As soon as this brief and any required file are in, your delivery window starts.',
+                    },
+                    {
+                      question: 'What if I remember something later?',
+                      answer: 'Reply to your confirmation email or WhatsApp Kagiso with the extra detail and your order reference.',
+                    },
+                    {
+                      question: 'How should I send my CV?',
+                      answer: 'Upload it here now, or choose the email option in the form and send it after you submit.',
+                    },
+                    {
+                      question: 'How will I receive the finished work?',
+                      answer: 'Kagiso will send your completed work back by email within the turnaround window.',
+                    },
+                  ].map((item) => (
+                    <div key={item.question} className="border-t border-[#142334]/10 pt-4 first:border-t-0 first:pt-0">
+                      <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#142334]">{item.question}</p>
+                      <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/62">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <a
                 href="https://wa.me/27695124398"
                 className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] transition hover:text-[#142334]"
