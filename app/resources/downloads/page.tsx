@@ -36,7 +36,7 @@ const downloads = [
     time: '15 minutes',
     description:
       'A practical review guide for checking whether your CV is clear, relevant, and positioned for the role you want next.',
-    status: 'Coming soon',
+    status: 'In development',
     icon: ClipboardList,
   },
   {
@@ -45,7 +45,7 @@ const downloads = [
     time: '20 minutes',
     description:
       'Guided prompts to help you write a LinkedIn About section that sounds like you and makes your value easier to understand.',
-    status: 'Coming soon',
+    status: 'In development',
     icon: PenLine,
   },
   {
@@ -54,7 +54,7 @@ const downloads = [
     time: '30 minutes',
     description:
       'A structure for gathering proof stories before interviews so you are not trying to remember your value under pressure.',
-    status: 'Planned',
+    status: 'On the list',
     icon: FileText,
   },
 ];
@@ -225,7 +225,7 @@ export default function DownloadsPage() {
               Resource library
             </p>
             <h2 className="mt-4 font-serif text-[42px] md:text-[56px] leading-tight">
-              Downloads being prepared for the next phase.
+              More downloads are being built for the library.
             </h2>
           </Reveal>
 

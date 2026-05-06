@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, CheckCircle2, Mail, MessageCircle } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Loader2, Mail, MessageCircle } from 'lucide-react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { FlowRibbon, FloralMark } from '@/components/DecorativeMotifs';
 
@@ -33,7 +34,8 @@ const quickSupportOptions = [
 ];
 
 export default function ContactForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const [state, setState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
   const sectionRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -42,11 +44,49 @@ export default function ContactForm() {
 
   const contactY = useTransform(scrollYProgress, [0, 1], [0, 250]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-    // Replace with Zoho form endpoint when the production form is connected.
-  };
+  function sanitizePhone(event: ChangeEvent<HTMLInputElement>) {
+    event.currentTarget.value = event.currentTarget.value.replace(/[^0-9+() -]/g, '');
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    setState('submitting');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          source: 'home-contact',
+          variant: 'quick',
+          name: data.get('name'),
+          email: data.get('email'),
+          phone: data.get('phone'),
+          support: data.get('support'),
+          message: data.get('message'),
+        }),
+      });
+
+      const body = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(body.error || 'Could not send your message right now.');
+      }
+
+      form.reset();
+      setState('success');
+      setMessage('Done. Kagiso has your note and will reply within 24 hours on weekdays.');
+    } catch (error) {
+      setState('error');
+      setMessage(error instanceof Error ? error.message : 'Could not send your message right now.');
+    }
+  }
 
   return (
     <motion.section
@@ -114,7 +154,7 @@ export default function ContactForm() {
           <div className="relative">
             <div className="absolute -left-5 -bottom-5 h-full w-full border border-[#C9AD98]/60"></div>
             <div className="relative bg-white p-6 md:p-8 lg:p-10 border border-[#CDC6C3] shadow-2xl">
-              {submitted ? (
+              {state === 'success' ? (
                 <div className="flex min-h-[470px] flex-col items-start justify-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#C9AD98]/20 text-[#142334] mb-7">
                     <CheckCircle2 className="h-8 w-8" />
@@ -126,7 +166,7 @@ export default function ContactForm() {
                     Thank you. I&apos;ll reply within 24 hours.
                   </h3>
                   <p className="mt-5 max-w-md text-[16px] leading-relaxed text-[#142334]/72">
-                    While you wait, the free audit is a good place to start if you want a quick read on where your visibility may be breaking down.
+                    {message || 'While you wait, the free audit is a good place to start if you want a quick read on where your visibility may be breaking down.'}
                   </p>
                   <Link
                     href="/#leadmagnet"
@@ -193,6 +233,7 @@ export default function ContactForm() {
                         title="Please enter a valid phone number using numbers, spaces, +, brackets, or hyphens."
                         autoComplete="tel"
                         placeholder="Optional"
+                        onChange={sanitizePhone}
                         className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                       />
                     </div>
@@ -229,6 +270,11 @@ export default function ContactForm() {
                       placeholder="One or two lines is enough. Tell me what you want help with."
                       className="w-full resize-none border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                     ></textarea>
+                    {state === 'error' && (
+                      <p role="alert" className="text-[13px] leading-relaxed text-red-700">
+                        {message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-3 border-t border-[#142334]/10 pt-5">
@@ -238,8 +284,20 @@ export default function ContactForm() {
                     </label>
                   </div>
 
-                  <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] text-white font-semibold px-8 py-4 hover:bg-[#C9AD98] hover:text-[#142334] hover:-translate-y-1 transition-all duration-300">
-                    Send message <ArrowUpRight className="h-4 w-4" />
+                  <button
+                    type="submit"
+                    disabled={state === 'submitting'}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] text-white font-semibold px-8 py-4 hover:bg-[#C9AD98] hover:text-[#142334] hover:-translate-y-1 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                  >
+                    {state === 'submitting' ? (
+                      <>
+                        Sending <Loader2 className="h-4 w-4 animate-spin" />
+                      </>
+                    ) : (
+                      <>
+                        Send message <ArrowUpRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </form>
               )}

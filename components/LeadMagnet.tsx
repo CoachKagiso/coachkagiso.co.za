@@ -77,7 +77,7 @@ export default function LeadMagnet() {
                   Take the diagnostic <ArrowUpRight className="h-4 w-4" />
                 </Link>
                 <span className="text-[13px] leading-relaxed text-[#142334]/65">
-                  Result shown instantly. PDF delivery can connect to Brevo when ready.
+                  Result shown instantly, with a practical next step at the end.
                 </span>
               </div>
             </div>

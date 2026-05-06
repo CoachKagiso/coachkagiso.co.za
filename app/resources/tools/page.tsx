@@ -119,7 +119,7 @@ export default function CareerToolsPage() {
             <Reveal direction="left" delay={0.08}>
               <div>
                 <p className="text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
-                  How it will work
+                  How it works
                 </p>
                 <h3 className="mt-4 font-serif text-[42px] md:text-[58px] leading-tight">
                   A personal result, not a generic checklist.
@@ -128,7 +128,7 @@ export default function CareerToolsPage() {
                   {[
                     'Complete the questions in a few minutes.',
                     'Receive your result and recommended next focus.',
-                    'Get a PDF summary by email when the generator is connected.',
+                    'Leave with a clear summary you can act on straight away.',
                     'Book a session if you want help applying the result.',
                   ].map((step, index) => (
                     <div key={step} className="grid grid-cols-[auto_1fr] gap-5">
@@ -147,7 +147,7 @@ export default function CareerToolsPage() {
         <div className="max-w-[1180px] mx-auto px-6 lg:px-8">
           <Reveal className="max-w-2xl mb-12">
             <p className="text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
-              Coming next
+              In development
             </p>
             <h2 className="mt-4 font-serif text-[42px] md:text-[56px] leading-tight">
               Tools that meet different career moments.
@@ -163,7 +163,7 @@ export default function CareerToolsPage() {
                   <h3 className="mt-6 font-serif text-[30px] leading-tight">{tool.title}</h3>
                   <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/72">{tool.description}</p>
                   <span className="mt-6 inline-flex rounded-full border border-[#C9AD98]/60 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[#A09086]">
-                    Planned
+                    In development
                   </span>
                 </Reveal>
               );

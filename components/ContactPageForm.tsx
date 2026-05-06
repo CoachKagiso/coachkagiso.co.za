@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 const serviceOptions = [
   '48-Hour CV Review',
@@ -19,15 +20,57 @@ const serviceOptions = [
 ];
 
 export default function ContactPageForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const [state, setState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setSubmitted(true);
-  };
+  function sanitizePhone(event: ChangeEvent<HTMLInputElement>) {
+    event.currentTarget.value = event.currentTarget.value.replace(/[^0-9+() -]/g, '');
+  }
 
-  if (submitted) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    setState('submitting');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          source: 'contact-page',
+          variant: 'detailed',
+          name: data.get('name'),
+          email: data.get('email'),
+          phone: data.get('phone'),
+          replyMethod: data.get('reply-method'),
+          service: data.get('service'),
+          timeline: data.get('timeline'),
+          careerStage: data.get('career-stage'),
+          message: data.get('message'),
+        }),
+      });
+
+      const body = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(body.error || 'Could not send your message right now.');
+      }
+
+      form.reset();
+      setState('success');
+      setMessage('Done. Kagiso has your message and will reply within 24 hours on weekdays.');
+    } catch (error) {
+      setState('error');
+      setMessage(error instanceof Error ? error.message : 'Could not send your message right now.');
+    }
+  }
+
+  if (state === 'success') {
     return (
       <div className="min-h-[480px] flex flex-col justify-center">
         <div className="h-16 w-16 bg-[#C9AD98]/20 text-[#142334] rounded-full flex items-center justify-center mb-7">
@@ -40,7 +83,7 @@ export default function ContactPageForm() {
           Thank you. I&apos;ll reply within 24 hours.
         </h3>
         <p className="mt-5 max-w-md text-[16px] leading-relaxed text-[#142334]/72">
-          While you wait, the Personal Brand Audit is a useful place to start. It takes five minutes and gives you a quick read on your visibility gaps.
+          {message || 'While you wait, the Personal Brand Audit is a useful place to start. It takes five minutes and gives you a quick read on your visibility gaps.'}
         </p>
         <Link
           href="/#leadmagnet"
@@ -110,6 +153,7 @@ export default function ContactPageForm() {
             title="Please enter a valid phone number using numbers, spaces, +, brackets, or hyphens."
             autoComplete="tel"
             placeholder="Optional"
+            onChange={sanitizePhone}
             className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
           />
         </div>
@@ -182,6 +226,11 @@ export default function ContactPageForm() {
           placeholder="Tell me what you want help with, what role or goal is involved, and anything that feels time-sensitive."
           className="w-full resize-none border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
         ></textarea>
+        {state === 'error' && (
+          <p role="alert" className="text-[13px] leading-relaxed text-red-700">
+            {message}
+          </p>
+        )}
       </div>
 
       <div className="flex items-start gap-3 border-t border-[#142334]/10 pt-5">
@@ -191,8 +240,20 @@ export default function ContactPageForm() {
         </label>
       </div>
 
-      <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] text-white font-semibold px-8 py-4 hover:bg-[#C9AD98] hover:text-[#142334] hover:-translate-y-1 transition-all duration-300">
-        Send message <ArrowUpRight className="h-4 w-4" />
+      <button
+        type="submit"
+        disabled={state === 'submitting'}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] text-white font-semibold px-8 py-4 hover:bg-[#C9AD98] hover:text-[#142334] hover:-translate-y-1 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+      >
+        {state === 'submitting' ? (
+          <>
+            Sending <Loader2 className="h-4 w-4 animate-spin" />
+          </>
+        ) : (
+          <>
+            Send message <ArrowUpRight className="h-4 w-4" />
+          </>
+        )}
       </button>
     </form>
   );
