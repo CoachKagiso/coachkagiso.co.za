@@ -74,7 +74,7 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
 
   if (status === 'success' || status === 'duplicate') {
     return (
-      <div className="border border-[#D8C8BB] bg-white p-7 shadow-[0_24px_70px_rgba(20,35,52,0.08)] md:p-9">
+      <div className="self-start border border-[#D8C8BB] bg-white p-7 shadow-[0_24px_70px_rgba(20,35,52,0.08)] md:p-9 lg:sticky lg:top-28">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#C9AD98]/20 text-[#142334]">
           <CheckCircle2 className="h-7 w-7" />
         </div>
