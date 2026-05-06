@@ -14,6 +14,17 @@ type IntakeFormProps = {
 const namePattern = "^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$";
 const phonePattern = '^[0-9+() -]{7,30}$';
 
+function getTextareaRows(field: IntakeService['fields'][number]) {
+  if (field.name === 'jobDescription') return 6;
+  if (field.name === 'targetRole' || field.name === 'targetRoles' || field.name === 'role') return 2;
+  if ((field.maxLength || 0) >= 1200) return 4;
+  return 3;
+}
+
+function sanitizePhoneInput(value: string) {
+  return value.replace(/[^0-9+() -]/g, '');
+}
+
 export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'duplicate' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -82,7 +93,7 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
           <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
             <p className="text-[13px] leading-relaxed text-[#142334]/65">
-              Your details stay private and are only used to complete this order.
+              Your details stay private and are handled in line with POPIA for this order.
             </p>
           </div>
           <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
@@ -95,98 +106,114 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
       </div>
 
       <div className="mt-7 space-y-6">
-      {service.fields.map((field) => (
-        <div key={field.name} className="space-y-2">
-          <label htmlFor={field.name} className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#142334]">
-            {field.label} {field.required && <span className="text-[#C9AD98]">*</span>}
-          </label>
+        {service.fields.map((field) => (
+          <div key={field.name} className="space-y-2">
+            <label htmlFor={field.name} className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#142334]">
+              {field.label} {field.required && <span className="text-[#C9AD98]">*</span>}
+            </label>
 
-          {field.type === 'textarea' ? (
-            <textarea
-              id={field.name}
-              name={field.name}
-              required={field.required}
-              maxLength={field.maxLength}
-              rows={5}
-              placeholder={field.placeholder}
-              className="w-full resize-none border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
-            />
-          ) : field.type === 'radio' ? (
-            <div className="grid gap-3 pt-2">
-              {field.options?.map((option) => (
-                <label key={option} className="flex items-center gap-3 text-[15px] text-[#142334]/72">
-                  <input
-                    type="radio"
-                    name={field.name}
-                    value={option}
-                    required={field.required}
-                    className="h-4 w-4 accent-[#142334]"
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
-          ) : (
-            <input
-              id={field.name}
-              name={field.name}
-              type={field.type}
-              required={field.required}
-              maxLength={field.maxLength}
-              placeholder={field.placeholder}
-              autoComplete={field.type === 'email' ? 'email' : field.name === 'fullName' ? 'name' : field.type === 'tel' ? 'tel' : undefined}
-              pattern={field.name === 'fullName' ? namePattern : field.type === 'tel' ? phonePattern : undefined}
-              title={
-                field.name === 'fullName'
-                  ? 'Please use letters only. Spaces, apostrophes, and hyphens are allowed.'
-                  : field.type === 'tel'
-                    ? 'Please enter a valid phone number using numbers, spaces, +, brackets, or hyphens.'
+            {field.type === 'textarea' ? (
+              <textarea
+                id={field.name}
+                name={field.name}
+                required={field.required}
+                maxLength={field.maxLength}
+                rows={getTextareaRows(field)}
+                placeholder={field.placeholder}
+                className="min-h-[54px] w-full resize-y border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+              />
+            ) : field.type === 'radio' ? (
+              <div className="grid gap-3 pt-2">
+                {field.options?.map((option) => (
+                  <label key={option} className="flex items-center gap-3 text-[15px] text-[#142334]/72">
+                    <input
+                      type="radio"
+                      name={field.name}
+                      value={option}
+                      required={field.required}
+                      className="h-4 w-4 accent-[#142334]"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <input
+                id={field.name}
+                name={field.name}
+                type={field.type}
+                required={field.required}
+                maxLength={field.maxLength}
+                placeholder={field.placeholder}
+                autoComplete={field.type === 'email' ? 'email' : field.name === 'fullName' ? 'name' : field.type === 'tel' ? 'tel' : undefined}
+                inputMode={field.type === 'tel' ? 'tel' : undefined}
+                pattern={field.name === 'fullName' ? namePattern : field.type === 'tel' ? phonePattern : undefined}
+                onInput={
+                  field.type === 'tel'
+                    ? (event) => {
+                        event.currentTarget.value = sanitizePhoneInput(event.currentTarget.value);
+                      }
                     : undefined
-              }
-              className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+                }
+                title={
+                  field.name === 'fullName'
+                    ? 'Please use letters only. Spaces, apostrophes, and hyphens are allowed.'
+                    : field.type === 'tel'
+                      ? 'Please enter a valid phone number using numbers, spaces, +, brackets, or hyphens.'
+                      : undefined
+                }
+                className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+              />
+            )}
+            {field.maxLength && field.type === 'textarea' && (
+              <p className="text-[12px] text-[#142334]/45">Recommended limit: {field.maxLength} characters.</p>
+            )}
+          </div>
+        ))}
+
+        {service.requiresCvUpload && (
+          <div className="space-y-3">
+            <label htmlFor="cv_file" className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#142334]">
+              Send your current CV <span className="text-[#C9AD98]">*</span>
+            </label>
+            <input
+              id="cv_file"
+              name="cv_file"
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 text-[14px] outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-[#142334] file:px-4 file:py-2 file:text-[12px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-white focus:border-[#142334]"
             />
-          )}
-          {field.maxLength && field.type === 'textarea' && (
-            <p className="text-[12px] text-[#142334]/45">Recommended limit: {field.maxLength} characters.</p>
-          )}
-        </div>
-      ))}
+            <p className="text-[12px] leading-relaxed text-[#142334]/55">
+              Choose one option: upload your PDF or Word file here now, or tick below and email it after submitting. Maximum upload size is 10MB.
+            </p>
+            <label className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4 text-[13px] leading-relaxed text-[#142334]/68">
+              <input
+                type="checkbox"
+                name="cv_email_fallback"
+                value="yes"
+                className="mt-1 h-4 w-4 shrink-0 accent-[#142334]"
+              />
+              <span>I&apos;ll email my CV instead of uploading it here.</span>
+            </label>
+            {service.cvInstruction && (
+              <p className="text-[13px] leading-relaxed text-[#142334]/68">{service.cvInstruction}</p>
+            )}
+          </div>
+        )}
 
-      {service.requiresCvUpload && (
-        <div className="space-y-2">
-          <label htmlFor="cv_file" className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#142334]">
-            Upload your current CV <span className="text-[#C9AD98]">*</span>
-          </label>
-          <input
-            id="cv_file"
-            name="cv_file"
-            type="file"
-            required
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 text-[14px] outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-[#142334] file:px-4 file:py-2 file:text-[12px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-white focus:border-[#142334]"
-          />
-          <p className="text-[12px] leading-relaxed text-[#142334]/55">
-            PDF or Word only. Maximum 10MB.
+        {status === 'error' && (
+          <p className="border border-red-200 bg-red-50 px-4 py-3 text-[14px] leading-relaxed text-red-700">
+            {message}
           </p>
-          {service.cvInstruction && (
-            <p className="text-[13px] leading-relaxed text-[#142334]/68">{service.cvInstruction}</p>
-          )}
-        </div>
-      )}
+        )}
 
-      {status === 'error' && (
-        <p className="border border-red-200 bg-red-50 px-4 py-3 text-[14px] leading-relaxed text-red-700">
-          {message}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={status === 'submitting'}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] px-8 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white shadow-[0_14px_30px_rgba(20,35,52,0.18)] transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {status === 'submitting' ? 'Securing your brief...' : 'Submit my brief'} <ArrowUpRight className="h-4 w-4" />
-      </button>
+        <button
+          type="submit"
+          disabled={status === 'submitting'}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] px-8 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white shadow-[0_14px_30px_rgba(20,35,52,0.18)] transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {status === 'submitting' ? 'Securing your brief...' : 'Submit my brief'} <ArrowUpRight className="h-4 w-4" />
+        </button>
       </div>
     </form>
   );

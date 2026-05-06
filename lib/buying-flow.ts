@@ -37,7 +37,7 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
     buyCta: 'Get my CV reviewed',
     folder: 'cv-review',
     requiresCvUpload: true,
-    cvInstruction: 'Please email your CV to hello@coachkagiso.co.za — subject: Your Name — CV Review',
+    cvInstruction: 'If you choose the email option instead, send your CV to hello@coachkagiso.co.za with the subject: Your Name - CV Review.',
     summary:
       "Your CV, my expert eye. Send your current CV and I'll show you what's working, what's broken, and what to fix first.",
     fields: [
@@ -60,7 +60,16 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
     ],
     confirmationSubject: 'Your CV Review is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},\n\nGot your CV. I'll record your review and have it back to you within 48 hours.\n\nWhen the Loom video lands in your inbox, watch it once through, then watch it again with your CV open and make the changes as I call them out. Most people find that takes about 30 minutes.\n\nIf you want a full rewrite after the review, the CV Revamp at R400 picks up where the review leaves off, with R150 credit applied since you've already paid for the review.\n\nTalk soon,\nKagiso`,
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Got your CV. I'll record your review and have it back to you within 48 hours.
+
+When the Loom video lands in your inbox, watch it once through, then watch it again with your CV open and make the changes as I call them out. Most people find that takes about 30 minutes.
+
+If you want a full rewrite after the review, the CV Revamp at R400 picks up where the review leaves off, with R150 credit applied since you've already paid for the review.
+
+Talk soon,
+Kagiso`,
   },
   'cv-revamp': {
     slug: 'cv-revamp',
@@ -71,9 +80,9 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
     buyCta: 'Revamp my CV',
     folder: 'cv-revamp',
     requiresCvUpload: true,
-    cvInstruction: 'Please email your CV to hello@coachkagiso.co.za — subject: Your Name — CV Revamp',
+    cvInstruction: 'If you choose the email option instead, send your CV to hello@coachkagiso.co.za with the subject: Your Name - CV Revamp.',
     summary:
-      "Your full CV rewritten to read like a story of impact, not a list of duties. ATS-friendly, recruiter-tested, and built for the role you actually want.",
+      'Your full CV rewritten to read like a story of impact, not a list of duties. ATS-friendly, recruiter-tested, and built for the role you actually want.',
     fields: [
       { name: 'fullName', label: 'Full name', type: 'text', required: true, maxLength: 80 },
       { name: 'email', label: 'Email address', type: 'email', required: true, maxLength: 120 },
@@ -101,7 +110,14 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
     ],
     confirmationSubject: 'Your CV Revamp is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},\n\nGot your details. I'll start your rewrite this week and have your new CV back within 5 working days. You'll get the Word file, the PDF, and a 10-minute Loom video where I walk you through every change so you understand the thinking.\n\nOne small ask: if you receive any feedback on your old CV from a recruiter, employer, or trusted friend in the next few days, forward it to me. It always helps.\n\nTalk soon,\nKagiso`,
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Got your details. I'll start your rewrite this week and have your new CV back within 5 working days. You'll get the Word file, the PDF, and a 10-minute Loom video where I walk you through every change so you understand the thinking.
+
+One small ask: if you receive any feedback on your old CV from a recruiter, employer, or trusted friend in the next few days, forward it to me. It always helps.
+
+Talk soon,
+Kagiso`,
   },
   'cover-letter': {
     slug: 'cover-letter',
@@ -112,7 +128,7 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
     buyCta: 'Write my cover letter',
     folder: 'cover-letter',
     requiresCvUpload: true,
-    cvInstruction: 'Please email your CV to hello@coachkagiso.co.za — subject: Your Name — Cover Letter',
+    cvInstruction: 'If you choose the email option instead, send your CV to hello@coachkagiso.co.za with the subject: Your Name - Cover Letter.',
     summary:
       "A cover letter written for one specific role, tailored to the job description, the company's language, and what makes you the right person for it.",
     fields: [
@@ -141,7 +157,14 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
     ],
     confirmationSubject: 'Your Cover Letter is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},\n\nGot your details. I'll write your tailored cover letter and send it back within 5 working days.\n\nIf anything changes with the role, deadline, or company requirements before then, reply to this email and let me know.\n\nTalk soon,\nKagiso`,
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Got your details. I'll write your tailored cover letter and send it back within 5 working days.
+
+If anything changes with the role, deadline, or company requirements before then, reply to this email and let me know.
+
+Talk soon,
+Kagiso`,
   },
   linkedin: {
     slug: 'linkedin',
@@ -181,7 +204,14 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
     ],
     confirmationSubject: 'Your LinkedIn Optimisation is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},\n\nGot your details. I'll rebuild the parts of your LinkedIn profile that are not pulling their weight and send your optimised copy back within 5 working days.\n\nKeep an eye on your inbox. If I need one quick clarification, I'll email you.\n\nTalk soon,\nKagiso`,
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Got your details. I'll rebuild the parts of your LinkedIn profile that are not pulling their weight and send your optimised copy back within 5 working days.
+
+Keep an eye on your inbox. If I need one quick clarification, I'll email you.
+
+Talk soon,
+Kagiso`,
   },
   bundle: {
     slug: 'bundle',
@@ -192,7 +222,7 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
     buyCta: 'Get the bundle',
     folder: 'bundle',
     requiresCvUpload: true,
-    cvInstruction: 'Please email your CV to hello@coachkagiso.co.za — subject: Your Name — CV + LinkedIn Bundle',
+    cvInstruction: 'If you choose the email option instead, send your CV to hello@coachkagiso.co.za with the subject: Your Name - CV + LinkedIn Bundle.',
     summary:
       'Your full job-search toolkit aligned. Your CV and LinkedIn are built together so they tell the same story and support the same career move.',
     fields: [
@@ -230,7 +260,14 @@ export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
       },
     ],
     confirmationSubject: 'Your CV + LinkedIn Bundle is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},\n\nGot your details. I'll build your CV and LinkedIn together so the messaging stays aligned. Both deliverables will come back within 7 working days.\n\nIf anything important changes about the roles you are targeting, reply to this email and tell me before I start.\n\nTalk soon,\nKagiso`,
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Got your details. I'll build your CV and LinkedIn together so the messaging stays aligned. Both deliverables will come back within 7 working days.
+
+If anything important changes about the roles you are targeting, reply to this email and tell me before I start.
+
+Talk soon,
+Kagiso`,
   },
 };
 

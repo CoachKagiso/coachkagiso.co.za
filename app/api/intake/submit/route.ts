@@ -14,6 +14,7 @@ const ALLOWED_TYPES = [
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
+const PHONE_PATTERN = /^[0-9+() -]{7,30}$/;
 
 function cleanFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '-');
@@ -71,11 +72,16 @@ export async function POST(request: Request) {
 
   const values: Record<string, string> = {};
   for (const field of service.fields) {
-    const value = String(formData.get(field.name) || '').trim();
+    const rawValue = String(formData.get(field.name) || '').trim();
+    const value = field.type === 'tel' ? rawValue.replace(/[^0-9+() -]/g, '') : rawValue;
     values[field.name] = value;
 
     if (field.required && !value) {
       return NextResponse.json({ error: `${field.label} is required` }, { status: 400 });
+    }
+
+    if (field.type === 'tel' && value && !PHONE_PATTERN.test(value)) {
+      return NextResponse.json({ error: `${field.label} must be a valid phone number` }, { status: 400 });
     }
   }
 
@@ -83,10 +89,11 @@ export async function POST(request: Request) {
   const email = values.email;
   const whatsapp = values.whatsapp;
   let signedCvUrl = '';
+  const cvEmailFallback = String(formData.get('cv_email_fallback') || '') === 'yes';
 
   const file = formData.get('cv_file');
-  if (service.requiresCvUpload && !(file instanceof File && file.size > 0)) {
-    return NextResponse.json({ error: 'CV file is required' }, { status: 400 });
+  if (service.requiresCvUpload && !(file instanceof File && file.size > 0) && !cvEmailFallback) {
+    return NextResponse.json({ error: 'Please upload your CV or choose the email option' }, { status: 400 });
   }
 
   if (file instanceof File && file.size > 0) {
@@ -126,7 +133,10 @@ export async function POST(request: Request) {
   const { error: insertError } = await supabase.from('intake_submissions').insert({
     payment_id: paymentId,
     service_slug: service.slug,
-    form_data: values,
+    form_data: {
+      ...values,
+      cvDeliveryMethod: signedCvUrl ? 'uploaded' : cvEmailFallback ? 'email_after_submit' : 'not_supplied',
+    },
     cv_file_url: signedCvUrl || null,
   });
 
