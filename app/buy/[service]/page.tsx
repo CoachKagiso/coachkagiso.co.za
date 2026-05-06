@@ -10,9 +10,11 @@ import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService } from '@/lib/buying-flow';
 import { createPayFastCheckoutFields, getPayFastProcessUrl } from '@/lib/payfast';
+import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
 
 type BuyPageProps = {
   params: Promise<{ service: string }>;
+  searchParams: Promise<{ upgrade_token?: string }>;
 };
 
 export function generateStaticParams() {
@@ -38,13 +40,25 @@ export async function generateMetadata({ params }: BuyPageProps): Promise<Metada
   };
 }
 
-export default async function BuyPage({ params }: BuyPageProps) {
+export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const { service: serviceSlug } = await params;
+  const { upgrade_token: upgradeToken } = await searchParams;
   const service = getAsyncService(serviceSlug);
   if (!service) notFound();
 
+  const upgradeOffer =
+    service.slug === 'cv-revamp' && upgradeToken
+      ? await getUpgradeOfferByToken(upgradeToken, 'cv-revamp')
+      : null;
+  const appliedUpgradeCredit = upgradeOffer?.valid ? upgradeOffer.credit : null;
+  const hasAppliedUpgrade = Boolean(appliedUpgradeCredit);
+  const checkoutAmount = appliedUpgradeCredit?.discounted_amount ?? service.amount;
   const paymentId = `${service.slug}-${randomUUID()}`;
-  const fields = createPayFastCheckoutFields(service, paymentId);
+  const fields = createPayFastCheckoutFields(service, paymentId, {
+    amountOverride: checkoutAmount,
+    customFields: appliedUpgradeCredit ? { custom_str2: appliedUpgradeCredit.token } : undefined,
+    extraReturnParams: appliedUpgradeCredit ? { upgrade_token: appliedUpgradeCredit.token } : undefined,
+  });
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
@@ -85,6 +99,20 @@ export default async function BuyPage({ params }: BuyPageProps) {
               <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/68">
                 You will pay securely through PayFast, then return to a private intake page connected to this order.
               </p>
+              {service.slug === 'cv-revamp' && upgradeOffer && (
+                <div className={`mt-6 border p-4 ${upgradeOffer.valid ? 'border-[#C9AD98]/50 bg-[#F7F1EC]' : 'border-[#D8C8BB] bg-[#FCFBFA]'}`}>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98]">
+                    {upgradeOffer.valid ? 'Upgrade credit applied' : 'Upgrade link unavailable'}
+                  </p>
+                  <p className="mt-2 text-[15px] leading-relaxed text-[#142334]/72">
+                    {upgradeOffer.valid
+                      ? `Your R150 CV Review credit is active for 7 days, so the amount due today is ${formatCurrency(appliedUpgradeCredit?.discounted_amount ?? service.amount)}.`
+                      : upgradeOffer.reason === 'used'
+                        ? 'That upgrade link has already been used. If you need help, email or WhatsApp Kagiso and she can guide you.'
+                        : 'That upgrade link has expired or is no longer valid. If you need help, email or WhatsApp Kagiso and she can guide you.'}
+                  </p>
+                </div>
+              )}
               <div className="mt-7 space-y-5">
                 {[
                   { icon: LockKeyhole, title: 'Secure payment', detail: 'Complete checkout through PayFast using card, EFT, PayShap, or supported options.' },
@@ -136,9 +164,23 @@ export default async function BuyPage({ params }: BuyPageProps) {
               <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
                 Your investment
               </p>
-              <p className="mt-5 font-serif text-[62px] leading-none text-white">
-                {formatCurrency(service.amount)}
-              </p>
+              {hasAppliedUpgrade ? (
+                <div className="mt-5">
+                  <p className="text-[15px] uppercase tracking-[0.12em] text-white/48 line-through">
+                    {formatCurrency(service.amount)}
+                  </p>
+                  <p className="mt-2 font-serif text-[62px] leading-none text-white">
+                    {formatCurrency(checkoutAmount)}
+                  </p>
+                  <p className="mt-3 text-[14px] leading-relaxed text-white/68">
+                    Includes your R150 CV Review credit. This upgrade link expires in 7 days.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-5 font-serif text-[62px] leading-none text-white">
+                  {formatCurrency(service.amount)}
+                </p>
+              )}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
                 Turnaround: {service.turnaround}. Payment is processed securely by PayFast.
               </p>

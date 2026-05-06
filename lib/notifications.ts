@@ -2,6 +2,12 @@ import type { AsyncService } from '@/lib/buying-flow';
 import { formatCurrency, getDeadlineDate } from '@/lib/buying-flow';
 import { getContactEmail } from '@/lib/env';
 import { sendTransactionalEmail } from '@/lib/brevo';
+import {
+  CV_REVIEW_UPGRADE_WINDOW_DAYS,
+  ensureCvReviewUpgradeCredit,
+  getCvReviewUpgradeCreditByPaymentId,
+  getCvRevampUpgradeUrl,
+} from '@/lib/upgrade-credits';
 
 type CvDeliveryMethod = 'uploaded' | 'email_after_submit' | 'not_required';
 
@@ -181,10 +187,20 @@ export async function sendClientIntakeConfirmation(input: {
   email: string;
   fullName: string;
   cvDeliveryMethod: CvDeliveryMethod;
+  paymentId: string;
 }) {
   const firstName = input.fullName.trim().split(/\s+/)[0] || 'there';
   const isWaitingForCv = input.cvDeliveryMethod === 'email_after_submit';
   const deadline = isWaitingForCv ? '' : formatDeadline(input.service);
+  const reviewUpgradeCredit = input.service.slug === 'cv-review'
+    ? (await getCvReviewUpgradeCreditByPaymentId(input.paymentId)) ||
+      (await ensureCvReviewUpgradeCredit({
+        paymentId: input.paymentId,
+        buyerEmail: input.email,
+        buyerName: input.fullName,
+      }))
+    : null;
+  const upgradeLink = reviewUpgradeCredit ? getCvRevampUpgradeUrl(reviewUpgradeCredit.token) : '';
   const text = isWaitingForCv
     ? `Hi ${firstName},
 
@@ -209,11 +225,15 @@ What happens next:
 3. Your completed work will be sent back within the delivery window.
 
 Thank you for trusting Coach Kagiso with this work.`;
+  const upgradeText =
+    reviewUpgradeCredit
+      ? `\n\nIf the review makes it clear that you want Kagiso to do the full rewrite, your R150 review fee is already reserved as credit toward the CV Revamp. That means you would only pay the R250 difference within ${CV_REVIEW_UPGRADE_WINDOW_DAYS} days.\n\nUse your personal upgrade link:\n${upgradeLink}`
+      : '';
 
   await sendTransactionalEmail({
     to: [{ email: input.email, name: input.fullName }],
     subject: input.service.confirmationSubject,
-    text,
+    text: `${text}${upgradeText}`,
     html: emailShell(
       isWaitingForCv
         ? `Your ${input.service.title} brief is in. CV still needed.`
@@ -246,7 +266,12 @@ Thank you for trusting Coach Kagiso with this work.`;
         <li>If anything is unclear, she will email you directly.</li>
         <li>Your completed work will be sent back within the delivery window.</li>
       </ol>
-      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">You do not need to resubmit anything unless Kagiso asks for a quick clarification.</p>`,
+      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">You do not need to resubmit anything unless Kagiso asks for a quick clarification.</p>
+      ${reviewUpgradeCredit ? `<div style="margin:28px 0 0;border:1px solid #dccdc1;background:#f7f1ec;padding:18px;">
+      <p style="margin:0;color:#c5a58e;font:700 12px Arial,sans-serif;letter-spacing:1.8px;text-transform:uppercase;">Optional next step</p>
+      <p style="margin:12px 0 0;color:#142334;font:16px/1.7 Arial,sans-serif;">If the review makes it clear that you want Kagiso to do the full rewrite, your R150 review fee is already reserved as credit toward the CV Revamp. You would only pay the R250 difference within ${CV_REVIEW_UPGRADE_WINDOW_DAYS} days.</p>
+      <p style="margin:14px 0 0;"><a href="${escapeHtml(upgradeLink)}" style="display:inline-block;background:#142334;color:#ffffff;padding:12px 18px;text-decoration:none;font:700 12px Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;">Use your upgrade link</a></p>
+      </div>` : ''}`,
     ),
   });
 }

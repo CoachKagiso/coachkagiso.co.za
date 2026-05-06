@@ -5,12 +5,13 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
 import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
+import { CV_REVIEW_REVAMP_AMOUNT_DUE, ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import IntakeForm from './IntakeForm';
 
 type ThanksPageProps = {
   params: Promise<{ service: string }>;
-  searchParams: Promise<{ payment_id?: string }>;
+  searchParams: Promise<{ payment_id?: string; upgrade_token?: string }>;
 };
 
 const INTAKE_ACCESS_WINDOW_DAYS = 14;
@@ -59,7 +60,7 @@ async function validatePayment(serviceSlug: string, paymentId?: string) {
   };
 }
 
-async function confirmSandboxReturn(serviceSlug: string, paymentId?: string) {
+async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upgradeToken?: string) {
   const service = getAsyncService(serviceSlug);
   const isSandbox = process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true';
   const isGeneratedPaymentId = paymentId?.startsWith(`${service?.slug}-`);
@@ -69,26 +70,42 @@ async function confirmSandboxReturn(serviceSlug: string, paymentId?: string) {
   }
 
   const now = new Date().toISOString();
+  const upgradeOffer =
+    service.slug === 'cv-revamp' && upgradeToken
+      ? await getUpgradeOfferByToken(upgradeToken, 'cv-revamp')
+      : null;
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from('payments').upsert(
     {
       payment_id: paymentId,
       service_slug: service.slug,
-      amount: service.amount,
+      amount: upgradeOffer?.valid ? CV_REVIEW_REVAMP_AMOUNT_DUE : service.amount,
       status: 'confirmed',
       confirmed_at: now,
     },
     { onConflict: 'payment_id' },
   );
 
-  return !error;
+  if (error) {
+    return false;
+  }
+
+  if (service.slug === 'cv-review') {
+    await ensureCvReviewUpgradeCredit({ paymentId, confirmedAt: now });
+  }
+
+  if (upgradeOffer?.valid) {
+    await markUpgradeCreditUsed(upgradeOffer.credit.token, paymentId);
+  }
+
+  return true;
 }
 
 export default async function ThanksPage({ params, searchParams }: ThanksPageProps) {
   const { service: serviceSlug } = await params;
-  const { payment_id: paymentId } = await searchParams;
+  const { payment_id: paymentId, upgrade_token: upgradeToken } = await searchParams;
   let { service, valid } = await validatePayment(serviceSlug, paymentId);
-  if (!valid && (await confirmSandboxReturn(serviceSlug, paymentId))) {
+  if (!valid && (await confirmSandboxReturn(serviceSlug, paymentId, upgradeToken))) {
     valid = true;
   }
   if (!service) notFound();

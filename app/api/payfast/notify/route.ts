@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { asyncServices } from '@/lib/buying-flow';
 import { validatePayFastSignature } from '@/lib/payfast';
+import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { notifyKagisoPayment } from '@/lib/notifications';
 
@@ -39,14 +40,29 @@ export async function POST(request: Request) {
   const buyerName = [fields.name_first, fields.name_last].filter(Boolean).join(' ').trim();
   const buyerEmail = fields.email_address || fields.email;
   const amount = Number(fields.amount_gross || fields.amount || service.amount);
+  const upgradeToken = fields.custom_str2 || '';
   const now = new Date().toISOString();
+  const upgradeOffer =
+    service.slug === 'cv-revamp' && upgradeToken
+      ? await getUpgradeOfferByToken(upgradeToken, 'cv-revamp')
+      : null;
+  const expectedAmount = upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : service.amount;
 
-  if (Math.abs(amount - service.amount) > 0.01) {
+  if (service.slug === 'cv-revamp' && upgradeToken && !upgradeOffer?.valid) {
+    console.warn('PayFast ITN rejected: invalid upgrade credit', {
+      paymentId,
+      upgradeToken,
+      reason: upgradeOffer?.reason || 'missing',
+    });
+    return NextResponse.json({ error: 'Invalid upgrade credit' }, { status: 400 });
+  }
+
+  if (Math.abs(amount - expectedAmount) > 0.01) {
     console.warn('PayFast ITN rejected: amount mismatch', {
       paymentId,
       serviceSlug: service.slug,
       receivedAmount: amount,
-      expectedAmount: service.amount,
+      expectedAmount,
     });
     return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
   }
@@ -71,6 +87,19 @@ export async function POST(request: Request) {
   }
 
   if (isComplete) {
+    if (service.slug === 'cv-review') {
+      await ensureCvReviewUpgradeCredit({
+        paymentId,
+        buyerEmail,
+        buyerName,
+        confirmedAt: now,
+      });
+    }
+
+    if (upgradeOffer?.valid) {
+      await markUpgradeCreditUsed(upgradeOffer.credit.token, paymentId);
+    }
+
     await notifyKagisoPayment({
       service,
       name: buyerName,

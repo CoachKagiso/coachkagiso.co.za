@@ -3,6 +3,11 @@ import { getSiteUrl } from '@/lib/env';
 import type { AsyncService } from '@/lib/buying-flow';
 
 type PayFastFields = Record<string, string>;
+type PayFastCheckoutOptions = {
+  amountOverride?: number;
+  customFields?: Record<string, string>;
+  extraReturnParams?: Record<string, string>;
+};
 
 function encodePayFastValue(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
@@ -55,18 +60,31 @@ export function getPayFastProcessUrl() {
     : 'https://www.payfast.co.za/eng/process';
 }
 
-export function createPayFastCheckoutFields(service: AsyncService, paymentId: string) {
+export function createPayFastCheckoutFields(
+  service: AsyncService,
+  paymentId: string,
+  options: PayFastCheckoutOptions = {}
+) {
   const siteUrl = getSiteUrl();
+  const returnParams = new URLSearchParams({ payment_id: paymentId });
+
+  for (const [key, value] of Object.entries(options.extraReturnParams || {})) {
+    if (value) {
+      returnParams.set(key, value);
+    }
+  }
+
   const fields: PayFastFields = {
     merchant_id: process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '',
     merchant_key: process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_KEY || '',
-    return_url: `${siteUrl}/thanks/${service.slug}?payment_id=${paymentId}`,
+    return_url: `${siteUrl}/thanks/${service.slug}?${returnParams.toString()}`,
     cancel_url: `${siteUrl}/buy/${service.slug}/failed`,
     notify_url: `${siteUrl}/api/payfast/notify`,
     m_payment_id: paymentId,
-    amount: service.amount.toFixed(2),
+    amount: (options.amountOverride ?? service.amount).toFixed(2),
     item_name: service.title,
     custom_str1: service.slug,
+    ...(options.customFields || {}),
   };
 
   return {

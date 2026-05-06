@@ -171,7 +171,7 @@ export async function POST(request: Request) {
     .eq('payment_id', paymentId);
 
   await Promise.all([
-    sendClientIntakeConfirmation({ service, email, fullName, cvDeliveryMethod }),
+    sendClientIntakeConfirmation({ service, email, fullName, cvDeliveryMethod, paymentId }),
     notifyKagisoIntake({ service, name: fullName, email, whatsapp, formData: values, signedCvUrl, cvDeliveryMethod }),
     addClientToBrevoList(email, fullName),
   ]);
