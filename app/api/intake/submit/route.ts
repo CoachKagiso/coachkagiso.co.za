@@ -65,8 +65,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       duplicate: true,
+      heading: 'Your brief is already in.',
       message:
         "Your brief is already safely submitted. If you need to add anything, email hello@coachkagiso.co.za and include your order reference.",
+      detail:
+        "Keep an eye on your inbox. If Kagiso needs one quick clarification, she'll email you directly.",
     });
   }
 
@@ -90,6 +93,12 @@ export async function POST(request: Request) {
   const whatsapp = values.whatsapp;
   let signedCvUrl = '';
   const cvEmailFallback = String(formData.get('cv_email_fallback') || '') === 'yes';
+  const cvDeliveryMethod =
+    service.requiresCvUpload
+      ? cvEmailFallback
+        ? 'email_after_submit'
+        : 'uploaded'
+      : 'not_required';
 
   const file = formData.get('cv_file');
   if (service.requiresCvUpload && !(file instanceof File && file.size > 0) && !cvEmailFallback) {
@@ -135,7 +144,7 @@ export async function POST(request: Request) {
     service_slug: service.slug,
     form_data: {
       ...values,
-      cvDeliveryMethod: signedCvUrl ? 'uploaded' : cvEmailFallback ? 'email_after_submit' : 'not_supplied',
+      cvDeliveryMethod,
     },
     cv_file_url: signedCvUrl || null,
   });
@@ -147,17 +156,25 @@ export async function POST(request: Request) {
 
   await supabase
     .from('payments')
-    .update({ intake_submitted_at: new Date().toISOString() })
+    .update({ intake_submitted_at: cvDeliveryMethod === 'uploaded' || cvDeliveryMethod === 'not_required' ? new Date().toISOString() : null })
     .eq('payment_id', paymentId);
 
   await Promise.all([
-    sendClientIntakeConfirmation({ service, email, fullName }),
-    notifyKagisoIntake({ service, name: fullName, email, whatsapp, formData: values, signedCvUrl }),
+    sendClientIntakeConfirmation({ service, email, fullName, cvDeliveryMethod }),
+    notifyKagisoIntake({ service, name: fullName, email, whatsapp, formData: values, signedCvUrl, cvDeliveryMethod }),
     addClientToBrevoList(email, fullName),
   ]);
 
+  const isWaitingForCv = cvDeliveryMethod === 'email_after_submit';
+
   return NextResponse.json({
     success: true,
-    message: `Your brief is safely in. Kagiso will review it and deliver within ${service.turnaround}. A confirmation email is on its way.`,
+    heading: isWaitingForCv ? 'Your brief is in. CV still needed.' : 'Your brief is safely in.',
+    message: isWaitingForCv
+      ? `Your brief has been received. Please email your CV so Kagiso can start the work. Your ${service.turnaround} turnaround starts once the CV arrives.`
+      : `Your brief is safely in. Kagiso will review it and deliver within ${service.turnaround}. A confirmation email is on its way.`,
+    detail: isWaitingForCv
+      ? `Send your CV to hello@coachkagiso.co.za using your order reference. Once it lands, Kagiso can begin.`
+      : `Keep an eye on your inbox. If Kagiso needs one quick clarification, she'll email you directly.`,
   });
 }

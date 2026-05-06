@@ -3,6 +3,8 @@ import { formatCurrency, getDeadlineDate } from '@/lib/buying-flow';
 import { getContactEmail } from '@/lib/env';
 import { sendTransactionalEmail } from '@/lib/brevo';
 
+type CvDeliveryMethod = 'uploaded' | 'email_after_submit' | 'not_required';
+
 export function formatDeadline(service: AsyncService, from = new Date()) {
   return getDeadlineDate(service.deliveryDays, from).toLocaleDateString('en-ZA', {
     weekday: 'long',
@@ -106,14 +108,29 @@ export async function notifyKagisoIntake(input: {
   whatsapp?: string;
   formData: Record<string, string>;
   signedCvUrl?: string;
+  cvDeliveryMethod: CvDeliveryMethod;
 }) {
-  const deadline = formatDeadline(input.service);
+  const isWaitingForCv = input.cvDeliveryMethod === 'email_after_submit';
+  const deadline = isWaitingForCv ? '' : formatDeadline(input.service);
   const responses = Object.entries(input.formData)
     .map(([key, value]) => `${key}: ${value || 'Not supplied'}`)
     .join('\n');
   const responseRows = Object.entries(input.formData)
     .map(([key, value]) => detailRow(key, value || 'Not supplied'))
     .join('');
+  const readinessLine = isWaitingForCv
+    ? 'Status: Waiting for CV by email before work can begin.'
+    : 'Status: Ready for review.';
+  const cvStatusText = isWaitingForCv
+    ? 'Client chose to email the CV after submitting.'
+    : input.signedCvUrl
+      ? 'CV uploaded with the brief.'
+      : 'No CV required for this service.';
+  const cvStatusHtml = isWaitingForCv
+    ? 'Client chose to email the CV after submitting. Turnaround starts once it arrives.'
+    : input.signedCvUrl
+      ? 'CV uploaded with the brief.'
+      : 'No CV required for this service.';
 
   await sendTransactionalEmail({
     to: [{ email: getContactEmail(), name: 'Coach Kagiso' }],
@@ -124,7 +141,9 @@ Name: ${input.name}
 Email: ${input.email}
 WhatsApp: ${input.whatsapp || 'Not supplied'}
 Service: ${input.service.title}
-Delivery due: ${deadline}
+${readinessLine}
+${deadline ? `Delivery due: ${deadline}` : ''}
+CV status: ${cvStatusText}
 
 Their responses:
 ${responses}
@@ -135,17 +154,24 @@ ${input.signedCvUrl || 'No file uploaded'}
     html: emailShell(
       `${input.name} submitted their ${input.service.title} intake brief.`,
       `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New client brief submitted.</h1>
-      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">This is ready for review. The delivery due date below uses the service turnaround from today.</p>
+      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">${escapeHtml(
+        isWaitingForCv
+          ? 'The brief is in, but the client still needs to email their CV before work can begin.'
+          : 'This is ready for review. The delivery due date below uses the service turnaround from today.',
+      )}</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
         ${detailRow('Client', input.name)}
         ${detailRow('Email', input.email)}
         ${detailRow('WhatsApp', input.whatsapp || 'Not supplied')}
         ${detailRow('Service', input.service.title)}
-        ${detailRow('Delivery due', deadline)}
+        ${detailRow('Status', isWaitingForCv ? 'Waiting for CV by email' : 'Ready for review')}
+        ${detailRow('CV status', cvStatusText)}
+        ${deadline ? detailRow('Delivery due', deadline) : ''}
       </table>
       <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">Brief responses</h2>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">${responseRows}</table>
-      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">CV download link: ${input.signedCvUrl ? `<a href="${escapeHtml(input.signedCvUrl)}" style="color:#142334;">Open file</a>` : 'No file uploaded'}</p>`,
+      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">${escapeHtml(cvStatusHtml)}</p>
+      <p style="margin:12px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">CV download link: ${input.signedCvUrl ? `<a href="${escapeHtml(input.signedCvUrl)}" style="color:#142334;">Open file</a>` : 'No file uploaded'}</p>`,
     ),
   });
 }
@@ -154,10 +180,23 @@ export async function sendClientIntakeConfirmation(input: {
   service: AsyncService;
   email: string;
   fullName: string;
+  cvDeliveryMethod: CvDeliveryMethod;
 }) {
   const firstName = input.fullName.trim().split(/\s+/)[0] || 'there';
-  const deadline = formatDeadline(input.service);
-  const text = `${input.service.confirmationBody(firstName)}
+  const isWaitingForCv = input.cvDeliveryMethod === 'email_after_submit';
+  const deadline = isWaitingForCv ? '' : formatDeadline(input.service);
+  const text = isWaitingForCv
+    ? `Hi ${firstName},
+
+Your brief has been received for ${input.service.title}, but your CV is still needed before Kagiso can begin.
+
+What happens next:
+1. Email your CV to ${getContactEmail()} and include your order reference.
+2. Kagiso will review your brief and CV together.
+3. Your ${input.service.turnaround} turnaround starts once the CV arrives.
+
+If anything is unclear, Kagiso will email you directly.`
+    : `${input.service.confirmationBody(firstName)}
 
 Quick recap:
 - Service: ${input.service.title}
@@ -176,8 +215,25 @@ Thank you for trusting Coach Kagiso with this work.`;
     subject: input.service.confirmationSubject,
     text,
     html: emailShell(
-      `Your ${input.service.title} brief is safely submitted.`,
-      `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your brief is safely in, ${escapeHtml(firstName)}.</h1>
+      isWaitingForCv
+        ? `Your ${input.service.title} brief is in. CV still needed.`
+        : `Your ${input.service.title} brief is safely submitted.`,
+      isWaitingForCv
+        ? `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your brief is in, ${escapeHtml(firstName)}. CV still needed.</h1>
+      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Thank you for submitting your brief for ${escapeHtml(input.service.title)}. Kagiso can begin as soon as your CV arrives.</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
+        ${detailRow('Service', input.service.title)}
+        ${detailRow('Turnaround', input.service.turnaround)}
+        ${detailRow('Status', 'Waiting for your CV by email')}
+      </table>
+      <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What happens next</h2>
+      <ol style="margin:0;padding-left:20px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">
+        <li>Email your CV to ${escapeHtml(getContactEmail())} and include your order reference.</li>
+        <li>Kagiso reviews your brief and CV together.</li>
+        <li>Your ${escapeHtml(input.service.turnaround)} turnaround starts once the CV arrives.</li>
+      </ol>
+      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">Once your CV is in, there is nothing else you need to resend unless Kagiso asks for one quick clarification.</p>`
+        : `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your brief is safely in, ${escapeHtml(firstName)}.</h1>
       <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Thank you for trusting Coach Kagiso with your ${escapeHtml(input.service.title)}. Your delivery window starts now that the brief is submitted.</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
         ${detailRow('Service', input.service.title)}

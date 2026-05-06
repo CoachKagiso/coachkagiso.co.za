@@ -28,6 +28,8 @@ function sanitizePhoneInput(value: string) {
 export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'duplicate' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [successHeading, setSuccessHeading] = useState('');
+  const [successDetail, setSuccessDetail] = useState('');
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,6 +49,11 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
     if (result.duplicate) {
       setStatus('duplicate');
       setMessage(result.message);
+      setSuccessHeading(result.heading || 'Your brief is already in.');
+      setSuccessDetail(
+        result.detail ||
+          "If you need to add anything, email hello@coachkagiso.co.za and include your order reference.",
+      );
       return;
     }
 
@@ -57,7 +64,12 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
     }
 
     setStatus('success');
+    setSuccessHeading(result.heading || 'Your brief is safely in.');
     setMessage(result.message || `Got it. Kagiso will be in touch within ${service.turnaround}.`);
+    setSuccessDetail(
+      result.detail ||
+        "Keep an eye on your inbox. If Kagiso needs one quick clarification, she'll email you directly.",
+    );
   }
 
   if (status === 'success' || status === 'duplicate') {
@@ -66,12 +78,10 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#C9AD98]/20 text-[#142334]">
           <CheckCircle2 className="h-7 w-7" />
         </div>
-        <h2 className="mt-6 font-serif text-[36px] leading-tight text-[#142334]">
-          {status === 'duplicate' ? 'Your brief is already in.' : 'Your brief is safely in.'}
-        </h2>
+        <h2 className="mt-6 font-serif text-[36px] leading-tight text-[#142334]">{successHeading}</h2>
         <p className="mt-4 text-[17px] leading-relaxed text-[#142334]/72">{message}</p>
         <p className="mt-5 border-t border-[#142334]/10 pt-5 text-[13px] leading-relaxed text-[#142334]/55">
-          Keep an eye on your inbox. If Kagiso needs one quick clarification, she&apos;ll email you directly.
+          {successDetail}
         </p>
       </div>
     );
