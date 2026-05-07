@@ -74,7 +74,7 @@ export default function About() {
               </div>
 
               <div className="mt-12 flex flex-col items-start sm:items-end">
-                <span className="font-signature text-[48px] text-[#C9AD98]">Coach Kagiso</span>
+                <span className="font-serif text-[48px] font-medium leading-none text-[#C9AD98]">Coach Kagiso</span>
                 <Link
                   href="/about"
                   className="mt-4 inline-flex items-center font-semibold text-white relative group text-[13px] uppercase tracking-[0.16em]"
