@@ -28,7 +28,7 @@ export default function GroupPrograms() {
               alt="Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
               fill
               priority={false}
-              className="object-cover"
+              className="object-cover object-[center_20%]"
             />
           </motion.div>
           <div className="absolute inset-0 bg-[#EFE3D7]/82" />
