@@ -5,28 +5,24 @@ import { motion, useMotionValue, useSpring } from "motion/react";
 
 const carouselItems = [
   {
-    src: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop",
-    alt: "Professional woman smiling confidently in a modern office",
+    src: "/images/contact/contact-book-portrait.png",
+    alt: "Kagiso holding a book in a warm studio portrait",
   },
   {
-    src: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop",
-    alt: "Team collaborating on career strategy around a conference table",
+    src: "/images/contact/contact-coaching-session.jpg",
+    alt: "Kagiso in a coaching conversation across a table",
   },
   {
-    src: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=800&auto=format&fit=crop",
-    alt: "Professional woman working on a laptop in a creative workspace",
+    src: "/images/contact/contact-library.jpg",
+    alt: "Kagiso selecting a book in a warmly lit library",
   },
   {
-    src: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=800&auto=format&fit=crop",
-    alt: "Coaching session between two professionals at a desk",
+    src: "/images/contact/contact-seated-portrait.png",
+    alt: "Kagiso seated in a bright lounge setting with a book",
   },
   {
-    src: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=800&auto=format&fit=crop",
-    alt: "Person reviewing career goals on a digital device",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1573497491208-6b1acb260507?q=80&w=800&auto=format&fit=crop",
-    alt: "Professional woman in a coaching conversation with a colleague",
+    src: "/images/contact/contact-laptop.png",
+    alt: "Close-up of Kagiso working on a laptop",
   },
 ];
 
