@@ -19,9 +19,9 @@ export default function GroupPrograms() {
   const backgroundY = useTransform(scrollYProgress, [0, 1], ['-4%', '4%']);
 
   return (
-    <section ref={sectionRef} className="relative z-10 min-h-[88vh] overflow-hidden bg-[#E4D8CB]">
+    <section ref={sectionRef} className="relative z-10 min-h-[88vh] overflow-hidden bg-[#E8DDD1]">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="sticky top-[72px] h-[calc(100vh-72px)] overflow-hidden">
+        <div className="sticky top-0 h-screen overflow-hidden">
           <motion.div style={{ y: backgroundY }} className="absolute inset-0 scale-[1.05]">
             <Image
               src="/images/masterclass-bg.png"
@@ -31,8 +31,8 @@ export default function GroupPrograms() {
               className="object-cover"
             />
           </motion.div>
-          <div className="absolute inset-0 bg-[#F4EEE9]/72" />
-          <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.12] text-[#142334]">
+          <div className="absolute inset-0 bg-[#EFE3D7]/82" />
+          <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.08] text-[#142334]">
             <GeoArchPattern />
           </motion.div>
         </div>
