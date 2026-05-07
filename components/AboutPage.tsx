@@ -96,7 +96,7 @@ export default function AboutPage() {
               </motion.div>
             </div>
 
-            <motion.div style={{ y: portraitY }} className="lg:col-span-4 lg:col-start-7 relative">
+            <motion.div style={{ y: portraitY }} className="lg:col-span-5 lg:col-start-7 relative">
               <div className="absolute -left-6 -bottom-6 w-full h-full border border-[#C9AD98]"></div>
               <div className="relative aspect-[4/5] bg-[#D8CEC6] shadow-2xl overflow-hidden">
                 <Image
