@@ -100,11 +100,10 @@ export default function AboutPage() {
               <div className="absolute -left-6 -bottom-6 w-full h-full border border-[#C9AD98]"></div>
               <div className="relative aspect-[4/5] bg-[#D8CEC6] shadow-2xl overflow-hidden">
                 <Image
-                  src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=1100&auto=format&fit=crop"
-                  alt="Professional woman in a coaching setting"
+                  src="/images/about/about-hero-portrait.png"
+                  alt="Portrait of Coach Kagiso smiling in a bright studio setting"
                   fill
                   priority
-                  referrerPolicy="no-referrer"
                   className="object-cover object-top"
                 />
               </div>
