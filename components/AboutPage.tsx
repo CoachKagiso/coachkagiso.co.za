@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useRef } from 'react';
+import DraggableCarousel from '@/components/DraggableCarousel';
 
 const beliefs = [
   {
@@ -268,6 +269,8 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      <DraggableCarousel />
 
       <section className="bg-[#E4D8CB] py-24 lg:py-32 relative overflow-hidden">
         <div className="absolute -right-24 top-10 w-[420px] h-[420px] opacity-20 text-[#142334]">
