@@ -177,7 +177,7 @@ export default function AboutPage() {
                 Soweto taught me to notice the doors nobody explained.
               </h2>
             </div>
-            <div className="lg:col-span-7 lg:col-start-6 grid md:grid-cols-2 gap-10">
+            <div className="lg:col-span-8 lg:col-start-5 grid md:grid-cols-[0.88fr_1.12fr] gap-10 lg:gap-12 items-start">
               <div className="space-y-6 text-[17px] leading-relaxed text-[#142334]/78">
                 <p>
                   I grew up on the dusty streets of Deepkloof and Zola. I did not grow up with a clear path, strong networks, or a script for how to be seen.
@@ -186,8 +186,8 @@ export default function AboutPage() {
                   For a long time, that felt like a disadvantage. I only started figuring it out in my thirties: how to build real connections, how to have the right conversations, and how to stop waiting for someone to notice me.
                 </p>
               </div>
-              <div className="relative min-h-[360px]">
-                <div className="absolute right-0 top-0 w-[78%] aspect-[4/5] overflow-hidden bg-[#E8E3DF]">
+              <div className="relative min-h-[420px] lg:min-h-[460px]">
+                <div className="absolute right-0 top-0 w-[92%] aspect-[4/5] overflow-hidden bg-[#E8E3DF] shadow-xl">
                   <Image
                     src="/images/about/about-where-i-come-from.png"
                     alt="Coach Kagiso working at a laptop in a bright home office"
@@ -195,7 +195,7 @@ export default function AboutPage() {
                     className="object-cover"
                   />
                 </div>
-                <div className="absolute left-0 bottom-0 bg-[#142334] text-white w-[74%] p-8">
+                <div className="absolute left-0 bottom-0 bg-[#142334] text-white w-[68%] p-8 lg:p-9">
                   <p className="font-serif text-[24px] leading-snug">
                     Nobody should have to figure this out alone.
                   </p>
