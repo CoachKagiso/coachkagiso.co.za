@@ -40,10 +40,9 @@ export default function About() {
           >
             <motion.div style={{ y: imageY }} className="absolute -inset-[20%] w-[140%] h-[140%]">
               <Image
-                src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=800&auto=format&fit=crop"
+                src="/images/home/home-about-portrait.jpg"
                 alt="Coach Kagiso portrait"
                 fill
-                referrerPolicy="no-referrer"
                 className="object-cover object-top"
               />
             </motion.div>
