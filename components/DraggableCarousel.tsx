@@ -24,6 +24,10 @@ const carouselItems = [
     src: "/images/contact/contact-study-session.jpeg",
     alt: "Study and planning session in a bright library workspace",
   },
+  {
+    src: "/images/contact/contact-laptop.png",
+    alt: "Close-up of Kagiso working on a laptop",
+  },
 ];
 
 // Repeat 4 times to simulate an infinite feel when dragged
