@@ -20,20 +20,22 @@ export default function GroupPrograms() {
 
   return (
     <section ref={sectionRef} className="relative z-10 min-h-[88vh] overflow-hidden bg-[#E4D8CB]">
-      <div className="sticky top-[72px] h-[calc(100vh-72px)]">
-        <motion.div style={{ y: backgroundY }} className="absolute inset-0 scale-[1.05]">
-          <Image
-            src="/images/masterclass-bg.png"
-            alt="Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
-            fill
-            priority={false}
-            className="object-cover"
-          />
-        </motion.div>
-        <div className="absolute inset-0 bg-[#F4EEE9]/72" />
-        <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.12] text-[#142334] pointer-events-none">
-          <GeoArchPattern />
-        </motion.div>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="sticky top-[72px] h-[calc(100vh-72px)] overflow-hidden">
+          <motion.div style={{ y: backgroundY }} className="absolute inset-0 scale-[1.05]">
+            <Image
+              src="/images/masterclass-bg.png"
+              alt="Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
+              fill
+              priority={false}
+              className="object-cover"
+            />
+          </motion.div>
+          <div className="absolute inset-0 bg-[#F4EEE9]/72" />
+          <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.12] text-[#142334]">
+            <GeoArchPattern />
+          </motion.div>
+        </div>
       </div>
       <div className="relative z-10 max-w-[1100px] mx-auto px-6 lg:px-8 py-20 lg:py-28">
         <div className="grid lg:grid-cols-[0.8fr_1fr] gap-10 lg:gap-16 items-center min-h-[calc(88vh-10rem)]">
