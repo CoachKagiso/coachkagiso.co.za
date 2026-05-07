@@ -31,6 +31,33 @@ const methods = [
   'Map affordable or free short courses that close the gaps for your next role.',
 ];
 
+const aboutCarouselItems = [
+  {
+    src: '/images/about/carousel/about-carousel-book-closeup.png',
+    alt: 'Kagiso smiling over an open book in a close-up portrait',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-writing.jpg',
+    alt: 'Kagiso writing in a notebook near a bright window',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-phone-tripod.jpg',
+    alt: 'Kagiso setting up a phone on a tripod in a home studio',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-pattern-portrait.png',
+    alt: 'Kagiso smiling in a patterned blouse in a warm indoor setting',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-workspace-book-phone.jpg',
+    alt: 'Kagiso seated at a workspace with a laptop, phone, coffee, and open book',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-white-shirt-desk.jpg',
+    alt: 'Kagiso seated at a desk in a white shirt with a notebook and coffee',
+  },
+];
+
 export default function AboutPage() {
   const shiftSectionRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll();
@@ -269,7 +296,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <DraggableCarousel />
+      <DraggableCarousel items={aboutCarouselItems} />
 
       <section className="bg-[#E4D8CB] py-24 lg:py-32 relative overflow-hidden">
         <div className="absolute -right-24 top-10 w-[420px] h-[420px] opacity-20 text-[#142334]">

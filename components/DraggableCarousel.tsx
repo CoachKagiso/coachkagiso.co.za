@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
 
-const carouselItems = [
+type CarouselItem = {
+  src: string;
+  alt: string;
+};
+
+const defaultCarouselItems: CarouselItem[] = [
   {
     src: "/images/contact/contact-year-of-yes.jpeg",
     alt: "A calm lifestyle workspace with coffee, laptop, and a book on a bed",
@@ -30,14 +35,12 @@ const carouselItems = [
   },
 ];
 
-// Repeat 4 times to simulate an infinite feel when dragged
-const carouselImages = [...carouselItems, ...carouselItems, ...carouselItems, ...carouselItems];
-
-export default function DraggableCarousel() {
+export default function DraggableCarousel({ items = defaultCarouselItems }: { items?: CarouselItem[] }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [constraintLeft, setConstraintLeft] = useState(0);
+  const carouselImages = [...items, ...items, ...items, ...items];
 
   const cursorX = useMotionValue(-100);
   const cursorY = useMotionValue(-100);
