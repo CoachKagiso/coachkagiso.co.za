@@ -65,10 +65,9 @@ export default function Hero() {
 
             <div className="aspect-[4/5] w-full bg-[#E8E3DF] shadow-2xl relative z-10">
               <Image
-                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop"
+                src="/images/hero/home-hero-portrait.png"
                 alt="Professional Black woman coach"
                 fill
-                referrerPolicy="no-referrer"
                 className="object-cover object-top"
               />
             </div>
