@@ -2,21 +2,12 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion, useScroll, useTransform } from 'motion/react';
-import { useRef } from 'react';
+import { motion } from 'motion/react';
 import { ContourField, FloralMark } from '@/components/DecorativeMotifs';
 
 const aboutSignals = ['Visibility', 'Career clarity', 'Personal brand'];
 
 export default function About() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start end', 'end start'],
-  });
-
-  const imageY = useTransform(scrollYProgress, [0, 1], ['-15%', '15%']);
-
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -34,18 +25,15 @@ export default function About() {
         <FloralMark className="absolute top-[8%] right-8 hidden lg:block h-24 w-24 text-[#C9AD98]/35 pointer-events-none z-10" />
 
         <div className="grid lg:grid-cols-12 gap-0 relative z-10 w-full h-full px-6 lg:px-0">
-          <div
-            ref={containerRef}
-            className="col-span-1 lg:col-span-5 relative w-full aspect-[4/5] lg:aspect-[3/4] shadow-2xl z-20 lg:translate-y-56 lg:-translate-x-8 overflow-hidden bg-[#142334]"
-          >
-            <motion.div style={{ y: imageY }} className="absolute -inset-[20%] w-[140%] h-[140%]">
+          <div className="col-span-1 lg:col-span-5 relative w-full aspect-[4/5] lg:aspect-[3/4] shadow-2xl z-20 lg:translate-y-56 lg:-translate-x-8 overflow-hidden bg-[#142334]">
+            <div className="absolute inset-0">
               <Image
                 src="/images/home/home-about-portrait.jpg"
                 alt="Coach Kagiso portrait"
                 fill
                 className="object-cover object-top"
               />
-            </motion.div>
+            </div>
           </div>
 
           <div className="col-span-1 lg:col-span-7 flex flex-col justify-center relative z-30 lg:pl-16 mt-12 lg:mt-0 pb-16 lg:pb-0">
