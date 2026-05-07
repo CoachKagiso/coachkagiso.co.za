@@ -21,8 +21,8 @@ const carouselItems = [
     alt: "Kagiso seated in a bright lounge setting with a book",
   },
   {
-    src: "/images/contact/contact-laptop.png",
-    alt: "Close-up of Kagiso working on a laptop",
+    src: "/images/contact/contact-study-session.jpeg",
+    alt: "Study and planning session in a bright library workspace",
   },
 ];
 
