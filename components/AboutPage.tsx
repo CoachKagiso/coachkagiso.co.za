@@ -236,10 +236,9 @@ export default function AboutPage() {
             <div className="lg:col-span-5 order-2 lg:order-1">
               <div className="relative aspect-[4/5] bg-[#E4D8CB] overflow-hidden">
                 <Image
-                  src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=900&auto=format&fit=crop"
-                  alt="Coaching conversation at a desk"
+                  src="/images/about/about-how-i-work.jpg"
+                  alt="Coach Kagiso in a coaching conversation across a table"
                   fill
-                  referrerPolicy="no-referrer"
                   className="object-cover"
                 />
               </div>
