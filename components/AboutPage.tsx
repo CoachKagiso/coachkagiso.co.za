@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useScroll, useTransform } from 'motion/react';
+import { useRef } from 'react';
 
 const beliefs = [
   {
@@ -30,9 +31,15 @@ const methods = [
 ];
 
 export default function AboutPage() {
+  const shiftSectionRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll();
+  const { scrollYProgress: shiftScrollYProgress } = useScroll({
+    target: shiftSectionRef,
+    offset: ['start end', 'end start'],
+  });
   const heroTextY = useTransform(scrollYProgress, [0, 0.35], [0, 160]);
   const portraitY = useTransform(scrollYProgress, [0, 0.45], [0, -70]);
+  const shiftBackgroundY = useTransform(shiftScrollYProgress, [0, 1], ['-8%', '8%']);
 
   return (
     <main className="font-sans bg-[#FCFBFA] text-[#142334] overflow-hidden">
@@ -152,16 +159,18 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative bg-[#142334] text-white py-24 lg:py-36 overflow-hidden">
-        <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 opacity-32">
-          <Image
-            src="/images/about/about-shift-background.png"
-            alt="Coach Kagiso working at a laptop in a bright office"
-            fill
-            className="object-cover"
-          />
+      <section ref={shiftSectionRef} className="relative bg-[#142334] text-white py-24 lg:py-36 overflow-hidden">
+        <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 overflow-hidden opacity-44">
+          <motion.div style={{ y: shiftBackgroundY }} className="absolute -inset-y-[10%] inset-x-0">
+            <Image
+              src="/images/about/about-shift-background.png"
+              alt="Coach Kagiso working at a laptop in a bright office"
+              fill
+              className="object-cover"
+            />
+          </motion.div>
         </div>
-        <div className="absolute inset-0 bg-[#142334]/68"></div>
+        <div className="absolute inset-0 bg-[#142334]/52"></div>
         <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-5">
