@@ -5,8 +5,8 @@ import { motion, useMotionValue, useSpring } from "motion/react";
 
 const carouselItems = [
   {
-    src: "/images/contact/contact-book-portrait.png",
-    alt: "Kagiso holding a book in a warm studio portrait",
+    src: "/images/contact/contact-year-of-yes.jpeg",
+    alt: "A calm lifestyle workspace with coffee, laptop, and a book on a bed",
   },
   {
     src: "/images/contact/contact-coaching-session.jpg",
