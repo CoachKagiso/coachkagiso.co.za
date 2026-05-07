@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRef } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
@@ -15,14 +16,27 @@ export default function GroupPrograms() {
   });
 
   const parallaxX = useTransform(scrollYProgress, [0, 1], [0, -50]);
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ['-4%', '4%']);
 
   return (
-    <section ref={sectionRef} className="relative z-10 overflow-hidden bg-[#E4D8CB] py-20 lg:py-28">
-      <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.16] text-[#142334] pointer-events-none">
-        <GeoArchPattern />
-      </motion.div>
-      <div className="relative z-10 max-w-[1100px] mx-auto px-6 lg:px-8">
-        <div className="grid lg:grid-cols-[0.8fr_1fr] gap-10 lg:gap-16 items-center">
+    <section ref={sectionRef} className="relative z-10 min-h-[88vh] overflow-hidden bg-[#E4D8CB]">
+      <div className="sticky top-[72px] h-[calc(100vh-72px)]">
+        <motion.div style={{ y: backgroundY }} className="absolute inset-0 scale-[1.05]">
+          <Image
+            src="/images/masterclass-bg.png"
+            alt="Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
+            fill
+            priority={false}
+            className="object-cover"
+          />
+        </motion.div>
+        <div className="absolute inset-0 bg-[#F4EEE9]/72" />
+        <motion.div style={{ x: parallaxX }} className="absolute -right-20 top-0 h-[420px] w-[520px] opacity-[0.12] text-[#142334] pointer-events-none">
+          <GeoArchPattern />
+        </motion.div>
+      </div>
+      <div className="relative z-10 max-w-[1100px] mx-auto px-6 lg:px-8 py-20 lg:py-28">
+        <div className="grid lg:grid-cols-[0.8fr_1fr] gap-10 lg:gap-16 items-center min-h-[calc(88vh-10rem)]">
           <Reveal direction="right">
             <p className="inline-block border border-[#142334]/25 px-4 py-1 rounded-full text-[12px] font-semibold tracking-[0.25em] uppercase text-[#142334]/65">
               Seasonal masterclass
@@ -32,7 +46,7 @@ export default function GroupPrograms() {
             </h2>
           </Reveal>
 
-          <Reveal direction="left" delay={0.12} className="bg-[#142334] text-white p-7 md:p-9 shadow-2xl rounded-tl-[30px] rounded-br-[30px]">
+          <Reveal direction="left" delay={0.12} className="bg-[#142334]/88 text-white p-7 md:p-9 shadow-2xl rounded-tl-[30px] rounded-br-[30px] backdrop-blur-[2px]">
             <p className="text-[17px] leading-relaxed text-white/76">
               Masterclasses run seasonally for people who want focused support around visibility, CV positioning, interview confidence, and career pivots.
             </p>
