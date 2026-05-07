@@ -161,7 +161,7 @@ export default function AboutPage() {
       </section>
 
       <section className="relative bg-[#142334] text-white py-24 lg:py-36 overflow-hidden">
-        <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 opacity-20">
+        <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 opacity-32">
           <Image
             src="/images/about/about-shift-background.png"
             alt="Coach Kagiso working at a laptop in a bright office"
@@ -169,7 +169,7 @@ export default function AboutPage() {
             className="object-cover"
           />
         </div>
-        <div className="absolute inset-0 bg-[#142334]/80"></div>
+        <div className="absolute inset-0 bg-[#142334]/68"></div>
         <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-5">
