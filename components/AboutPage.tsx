@@ -109,14 +109,6 @@ export default function AboutPage() {
               </div>
             </motion.div>
 
-            <div className="lg:col-span-2 lg:pb-24">
-              <div className="border-l border-[#142334]/20 pl-6">
-                <p className="font-signature text-[54px] leading-none text-[#C9AD98]">Kagiso</p>
-                <p className="mt-4 text-[13px] uppercase tracking-[0.22em] font-semibold text-[#142334]/70">
-                  Career Development and Personal Brand Coach
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
