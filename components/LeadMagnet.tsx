@@ -73,7 +73,7 @@ export default function LeadMagnet() {
 
             <div className="mt-9 border-y border-[#142334]/15 py-7">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <Link href="/resources/career-diagnostic" className="inline-flex justify-center items-center gap-2 bg-[#142334] text-white font-semibold px-8 py-4 rounded-full hover:bg-white hover:text-[#142334] hover:-translate-y-1 transition-all duration-300">
+                <Link href="/resources/career-diagnostic" className="inline-flex min-w-[198px] justify-center items-center gap-2 whitespace-nowrap bg-[#142334] text-white font-semibold px-8 py-4 rounded-full hover:bg-white hover:text-[#142334] hover:-translate-y-1 transition-all duration-300">
                   Take the diagnostic <ArrowUpRight className="h-4 w-4" />
                 </Link>
                 <span className="text-[13px] leading-relaxed text-[#142334]/65">
