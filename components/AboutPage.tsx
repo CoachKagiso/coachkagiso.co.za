@@ -56,6 +56,26 @@ const aboutCarouselItems = [
     src: '/images/about/carousel/about-carousel-white-shirt-desk.jpg',
     alt: 'Kagiso seated at a desk in a white shirt with a notebook and coffee',
   },
+  {
+    src: '/images/about/carousel/about-carousel-cafe-reading.jpg',
+    alt: 'Kagiso seated in a bright cafe workspace with a laptop, coffee, and open book',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-team-facilitation.jpg',
+    alt: 'Kagiso leading a small professional group conversation around a table',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-cafe-phone.jpg',
+    alt: 'Kagiso checking her phone at a warm cafe table beside a laptop and coffee',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-atomic-habits.jpg',
+    alt: 'Kagiso reading in a calm lounge setting with a book in hand',
+  },
+  {
+    src: '/images/about/carousel/about-carousel-speaker.jpg',
+    alt: 'Kagiso speaking at an event beside a laptop and presentation table',
+  },
 ];
 
 export default function AboutPage() {
