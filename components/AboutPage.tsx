@@ -163,10 +163,9 @@ export default function AboutPage() {
       <section className="relative bg-[#142334] text-white py-24 lg:py-36 overflow-hidden">
         <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 opacity-20">
           <Image
-            src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?q=80&w=1200&auto=format&fit=crop"
-            alt="Warm professional office"
+            src="/images/about/about-shift-background.png"
+            alt="Coach Kagiso working at a laptop in a bright office"
             fill
-            referrerPolicy="no-referrer"
             className="object-cover"
           />
         </div>
