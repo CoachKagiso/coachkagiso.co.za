@@ -19,7 +19,7 @@ type ArticlePageProps = {
 const articleAuthor = {
   name: 'Coach Kagiso',
   title: 'Career Development and Personal Brand Coach',
-  image: '/images/author/coach-kagiso-headshot.jpg',
+  image: '/images/author/ck-profile.png',
 };
 
 function RichParagraph({ text }: { text: string }) {

@@ -24,7 +24,7 @@ export default function GroupPrograms() {
         <div className="sticky top-0 h-screen overflow-hidden">
           <motion.div style={{ y: backgroundY }} className="absolute inset-0 scale-[1.05]">
             <Image
-              src="/images/masterclass-bg.png"
+              src="/images/masterclass-bg.jpg"
               alt="Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
               fill
               priority={false}

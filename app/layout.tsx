@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import { Raleway, Noto_Serif_Display, Dancing_Script } from 'next/font/google';
 import SmoothScroll from '@/components/SmoothScroll';
 import CookieNotice from '@/components/CookieNotice';
+import MouseTrail from '@/components/MouseTrail';
 import { OrganizationJsonLd } from '@/app/JsonLd';
 import 'lenis/dist/lenis.css';
 import './globals.css'; // Global styles
@@ -85,6 +86,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
       <body className="font-sans antialiased text-[#142334] bg-white" suppressHydrationWarning>
         <OrganizationJsonLd />
         <SmoothScroll>{children}</SmoothScroll>
+        <MouseTrail />
         <CookieNotice />
       </body>
     </html>

@@ -33,7 +33,7 @@ const methods = [
 
 const aboutCarouselItems = [
   {
-    src: '/images/about/carousel/about-carousel-book-closeup.png',
+    src: '/images/about/carousel/about-carousel-book-closeup.jpg',
     alt: 'Kagiso smiling over an open book in a close-up portrait',
   },
   {
@@ -45,7 +45,7 @@ const aboutCarouselItems = [
     alt: 'Kagiso setting up a phone on a tripod in a home studio',
   },
   {
-    src: '/images/about/carousel/about-carousel-pattern-portrait.png',
+    src: '/images/about/carousel/about-carousel-pattern-portrait.jpg',
     alt: 'Kagiso smiling in a patterned blouse in a warm indoor setting',
   },
   {
@@ -155,7 +155,7 @@ export default function AboutPage() {
               <div className="absolute -left-6 -bottom-6 w-full h-full border border-[#C9AD98]"></div>
               <div className="relative aspect-[4/5] bg-[#D8CEC6] shadow-2xl overflow-hidden">
                 <Image
-                  src="/images/about/about-hero-portrait.png"
+                  src="/images/about/about-hero-portrait.jpg"
                   alt="Portrait of Coach Kagiso smiling in a bright studio setting"
                   fill
                   priority
@@ -189,13 +189,13 @@ export default function AboutPage() {
               <div className="relative min-h-[420px] lg:min-h-[460px]">
                 <div className="absolute right-0 top-0 w-[92%] aspect-[4/5] overflow-hidden bg-[#E8E3DF] shadow-xl">
                   <Image
-                    src="/images/about/about-where-i-come-from.png"
+                    src="/images/about/about-where-i-come-from.jpg"
                     alt="Coach Kagiso working at a laptop in a bright home office"
                     fill
                     className="object-cover"
                   />
                 </div>
-                <div className="absolute left-0 bottom-0 bg-[#142334] text-white w-[68%] p-8 lg:p-9">
+                <div className="absolute left-0 -bottom-6 lg:-bottom-8 bg-[#142334] text-white w-[68%] p-8 lg:p-9">
                   <p className="font-serif text-[24px] leading-snug">
                     Nobody should have to figure this out alone.
                   </p>
@@ -210,7 +210,7 @@ export default function AboutPage() {
         <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 overflow-hidden opacity-44">
           <motion.div style={{ y: shiftBackgroundY }} className="absolute -inset-y-[10%] inset-x-0">
             <Image
-              src="/images/about/about-shift-background.png"
+              src="/images/about/about-shift-background.jpg"
               alt="Coach Kagiso working at a laptop in a bright office"
               fill
               className="object-cover"

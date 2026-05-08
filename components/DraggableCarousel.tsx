@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
 
@@ -22,7 +23,7 @@ const defaultCarouselItems: CarouselItem[] = [
     alt: "Kagiso selecting a book in a warmly lit library",
   },
   {
-    src: "/images/contact/contact-seated-portrait.png",
+    src: "/images/contact/contact-seated-portrait.jpg",
     alt: "Kagiso seated in a bright lounge setting with a book",
   },
   {
@@ -30,7 +31,7 @@ const defaultCarouselItems: CarouselItem[] = [
     alt: "Study and planning session in a bright library workspace",
   },
   {
-    src: "/images/contact/contact-laptop.png",
+    src: "/images/contact/contact-laptop.jpg",
     alt: "Close-up of Kagiso working on a laptop",
   },
 ];
@@ -71,6 +72,7 @@ export default function DraggableCarousel({ items = defaultCarouselItems }: { it
 
   return (
     <div
+      data-hide-custom-cursor
       className="relative w-full overflow-hidden h-[60vh] min-h-[400px] max-h-[800px] bg-white group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -104,11 +106,12 @@ export default function DraggableCarousel({ items = defaultCarouselItems }: { it
             className="h-full aspect-[3/4] sm:aspect-[4/5] relative flex-shrink-0"
             whileHover={{ opacity: 0.95 }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={item.src}
               alt={item.alt}
-              className="w-full h-full object-cover pointer-events-none"
+              fill
+              sizes="(max-width: 640px) 75vw, (max-width: 1024px) 45vw, 360px"
+              className="object-cover pointer-events-none"
             />
           </motion.div>
         ))}

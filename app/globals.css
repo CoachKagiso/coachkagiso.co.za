@@ -4,3 +4,54 @@
   --font-display: var(--font-serif);
   --font-serif: var(--font-serif);
 }
+
+:root {
+  --brand-ink: #142334;
+  --brand-warm: #C9AD98;
+  --brand-scroll-track: #F4EFEB;
+}
+
+html,
+body {
+  scrollbar-color: var(--brand-warm) var(--brand-scroll-track);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: var(--brand-scroll-track);
+}
+
+::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--brand-warm), #A9856F);
+  border: 3px solid var(--brand-scroll-track);
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-ink);
+}
+
+@media (pointer: fine) {
+  html.has-custom-cursor,
+  html.has-custom-cursor * {
+    cursor: none !important;
+  }
+}
