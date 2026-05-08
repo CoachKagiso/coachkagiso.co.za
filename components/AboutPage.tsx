@@ -37,16 +37,12 @@ const aboutCarouselItems = [
     alt: 'Kagiso smiling over an open book in a close-up portrait',
   },
   {
-    src: '/images/about/carousel/about-carousel-writing.jpg',
-    alt: 'Kagiso writing in a notebook near a bright window',
-  },
-  {
     src: '/images/about/carousel/about-carousel-phone-tripod.jpg',
     alt: 'Kagiso setting up a phone on a tripod in a home studio',
   },
   {
-    src: '/images/about/carousel/about-carousel-pattern-portrait.jpg',
-    alt: 'Kagiso smiling in a patterned blouse in a warm indoor setting',
+    src: '/images/about/carousel/about-carousel-white-suit-couch.jpg',
+    alt: 'Kagiso seated on a leather couch in a white suit for a personal branding portrait',
   },
   {
     src: '/images/about/carousel/about-carousel-workspace-book-phone.jpg',
