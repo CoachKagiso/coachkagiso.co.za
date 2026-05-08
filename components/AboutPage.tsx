@@ -155,7 +155,7 @@ export default function AboutPage() {
               <div className="absolute -left-6 -bottom-6 w-full h-full border border-[#C9AD98]"></div>
               <div className="relative aspect-[4/5] bg-[#D8CEC6] shadow-2xl overflow-hidden">
                 <Image
-                  src="/images/about/about-hero-portrait.jpg"
+                  src="/images/about/about-hero-portrait-20260508.jpg"
                   alt="Portrait of Coach Kagiso smiling in a bright studio setting"
                   fill
                   priority
