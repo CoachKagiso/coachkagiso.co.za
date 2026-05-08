@@ -68,9 +68,10 @@ export default function TermsPage() {
             <p className="mt-4">Because I balance this practice with full-time work, my capacity is limited. Please respect the boundaries:</p>
             <ul className="mt-3 list-disc space-y-2 pl-6">
               <li><strong>Reschedule:</strong> You may reschedule once, up to 24 hours before your session, via the cal.com link in your booking confirmation</li>
-              <li><strong>Cancellation with refund:</strong> Cancel up to 24 hours before and receive a full refund, less PayFast transaction fees</li>
-              <li><strong>Late cancellation:</strong> Less than 24 hours notice, the session is forfeited. No refund</li>
-              <li><strong>No-show:</strong> No refund or reschedule</li>
+              <li><strong>Cancellation with 24+ hours notice:</strong> Cancel up to 24 hours before your session and receive a full refund, less PayFast transaction fees. You may also choose to keep the full amount as credit toward a future Coach Kagiso service</li>
+              <li><strong>Late cancellation:</strong> If you cancel with less than 24 hours&apos; notice, 50% of the session fee will be refunded or credited toward a future booking. The remaining 50% is retained because the time has been reserved and is unlikely to be filled at short notice</li>
+              <li><strong>No-show:</strong> If you do not attend your session and do not notify me before the start time, the session is forfeited. No refund or reschedule will be offered</li>
+              <li><strong>Emergency exception:</strong> No cancellation fee will be charged where you cannot attend because of death or hospitalisation of the person for whom the booking was made. Other genuine emergencies may be considered at my discretion</li>
               <li><strong>CV, Cover Letter, and LinkedIn services:</strong> Once work has started, no refunds. You have a 7-day revision window included in the price</li>
               <li><strong>Saturday Masterclass:</strong> You may transfer to a future session up to 24 hours before, at no extra cost. No refunds within 24 hours. Sessions are not recorded for attendee privacy reasons. You will receive the workbook, take-home pack, and follow-up materials by email</li>
             </ul>

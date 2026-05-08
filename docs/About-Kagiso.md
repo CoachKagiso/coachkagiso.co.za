@@ -5,7 +5,7 @@
 
 ### 1. Where I come from
 
-I grew up in Soweto, on the dusty streets of Deepkloof and Zola. I didn't grow up with a clear path. I grew up having to figure out a lot of things myself.
+I grew up in Soweto, on the dusty streets of Diepkloof and Zola. I didn't grow up with a clear path. I grew up having to figure out a lot of things myself.
 
 For a long time, that felt like a disadvantage. I didn't have the networks. I didn't know how to knock on doors or have the right conversations. I only started to figure it out in my thirties — how to build real connections, how to be seen for what I could actually do, how to stop waiting for someone to notice me.
 

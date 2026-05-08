@@ -85,7 +85,7 @@ const tracks: Track[] = [
         tagline: 'Your CV, my expert eye. Back in under 48 hours.',
         body: "Send me your current CV. I'll record a 5-minute video walking you through what's broken, what's working, and what to fix first. This is feedback, not a rewrite. If you later want Kagiso to do the full rewrite, your R150 is credited toward the CV Revamp and you only pay the R250 difference.",
         items: [
-          '5-minute Loom video review delivered within 48 hours',
+          '5-minute review delivered within 48 hours',
           '3 specific fixes you can apply yourself',
           '3 strengths worth keeping',
           'Honest, no fluff',
@@ -98,9 +98,9 @@ const tracks: Track[] = [
         tagline: "Built for the job you actually want, not the one you've outgrown.",
         body: 'Your full CV rewritten by me to read like a story of impact, not a list of duties. ATS-friendly. Recruiter-tested. Includes a 10-minute video walkthrough.',
         items: [
-          '30-minute intake call or detailed form',
+          '15-minute intake call or detailed form',
           'Full CV rewrite in Word and PDF',
-          '10-minute Loom walkthrough',
+          '10-Minute CV Walkthrough',
           '7-day revision window',
         ],
         cta: 'Revamp my CV',

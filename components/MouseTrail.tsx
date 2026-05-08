@@ -13,6 +13,48 @@ const interactiveSelector = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+function parseRgbChannels(color: string) {
+  const matches = color.match(/[\d.]+/g);
+  if (!matches || matches.length < 3) return null;
+
+  const [red, green, blue, alpha] = matches.map(Number);
+
+  return {
+    red,
+    green,
+    blue,
+    alpha: alpha ?? 1,
+  };
+}
+
+function getRelativeLuminance(red: number, green: number, blue: number) {
+  const toLinear = (value: number) => {
+    const normalized = value / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+
+  return 0.2126 * toLinear(red) + 0.7152 * toLinear(green) + 0.0722 * toLinear(blue);
+}
+
+function isDarkSurface(target: Element | null) {
+  let current: Element | null = target;
+  let depth = 0;
+
+  while (current && depth < 10) {
+    const backgroundColor = window.getComputedStyle(current).backgroundColor;
+    const channels = parseRgbChannels(backgroundColor);
+
+    if (channels && channels.alpha > 0.03) {
+      return getRelativeLuminance(channels.red, channels.green, channels.blue) < 0.18;
+    }
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return false;
+}
+
 export default function MouseTrail() {
   const ringRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
@@ -81,11 +123,18 @@ export default function MouseTrail() {
 
       const target = event.target instanceof Element ? event.target : null;
       const shouldHide = Boolean(target?.closest("[data-hide-custom-cursor]"));
+      const darkSurface = isDarkSurface(target);
       isInteractive = Boolean(target?.closest(interactiveSelector));
 
-      ring.style.borderColor = isInteractive ? "rgba(201, 173, 152, 0.92)" : "rgba(20, 35, 52, 0.72)";
-      ring.style.backgroundColor = isInteractive ? "rgba(201, 173, 152, 0.08)" : "transparent";
-      dot.style.backgroundColor = isInteractive ? "#C9AD98" : "#142334";
+      if (darkSurface) {
+        ring.style.borderColor = isInteractive ? "rgba(244, 239, 235, 0.95)" : "rgba(201, 173, 152, 0.96)";
+        ring.style.backgroundColor = isInteractive ? "rgba(201, 173, 152, 0.18)" : "rgba(201, 173, 152, 0.08)";
+        dot.style.backgroundColor = isInteractive ? "#F4EFEB" : "#C9AD98";
+      } else {
+        ring.style.borderColor = isInteractive ? "rgba(201, 173, 152, 0.92)" : "rgba(20, 35, 52, 0.72)";
+        ring.style.backgroundColor = isInteractive ? "rgba(201, 173, 152, 0.08)" : "transparent";
+        dot.style.backgroundColor = isInteractive ? "#C9AD98" : "#142334";
+      }
 
       setVisibility(!shouldHide);
     };

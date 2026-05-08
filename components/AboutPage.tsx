@@ -180,7 +180,7 @@ export default function AboutPage() {
             <div className="lg:col-span-8 lg:col-start-5 grid md:grid-cols-[0.88fr_1.12fr] gap-10 lg:gap-12 items-start">
               <div className="space-y-6 text-[17px] leading-relaxed text-[#142334]/78">
                 <p>
-                  I grew up on the dusty streets of Deepkloof and Zola. I did not grow up with a clear path, strong networks, or a script for how to be seen.
+                  I grew up on the dusty streets of Diepkloof and Zola. I did not grow up with a clear path, strong networks, or a script for how to be seen.
                 </p>
                 <p>
                   For a long time, that felt like a disadvantage. I only started figuring it out in my thirties: how to build real connections, how to have the right conversations, and how to stop waiting for someone to notice me.
