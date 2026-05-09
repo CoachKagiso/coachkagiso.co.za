@@ -65,7 +65,7 @@ export default function Hero() {
 
             <div className="aspect-[4/5] w-full bg-[#E8E3DF] shadow-2xl relative z-10">
               <Image
-                src="/images/hero/home-hero-portrait-20260508.jpg"
+                src="/images/hero/home-hero-portrait-20260509.png"
                 alt="Professional Black woman coach"
                 fill
                 className="object-cover object-top"
