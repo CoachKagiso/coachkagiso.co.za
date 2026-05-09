@@ -61,7 +61,7 @@ export default function GroupPrograms() {
             </div>
             <div className="mt-10 flex flex-wrap items-center gap-8">
               <Link href="/book/masterclass" className="inline-flex items-center gap-2 rounded-full bg-[#C9AD98] text-[#142334] px-7 py-3.5 text-[12px] uppercase tracking-[0.18em] font-semibold hover:bg-white hover:-translate-y-1 transition-all duration-300">
-                Hold my spot <ArrowUpRight className="h-4 w-4" />
+                Reserve my seat <ArrowUpRight className="h-4 w-4" />
               </Link>
               <Link href="/about" className="inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.2em] font-semibold text-white/70 relative group">
                 Learn more <ArrowUpRight className="h-4 w-4" />

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Clock, Facebook, Instagram, Linkedin } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { AuditBreakLeadMagnet } from '@/components/ArticleLeadMagnets';
@@ -19,8 +19,21 @@ type ArticlePageProps = {
 const articleAuthor = {
   name: 'Coach Kagiso',
   title: 'Career Development and Personal Brand Coach',
-  image: '/images/author/ck-profile.png',
+  image: '/images/author/ck-profile-article.jpeg',
+  aboutHref: '/about',
+  linkedin: 'https://linkedin.com/in/coach-kagiso',
+  tiktok: 'https://www.tiktok.com/@coach_kagiso',
+  facebook: 'https://facebook.com/coachkagiso',
+  instagram: 'https://www.instagram.com/coach.kagiso',
 };
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+    </svg>
+  );
+}
 
 function RichParagraph({ text }: { text: string }) {
   const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*)/g);
@@ -618,30 +631,69 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 </h1>
                 <p className="mt-8 max-w-[680px] text-[19px] leading-relaxed text-[#142334]/78">{article.dek}</p>
               </div>
-              <div className="lg:col-span-4 lg:col-start-9">
-                <Link
-                  href="/about"
-                  className="group flex max-w-[360px] items-center gap-4 border border-[#142334]/12 bg-white/55 p-4 backdrop-blur-sm transition hover:border-[#C9AD98]/70 hover:bg-white/78"
-                >
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[#C9AD98]/45 bg-[#F4EEE9]">
-                    <Image
-                      src={articleAuthor.image}
-                      alt={articleAuthor.name}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                    />
+                <div className="lg:col-span-4 lg:col-start-9">
+                  <div className="max-w-[360px] border border-[#142334]/12 bg-white/55 p-4 backdrop-blur-sm transition hover:border-[#C9AD98]/70 hover:bg-white/78">
+                    <div className="flex items-center gap-4">
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[#C9AD98]/45 bg-[#F4EEE9]">
+                        <Image
+                          src={articleAuthor.image}
+                          alt={articleAuthor.name}
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <Link href={articleAuthor.aboutHref} className="group block">
+                          <p className="font-serif text-[31px] leading-none text-[#142334] transition group-hover:text-[#C9AD98]">
+                            {articleAuthor.name}
+                          </p>
+                          <p className="mt-3 text-[11px] uppercase tracking-[0.2em] font-semibold text-[#142334]/60 transition group-hover:text-[#142334]/78">
+                            {articleAuthor.title}
+                          </p>
+                        </Link>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <a
+                            href={articleAuthor.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Coach Kagiso on LinkedIn"
+                            className="h-9 w-9 rounded-full border border-[#142334]/18 flex items-center justify-center text-[#142334]/72 hover:border-[#C9AD98] hover:text-[#C9AD98] transition"
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </a>
+                          <a
+                            href={articleAuthor.tiktok}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Coach Kagiso on TikTok"
+                            className="h-9 w-9 rounded-full border border-[#142334]/18 flex items-center justify-center text-[#142334]/72 hover:border-[#C9AD98] hover:text-[#C9AD98] transition"
+                          >
+                            <TikTokIcon className="h-4 w-4" />
+                          </a>
+                          <a
+                            href={articleAuthor.facebook}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Coach Kagiso on Facebook"
+                            className="h-9 w-9 rounded-full border border-[#142334]/18 flex items-center justify-center text-[#142334]/72 hover:border-[#C9AD98] hover:text-[#C9AD98] transition"
+                          >
+                            <Facebook className="h-4 w-4" />
+                          </a>
+                          <a
+                            href={articleAuthor.instagram}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Coach Kagiso on Instagram"
+                            className="h-9 w-9 rounded-full border border-[#142334]/18 flex items-center justify-center text-[#142334]/72 hover:border-[#C9AD98] hover:text-[#C9AD98] transition"
+                          >
+                            <Instagram className="h-4 w-4" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-serif text-[31px] leading-none text-[#142334] transition group-hover:text-[#C9AD98]">
-                      {articleAuthor.name}
-                    </p>
-                    <p className="mt-3 text-[11px] uppercase tracking-[0.2em] font-semibold text-[#142334]/60">
-                      {articleAuthor.title}
-                    </p>
-                  </div>
-                </Link>
-              </div>
+                </div>
             </div>
           </div>
         </section>

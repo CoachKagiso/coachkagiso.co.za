@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowUpRight, Facebook, Linkedin, Mail, MessageCircle } from 'lucide-react';
+import { Facebook, Instagram, Linkedin, Mail, MessageCircle } from 'lucide-react';
 import { ContourField } from '@/components/DecorativeMotifs';
 
 const navigation = [
@@ -173,9 +173,9 @@ export default function Footer() {
                 <a href="https://facebook.com/coachkagiso" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <Link href="/insights" aria-label="Read insights" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
+                <a href="https://www.instagram.com/coach.kagiso/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
+                  <Instagram className="h-4 w-4" />
+                </a>
               </div>
             </div>
           </div>

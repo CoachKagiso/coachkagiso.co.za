@@ -38,6 +38,9 @@ export type BookingPageConfig = {
   envKey: string;
   fallbackUrl: string;
   description: string;
+  mode?: 'calendar' | 'reservation';
+  ctaLabel?: string;
+  availabilityNote?: string;
   faqs: FaqItem[];
 };
 
@@ -420,7 +423,10 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
     title: 'Saturday Masterclass',
     envKey: 'NEXT_PUBLIC_CAL_MASTERCLASS_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/saturday-masterclass',
-    description: 'Choose an upcoming Saturday Masterclass session and hold your spot.',
+    description: 'Reserve your seat for the Saturday 4 July 2026 session. We will email the booking and payment link as soon as July booking opens.',
+    mode: 'reservation',
+    ctaLabel: 'Reserve my seat',
+    availabilityNote: 'No live calendar yet. Join the reserve list now and you will get first access before booking opens.',
     faqs: [
       {
         question: 'Who is the masterclass for?',
@@ -431,8 +437,8 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
         answer: 'It is interactive. You will learn, reflect, and leave with a clearer plan than you started with.',
       },
       {
-        question: 'What happens if I cannot attend live?',
-        answer: 'Use the booking page to choose a session you can commit to. If you are unsure, message before booking so expectations are clear.',
+        question: 'What happens after I reserve my seat?',
+        answer: 'You will be added to the July reserve list first. Once booking opens, Coach Kagiso will email you the live booking and payment link before the Saturday 4 July 2026 session.',
       },
     ],
   },
