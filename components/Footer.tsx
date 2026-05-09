@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight, Facebook, Linkedin, Mail, MessageCircle } from 'lucide-react';
 import { ContourField } from '@/components/DecorativeMotifs';
@@ -103,8 +104,14 @@ export default function Footer() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 py-12 border-b border-white/12">
           <div>
-            <Link href="/" className="font-semibold tracking-[0.18em] text-[15px]">
-              COACH KAGISO
+            <Link href="/" className="inline-flex items-center" aria-label="Coach Kagiso home">
+              <Image
+                src="/images/branding/footer-logo.png"
+                alt="Coach Kagiso"
+                width={224}
+                height={88}
+                className="h-auto w-[180px] md:w-[210px]"
+              />
             </Link>
             <p className="mt-5 max-w-xs text-[14px] leading-relaxed text-white/62">
               Career Development and Personal Brand Coach for capable people who are ready to stop being overlooked.
