@@ -13,11 +13,11 @@ const navigation = [
 ];
 
 const services = [
-  'CV strategy',
-  'Personal brand audit',
-  'Career clarity',
-  'Interview preparation',
-  'Leadership visibility',
+  { label: 'CV strategy', href: '/buy/cv-review' },
+  { label: 'Personal brand audit', href: '/resources/personal-brand-audit' },
+  { label: 'Career clarity', href: '/book/clarity' },
+  { label: 'Interview preparation', href: '/book/glow-up' },
+  { label: 'Leadership visibility', href: '/work-with-me' },
 ];
 
 export default function Footer() {
@@ -122,8 +122,13 @@ export default function Footer() {
             <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">Navigate</p>
             <div className="mt-5 grid gap-3">
               {navigation.map((item) => (
-                <Link key={item.label} href={item.href} className="text-[14px] text-white/70 hover:text-white transition">
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="group relative inline-flex w-fit text-[14px] text-white/70 transition-colors duration-300 hover:text-white"
+                >
                   {item.label}
+                  <span className="absolute -bottom-1 left-0 h-[1.5px] w-0 bg-[#C9AD98] transition-all duration-300 ease-out group-hover:w-full"></span>
                 </Link>
               ))}
             </div>
@@ -133,9 +138,14 @@ export default function Footer() {
             <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">Support</p>
             <div className="mt-5 grid gap-3">
               {services.map((item) => (
-                <span key={item} className="text-[14px] text-white/70">
-                  {item}
-                </span>
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="group relative inline-flex w-fit text-[14px] text-white/70 transition-colors duration-300 hover:text-white"
+                >
+                  {item.label}
+                  <span className="absolute -bottom-1 left-0 h-[1.5px] w-0 bg-[#C9AD98] transition-all duration-300 ease-out group-hover:w-full"></span>
+                </Link>
               ))}
             </div>
           </div>
@@ -152,18 +162,18 @@ export default function Footer() {
                 069 512 4398
               </a>
               <div className="flex gap-3 pt-2">
-                <a href="https://linkedin.com/in/coach-kagiso" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-[#142334] transition">
+                <a href="https://linkedin.com/in/coach-kagiso" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a href="https://www.tiktok.com/@coach_kagiso" target="_blank" rel="noopener noreferrer" aria-label="TikTok" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-[#142334] transition">
+                <a href="https://www.tiktok.com/@coach_kagiso" target="_blank" rel="noopener noreferrer" aria-label="TikTok" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
                   </svg>
                 </a>
-                <a href="https://facebook.com/coachkagiso" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-[#142334] transition">
+                <a href="https://facebook.com/coachkagiso" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <Link href="/insights" aria-label="Read insights" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white hover:text-[#142334] transition">
+                <Link href="/insights" aria-label="Read insights" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -175,7 +185,7 @@ export default function Footer() {
           <p>Copyright 2026 Coach Kagiso. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <a href="https://kreativeforeflow.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-              Designed with love by Kreative Reflow
+              A KREATIVE REFLOW DESIGN.
             </a>
             <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
             <Link href="/terms" className="hover:text-white transition">Terms</Link>

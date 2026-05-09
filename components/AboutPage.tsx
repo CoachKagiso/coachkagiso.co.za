@@ -65,12 +65,8 @@ const aboutCarouselItems = [
     alt: 'Kagiso checking her phone at a warm cafe table beside a laptop and coffee',
   },
   {
-    src: '/images/about/carousel/about-carousel-atomic-habits.jpg',
-    alt: 'Kagiso reading in a calm lounge setting with a book in hand',
-  },
-  {
-    src: '/images/about/carousel/about-carousel-speaker.jpg',
-    alt: 'Kagiso speaking at an event beside a laptop and presentation table',
+    src: '/images/about/carousel/about-carousel-cream-blazer-headshot.png',
+    alt: 'Kagiso in a cream blazer portrait with a calm, direct expression',
   },
 ];
 

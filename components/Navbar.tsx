@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -58,8 +59,15 @@ export default function Navbar() {
     >
       <nav className="max-w-[1200px] mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-[72px]">
-          <Link href="/" className="font-sans font-semibold tracking-[0.18em] text-[15px] text-[#142334]">
-            COACH KAGISO
+          <Link href="/" className="inline-flex items-center" aria-label="Coach Kagiso home">
+            <Image
+              src="/images/branding/nav-logo-transparent.png"
+              alt="Coach Kagiso"
+              width={398}
+              height={62}
+              priority
+              className="h-auto w-[180px] sm:w-[220px] lg:w-[250px]"
+            />
           </Link>
 
           <div className="hidden lg:flex items-center gap-8">
