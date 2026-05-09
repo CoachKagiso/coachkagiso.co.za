@@ -846,27 +846,75 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             )}
 
             {article.authorBio && (
-              <section className="mt-16 bg-[#142334] p-7 md:p-9 text-white">
-                <p className="text-[12px] uppercase tracking-[0.22em] font-semibold text-[#C9AD98]">
-                  Written by
-                </p>
-                <div className="mt-5 grid gap-7 md:grid-cols-[1fr_auto] md:items-end">
-                  <div>
-                    <h2 className="font-serif text-[40px] md:text-[54px] leading-none">{article.authorBio.name}</h2>
-                    <p className="mt-3 text-[12px] uppercase tracking-[0.18em] font-semibold text-white/56">
-                      {article.authorBio.role}
-                    </p>
-                    <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-white/72">
-                      {article.authorBio.body}
-                    </p>
+              <section className="relative mt-24 overflow-visible bg-[#142334] px-7 pb-7 pt-7 text-white md:min-h-[230px] md:px-8 md:pb-7 md:pt-7">
+                <div className="relative z-10 max-w-[370px]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
+                    Written by
+                  </p>
+                  <h2 className="mt-4 font-serif text-[40px] leading-none md:text-[44px]">{article.authorBio.name}</h2>
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/56">
+                    {article.authorBio.role}
+                  </p>
+                  <p className="mt-4 text-[14px] leading-relaxed text-white/76">
+                    {article.authorBio.body}
+                  </p>
+                  <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C9AD98]">
+                    Follow for career clarity and personal brand guidance.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <a
+                      href={articleAuthor.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Follow Coach Kagiso on LinkedIn"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/78 transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    >
+                      <Linkedin className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={articleAuthor.tiktok}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Follow Coach Kagiso on TikTok"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/78 transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    >
+                      <TikTokIcon className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={articleAuthor.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Follow Coach Kagiso on Facebook"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/78 transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    >
+                      <Facebook className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={articleAuthor.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Follow Coach Kagiso on Instagram"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/78 transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    >
+                      <Instagram className="h-4 w-4" />
+                    </a>
                   </div>
-                  <Link
-                    href={article.authorBio.href}
-                    className="inline-flex rounded-full border border-white/20 px-6 py-3 text-[12px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white hover:text-[#142334]"
-                  >
-                    {article.authorBio.cta}
-                  </Link>
                 </div>
+                <div className="pointer-events-none relative z-0 mx-auto mt-8 h-[260px] w-full max-w-[310px] md:absolute md:-top-8 md:right-8 md:mt-0 md:h-[315px] md:w-[280px] md:max-w-none lg:-top-10 lg:right-12 lg:h-[340px] lg:w-[315px]">
+                  <Image
+                    src="/images/author/ck-transparent.png"
+                    alt={article.authorBio.name}
+                    fill
+                    sizes="(max-width: 768px) 320px, 360px"
+                    className="object-contain object-bottom"
+                  />
+                </div>
+                <Link
+                  href={article.authorBio.href}
+                  className="relative z-10 mt-6 inline-flex rounded-full border border-white/20 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white hover:text-[#142334] md:absolute md:bottom-7 md:right-[60px] md:mt-0 lg:right-[93px]"
+                >
+                  {article.authorBio.cta}
+                </Link>
               </section>
             )}
           </div>
