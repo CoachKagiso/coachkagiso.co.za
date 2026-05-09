@@ -24,6 +24,7 @@ const dancingScript = Dancing_Script({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://coachkagiso.co.za'),
+  manifest: '/site.webmanifest',
   title: {
     default: 'Coach Kagiso | Career Coach South Africa — CV Reviews, LinkedIn, Clarity Sessions',
     template: '%s | Coach Kagiso',
@@ -63,6 +64,15 @@ export const metadata: Metadata = {
     title: 'Coach Kagiso | Career Coach South Africa',
     description: 'Career development and personal brand coaching for South African professionals.',
     images: ['/og-image.png'],
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
+    shortcut: ['/favicon.ico'],
   },
   alternates: {
     canonical: '/',
