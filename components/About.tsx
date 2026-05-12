@@ -31,6 +31,7 @@ export default function About() {
                 src="/images/home/home-about-portrait.jpg"
                 alt="Coach Kagiso portrait"
                 fill
+                sizes="(min-width: 1024px) 508px, calc(100vw - 48px)"
                 className="object-cover object-top"
               />
             </div>

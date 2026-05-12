@@ -1,29 +1,15 @@
-'use client';
 import Image from 'next/image';
-import { motion, useScroll, useTransform } from 'motion/react';
 import { FlowRibbon } from '@/components/DecorativeMotifs';
 
 export default function Hero() {
-  const { scrollY } = useScroll();
-  const textY = useTransform(scrollY, [0, 1000], [0, 400]);
-
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-      className="relative min-h-screen flex items-center overflow-hidden py-24"
-    >
+    <section className="relative min-h-screen flex items-center overflow-hidden py-24">
       {/* Huge background text for editorial feel */}
-      <motion.div
-        style={{ y: textY }}
-        className="absolute top-0 left-0 w-full overflow-hidden pointer-events-none select-none opacity-10 flex justify-center -translate-y-12 z-0"
-      >
+      <div className="absolute top-0 left-0 w-full overflow-hidden pointer-events-none select-none opacity-10 flex justify-center -translate-y-12 z-0">
         <span className="font-serif text-[180px] lg:text-[300px] leading-none whitespace-nowrap tracking-tight text-[#C9AD98] font-bold">
           ELEVATE
         </span>
-      </motion.div>
+      </div>
 
       <FlowRibbon className="absolute top-[-16%] right-[-12%] h-[760px] w-[58%] opacity-25 pointer-events-none text-[#C9AD98] z-0" />
 
@@ -68,12 +54,15 @@ export default function Hero() {
                 src="/images/hero/home-hero-portrait-20260509.png"
                 alt="Professional Black woman coach"
                 fill
+                fetchPriority="high"
+                loading="eager"
+                sizes="(min-width: 1280px) 455px, (min-width: 1024px) 38vw, calc(100vw - 48px)"
                 className="object-cover object-top"
               />
             </div>
           </div>
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }

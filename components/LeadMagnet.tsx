@@ -46,6 +46,7 @@ export default function LeadMagnet() {
                   alt="Career diagnostic worksheet on a desk"
                   fill
                   referrerPolicy="no-referrer"
+                  sizes="(min-width: 1024px) 521px, calc(100vw - 88px)"
                   className="object-cover"
                 />
               </div>
