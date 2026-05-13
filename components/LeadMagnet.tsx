@@ -40,12 +40,11 @@ export default function LeadMagnet() {
           <div className="relative">
             <div className="absolute -left-5 -bottom-5 h-full w-full border border-[#142334]/25" />
             <div className="relative bg-[#142334] text-white p-5 md:p-7 shadow-2xl">
-              <div className="relative aspect-[4/3] overflow-hidden bg-[#CDC6C3]">
+              <div className="relative aspect-[5/3] overflow-hidden bg-[#CDC6C3]">
                 <Image
-                  src="https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=1000&auto=format&fit=crop"
+                  src="/images/lead-magnets/career-diagnostic-desk.webp"
                   alt="Career diagnostic worksheet on a desk"
                   fill
-                  referrerPolicy="no-referrer"
                   sizes="(min-width: 1024px) 521px, calc(100vw - 88px)"
                   className="object-cover"
                 />
