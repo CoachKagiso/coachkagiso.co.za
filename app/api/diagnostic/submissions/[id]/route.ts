@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
+  deleteDiagnosticSubmission,
   isDiagnosticAdminAuthorized,
   isDiagnosticLeadStatus,
   updateDiagnosticSubmissionCrm,
@@ -14,10 +15,10 @@ type RouteContext = {
 function redirectWithStatus(
   redirectTo: string,
   requestUrl: string,
-  status: 'updated' | 'crm-schema' | 'unauthorized'
+  status: 'updated' | 'deleted' | 'crm-schema' | 'unauthorized' | 'invalid'
 ) {
   const url = new URL(redirectTo || '/resources/career-diagnostic/submissions', requestUrl);
-  url.searchParams.set(status === 'updated' ? 'updated' : 'error', status);
+  url.searchParams.set(status === 'updated' || status === 'deleted' ? 'updated' : 'error', status);
   return NextResponse.redirect(url, { status: 303 });
 }
 
@@ -32,11 +33,21 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const intent = String(formData.get('intent') || 'save');
+  const confirmDelete = String(formData.get('confirm_delete') || '');
   const leadStatus = String(formData.get('lead_status') || '');
   const leadNotes = String(formData.get('lead_notes') || '').trim();
   const nextFollowUpAt = String(formData.get('next_follow_up_at') || '').trim();
 
   try {
+    if (intent === 'delete') {
+      if (confirmDelete !== id) {
+        return redirectWithStatus(redirectTo, request.url, 'invalid');
+      }
+
+      await deleteDiagnosticSubmission(id);
+      return redirectWithStatus(redirectTo, request.url, 'deleted');
+    }
+
     await updateDiagnosticSubmissionCrm(id, {
       lead_status:
         intent === 'mark_contacted'

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { updatePaymentDeliveryStatus, type DeliveryStatus } from '@/lib/client-operations';
+import { deleteClientOperation, updatePaymentDeliveryStatus, type DeliveryStatus } from '@/lib/client-operations';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,9 +12,9 @@ function isDeliveryStatus(value: string): value is DeliveryStatus {
   return value === 'not_started' || value === 'in_progress' || value === 'delivered' || value === 'cancelled';
 }
 
-function redirectWithStatus(redirectTo: string, requestUrl: string, status: 'updated' | 'unauthorized' | 'invalid') {
+function redirectWithStatus(redirectTo: string, requestUrl: string, status: 'updated' | 'deleted' | 'unauthorized' | 'invalid') {
   const url = new URL(redirectTo || '/resources/career-diagnostic/submissions', requestUrl);
-  url.searchParams.set(status === 'updated' ? 'updated' : 'error', status);
+  url.searchParams.set(status === 'updated' || status === 'deleted' ? 'updated' : 'error', status);
   return NextResponse.redirect(url, { status: 303 });
 }
 
@@ -23,11 +23,22 @@ export async function POST(request: Request, context: RouteContext) {
   const formData = await request.formData();
   const key = String(formData.get('key') || '');
   const redirectTo = String(formData.get('redirectTo') || '/resources/career-diagnostic/submissions');
+  const intent = String(formData.get('intent') || 'save');
+  const confirmDelete = String(formData.get('confirm_delete') || '');
   const deliveryStatus = String(formData.get('delivery_status') || '');
   const deliveryNotes = String(formData.get('delivery_notes') || '').trim();
 
   if (!isDiagnosticAdminAuthorized(key)) {
     return redirectWithStatus(redirectTo, request.url, 'unauthorized');
+  }
+
+  if (intent === 'delete') {
+    if (confirmDelete !== paymentId) {
+      return redirectWithStatus(redirectTo, request.url, 'invalid');
+    }
+
+    await deleteClientOperation(paymentId);
+    return redirectWithStatus(redirectTo, request.url, 'deleted');
   }
 
   if (!isDeliveryStatus(deliveryStatus)) {

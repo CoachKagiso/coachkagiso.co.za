@@ -45,6 +45,24 @@ export type ClientOperation = {
   alertLabel: string | null;
 };
 
+type ClientOperationFilters = {
+  from?: string | null;
+  to?: string | null;
+};
+
+function getDateBoundary(value: string | null | undefined, boundary: 'start' | 'end') {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const date = new Date(`${value}T00:00:00+02:00`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (boundary === 'end') {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date.toISOString();
+}
+
 function normalizeDeliveryStatus(value?: string | null): DeliveryStatus {
   if (value === 'in_progress' || value === 'delivered' || value === 'cancelled') return value;
   return 'not_started';
@@ -123,20 +141,31 @@ function getAlertLabel(operation: Pick<ClientOperation, 'payment' | 'intake' | '
   return null;
 }
 
-export async function listClientOperations() {
+export async function listClientOperations(filters: ClientOperationFilters = {}) {
   const supabase = createSupabaseServiceClient();
+  const createdFrom = getDateBoundary(filters.from, 'start');
+  const createdTo = getDateBoundary(filters.to, 'end');
 
-  const paymentResult = await supabase
+  let paymentQuery = supabase
     .from('payments')
     .select(PAYMENT_SELECT)
     .order('created_at', { ascending: false })
     .limit(250);
 
+  if (createdFrom) {
+    paymentQuery = paymentQuery.gte('created_at', createdFrom);
+  }
+
+  if (createdTo) {
+    paymentQuery = paymentQuery.lte('created_at', createdTo);
+  }
+
+  const paymentResult = await paymentQuery;
   let paymentRows: unknown[] | null = paymentResult.data;
   let paymentError = paymentResult.error;
 
   if (paymentError && isMissingDeliveryColumn(paymentError.message)) {
-    const legacyResult = await supabase
+    let legacyQuery = supabase
       .from('payments')
       .select(
         'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, intake_submitted_at, intake_reminder_sent_at'
@@ -144,6 +173,15 @@ export async function listClientOperations() {
       .order('created_at', { ascending: false })
       .limit(250);
 
+    if (createdFrom) {
+      legacyQuery = legacyQuery.gte('created_at', createdFrom);
+    }
+
+    if (createdTo) {
+      legacyQuery = legacyQuery.lte('created_at', createdTo);
+    }
+
+    const legacyResult = await legacyQuery;
     paymentRows = legacyResult.data;
     paymentError = legacyResult.error;
   }
@@ -207,4 +245,42 @@ export async function updatePaymentDeliveryStatus(
     .eq('payment_id', paymentId);
 
   if (error) throw new Error(error.message);
+}
+
+export async function deleteClientOperation(paymentId: string) {
+  const supabase = createSupabaseServiceClient();
+
+  const intakeResult = await supabase
+    .from('intake_submissions')
+    .delete()
+    .eq('payment_id', paymentId);
+
+  if (intakeResult.error) throw new Error(intakeResult.error.message);
+
+  const paymentResult = await supabase
+    .from('payments')
+    .delete()
+    .eq('payment_id', paymentId);
+
+  if (paymentResult.error) throw new Error(paymentResult.error.message);
+}
+
+export async function deleteClientOperations(paymentIds: string[]) {
+  if (paymentIds.length === 0) return;
+
+  const supabase = createSupabaseServiceClient();
+
+  const intakeResult = await supabase
+    .from('intake_submissions')
+    .delete()
+    .in('payment_id', paymentIds);
+
+  if (intakeResult.error) throw new Error(intakeResult.error.message);
+
+  const paymentResult = await supabase
+    .from('payments')
+    .delete()
+    .in('payment_id', paymentIds);
+
+  if (paymentResult.error) throw new Error(paymentResult.error.message);
 }

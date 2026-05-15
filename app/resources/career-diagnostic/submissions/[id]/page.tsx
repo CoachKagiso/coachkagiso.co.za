@@ -9,7 +9,9 @@ import {
   Mail,
   Printer,
   Save,
+  Trash2,
 } from 'lucide-react';
+import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PrintButton from '@/components/PrintButton';
@@ -198,6 +200,19 @@ export default async function DiagnosticSubmissionSummaryPage({
                 >
                   Print prep sheet <Printer className="h-4 w-4" />
                 </PrintButton>
+                <form action={`/api/diagnostic/submissions/${submission.id}`} method="post">
+                  <input type="hidden" name="key" value={key || ''} />
+                  <input type="hidden" name="redirectTo" value={`/resources/career-diagnostic/submissions?key=${encodeURIComponent(key || '')}`} />
+                  <input type="hidden" name="intent" value="delete" />
+                  <input type="hidden" name="confirm_delete" value={submission.id} />
+                  <ConfirmSubmitButton
+                    type="submit"
+                    confirmMessage={`Delete ${submission.first_name}'s diagnostic record? This cannot be undone.`}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#C98672]/45 px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#7A2F22] transition hover:border-[#7A2F22] hover:bg-[#FFF5F2]"
+                  >
+                    Delete <Trash2 className="h-4 w-4" />
+                  </ConfirmSubmitButton>
+                </form>
               </div>
             </div>
 
@@ -209,7 +224,9 @@ export default async function DiagnosticSubmissionSummaryPage({
                   ? 'CRM fields are not live in Supabase yet. Apply the SQL additions in docs/Diagnostic-Lead-Magnet-Supabase.sql, then retry.'
                   : error === 'unauthorized'
                     ? 'The admin key was rejected. Re-open the dashboard with the correct key.'
-                    : 'Lead profile updated.'}
+                    : error === 'invalid'
+                      ? 'That delete request was missing its confirmation token. Nothing was removed.'
+                      : 'Lead profile updated.'}
               </div>
             )}
 

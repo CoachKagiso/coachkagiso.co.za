@@ -75,6 +75,8 @@ export type DiagnosticSubmissionFilters = {
   service?: string | null;
   followUp?: string | null;
   query?: string | null;
+  from?: string | null;
+  to?: string | null;
 };
 
 function isMissingCrmColumn(message?: string) {
@@ -107,11 +109,26 @@ function normalizeFilters(filtersOrArchetype?: string | null | DiagnosticSubmiss
   return filtersOrArchetype;
 }
 
+function getDateBoundary(value: string | null | undefined, boundary: 'start' | 'end') {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const date = new Date(`${value}T00:00:00+02:00`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (boundary === 'end') {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date.toISOString();
+}
+
 export async function listDiagnosticSubmissions(
   filtersOrArchetype?: string | null | DiagnosticSubmissionFilters
 ) {
   const filters = normalizeFilters(filtersOrArchetype);
   const supabase = createSupabaseServiceClient();
+  const submittedFrom = getDateBoundary(filters.from, 'start');
+  const submittedTo = getDateBoundary(filters.to, 'end');
   let query = supabase
     .from('diagnostic_submissions')
     .select(CRM_SELECT)
@@ -124,6 +141,14 @@ export async function listDiagnosticSubmissions(
 
   if (isDiagnosticLeadStatus(filters.status)) {
     query = query.eq('lead_status', filters.status);
+  }
+
+  if (submittedFrom) {
+    query = query.gte('submitted_at', submittedFrom);
+  }
+
+  if (submittedTo) {
+    query = query.lte('submitted_at', submittedTo);
   }
 
   const result = await query;
@@ -139,6 +164,14 @@ export async function listDiagnosticSubmissions(
 
     if (isDiagnosticArchetypeKey(filters.archetype)) {
       legacyQuery = legacyQuery.eq('archetype_key', filters.archetype);
+    }
+
+    if (submittedFrom) {
+      legacyQuery = legacyQuery.gte('submitted_at', submittedFrom);
+    }
+
+    if (submittedTo) {
+      legacyQuery = legacyQuery.lte('submitted_at', submittedTo);
     }
 
     const legacyResult = await legacyQuery;
@@ -238,6 +271,32 @@ export async function updateDiagnosticSubmissionCrm(
     .from('diagnostic_submissions')
     .update(updatePayload)
     .eq('id', id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDiagnosticSubmission(id: string) {
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('diagnostic_submissions')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteDiagnosticSubmissions(ids: string[]) {
+  if (ids.length === 0) return;
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('diagnostic_submissions')
+    .delete()
+    .in('id', ids);
 
   if (error) {
     throw new Error(error.message);

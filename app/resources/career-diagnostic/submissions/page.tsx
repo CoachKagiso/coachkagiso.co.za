@@ -13,9 +13,12 @@ import {
   PackageCheck,
   RefreshCcw,
   Search,
+  Trash2,
   UserRoundCheck,
   WalletCards,
 } from 'lucide-react';
+import BatchDeleteControls from '@/components/BatchDeleteControls';
+import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
@@ -29,6 +32,7 @@ import {
   type DiagnosticSubmission,
 } from '@/lib/diagnostic-submissions';
 import { listClientOperations, type ClientOperation } from '@/lib/client-operations';
+import { BATCH_DELETE_CONFIRM_PHRASE } from '@/lib/dashboard-cleanup';
 import { getDiagnosticAdminKey } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +54,10 @@ type DiagnosticSubmissionsPageProps = {
     service?: string;
     followUp?: string;
     q?: string;
+    from?: string;
+    to?: string;
     updated?: string;
+    deletedCount?: string;
     error?: string;
   }>;
 };
@@ -196,6 +203,8 @@ function buildFilterHref(
     service?: string;
     followUp?: string;
     q?: string;
+    from?: string;
+    to?: string;
   },
   next: Partial<typeof current>
 ) {
@@ -262,7 +271,7 @@ function AccessGate() {
 }
 
 export default async function DiagnosticSubmissionsPage({ searchParams }: DiagnosticSubmissionsPageProps) {
-  const { key, archetype, status, service, followUp, q, updated, error } = await searchParams;
+  const { key, archetype, status, service, followUp, q, from, to, updated, deletedCount, error } = await searchParams;
 
   if (!isDiagnosticAdminAuthorized(key)) {
     return <AccessGate />;
@@ -277,8 +286,10 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     service,
     followUp,
     query: q,
+    from,
+    to,
   });
-  const operations = await listClientOperations();
+  const operations = await listClientOperations({ from, to });
   const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
     selectedFilter === 'all' ? '' : `&archetype=${selectedFilter}`
@@ -289,6 +300,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     service,
     followUp: selectedFollowUp,
     q,
+    from,
+    to,
   };
   const sortedSubmissions = [...submissions].sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
   const actionQueue = sortedSubmissions.filter((submission) => !['paid', 'archived', 'not_a_fit'].includes(submission.lead_status)).slice(0, 8);
@@ -366,7 +379,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         <section className="border-b border-[#142334]/10 bg-white">
           <div className="mx-auto max-w-[1240px] px-6 py-5 lg:px-8">
             <Reveal>
-              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-3 lg:grid-cols-[1.4fr_0.85fr_0.85fr_0.85fr_auto]">
+              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.3fr_0.78fr_0.78fr_0.75fr_0.75fr_0.75fr_auto]">
                 <input type="hidden" name="key" value={key || ''} />
                 <label className="relative block">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A09086]" />
@@ -410,6 +423,20 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   <option value="scheduled">Scheduled</option>
                   <option value="none">No follow-up set</option>
                 </select>
+                <input
+                  type="date"
+                  name="from"
+                  defaultValue={from || ''}
+                  aria-label="Date from"
+                  className="h-12 border border-[#D8C8BB] bg-[#FCFBFA] px-4 text-[13px] outline-none focus:border-[#142334]"
+                />
+                <input
+                  type="date"
+                  name="to"
+                  defaultValue={to || ''}
+                  aria-label="Date to"
+                  className="h-12 border border-[#D8C8BB] bg-[#FCFBFA] px-4 text-[13px] outline-none focus:border-[#142334]"
+                />
                 <button
                   type="submit"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-[#142334] px-6 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
@@ -431,7 +458,11 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   ? 'CRM fields are not live in Supabase yet. Apply the SQL additions in docs/Diagnostic-Lead-Magnet-Supabase.sql, then retry.'
                   : error === 'unauthorized'
                     ? 'The admin key was rejected. Re-open the dashboard with the correct key.'
-                    : 'Lead details updated.'}
+                    : error === 'invalid'
+                      ? 'That delete request was missing its confirmation token. Nothing was removed.'
+                      : updated === 'deleted'
+                        ? `${deletedCount || 'Selected'} dashboard record${deletedCount === '1' ? '' : 's'} deleted.`
+                        : 'Lead details updated.'}
               </div>
             </div>
           </section>
@@ -578,6 +609,19 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                               >
                                 Delivered
                               </button>
+                            </form>
+                            <form action={`/api/operations/payments/${encodeURIComponent(operation.payment.payment_id)}`} method="post">
+                              <input type="hidden" name="key" value={key || ''} />
+                              <input type="hidden" name="redirectTo" value={redirectTo} />
+                              <input type="hidden" name="intent" value="delete" />
+                              <input type="hidden" name="confirm_delete" value={operation.payment.payment_id} />
+                              <ConfirmSubmitButton
+                                type="submit"
+                                confirmMessage={`Delete this payment/intake record for ${operation.payment.buyer_name || operation.serviceTitle}? This cannot be undone.`}
+                                className="inline-flex items-center gap-2 rounded-full border border-[#C98672]/45 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#7A2F22] transition hover:border-[#7A2F22] hover:bg-[#FFF5F2]"
+                              >
+                                Delete <Trash2 className="h-4 w-4" />
+                              </ConfirmSubmitButton>
                             </form>
                           </div>
                         </div>
@@ -775,6 +819,66 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           </div>
         </section>
 
+        <section className="pb-10">
+          <div className="mx-auto max-w-[1240px] px-6 lg:px-8">
+            <Reveal>
+              <div className="border border-[#D8C8BB] bg-white">
+                <div className="border-b border-[#D8C8BB] px-6 py-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                    Recent payment records
+                  </p>
+                  <h2 className="mt-2 font-serif text-[36px] leading-tight">Clean up sandbox payment tests</h2>
+                </div>
+                {operations.length === 0 ? (
+                  <div className="p-6 text-[15px] leading-relaxed text-[#142334]/70">
+                    No payment records found.
+                  </div>
+                ) : (
+                  <form action="/api/operations/payments/batch" method="post">
+                    <input type="hidden" name="key" value={key || ''} />
+                    <input type="hidden" name="redirectTo" value={buildFilterHref(key, currentFilters, {})} />
+                    <BatchDeleteControls
+                      group="payment-records"
+                      phrase={BATCH_DELETE_CONFIRM_PHRASE}
+                      label="payment records"
+                    />
+                    <div className="divide-y divide-[#D8C8BB]">
+                      {operations.slice(0, 12).map((operation) => (
+                        <div key={operation.payment.payment_id} className="grid gap-4 px-6 py-5 md:grid-cols-[auto_1fr] md:items-center">
+                          <input
+                            type="checkbox"
+                            name="payment_ids"
+                            value={operation.payment.payment_id}
+                            data-batch-group="payment-records"
+                            aria-label={`Select payment record ${operation.payment.payment_id}`}
+                            className="h-4 w-4 accent-[#142334]"
+                          />
+                          <div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <p className="font-serif text-[25px] leading-none text-[#142334]">
+                                {operation.payment.buyer_name || operation.intake?.form_data.fullName || 'Payment record'}
+                              </p>
+                              <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.17em] ${getDeliveryStateClass(operation.deliveryState)}`}>
+                                {operation.deliveryLabel}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/68">
+                              {operation.serviceTitle} - {operation.amountLabel} - {formatDate(operation.payment.confirmed_at || operation.payment.created_at)}
+                            </p>
+                            <p className="mt-1 text-[12px] text-[#142334]/58">
+                              {operation.payment.payment_id}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </form>
+                )}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         <section className="pb-24">
           <div className="mx-auto max-w-[1240px] px-6 lg:px-8">
             <Reveal>
@@ -783,9 +887,16 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   No submissions found for this filter yet.
                 </div>
               ) : (
-                <div className="overflow-hidden border border-[#D8C8BB] bg-white">
-                  <div className="hidden border-b border-[#D8C8BB] bg-[#F7F1EC] px-6 py-4 lg:grid lg:grid-cols-[1.05fr_0.95fr_0.75fr_0.65fr_0.8fr_0.75fr] lg:gap-5">
-                    {['Lead', 'Fit', 'Status', 'Priority', 'Follow-up', 'Actions'].map((label) => (
+                <form action="/api/diagnostic/submissions/batch" method="post" className="overflow-hidden border border-[#D8C8BB] bg-white">
+                  <input type="hidden" name="key" value={key || ''} />
+                  <input type="hidden" name="redirectTo" value={buildFilterHref(key, currentFilters, {})} />
+                  <BatchDeleteControls
+                    group="diagnostic-records"
+                    phrase={BATCH_DELETE_CONFIRM_PHRASE}
+                    label="diagnostic records"
+                  />
+                  <div className="hidden border-b border-[#D8C8BB] bg-[#F7F1EC] px-6 py-4 lg:grid lg:grid-cols-[auto_1.05fr_0.95fr_0.75fr_0.65fr_0.8fr_0.75fr] lg:gap-5">
+                    {['Select', 'Lead', 'Fit', 'Status', 'Priority', 'Follow-up', 'Actions'].map((label) => (
                       <p key={label} className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
                         {label}
                       </p>
@@ -794,9 +905,18 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   <div className="divide-y divide-[#D8C8BB]">
                     {sortedSubmissions.map((submission) => {
                       const priority = getPriorityScore(submission);
-
                       return (
-                        <div key={submission.id} className="px-6 py-6 lg:grid lg:grid-cols-[1.05fr_0.95fr_0.75fr_0.65fr_0.8fr_0.75fr] lg:gap-5">
+                        <div key={submission.id} className="px-6 py-6 lg:grid lg:grid-cols-[auto_1.05fr_0.95fr_0.75fr_0.65fr_0.8fr_0.75fr] lg:gap-5">
+                          <div>
+                            <input
+                              type="checkbox"
+                              name="ids"
+                              value={submission.id}
+                              data-batch-group="diagnostic-records"
+                              aria-label={`Select ${submission.first_name}'s diagnostic record`}
+                              className="h-4 w-4 accent-[#142334]"
+                            />
+                          </div>
                           <div>
                             <Link
                               href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`}
@@ -862,7 +982,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       );
                     })}
                   </div>
-                </div>
+                </form>
               )}
             </Reveal>
           </div>
