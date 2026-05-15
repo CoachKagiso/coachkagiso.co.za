@@ -9,7 +9,8 @@ import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService } from '@/lib/buying-flow';
-import { createPayFastCheckoutFields, getPayFastProcessUrl } from '@/lib/payfast';
+import { getContactEmail } from '@/lib/env';
+import { createPayFastCheckoutFields, getPayFastProcessUrl, isPayFastManualMode } from '@/lib/payfast';
 import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
 
 type BuyPageProps = {
@@ -54,6 +55,11 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const hasAppliedUpgrade = Boolean(appliedUpgradeCredit);
   const checkoutAmount = appliedUpgradeCredit?.discounted_amount ?? service.amount;
   const paymentId = `${service.slug}-${randomUUID()}`;
+  const isManualPaymentMode = isPayFastManualMode();
+  const contactEmail = getContactEmail();
+  const manualMessage = `Hi Kagiso, I want to book ${service.title} for ${formatCurrency(checkoutAmount)}. Please send me the next step while online checkout is being activated.`;
+  const manualEmailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(`Purchase request: ${service.title}`)}&body=${encodeURIComponent(`${manualMessage}\n\nService: ${service.title}\nAmount: ${formatCurrency(checkoutAmount)}`)}`;
+  const manualWhatsAppHref = `https://wa.me/27695124398?text=${encodeURIComponent(manualMessage)}`;
   const fields = createPayFastCheckoutFields(service, paymentId, {
     amountOverride: checkoutAmount,
     customFields: appliedUpgradeCredit ? { custom_str2: appliedUpgradeCredit.token } : undefined,
@@ -74,7 +80,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
         <div className="relative z-10 mx-auto max-w-[1120px] px-6 lg:px-8">
           <Reveal className="max-w-4xl">
             <p className="inline-flex rounded-full border border-[#142334]/25 px-4 py-1 text-[12px] font-semibold uppercase tracking-[0.24em] text-[#142334]/70">
-              Secure checkout
+              {isManualPaymentMode ? 'Direct purchase request' : 'Secure checkout'}
             </p>
             <h1 className="mt-7 font-serif text-[52px] leading-[0.94] md:text-[82px]">
               {service.title}
@@ -94,10 +100,12 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 Purchase flow
               </p>
               <h2 className="mt-4 font-serif text-[40px] leading-tight text-[#142334]">
-                A clear handoff after checkout.
+                {isManualPaymentMode ? 'A direct handoff while checkout is being activated.' : 'A clear handoff after checkout.'}
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/68">
-                You will pay securely through PayFast, then return to a private intake page connected to this order.
+                {isManualPaymentMode
+                  ? 'Online payment is being activated. Send Kagiso a purchase request and she will reply with the next step directly.'
+                  : 'You will pay securely through PayFast, then return to a private intake page connected to this order.'}
               </p>
               {service.slug === 'cv-revamp' && upgradeOffer && (
                 <div className={`mt-6 border p-4 ${upgradeOffer.valid ? 'border-[#C9AD98]/50 bg-[#F7F1EC]' : 'border-[#D8C8BB] bg-[#FCFBFA]'}`}>
@@ -115,8 +123,12 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               )}
               <div className="mt-7 space-y-5">
                 {[
-                  { icon: LockKeyhole, title: 'Secure payment', detail: 'Complete checkout through PayFast using card, EFT, PayShap, or supported options.' },
-                  { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
+                  isManualPaymentMode
+                    ? { icon: MessageCircle, title: 'Send a purchase request', detail: 'Message Kagiso directly with the service you want and she will reply with the next step.' }
+                    : { icon: LockKeyhole, title: 'Secure payment', detail: 'Complete checkout through PayFast using card, EFT, PayShap, or supported options.' },
+                  isManualPaymentMode
+                    ? { icon: FileText, title: 'Brief follows manually', detail: 'Once the payment route is confirmed, Kagiso will send the correct intake instructions for this service.' }
+                    : { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
                   { icon: Clock3, title: 'Delivery starts', detail: `Your ${service.turnaround} turnaround begins once the brief and required file are submitted.` },
                 ].map((step, index) => {
                   const Icon = step.icon;
@@ -182,31 +194,53 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 </p>
               )}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
-                Turnaround: {service.turnaround}. Payment is processed securely by PayFast.
+                Turnaround: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : 'Payment is processed securely by PayFast.'}
               </p>
               <div className="mt-6 border border-white/12 bg-white/[0.04] p-4">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
                   <p className="text-[13px] leading-relaxed text-white/68">
-                    After payment, your order reference unlocks the intake page. You will also receive a confirmation email after submitting your brief.
+                    {isManualPaymentMode
+                      ? 'Online checkout is temporarily paused for merchant verification. Your message keeps your place in the queue without sending you through a broken payment screen.'
+                      : 'After payment, your order reference unlocks the intake page. You will also receive a confirmation email after submitting your brief.'}
                   </p>
                 </div>
               </div>
 
-              <form action={getPayFastProcessUrl()} method="post" className="mt-8">
-                {Object.entries(fields).map(([key, value]) => (
-                  <input key={key} type="hidden" name={key} value={value} />
-                ))}
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
-                >
-                  Continue to PayFast <ArrowUpRight className="h-4 w-4" />
-                </button>
-              </form>
+              {isManualPaymentMode ? (
+                <div className="mt-8 grid gap-3">
+                  <a
+                    href={manualWhatsAppHref}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
+                  >
+                    Message Kagiso on WhatsApp <MessageCircle className="h-4 w-4" />
+                  </a>
+                  <a
+                    href={manualEmailHref}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/20 px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:border-white hover:bg-white hover:text-[#142334]"
+                  >
+                    Email purchase request <ArrowUpRight className="h-4 w-4" />
+                  </a>
+                </div>
+              ) : (
+                <form action={getPayFastProcessUrl()} method="post" className="mt-8">
+                  {Object.entries(fields).map(([key, value]) => (
+                    <input key={key} type="hidden" name={key} value={value} />
+                  ))}
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
+                  >
+                    Continue to PayFast <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </form>
+              )}
 
               <div className="mt-7 space-y-3 border-t border-white/12 pt-6">
-                {['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order'].map((item) => (
+                {(isManualPaymentMode
+                  ? ['No failed checkout page while PayFast verification is pending', 'Kagiso will reply directly with the safest next step']
+                  : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
+                ).map((item) => (
                   <div key={item} className="flex gap-3 text-[13px] leading-relaxed text-white/62">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#C9AD98]" />
                     {item}
@@ -214,13 +248,15 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 ))}
               </div>
 
-              <a
-                href="https://wa.me/27695124398"
-                className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/72 transition hover:text-white"
-              >
-                <MessageCircle className="h-4 w-4 text-[#C9AD98]" />
-                Got questions? WhatsApp me first
-              </a>
+              {!isManualPaymentMode && (
+                <a
+                  href="https://wa.me/27695124398"
+                  className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/72 transition hover:text-white"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#C9AD98]" />
+                  Got questions? WhatsApp me first
+                </a>
+              )}
             </div>
           </Reveal>
         </div>

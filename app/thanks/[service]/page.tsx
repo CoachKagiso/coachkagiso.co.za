@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
 import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
+import { isPayFastSandboxMode } from '@/lib/payfast';
 import { CV_REVIEW_REVAMP_AMOUNT_DUE, ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import IntakeForm from './IntakeForm';
@@ -62,7 +63,7 @@ async function validatePayment(serviceSlug: string, paymentId?: string) {
 
 async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upgradeToken?: string) {
   const service = getAsyncService(serviceSlug);
-  const isSandbox = process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true';
+  const isSandbox = isPayFastSandboxMode();
   const isGeneratedPaymentId = paymentId?.startsWith(`${service?.slug}-`);
 
   if (!service || !paymentId || !isSandbox || !isGeneratedPaymentId) {

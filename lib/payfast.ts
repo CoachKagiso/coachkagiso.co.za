@@ -9,6 +9,14 @@ type PayFastCheckoutOptions = {
   extraReturnParams?: Record<string, string>;
 };
 
+export function isPayFastSandboxMode() {
+  return process.env.PAYFAST_MODE?.trim().toLowerCase() === 'sandbox';
+}
+
+export function isPayFastManualMode() {
+  return process.env.PAYFAST_MODE?.trim().toLowerCase() === 'manual';
+}
+
 function encodePayFastValue(value: string) {
   return encodeURIComponent(value.trim()).replace(/%20/g, '+');
 }
@@ -36,7 +44,7 @@ export function validatePayFastSignature(fields: PayFastFields) {
   if (!received) return false;
 
   const passphrase = process.env.PAYFAST_PASSPHRASE?.trim();
-  const allowUnsignedSandboxFallback = process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true';
+  const allowUnsignedSandboxFallback = isPayFastSandboxMode();
   const candidates = [
     createSignatureString(fields, passphrase),
     createSignatureString(fields, passphrase, true),
@@ -55,7 +63,7 @@ export function validatePayFastSignature(fields: PayFastFields) {
 }
 
 export function getPayFastProcessUrl() {
-  return process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true'
+  return isPayFastSandboxMode()
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process';
 }
