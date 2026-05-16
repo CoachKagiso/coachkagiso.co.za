@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import { Raleway, Noto_Serif_Display, Dancing_Script } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import SmoothScroll from '@/components/SmoothScroll';
 import CookieNotice from '@/components/CookieNotice';
 import MouseTrail from '@/components/MouseTrail';
@@ -98,6 +99,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
         <SmoothScroll>{children}</SmoothScroll>
         <MouseTrail />
         <CookieNotice />
+        <Analytics />
       </body>
     </html>
   );
