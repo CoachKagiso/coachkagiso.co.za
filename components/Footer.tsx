@@ -184,7 +184,7 @@ export default function Footer() {
         <div className="pt-8 flex flex-col md:flex-row justify-between gap-4 text-[12px] uppercase tracking-[0.16em] text-white/45">
           <p>Copyright 2026 Coach Kagiso. All rights reserved.</p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            <a href="https://kreativeforeflow.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+            <a href="https://kreativereflow.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
               A KREATIVE REFLOW DESIGN.
             </a>
             <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
