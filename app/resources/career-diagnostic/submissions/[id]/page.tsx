@@ -12,6 +12,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
+import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import LeadProfileEmailButton from '@/components/leads/LeadProfileEmailButton';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PrintButton from '@/components/PrintButton';
@@ -24,6 +26,7 @@ import {
   type DiagnosticSubmission,
 } from '@/lib/diagnostic-submissions';
 import { questions } from '@/lib/career-diagnostic';
+import { listNotes } from '@/lib/dashboard-task-records';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +63,7 @@ function getStatusClass(status: DiagnosticLeadStatus) {
   if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';
 }
@@ -78,7 +82,7 @@ function getPriorityScore(submission: DiagnosticSubmission) {
   if (service.includes('Glow Up') || service.includes('Career Clarity')) score += 15;
   if (submission.archetype_key === 'D' || submission.archetype_key === 'C') score += 10;
   if (submission.lead_status === 'discovery_booked' || submission.lead_status === 'paid') score -= 20;
-  if (submission.lead_status === 'not_a_fit' || submission.lead_status === 'archived') score -= 45;
+  if (submission.lead_status === 'not_a_fit' || submission.lead_status === 'archived' || submission.lead_status === 'closed') score -= 45;
 
   return Math.max(0, Math.min(score, 100));
 }
@@ -91,43 +95,9 @@ function getNextAction(submission: DiagnosticSubmission) {
   }
   if (submission.lead_status === 'new') return 'Send the first result follow-up while the diagnostic is still fresh.';
   if (submission.lead_status === 'follow_up_later') return 'Wait for the scheduled follow-up date.';
+  if (submission.lead_status === 'closed') return 'Closed.';
   if (submission.lead_status === 'not_a_fit') return 'Keep context saved, but do not prioritise active outreach.';
   return 'Check whether a second nudge or service route is useful.';
-}
-
-function buildLeadEmailHref(
-  firstName: string,
-  email: string,
-  archetypeName: string,
-  payload: {
-    tagline?: string;
-    diagnosis?: string;
-    action?: string;
-    service?: string;
-    href?: string;
-  }
-) {
-  const subject = encodeURIComponent(`Your career diagnostic result: ${archetypeName}`);
-  const body = encodeURIComponent(`Hi ${firstName},
-
-Thank you for taking the 5-Minute Career Diagnostic.
-
-Your result came through as: ${archetypeName}.
-${payload.tagline ? `\n${payload.tagline}\n` : ''}
-What this suggests:
-${payload.diagnosis || 'You are in a career season that needs a clearer next step.'}
-
-One useful action for this week:
-${payload.action || 'Choose one focused action and complete it before collecting more advice.'}
-
-If you want support with the next step we discussed, you can start here:
-${payload.service || 'Support option'}
-${payload.href ? `\nhttps://coachkagiso.co.za${payload.href}` : ''}
-
-Warmly,
-Coach Kagiso`);
-
-  return `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
 }
 
 function getAnswerRows(submission: DiagnosticSubmission) {
@@ -168,6 +138,15 @@ export default async function DiagnosticSubmissionSummaryPage({
   const answerRows = getAnswerRows(submission);
   const priority = getPriorityScore(submission);
   const profileHref = `/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`;
+  const allNotes = await listNotes();
+  const leadNotes = allNotes.filter((note) => note.linkedLeadId === submission.id);
+  const leadEmailModalLead = {
+    id: submission.id,
+    firstName: submission.first_name,
+    email: submission.email,
+    archetype: submission.archetype_name,
+    serviceInterest: submission.archetype_payload?.service || '',
+  };
 
   return (
     <>
@@ -184,17 +163,12 @@ export default async function DiagnosticSubmissionSummaryPage({
                 Back to command center
               </Link>
               <div className="flex flex-wrap gap-3">
-                <a
-                  href={buildLeadEmailHref(
-                    submission.first_name,
-                    submission.email,
-                    submission.archetype_name,
-                    payload
-                  )}
+                <LeadEmailButton
+                  lead={leadEmailModalLead}
+                  initialNotes={leadNotes}
+                  label="Email lead"
                   className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
-                >
-                  Email lead <Mail className="h-4 w-4" />
-                </a>
+                />
                 <PrintButton
                   className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
                 >
@@ -239,13 +213,10 @@ export default async function DiagnosticSubmissionSummaryPage({
                   <h1 className="mt-4 font-serif text-[54px] leading-[0.94]">
                     {submission.first_name}
                   </h1>
-                  <a
-                    href={`mailto:${submission.email}`}
-                    className="mt-4 inline-flex items-center gap-2 text-[16px] leading-relaxed text-[#142334]/72 transition hover:text-[#C9AD98]"
-                  >
+                  <p className="mt-4 inline-flex items-center gap-2 text-[16px] leading-relaxed text-[#142334]/72">
                     <Mail className="h-4 w-4" />
                     {submission.email}
-                  </a>
+                  </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <span className={`rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] ${getStatusClass(submission.lead_status)}`}>
                       {getStatusLabel(submission.lead_status)}
@@ -368,6 +339,7 @@ export default async function DiagnosticSubmissionSummaryPage({
                         className="resize-y border border-[#D8C8BB] bg-[#FCFBFA] px-4 py-3 text-[14px] leading-relaxed outline-none focus:border-[#142334]"
                       />
                     </label>
+                    <LeadProfileEmailButton lead={leadEmailModalLead} initialNotes={leadNotes} />
                     <button
                       type="submit"
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-[#142334] px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"

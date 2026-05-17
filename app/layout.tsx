@@ -93,10 +93,10 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={`${raleway.variable} ${notoSerif.variable} ${dancingScript.variable}`} suppressHydrationWarning>
-      <body className="font-sans antialiased text-[#142334] bg-white" suppressHydrationWarning>
+      <body className="cursor-none font-sans antialiased text-[#142334] bg-white" suppressHydrationWarning>
         <OrganizationJsonLd />
-        <SmoothScroll>{children}</SmoothScroll>
         <MouseTrail />
+        <SmoothScroll>{children}</SmoothScroll>
         <CookieNotice />
       </body>
     </html>

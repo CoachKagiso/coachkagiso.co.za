@@ -1,0 +1,678 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - link "Coach Kagiso home" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "Coach Kagiso" [ref=e7]
+        - generic [ref=e8]:
+          - link "Home" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - text: Home
+          - link "About" [ref=e11] [cursor=pointer]:
+            - /url: /about
+            - text: About
+          - link "Work With Me" [ref=e12] [cursor=pointer]:
+            - /url: /work-with-me
+            - text: Work With Me
+          - link "Insights" [ref=e13] [cursor=pointer]:
+            - /url: /insights
+            - text: Insights
+          - generic [ref=e14]:
+            - link "Resources" [ref=e15] [cursor=pointer]:
+              - /url: /resources
+              - text: Resources
+              - img [ref=e16]
+            - generic:
+              - link "Career tools Diagnostics and guided assessments":
+                - /url: /resources/tools
+                - generic: Career tools
+                - generic: Diagnostics and guided assessments
+              - link "Free downloads PDFs, checklists, and prompts":
+                - /url: /resources/downloads
+                - generic: Free downloads
+                - generic: PDFs, checklists, and prompts
+          - link "Contact" [ref=e18] [cursor=pointer]:
+            - /url: /contact
+            - text: Contact
+        - link "Book a Discovery Call" [ref=e20] [cursor=pointer]:
+          - /url: /book/discovery
+    - generic [ref=e21]:
+      - generic:
+        - generic: ELEVATE
+      - generic:
+        - img
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - paragraph [ref=e25]: Career Development & Personal Brand Coach
+          - heading "You did the work. Why isn't anything moving?" [level=1] [ref=e26]:
+            - text: You did the work.
+            - text: Why isn't anything moving?
+          - paragraph [ref=e28]: You've out-earned your graduate self. Or you're still waiting for the chance to prove you can. Promotion isn't coming because nobody is making it for you. That's not bad luck. That's how early to mid-career works in South Africa.
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - link "Take the 5-minute audit →" [ref=e31] [cursor=pointer]:
+                - /url: "#leadmagnet"
+              - link "See 1-on-1 services →" [ref=e32] [cursor=pointer]:
+                - /url: "#services"
+                - text: See 1-on-1 services →
+            - generic [ref=e33]: Free, by email, in under 2 minutes
+        - img "Professional Black woman coach" [ref=e37]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: Career Coaching
+        - generic [ref=e43]: ·
+      - generic [ref=e44]:
+        - generic [ref=e45]: Leadership
+        - generic [ref=e46]: ·
+      - generic [ref=e47]:
+        - generic [ref=e48]: Mentorship
+        - generic [ref=e49]: ·
+      - generic [ref=e50]:
+        - generic [ref=e51]: Personal Branding
+        - generic [ref=e52]: ·
+      - generic [ref=e53]:
+        - generic [ref=e54]: Show up. Stand out. Level up.
+        - generic [ref=e55]: ·
+      - generic [ref=e56]:
+        - generic [ref=e57]: Skills Development
+        - generic [ref=e58]: ·
+      - generic [ref=e59]:
+        - generic [ref=e60]: Training
+        - generic [ref=e61]: ·
+      - generic [ref=e62]:
+        - generic [ref=e63]: Facilitation
+        - generic [ref=e64]: ·
+      - generic [ref=e65]:
+        - generic [ref=e66]: Career Clarity
+        - generic [ref=e67]: ·
+      - generic [ref=e68]:
+        - generic [ref=e69]: Show up. Stand out. Level up.
+        - generic [ref=e70]: ·
+      - generic [ref=e71]:
+        - generic [ref=e72]: Career Coaching
+        - generic [ref=e73]: ·
+      - generic [ref=e74]:
+        - generic [ref=e75]: Leadership
+        - generic [ref=e76]: ·
+      - generic [ref=e77]:
+        - generic [ref=e78]: Mentorship
+        - generic [ref=e79]: ·
+      - generic [ref=e80]:
+        - generic [ref=e81]: Personal Branding
+        - generic [ref=e82]: ·
+      - generic [ref=e83]:
+        - generic [ref=e84]: Show up. Stand out. Level up.
+        - generic [ref=e85]: ·
+      - generic [ref=e86]:
+        - generic [ref=e87]: Skills Development
+        - generic [ref=e88]: ·
+      - generic [ref=e89]:
+        - generic [ref=e90]: Training
+        - generic [ref=e91]: ·
+      - generic [ref=e92]:
+        - generic [ref=e93]: Facilitation
+        - generic [ref=e94]: ·
+      - generic [ref=e95]:
+        - generic [ref=e96]: Career Clarity
+        - generic [ref=e97]: ·
+      - generic [ref=e98]:
+        - generic [ref=e99]: Show up. Stand out. Level up.
+        - generic [ref=e100]: ·
+      - generic [ref=e101]:
+        - generic [ref=e102]: Career Coaching
+        - generic [ref=e103]: ·
+      - generic [ref=e104]:
+        - generic [ref=e105]: Leadership
+        - generic [ref=e106]: ·
+      - generic [ref=e107]:
+        - generic [ref=e108]: Mentorship
+        - generic [ref=e109]: ·
+      - generic [ref=e110]:
+        - generic [ref=e111]: Personal Branding
+        - generic [ref=e112]: ·
+      - generic [ref=e113]:
+        - generic [ref=e114]: Show up. Stand out. Level up.
+        - generic [ref=e115]: ·
+      - generic [ref=e116]:
+        - generic [ref=e117]: Skills Development
+        - generic [ref=e118]: ·
+      - generic [ref=e119]:
+        - generic [ref=e120]: Training
+        - generic [ref=e121]: ·
+      - generic [ref=e122]:
+        - generic [ref=e123]: Facilitation
+        - generic [ref=e124]: ·
+      - generic [ref=e125]:
+        - generic [ref=e126]: Career Clarity
+        - generic [ref=e127]: ·
+      - generic [ref=e128]:
+        - generic [ref=e129]: Show up. Stand out. Level up.
+        - generic [ref=e130]: ·
+      - generic [ref=e131]:
+        - generic [ref=e132]: Career Coaching
+        - generic [ref=e133]: ·
+      - generic [ref=e134]:
+        - generic [ref=e135]: Leadership
+        - generic [ref=e136]: ·
+      - generic [ref=e137]:
+        - generic [ref=e138]: Mentorship
+        - generic [ref=e139]: ·
+      - generic [ref=e140]:
+        - generic [ref=e141]: Personal Branding
+        - generic [ref=e142]: ·
+      - generic [ref=e143]:
+        - generic [ref=e144]: Show up. Stand out. Level up.
+        - generic [ref=e145]: ·
+      - generic [ref=e146]:
+        - generic [ref=e147]: Skills Development
+        - generic [ref=e148]: ·
+      - generic [ref=e149]:
+        - generic [ref=e150]: Training
+        - generic [ref=e151]: ·
+      - generic [ref=e152]:
+        - generic [ref=e153]: Facilitation
+        - generic [ref=e154]: ·
+      - generic [ref=e155]:
+        - generic [ref=e156]: Career Clarity
+        - generic [ref=e157]: ·
+      - generic [ref=e158]:
+        - generic [ref=e159]: Show up. Stand out. Level up.
+        - generic [ref=e160]: ·
+    - generic [ref=e161]:
+      - generic: WORK
+      - generic [ref=e162]:
+        - generic [ref=e163]:
+          - paragraph [ref=e164]: Who I work with
+          - heading "Career coaching for the moment you are actually in." [level=2] [ref=e165]
+          - paragraph [ref=e166]: Whether you are stuck, searching, or ready to pivot, there is a place for you here.
+        - generic [ref=e167]:
+          - generic [ref=e168]:
+            - generic [ref=e169]: "01"
+            - heading "Past entry-level, stuck in the same role" [level=3] [ref=e170]
+            - paragraph [ref=e171]: You have put in the years. You are earning more than you did as a grad, but the title has not moved. The problem is not your work. It is that your work is not visible to the people who decide.
+          - generic [ref=e172]:
+            - generic [ref=e173]: "02"
+            - heading "Qualified, but cannot find a way in" [level=3] [ref=e174]
+            - paragraph [ref=e175]: You have the degree and the grades, but your applications keep disappearing. You need a CV that actually gets opened and a way into rooms you did not know existed.
+          - generic [ref=e176]:
+            - generic [ref=e177]: "03"
+            - heading "Ready to pivot, not start over" [level=3] [ref=e178]
+            - paragraph [ref=e179]: You are done with your industry, but you are not trying to start again at the bottom. You need a bridge from where you are to where you are going.
+        - paragraph [ref=e181]:
+          - text: Whichever one of these you are, the audit is the place to start.
+          - link "Take 5 minutes →" [ref=e182] [cursor=pointer]:
+            - /url: /#leadmagnet
+            - text: Take 5 minutes
+            - generic [ref=e183]: →
+    - generic [ref=e184]:
+      - generic: DIAGNOSTIC
+      - generic:
+        - img
+      - generic [ref=e186]:
+        - generic [ref=e189]:
+          - img "Career diagnostic worksheet on a desk" [ref=e191]
+          - generic [ref=e192]:
+            - generic [ref=e193]:
+              - img [ref=e194]
+              - generic [ref=e197]: 10 questions
+            - generic [ref=e198]:
+              - img [ref=e199]
+              - generic [ref=e202]: Career archetype
+            - generic [ref=e203]:
+              - img [ref=e204]
+              - generic [ref=e207]: 7-day action
+            - generic [ref=e208]:
+              - img [ref=e209]
+              - generic [ref=e212]: Matched next step
+        - generic [ref=e213]:
+          - paragraph [ref=e214]: Free 5-minute diagnostic
+          - heading "Find out which kind of stuck you are before you try to fix the wrong thing." [level=2] [ref=e215]
+          - paragraph [ref=e216]: Answer 10 focused questions and receive a career archetype, a 7-day action, and a next step that matches your current career season.
+          - generic [ref=e218]:
+            - link "Take the diagnostic" [ref=e219] [cursor=pointer]:
+              - /url: /resources/career-diagnostic
+              - text: Take the diagnostic
+              - img [ref=e220]
+            - generic [ref=e223]: Result shown instantly, with a practical next step at the end.
+    - generic [ref=e225]:
+      - generic [ref=e226]:
+        - generic:
+          - img
+      - generic:
+        - img
+      - generic [ref=e227]:
+        - img "Coach Kagiso portrait" [ref=e230]
+        - generic [ref=e231]:
+          - generic [ref=e232]:
+            - generic:
+              - img
+            - paragraph [ref=e233]: "\"As soon as you feel that you're comfortable in a space, that's the most dangerous and riskiest place that you can be.\""
+            - paragraph [ref=e234]: Coach Kagiso
+          - generic [ref=e235]:
+            - paragraph [ref=e236]: About Coach Kagiso
+            - 'heading "The short version: I know what invisible potential feels like." [level=2] [ref=e237]'
+            - generic [ref=e238]:
+              - paragraph [ref=e239]: I am a Career Development and Personal Brand Coach. My clients are usually past entry-level, employed, capable, and quietly losing patience with their own trajectory.
+              - paragraph [ref=e240]: "I learned something useful from my own career: doing good work does not automatically move you. The people who get considered are usually the ones whose work is visible to people who can do something about it."
+              - paragraph [ref=e241]: That is the work I do with private clients. We clean up the story, close the gaps, and build a plan that helps you move with intention instead of waiting to be noticed.
+            - generic [ref=e242]:
+              - paragraph [ref=e244]: Visibility
+              - paragraph [ref=e246]: Career clarity
+              - paragraph [ref=e248]: Personal brand
+            - generic [ref=e249]:
+              - generic [ref=e250]: Coach Kagiso
+              - link "Read the full story →" [ref=e251] [cursor=pointer]:
+                - /url: /about
+                - text: Read the full story →
+    - generic [ref=e253]:
+      - generic [ref=e254]:
+        - generic [ref=e256]: WHAT PEOPLE SAY
+        - heading "From people I've worked with" [level=2] [ref=e257]
+        - paragraph [ref=e258]: I want to keep it honest, I want to keep it real, I want to keep it raw.
+      - generic [ref=e259]:
+        - generic [ref=e261]:
+          - generic [ref=e262]:
+            - generic [ref=e263]: She is the best and she will guide you in the right direction. I am living testimony. Opportunities just start opening up.
+            - generic [ref=e265]:
+              - generic [ref=e266]: Gcina
+              - generic [ref=e267]: Mid-career Professional
+          - generic [ref=e268]:
+            - generic [ref=e269]: The best decision I have made for myself. Thank you Kagiso for your guidance.
+            - generic [ref=e271]:
+              - generic [ref=e272]: Kgothatso
+              - generic [ref=e273]: Professional
+          - generic [ref=e274]:
+            - generic [ref=e275]: When you learn from the best, you become the best no doubt.
+            - generic [ref=e277]:
+              - generic [ref=e278]: Cynthia
+              - generic [ref=e279]: Professional
+          - generic [ref=e280]:
+            - generic [ref=e281]: She is the best and she will guide you in the right direction. I am living testimony. Opportunities just start opening up.
+            - generic [ref=e283]:
+              - generic [ref=e284]: Gcina
+              - generic [ref=e285]: Mid-career Professional
+          - generic [ref=e286]:
+            - generic [ref=e287]: The best decision I have made for myself. Thank you Kagiso for your guidance.
+            - generic [ref=e289]:
+              - generic [ref=e290]: Kgothatso
+              - generic [ref=e291]: Professional
+          - generic [ref=e292]:
+            - generic [ref=e293]: When you learn from the best, you become the best no doubt.
+            - generic [ref=e295]:
+              - generic [ref=e296]: Cynthia
+              - generic [ref=e297]: Professional
+        - generic [ref=e299]:
+          - generic [ref=e300]:
+            - generic [ref=e301]: Working with Kagiso has been one of the most transformative experiences of my professional journey. Her guidance gave me the confidence to lean into discomfort.
+            - generic [ref=e303]:
+              - generic [ref=e304]: Tshepang
+              - generic [ref=e305]: Mid-career Professional
+          - generic [ref=e306]:
+            - generic [ref=e307]: You helped me prepare for a senior leadership role and refine my interview approach. I secured the position.
+            - generic [ref=e309]:
+              - generic [ref=e310]: Mbalizethu
+              - generic [ref=e311]: Senior Leader
+          - generic [ref=e312]:
+            - generic [ref=e313]: We had sessions which were just more than sessions. You helped me believe in myself again and know my worth, even when unemployed. I landed a job.
+            - generic [ref=e315]:
+              - generic [ref=e316]: KG
+              - generic [ref=e317]: Job Seeker
+          - generic [ref=e318]:
+            - generic [ref=e319]: Working with Kagiso has been one of the most transformative experiences of my professional journey. Her guidance gave me the confidence to lean into discomfort.
+            - generic [ref=e321]:
+              - generic [ref=e322]: Tshepang
+              - generic [ref=e323]: Mid-career Professional
+          - generic [ref=e324]:
+            - generic [ref=e325]: You helped me prepare for a senior leadership role and refine my interview approach. I secured the position.
+            - generic [ref=e327]:
+              - generic [ref=e328]: Mbalizethu
+              - generic [ref=e329]: Senior Leader
+          - generic [ref=e330]:
+            - generic [ref=e331]: We had sessions which were just more than sessions. You helped me believe in myself again and know my worth, even when unemployed. I landed a job.
+            - generic [ref=e333]:
+              - generic [ref=e334]: KG
+              - generic [ref=e335]: Job Seeker
+        - generic [ref=e337]:
+          - generic [ref=e338]:
+            - generic [ref=e339]: She quickly understood my career goals, highlighted my strengths with clarity, and transformed my profile into a compelling, professional brand.
+            - generic [ref=e341]:
+              - generic [ref=e342]: Kelebogile
+              - generic [ref=e343]: Mid-career Professional
+          - generic [ref=e344]:
+            - generic [ref=e345]: Professional, patient, and results-driven. She transformed my profile into a clear, compelling representation of my skills and experience.
+            - generic [ref=e347]:
+              - generic [ref=e348]: Katlego
+              - generic [ref=e349]: Mid-career Professional
+          - generic [ref=e350]:
+            - generic [ref=e351]: You came at a time when I didn't know where to turn, and gave me clarity, direction, and hope. You refined my CV, and within two months I secured two interviews.
+            - generic [ref=e353]:
+              - generic [ref=e354]: Bulelani
+              - generic [ref=e355]: Career Changer
+          - generic [ref=e356]:
+            - generic [ref=e357]: She quickly understood my career goals, highlighted my strengths with clarity, and transformed my profile into a compelling, professional brand.
+            - generic [ref=e359]:
+              - generic [ref=e360]: Kelebogile
+              - generic [ref=e361]: Mid-career Professional
+          - generic [ref=e362]:
+            - generic [ref=e363]: Professional, patient, and results-driven. She transformed my profile into a clear, compelling representation of my skills and experience.
+            - generic [ref=e365]:
+              - generic [ref=e366]: Katlego
+              - generic [ref=e367]: Mid-career Professional
+          - generic [ref=e368]:
+            - generic [ref=e369]: You came at a time when I didn't know where to turn, and gave me clarity, direction, and hope. You refined my CV, and within two months I secured two interviews.
+            - generic [ref=e371]:
+              - generic [ref=e372]: Bulelani
+              - generic [ref=e373]: Career Changer
+    - generic [ref=e374]:
+      - generic:
+        - generic:
+          - generic:
+            - img "Elevate Saturday Masterclass set with branded backdrop and lounge chairs"
+          - generic:
+            - generic:
+              - img
+      - generic [ref=e376]:
+        - generic [ref=e377]:
+          - paragraph [ref=e378]: Seasonal masterclass
+          - heading "Learn the career moves people usually find out too late." [level=2] [ref=e379]
+        - generic [ref=e380]:
+          - paragraph [ref=e381]: Masterclasses run seasonally for people who want focused support around visibility, CV positioning, interview confidence, and career pivots.
+          - generic [ref=e382]:
+            - paragraph [ref=e384]: Live teaching
+            - paragraph [ref=e386]: Practical pre-work
+            - paragraph [ref=e388]: Early access
+          - generic [ref=e389]:
+            - link "Reserve my seat" [ref=e390] [cursor=pointer]:
+              - /url: /book/masterclass
+              - text: Reserve my seat
+              - img [ref=e391]
+            - link "Learn more" [ref=e394] [cursor=pointer]:
+              - /url: /about
+              - text: Learn more
+              - img [ref=e395]
+    - generic [ref=e398]:
+      - generic: INSIGHTS
+      - generic [ref=e399]:
+        - generic [ref=e400]:
+          - generic [ref=e401]:
+            - paragraph [ref=e402]: Learn with me
+            - heading "Career strategies for the work behind the work." [level=2] [ref=e403]
+          - generic [ref=e404]:
+            - paragraph [ref=e405]: Practical field notes for visibility, CV strategy, career pivots, and the conversations that move your name into the right rooms.
+            - link "View all insights" [ref=e406] [cursor=pointer]:
+              - /url: /insights
+              - text: View all insights
+              - img [ref=e407]
+        - generic [ref=e410]:
+          - article [ref=e411]:
+            - 'link "Two professionals in a bright office conversation about leadership and growth Insider Advice 10 min read The First-Time Manager''s Survival Guide: Your First 30 Days Getting promoted is one thing. Knowing what to do next is another. Here is what actually works in the first 30 days as a new manager in a South African workplace. Read article" [ref=e412] [cursor=pointer]':
+              - /url: /insights/first-time-manager-south-africa-first-30-days
+              - img "Two professionals in a bright office conversation about leadership and growth" [ref=e414]
+              - generic [ref=e415]:
+                - generic [ref=e416]:
+                  - generic [ref=e417]: Insider Advice
+                  - generic [ref=e418]:
+                    - img [ref=e419]
+                    - text: 10 min read
+                - 'heading "The First-Time Manager''s Survival Guide: Your First 30 Days" [level=3] [ref=e422]'
+                - paragraph [ref=e423]: Getting promoted is one thing. Knowing what to do next is another. Here is what actually works in the first 30 days as a new manager in a South African workplace.
+                - generic [ref=e424]:
+                  - text: Read article
+                  - img [ref=e425]
+          - article [ref=e428]:
+            - 'link "LinkedIn profile open on a laptop in a warm professional workspace Search Pillar 11 min read LinkedIn Profile Optimisation for SA Professionals: The Complete Playbook Most SA professionals have a LinkedIn profile. Very few have one that gets them found. Here is how the algorithm works in 2026 and how to fix your profile section by section. Read article" [ref=e429] [cursor=pointer]':
+              - /url: /insights/linkedin-profile-optimisation-south-africa-2026
+              - img "LinkedIn profile open on a laptop in a warm professional workspace" [ref=e431]
+              - generic [ref=e432]:
+                - generic [ref=e433]:
+                  - generic [ref=e434]: Search Pillar
+                  - generic [ref=e435]:
+                    - img [ref=e436]
+                    - text: 11 min read
+                - 'heading "LinkedIn Profile Optimisation for SA Professionals: The Complete Playbook" [level=3] [ref=e439]'
+                - paragraph [ref=e440]: Most SA professionals have a LinkedIn profile. Very few have one that gets them found. Here is how the algorithm works in 2026 and how to fix your profile section by section.
+                - generic [ref=e441]:
+                  - text: Read article
+                  - img [ref=e442]
+          - article [ref=e445]:
+            - link "Professional reviewing CV documents on a laptop Search Pillar 10 min read The ATS Test Your CV Is Failing in South Africa (and the 4-Minute Fix) Most CVs sent to SA companies never reach a human. Here is how ATS works in South Africa, what breaks it, and how to fix your CV in under 4 minutes. Read article" [ref=e446] [cursor=pointer]:
+              - /url: /insights/ats-cv-south-africa-4-minute-fix
+              - img "Professional reviewing CV documents on a laptop" [ref=e448]
+              - generic [ref=e449]:
+                - generic [ref=e450]:
+                  - generic [ref=e451]: Search Pillar
+                  - generic [ref=e452]:
+                    - img [ref=e453]
+                    - text: 10 min read
+                - heading "The ATS Test Your CV Is Failing in South Africa (and the 4-Minute Fix)" [level=3] [ref=e456]
+                - paragraph [ref=e457]: Most CVs sent to SA companies never reach a human. Here is how ATS works in South Africa, what breaks it, and how to fix your CV in under 4 minutes.
+                - generic [ref=e458]:
+                  - text: Read article
+                  - img [ref=e459]
+    - generic [ref=e462]:
+      - generic:
+        - img
+      - generic [ref=e465]:
+        - generic [ref=e466]:
+          - paragraph [ref=e467]: Good questions
+          - heading "Still deciding if this is the right step?" [level=2] [ref=e468]
+          - paragraph [ref=e469]: These are the questions people usually ask before we work together. If your question is more personal, send it through.
+          - link "Ask a question" [ref=e470] [cursor=pointer]:
+            - /url: /contact
+            - img [ref=e471]
+            - text: Ask a question
+        - generic [ref=e473]:
+          - group [ref=e474]:
+            - generic "01 How long does a CV revamp take?" [ref=e475] [cursor=pointer]:
+              - generic [ref=e476]: "01"
+              - generic [ref=e477]: How long does a CV revamp take?
+              - img [ref=e478]
+            - generic [ref=e480]: Typically 5-7 business days from the moment you submit your intake form. The process is careful because the goal is not a prettier document. The goal is clearer positioning.
+          - group [ref=e481]:
+            - generic "02 Do you only work with banking and insurance professionals?" [ref=e482] [cursor=pointer]:
+              - generic [ref=e483]: "02"
+              - generic [ref=e484]: Do you only work with banking and insurance professionals?
+              - img [ref=e485]
+          - group [ref=e487]:
+            - generic "03 What happens in the Career Clarity call?" [ref=e488] [cursor=pointer]:
+              - generic [ref=e489]: "03"
+              - generic [ref=e490]: What happens in the Career Clarity call?
+              - img [ref=e491]
+          - group [ref=e493]:
+            - generic "04 Will my CV pass South African ATS systems?" [ref=e494] [cursor=pointer]:
+              - generic [ref=e495]: "04"
+              - generic [ref=e496]: Will my CV pass South African ATS systems?
+              - img [ref=e497]
+          - group [ref=e499]:
+            - generic "05 How do I pay?" [ref=e500] [cursor=pointer]:
+              - generic [ref=e501]: "05"
+              - generic [ref=e502]: How do I pay?
+              - img [ref=e503]
+          - group [ref=e505]:
+            - generic "06 Do you offer refunds?" [ref=e506] [cursor=pointer]:
+              - generic [ref=e507]: "06"
+              - generic [ref=e508]: Do you offer refunds?
+              - img [ref=e509]
+    - generic [ref=e511]:
+      - generic:
+        - generic: CONTACT
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic [ref=e513]:
+        - generic [ref=e514]:
+          - paragraph [ref=e515]: Reach out
+          - heading "Ready to map out your next career move?" [level=2] [ref=e516]
+          - paragraph [ref=e517]: Use this quick form if you know enough to reach out. If your situation needs more context, the contact page has the fuller enquiry form.
+          - generic [ref=e518]:
+            - link "Email hello@coachkagiso.co.za" [ref=e519] [cursor=pointer]:
+              - /url: mailto:hello@coachkagiso.co.za
+              - generic [ref=e520]:
+                - img [ref=e522]
+                - generic [ref=e525]:
+                  - generic [ref=e526]: Email
+                  - generic [ref=e527]: hello@coachkagiso.co.za
+              - img [ref=e528]
+            - link "WhatsApp 069 512 4398" [ref=e531] [cursor=pointer]:
+              - /url: https://wa.me/27695124398
+              - generic [ref=e532]:
+                - img [ref=e534]
+                - generic [ref=e536]:
+                  - generic [ref=e537]: WhatsApp
+                  - generic [ref=e538]: 069 512 4398
+              - img [ref=e539]
+          - paragraph [ref=e542]: I usually reply within 24 hours on weekdays. If it is urgent, WhatsApp is the quickest route.
+          - link "Open the detailed contact form" [ref=e543] [cursor=pointer]:
+            - /url: /contact
+            - text: Open the detailed contact form
+            - img [ref=e544]
+        - generic [ref=e550]:
+          - generic [ref=e551]:
+            - paragraph [ref=e552]: Quick enquiry
+            - heading "Send the short version." [level=3] [ref=e553]
+          - generic [ref=e554]:
+            - generic [ref=e555]:
+              - generic [ref=e556]: Name *
+              - textbox "Name *" [ref=e557]
+            - generic [ref=e558]:
+              - generic [ref=e559]: Email *
+              - textbox "Email *" [ref=e560]
+          - generic [ref=e561]:
+            - generic [ref=e562]:
+              - text: WhatsApp number
+              - textbox "WhatsApp number" [ref=e563]:
+                - /placeholder: Optional
+            - generic [ref=e564]:
+              - generic [ref=e565]: What do you need? *
+              - combobox "What do you need? *" [ref=e566]:
+                - option "Choose one" [selected]
+                - option "CV Review or CV Revamp"
+                - option "LinkedIn Optimisation"
+                - option "CV + LinkedIn Bundle"
+                - option "Career Clarity Session"
+                - option "Glow Up VIP Package"
+                - option "Saturday Masterclass"
+                - option "Free audit or resources"
+                - option "I am not sure yet"
+          - generic [ref=e567]:
+            - generic [ref=e568]: Short note *
+            - textbox "Short note *" [ref=e569]:
+              - /placeholder: One or two lines is enough. Tell me what you want help with.
+          - generic [ref=e570]:
+            - checkbox "I understand my information will only be used to respond to this enquiry." [ref=e571]
+            - generic [ref=e572]: I understand my information will only be used to respond to this enquiry.
+          - button "Send message" [ref=e573]:
+            - text: Send message
+            - img [ref=e574]
+    - generic [ref=e577]:
+      - generic:
+        - generic:
+          - generic: Coach Kagiso
+          - generic: Coach Kagiso
+          - generic: Coach Kagiso
+          - generic: Coach Kagiso
+          - generic: Coach Kagiso
+          - generic: Coach Kagiso
+      - generic:
+        - img
+      - generic [ref=e578]:
+        - generic [ref=e579]:
+          - generic [ref=e580]:
+            - paragraph [ref=e581]: Ready when you are
+            - heading "Your career does not need more waiting." [level=2] [ref=e582]
+            - paragraph [ref=e583]: "Start with a conversation, the free diagnostic, or the latest insights. Wherever you begin, the goal is the same: show up, stand out, and move with intention."
+            - generic [ref=e584]:
+              - link "Book a discovery call" [ref=e585] [cursor=pointer]:
+                - /url: /book/discovery
+              - link "Take the diagnostic" [ref=e586] [cursor=pointer]:
+                - /url: /resources/career-diagnostic
+          - generic [ref=e587]:
+            - paragraph [ref=e588]: Stay in the loop
+            - heading "One useful career note a month." [level=3] [ref=e589]
+            - paragraph [ref=e590]: Practical prompts, new articles, and early access to resources. No noisy inbox energy.
+            - generic [ref=e591]:
+              - textbox "Email address" [ref=e592]
+              - button "Join" [ref=e593]
+            - paragraph [ref=e594]: POPIA-conscious. Unsubscribe anytime.
+        - generic [ref=e595]:
+          - generic [ref=e596]:
+            - link "Coach Kagiso home" [ref=e597] [cursor=pointer]:
+              - /url: /
+              - img "Coach Kagiso" [ref=e598]
+            - paragraph [ref=e599]: Career Development and Personal Brand Coach for capable people who are ready to stop being overlooked.
+          - generic [ref=e600]:
+            - paragraph [ref=e601]: Navigate
+            - generic [ref=e602]:
+              - link "Home" [ref=e603] [cursor=pointer]:
+                - /url: /
+                - text: Home
+              - link "About" [ref=e604] [cursor=pointer]:
+                - /url: /about
+                - text: About
+              - link "Work With Me" [ref=e605] [cursor=pointer]:
+                - /url: /work-with-me
+                - text: Work With Me
+              - link "Insights" [ref=e606] [cursor=pointer]:
+                - /url: /insights
+                - text: Insights
+              - link "Resources" [ref=e607] [cursor=pointer]:
+                - /url: /resources
+                - text: Resources
+              - link "Contact" [ref=e608] [cursor=pointer]:
+                - /url: /contact
+                - text: Contact
+          - generic [ref=e609]:
+            - paragraph [ref=e610]: Support
+            - generic [ref=e611]:
+              - link "CV strategy" [ref=e612] [cursor=pointer]:
+                - /url: /buy/cv-review
+                - text: CV strategy
+              - link "Personal brand audit" [ref=e613] [cursor=pointer]:
+                - /url: /resources/personal-brand-audit
+                - text: Personal brand audit
+              - link "Career clarity" [ref=e614] [cursor=pointer]:
+                - /url: /book/clarity
+                - text: Career clarity
+              - link "Interview preparation" [ref=e615] [cursor=pointer]:
+                - /url: /book/glow-up
+                - text: Interview preparation
+              - link "Leadership visibility" [ref=e616] [cursor=pointer]:
+                - /url: /work-with-me
+                - text: Leadership visibility
+          - generic [ref=e617]:
+            - paragraph [ref=e618]: Contact
+            - generic [ref=e619]:
+              - link "hello@coachkagiso.co.za" [ref=e620] [cursor=pointer]:
+                - /url: mailto:hello@coachkagiso.co.za
+                - img [ref=e621]
+                - text: hello@coachkagiso.co.za
+              - link "069 512 4398" [ref=e624] [cursor=pointer]:
+                - /url: https://wa.me/27695124398
+                - img [ref=e625]
+                - text: 069 512 4398
+              - generic [ref=e627]:
+                - link "LinkedIn" [ref=e628] [cursor=pointer]:
+                  - /url: https://linkedin.com/in/coach-kagiso
+                  - img [ref=e629]
+                - link "TikTok" [ref=e633] [cursor=pointer]:
+                  - /url: https://www.tiktok.com/@coach_kagiso
+                  - img [ref=e634]
+                - link "Facebook" [ref=e636] [cursor=pointer]:
+                  - /url: https://facebook.com/coachkagiso
+                  - img [ref=e637]
+                - link "Instagram" [ref=e639] [cursor=pointer]:
+                  - /url: https://www.instagram.com/coach.kagiso/
+                  - img [ref=e640]
+        - generic [ref=e643]:
+          - paragraph [ref=e644]: Copyright 2026 Coach Kagiso. All rights reserved.
+          - generic [ref=e645]:
+            - link "A KREATIVE REFLOW DESIGN." [ref=e646] [cursor=pointer]:
+              - /url: https://kreativeforeflow.com
+            - link "Privacy" [ref=e647] [cursor=pointer]:
+              - /url: /privacy
+            - link "Terms" [ref=e648] [cursor=pointer]:
+              - /url: /terms
+  - button "Open Next.js Dev Tools" [ref=e654] [cursor=pointer]:
+    - img [ref=e655]
