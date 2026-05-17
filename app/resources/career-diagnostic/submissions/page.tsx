@@ -28,8 +28,10 @@ import {
   WalletCards,
 } from 'lucide-react';
 import BatchDeleteControls from '@/components/BatchDeleteControls';
+import AiConfigurationPanel from '@/components/settings/AiConfigurationPanel';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
 import ClientsDashboard from '@/components/clients/ClientsDashboard';
+import ContentStudio from '@/components/content/ContentStudio';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import FinanceTab from '@/components/finance/FinanceTab';
@@ -51,6 +53,7 @@ import {
 } from '@/lib/diagnostic-submissions';
 import { listClientOperations, type ClientOperation } from '@/lib/client-operations';
 import { listClientRecords } from '@/lib/clients';
+import { buildDashboardContext, listContentBacklogItems, listContentCalendarItems } from '@/lib/content-studio';
 import { BATCH_DELETE_CONFIRM_PHRASE } from '@/lib/dashboard-cleanup';
 import {
   generateTasks,
@@ -483,7 +486,16 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     from: activeTab === 'messages' ? from : null,
     to: activeTab === 'messages' ? to : null,
   };
-  const [submissions, operations, manualTasks, taskNotes, sentEmailLog, clientRecords] = await Promise.all([
+  const [
+    submissions,
+    operations,
+    manualTasks,
+    taskNotes,
+    sentEmailLog,
+    clientRecords,
+    contentCalendarItems,
+    contentBacklogItems,
+  ] = await Promise.all([
     listDiagnosticSubmissions({
       archetype,
       status,
@@ -506,6 +518,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           hasFilters: false,
         }),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
+    activeTab === 'content' ? listContentCalendarItems() : Promise.resolve([]),
+    activeTab === 'content' ? listContentBacklogItems() : Promise.resolve([]),
   ]);
   const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
@@ -703,6 +717,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     ['Revenue this month', formatMoney(monthlyRevenue), `As of ${dashboardTimeLabel}`, CreditCard],
     ['Overdue delivery', String(overdueDeliveryCount), 'Needs attention', CircleAlert],
   ] as const;
+  const contentDashboardContext = buildDashboardContext(submissions, operations);
 
   return (
     <main className="coach-dashboard-clean min-h-screen overflow-x-hidden bg-[#EDEBE8] text-[#142334]">
@@ -710,7 +725,10 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         <DashboardSidebar activeTab={activeTab} adminKey={key} todayTaskCount={todayDueTaskCount} />
 
         <section className="min-w-0 flex-1 overflow-hidden rounded-[8px] bg-transparent">
-          <div id="dashboard-command" className="space-y-5 p-4 md:p-6 lg:p-7">
+          <div
+            id="dashboard-command"
+            className={activeTab === 'calendar' ? 'space-y-5 p-0' : 'space-y-5 p-4 md:p-6 lg:p-7'}
+          >
             {activeTab === 'dashboard' && (
             <section className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[linear-gradient(115deg,#FCFBFA_0%,#F7F1EC_63%,#F3D97B_100%)] p-5 md:p-6 xl:p-7">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -1298,62 +1316,12 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
 
         {activeTab === 'content' && (
-        <section id="content-planning" className="pb-10">
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-            <div className="rounded-[8px] bg-[#FCFBFA] p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">Content</p>
-                  <h2 className="mt-2 font-serif text-[36px] leading-tight">Content angles from live diagnostic demand</h2>
-                </div>
-                <Lightbulb className="h-5 w-5 shrink-0 text-[#C9AD98]" />
-              </div>
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                {[
-                  ['Strongest signal', strongestContentSignal],
-                  ['Top archetype', topArchetype],
-                  ['Recent leads', `${recentLeadCount} in 7 days`],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-[8px] bg-[#F8F6F4] p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A09086]">{label}</p>
-                    <p className="mt-3 font-serif text-[25px] leading-tight text-[#142334]">{value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 rounded-[8px] bg-[#F8F6F4] p-5">
-                <p className="text-[13px] font-semibold text-[#142334]">Next useful content brief</p>
-                <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/68">
-                  Build the next post around {strongestContentSignal}, then route readers to the service that appears most often in demand data.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[8px] bg-[#FCFBFA] p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">Service demand</p>
-              <div className="mt-5 grid gap-4">
-                {Object.entries(serviceCounts).length === 0 ? (
-                  <p className="text-[14px] leading-relaxed text-[#142334]/68">Service demand will appear once diagnostic records are available.</p>
-                ) : (
-                  Object.entries(serviceCounts).map(([serviceName, count]) => (
-                    <Link
-                      key={serviceName}
-                      href={buildFilterHref(key, currentFilters, { tab: 'pipeline', service: serviceName })}
-                      className="block transition hover:text-[#C9AD98]"
-                    >
-                      <div className="flex items-center justify-between gap-4 text-[14px]">
-                        <span>{serviceName}</span>
-                        <span className="font-serif text-[22px] leading-none">{count}</span>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
-                        <div className="h-full bg-[#C9AD98]" style={{ width: `${(count / maxServiceCount) * 100}%` }} />
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+          <ContentStudio
+            adminKey={key || ''}
+            context={contentDashboardContext}
+            calendarItems={contentCalendarItems}
+            backlogItems={contentBacklogItems}
+          />
         )}
 
         {activeTab === 'calendar' && <CustomCalendarDashboard adminKey={key || ''} leads={submissions} />}
@@ -1390,7 +1358,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
         {activeTab === 'settings' && (
         <section className="pb-10">
-          <div className="w-full">
+          <div className="grid w-full gap-5">
+            <AiConfigurationPanel adminKey={key || ''} />
             <div>
               <div className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA]">
                 <div className="flex items-start justify-between gap-4 border-b border-[#D8C8BB] px-6 py-5">
