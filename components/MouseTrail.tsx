@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { motion, useMotionValue, useSpring } from "motion/react";
 
 const interactiveSelector = [
   "a",
@@ -10,8 +11,45 @@ const interactiveSelector = [
   "select",
   "summary",
   "[role='button']",
+  "[role='link']",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+
+const pointerSelector = [
+  "a",
+  "button:not(:disabled)",
+  "summary",
+  "[role='button']:not([aria-disabled='true'])",
+  "[role='link']",
+  "input[type='button']:not(:disabled)",
+  "input[type='submit']:not(:disabled)",
+  "input[type='reset']:not(:disabled)",
+  "input[type='checkbox']:not(:disabled)",
+  "input[type='radio']:not(:disabled)",
+  "label[for]",
+].join(",");
+
+const smoothSpring = {
+  damping: 42,
+  mass: 0.55,
+  stiffness: 320,
+};
+
+type CursorState = {
+  darkSurface: boolean;
+  interactive: boolean;
+  pointerTarget: boolean;
+  pressed: boolean;
+  visible: boolean;
+};
+
+const initialCursorState: CursorState = {
+  darkSurface: false,
+  interactive: false,
+  pointerTarget: false,
+  pressed: false,
+  visible: false,
+};
 
 function parseRgbChannels(color: string) {
   const matches = color.match(/[\d.]+/g);
@@ -20,10 +58,10 @@ function parseRgbChannels(color: string) {
   const [red, green, blue, alpha] = matches.map(Number);
 
   return {
-    red,
-    green,
-    blue,
     alpha: alpha ?? 1,
+    blue,
+    green,
+    red,
   };
 }
 
@@ -55,156 +93,155 @@ function isDarkSurface(target: Element | null) {
   return false;
 }
 
+function mergeCursorState(current: CursorState, next: Partial<CursorState>) {
+  const merged = { ...current, ...next };
+
+  return Object.keys(merged).every((key) => current[key as keyof CursorState] === merged[key as keyof CursorState])
+    ? current
+    : merged;
+}
+
 export default function MouseTrail() {
-  const ringRef = useRef<HTMLDivElement>(null);
-  const dotRef = useRef<HTMLDivElement>(null);
-  const handRef = useRef<HTMLDivElement>(null);
-  const [enabled, setEnabled] = useState(false);
+  const [cursorState, setCursorState] = useState<CursorState>(initialCursorState);
+  const [isTouch, setIsTouch] = useState(false);
+
+  const cursorX = useMotionValue(-100);
+  const cursorY = useMotionValue(-100);
+  const circleX = useSpring(-100, smoothSpring);
+  const circleY = useSpring(-100, smoothSpring);
 
   useEffect(() => {
-    const finePointer = window.matchMedia("(pointer: fine)");
+    const touchPointer = window.matchMedia("(hover: none), (pointer: coarse)");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    const syncEnabled = () => {
-      const shouldEnable = finePointer.matches && !reducedMotion.matches;
-      setEnabled(shouldEnable);
-      document.documentElement.classList.toggle("has-custom-cursor", shouldEnable);
+    const syncAvailability = () => {
+      const shouldDisable = touchPointer.matches || reducedMotion.matches;
+      setIsTouch(shouldDisable);
+      document.documentElement.classList.toggle("has-custom-cursor", !shouldDisable);
     };
 
-    syncEnabled();
-    finePointer.addEventListener("change", syncEnabled);
-    reducedMotion.addEventListener("change", syncEnabled);
-
-    return () => {
-      finePointer.removeEventListener("change", syncEnabled);
-      reducedMotion.removeEventListener("change", syncEnabled);
-      document.documentElement.classList.remove("has-custom-cursor");
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const ring = ringRef.current;
-    const dot = dotRef.current;
-    const hand = handRef.current;
-    if (!ring || !dot || !hand) return;
-
-    const pointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    const ringPosition = { ...pointer };
-    let isVisible = false;
-    let isPressed = false;
-    let isInteractive = false;
-    let isLink = false;
-    let frame = 0;
-
-    const setVisibility = (visible: boolean) => {
-      isVisible = visible;
-      ring.style.opacity = visible ? "1" : "0";
-      dot.style.opacity = visible && !isLink ? "1" : "0";
-      hand.style.opacity = visible && isLink ? "1" : "0";
-    };
-
-    const animate = () => {
-      ringPosition.x += (pointer.x - ringPosition.x) * 0.18;
-      ringPosition.y += (pointer.y - ringPosition.y) * 0.18;
-
-      const interactiveScale = isInteractive ? 1.52 : 1;
-      const pressedScale = isPressed ? 0.78 : 1;
-
-      ring.style.transform = `translate3d(${ringPosition.x - 18}px, ${ringPosition.y - 18}px, 0) scale(${interactiveScale * pressedScale})`;
-      dot.style.transform = `translate3d(${pointer.x - 3}px, ${pointer.y - 3}px, 0) scale(${isPressed ? 1.4 : 1})`;
-      hand.style.transform = `translate3d(${ringPosition.x - 12}px, ${ringPosition.y - 12}px, 0) scale(${isPressed ? 0.92 : 1})`;
-
-      frame = window.requestAnimationFrame(animate);
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.pointerType && event.pointerType !== "mouse") return;
-
-      pointer.x = event.clientX;
-      pointer.y = event.clientY;
-
+    const handleMouseMove = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       const shouldHide = Boolean(target?.closest("[data-hide-custom-cursor]"));
-      const darkSurface = isDarkSurface(target);
       const interactiveTarget = target?.closest(interactiveSelector);
-      isInteractive = Boolean(target?.closest(interactiveSelector));
-      isLink = Boolean(target?.closest("a"));
 
-      if (darkSurface) {
-        ring.style.borderColor = isInteractive ? "rgba(244, 239, 235, 0.95)" : "rgba(201, 173, 152, 0.96)";
-        ring.style.backgroundColor = isInteractive ? "rgba(201, 173, 152, 0.18)" : "rgba(201, 173, 152, 0.08)";
-        dot.style.backgroundColor = isInteractive ? "#F4EFEB" : "#C9AD98";
-        hand.style.color = "#F4EFEB";
-      } else {
-        ring.style.borderColor = isInteractive ? "rgba(201, 173, 152, 0.92)" : "rgba(20, 35, 52, 0.72)";
-        ring.style.backgroundColor = isInteractive ? "rgba(201, 173, 152, 0.08)" : "transparent";
-        dot.style.backgroundColor = isInteractive ? "#C9AD98" : "#142334";
-        hand.style.color = "#C9AD98";
-      }
-
-      if (!interactiveTarget) {
-        isInteractive = false;
-      }
-
-      setVisibility(!shouldHide);
+      cursorX.set(event.clientX);
+      cursorY.set(event.clientY);
+      circleX.set(event.clientX);
+      circleY.set(event.clientY);
+      setCursorState((current) =>
+        mergeCursorState(current, {
+          darkSurface: isDarkSurface(target),
+          interactive: Boolean(interactiveTarget),
+          pointerTarget: Boolean(target?.closest(pointerSelector)),
+          visible: !shouldHide,
+        }),
+      );
     };
 
-    const handlePointerDown = () => {
-      isPressed = true;
+    const handleMouseDown = () => {
+      setCursorState((current) => mergeCursorState(current, { pressed: true }));
     };
 
-    const handlePointerUp = () => {
-      isPressed = false;
+    const handleMouseUp = () => {
+      setCursorState((current) => mergeCursorState(current, { pressed: false }));
     };
 
-    const handleLeave = () => setVisibility(false);
-    const handleEnter = () => setVisibility(true);
+    const handleMouseLeave = () => {
+      setCursorState((current) => mergeCursorState(current, { pressed: false, visible: false }));
+    };
 
-    frame = window.requestAnimationFrame(animate);
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    window.addEventListener("pointerdown", handlePointerDown, { passive: true });
-    window.addEventListener("pointerup", handlePointerUp, { passive: true });
-    document.addEventListener("mouseleave", handleLeave);
-    document.addEventListener("mouseenter", handleEnter);
+    const handleMouseEnter = () => {
+      setCursorState((current) => mergeCursorState(current, { visible: true }));
+    };
+
+    syncAvailability();
+    touchPointer.addEventListener("change", syncAvailability);
+    reducedMotion.addEventListener("change", syncAvailability);
+    document.addEventListener("mousemove", handleMouseMove, { passive: true });
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseleave", handleMouseLeave);
+    document.addEventListener("mouseenter", handleMouseEnter);
 
     return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("pointerup", handlePointerUp);
-      document.removeEventListener("mouseleave", handleLeave);
-      document.removeEventListener("mouseenter", handleEnter);
+      touchPointer.removeEventListener("change", syncAvailability);
+      reducedMotion.removeEventListener("change", syncAvailability);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseleave", handleMouseLeave);
+      document.removeEventListener("mouseenter", handleMouseEnter);
+      document.documentElement.classList.remove("has-custom-cursor");
     };
-  }, [enabled]);
+  }, [circleX, circleY, cursorX, cursorY]);
 
-  if (!enabled) return null;
+  if (isTouch) return null;
+
+  const dotColor = "#C9AD98";
+  const outlineColor = cursorState.pointerTarget ? "#d7c2b2" : "rgba(201, 173, 152, 0.72)";
+  const outlineFill = cursorState.darkSurface
+    ? cursorState.interactive
+      ? "rgba(201, 173, 152, 0.18)"
+      : "rgba(201, 173, 152, 0.08)"
+    : cursorState.interactive
+      ? "rgba(201, 173, 152, 0.08)"
+      : "rgba(201, 173, 152, 0)";
+  const outlineScale = (cursorState.interactive ? 1.52 : 1) * (cursorState.pressed ? 0.78 : 1);
 
   return (
     <>
-      <div
-        ref={ringRef}
+      <motion.div
+        data-custom-cursor-dot
         aria-hidden="true"
-        className="pointer-events-none fixed left-0 top-0 z-[9999] h-9 w-9 rounded-full border transition-[opacity,border-color,background-color] duration-200"
-      />
-      <div
-        ref={dotRef}
-        aria-hidden="true"
-        className="pointer-events-none fixed left-0 top-0 z-[10000] h-1.5 w-1.5 rounded-full transition-[opacity,background-color] duration-150"
-      />
-      <div
-        ref={handRef}
-        aria-hidden="true"
-        className="pointer-events-none fixed left-0 top-0 z-[10001] flex h-6 w-6 items-center justify-center opacity-0 transition-[opacity,color] duration-150"
+        className="pointer-events-none fixed left-0 top-0 z-[10000] transition-opacity duration-100 ease-out"
+        style={{
+          x: cursorX,
+          y: cursorY,
+          opacity: cursorState.visible && !cursorState.pointerTarget ? 1 : 0,
+        }}
       >
-        <svg viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 11.5V6.75a1.25 1.25 0 1 1 2.5 0V10" />
-          <path d="M9.5 10V5.75a1.25 1.25 0 1 1 2.5 0V10" />
-          <path d="M12 10V7a1.25 1.25 0 1 1 2.5 0v5.5" />
-          <path d="M14.5 10.5a1.25 1.25 0 1 1 2.5 0v5.25c0 2.9-2.35 5.25-5.25 5.25h-.75A6 6 0 0 1 5 15v-2.2a1.3 1.3 0 0 1 2.22-.92L9.5 14" />
-        </svg>
-      </div>
+        <div className="h-2 w-2 -translate-x-1/2 -translate-y-1/2">
+          <motion.div
+            animate={{
+              backgroundColor: dotColor,
+              scale: cursorState.pressed ? 1.4 : 1,
+            }}
+            className="h-full w-full rounded-full"
+            transition={{ duration: 0.14, ease: "easeOut" }}
+          />
+        </div>
+      </motion.div>
+
+      <motion.div
+        data-custom-cursor-outline
+        aria-hidden="true"
+        className="pointer-events-none fixed left-0 top-0 z-[9999] transition-opacity duration-100 ease-out"
+        style={{
+          x: circleX,
+          y: circleY,
+          opacity: cursorState.visible ? 1 : 0,
+        }}
+      >
+        <div className="h-9 w-9 -translate-x-1/2 -translate-y-1/2">
+          <motion.div
+            data-custom-cursor-ring
+            animate={{
+              backgroundColor: outlineFill,
+              borderWidth: cursorState.pointerTarget ? 2 : 1,
+              borderColor: outlineColor,
+              scale: outlineScale,
+            }}
+            className="relative flex h-full w-full items-center justify-center rounded-full border"
+            transition={{
+              backgroundColor: { duration: 0.16, ease: "easeOut" },
+              borderWidth: { duration: 0.14, ease: "easeOut" },
+              borderColor: { duration: 0.16, ease: "easeOut" },
+              scale: { damping: 28, mass: 0.7, stiffness: 260, type: "spring" },
+            }}
+          />
+        </div>
+      </motion.div>
     </>
   );
 }

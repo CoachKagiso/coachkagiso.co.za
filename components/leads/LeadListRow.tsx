@@ -1,0 +1,143 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { FileText, Mail } from 'lucide-react';
+import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import type { DashboardNote } from '@/lib/dashboard-tasks';
+import LeadEmailButton from './LeadEmailButton';
+
+const statusLabels: Record<DiagnosticLeadStatus, string> = {
+  new: 'New',
+  contacted: 'Contacted',
+  discovery_booked: 'Booked',
+  paid: 'Paid',
+  follow_up_later: 'Follow up',
+  not_a_fit: 'Not a fit',
+  closed: 'Closed',
+  archived: 'Archived',
+};
+
+function getStatusClass(status: DiagnosticLeadStatus) {
+  if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
+  if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
+  if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
+  if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
+  return 'border-[#D8C8BB] bg-white text-[#142334]';
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-ZA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function formatShortDate(value?: string | null) {
+  if (!value) return 'Not scheduled';
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+export default function LeadListRow({
+  submission,
+  priority,
+  adminKey,
+  initialNotes,
+}: {
+  submission: DiagnosticSubmission;
+  priority: number;
+  adminKey: string;
+  initialNotes: DashboardNote[];
+}) {
+  const [leadStatus, setLeadStatus] = useState<DiagnosticLeadStatus>(submission.lead_status);
+  const [lastContactedAt, setLastContactedAt] = useState<string | null>(submission.last_contacted_at);
+  const [nextFollowUpAt, setNextFollowUpAt] = useState<string | null>(submission.next_follow_up_at);
+  const [notes, setNotes] = useState(initialNotes);
+  const lead = {
+    id: submission.id,
+    firstName: submission.first_name,
+    email: submission.email,
+    archetype: submission.archetype_name,
+    serviceInterest: submission.archetype_payload?.service || '',
+  };
+
+  return (
+    <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.25fr_0.7fr_0.72fr_0.5fr_0.72fr_auto] lg:items-center">
+      <div className="flex items-start gap-4">
+        <input
+          type="checkbox"
+          name="ids"
+          value={submission.id}
+          data-batch-group="diagnostic-records"
+          aria-label={`Select ${submission.first_name}'s diagnostic record`}
+          className="mt-1 h-4 w-4 shrink-0 accent-[#142334]"
+        />
+        <div className="flex min-w-0 flex-col items-start">
+          <Link
+            href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(adminKey)}`}
+            className="block w-full truncate font-serif text-[29px] leading-none text-[#142334] transition hover:text-[#C9AD98]"
+          >
+            {submission.first_name}
+          </Link>
+          <a
+            href={`mailto:${submission.email}`}
+            className="mt-2 flex w-full min-w-0 items-center gap-2 text-[14px] leading-relaxed text-[#142334]/72 transition hover:text-[#C9AD98]"
+          >
+            <Mail className="h-4 w-4 shrink-0" />
+            <span className="truncate">{submission.email}</span>
+          </a>
+        </div>
+      </div>
+      <div className="mt-5 lg:mt-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">{submission.archetype_key}</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-[#142334]">
+          {submission.archetype_payload?.service || 'Not set'}
+        </p>
+      </div>
+      <div className="mt-5 lg:mt-0">
+        <span className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.17em] ${getStatusClass(leadStatus)}`}>
+          {statusLabels[leadStatus]}
+        </span>
+        <p className="mt-3 text-[12px] text-[#142334]/58">Submitted {formatDate(submission.submitted_at)}</p>
+      </div>
+      <div className="mt-5 lg:mt-0">
+        <p className="font-serif text-[30px] leading-none text-[#142334]">{priority}</p>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
+          <div className="h-full bg-[#C9AD98]" style={{ width: `${priority}%` }} />
+        </div>
+      </div>
+      <div className="mt-5 lg:mt-0">
+        <p className="text-[14px] leading-relaxed text-[#142334]/72">{formatShortDate(nextFollowUpAt)}</p>
+        <p className="mt-1 text-[12px] text-[#142334]/58">Last contact: {formatShortDate(lastContactedAt)}</p>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-3 lg:mt-0">
+        <LeadEmailButton
+          lead={lead}
+          initialNotes={notes}
+          className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+          onSent={(nextSubmission) => {
+            if (nextSubmission.lead_status) setLeadStatus(nextSubmission.lead_status as DiagnosticLeadStatus);
+            if (typeof nextSubmission.last_contacted_at !== 'undefined') {
+              setLastContactedAt(nextSubmission.last_contacted_at || null);
+            }
+            if (typeof nextSubmission.next_follow_up_at !== 'undefined') {
+              setNextFollowUpAt(nextSubmission.next_follow_up_at || null);
+            }
+          }}
+          onNoteCreated={(note) => setNotes((current) => [note, ...current])}
+        />
+        <Link
+          href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(adminKey)}`}
+          className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+        >
+          Profile <FileText className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}

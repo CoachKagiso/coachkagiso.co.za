@@ -41,6 +41,7 @@ alter table public.diagnostic_submissions
       'paid',
       'follow_up_later',
       'not_a_fit',
+      'closed',
       'archived'
     )
   );

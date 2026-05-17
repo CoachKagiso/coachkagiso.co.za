@@ -17,14 +17,26 @@ export default function BatchDeleteControls({ group, phrase, label }: BatchDelet
     const selector = `input[data-batch-group="${group}"]`;
     const updateSelectedCount = () => {
       const inputs = Array.from(document.querySelectorAll<HTMLInputElement>(selector));
-      setSelectedCount(inputs.filter((input) => input.checked).length);
+      const nextSelectedCount = inputs.filter((input) => input.checked).length;
+      setSelectedCount(nextSelectedCount);
+      if (nextSelectedCount === 0) setTypedPhrase('');
+    };
+    const queueSelectedCountUpdate = () => {
+      window.setTimeout(updateSelectedCount, 0);
     };
 
-    updateSelectedCount();
+    const initialTimeout = window.setTimeout(updateSelectedCount, 0);
+    const selectedCountInterval = window.setInterval(updateSelectedCount, 250);
     document.addEventListener('change', updateSelectedCount);
+    document.addEventListener('input', updateSelectedCount);
+    document.addEventListener('click', queueSelectedCountUpdate);
 
     return () => {
+      window.clearTimeout(initialTimeout);
+      window.clearInterval(selectedCountInterval);
       document.removeEventListener('change', updateSelectedCount);
+      document.removeEventListener('input', updateSelectedCount);
+      document.removeEventListener('click', queueSelectedCountUpdate);
     };
   }, [group]);
 
@@ -34,12 +46,16 @@ export default function BatchDeleteControls({ group, phrase, label }: BatchDelet
       input.checked = checked;
     });
     setSelectedCount(checked ? inputs.length : 0);
+    if (!checked) setTypedPhrase('');
   }
 
   const canDelete = selectedCount > 0 && typedPhrase === phrase;
 
   return (
-    <div className="border-b border-[#D8C8BB] bg-[#FCFBFA] px-6 py-5">
+    <div
+      data-batch-delete-controls
+      className={`${selectedCount === 0 ? 'hidden' : 'block'} border-b border-[#D8C8BB] bg-[#FCFBFA] px-6 py-5`}
+    >
       <div className="grid gap-4 lg:grid-cols-[auto_auto_1fr_auto] lg:items-end">
         <div className="flex flex-wrap gap-2">
           <button

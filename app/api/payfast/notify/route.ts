@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { asyncServices } from '@/lib/buying-flow';
+import { ensureClientDeliveryMilestones } from '@/lib/delivery-milestones';
 import { validatePayFastSignature } from '@/lib/payfast';
 import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -87,6 +88,8 @@ export async function POST(request: Request) {
   }
 
   if (isComplete) {
+    await ensureClientDeliveryMilestones(supabase, paymentId, service.slug);
+
     if (service.slug === 'cv-review') {
       await ensureCvReviewUpgradeCredit({
         paymentId,

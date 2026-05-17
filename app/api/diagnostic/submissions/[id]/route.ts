@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   deleteDiagnosticSubmission,
+  getDiagnosticSubmissionById,
   isDiagnosticAdminAuthorized,
   isDiagnosticLeadStatus,
   updateDiagnosticSubmissionCrm,
@@ -73,4 +74,29 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   return redirectWithStatus(redirectTo, request.url, 'updated');
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  const { id } = await context.params;
+  const body = await request.json().catch(() => null);
+  const key = String(body?.key || '');
+
+  if (!isDiagnosticAdminAuthorized(key)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const leadStatus = String(body?.leadStatus || '');
+  if (!isDiagnosticLeadStatus(leadStatus)) {
+    return NextResponse.json({ error: 'Invalid lead status.' }, { status: 400 });
+  }
+
+  const markContacted = Boolean(body?.markContacted);
+
+  await updateDiagnosticSubmissionCrm(id, {
+    lead_status: leadStatus,
+    last_contacted_at: markContacted ? new Date().toISOString() : undefined,
+  });
+
+  const submission = await getDiagnosticSubmissionById(id);
+  return NextResponse.json({ submission });
 }

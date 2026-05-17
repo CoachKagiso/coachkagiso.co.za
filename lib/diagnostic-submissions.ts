@@ -14,6 +14,7 @@ export type DiagnosticLeadStatus =
   | 'paid'
   | 'follow_up_later'
   | 'not_a_fit'
+  | 'closed'
   | 'archived';
 
 export const diagnosticLeadStatuses: {
@@ -27,6 +28,7 @@ export const diagnosticLeadStatuses: {
   { value: 'paid', label: 'Paid client', shortLabel: 'Paid' },
   { value: 'follow_up_later', label: 'Follow up later', shortLabel: 'Follow up' },
   { value: 'not_a_fit', label: 'Not a fit', shortLabel: 'Not a fit' },
+  { value: 'closed', label: 'Closed', shortLabel: 'Closed' },
   { value: 'archived', label: 'Archived', shortLabel: 'Archived' },
 ];
 

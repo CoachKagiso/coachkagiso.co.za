@@ -17,6 +17,135 @@ body {
   scrollbar-width: thin;
 }
 
+.dashboard-sidebar-panel {
+  width: 238px;
+  min-height: calc(100vh - 32px);
+  padding: 16px;
+  transition: width 300ms ease, padding 300ms ease;
+}
+
+.dashboard-sidebar-expand-icon,
+.dashboard-sidebar-today-collapsed {
+  display: none;
+}
+
+.dashboard-sidebar-checkbox:focus-visible + .dashboard-sidebar-panel .dashboard-sidebar-toggle {
+  outline: 2px solid var(--brand-ink);
+  outline-offset: 3px;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel {
+  width: 78px;
+  padding: 12px;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-header {
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-brand,
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-link {
+  gap: 0;
+  justify-content: center;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-link {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-copy,
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-collapse-icon,
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-today-expanded {
+  display: none;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-expand-icon {
+  display: block;
+}
+
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-today-collapsed {
+  display: grid;
+}
+
+.coach-dashboard-clean *,
+.coach-dashboard-clean *::before,
+.coach-dashboard-clean *::after {
+  box-shadow: none !important;
+}
+
+.coach-dashboard-clean :where(.border, .border-t, .border-r, .border-b, .border-l) {
+  border-color: transparent !important;
+}
+
+@keyframes task-modal-fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes task-modal-fade-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes task-modal-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes task-modal-slide-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.task-modal-panel {
+  animation: task-modal-fade-scale-in 180ms ease-out;
+}
+
+.task-modal-panel-closing {
+  animation: task-modal-fade-scale-out 180ms ease-in forwards;
+}
+
+[data-batch-delete-controls] {
+  display: none;
+}
+
+form:has(input[data-batch-group]:checked) [data-batch-delete-controls] {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .task-modal-panel {
+    animation: task-modal-slide-up 220ms ease-out;
+  }
+
+  .task-modal-panel-closing {
+    animation: task-modal-slide-down 220ms ease-in forwards;
+  }
+}
+
 ::-webkit-scrollbar,
 html::-webkit-scrollbar,
 body::-webkit-scrollbar,
@@ -53,5 +182,67 @@ body::-webkit-scrollbar-thumb:hover,
   html.has-custom-cursor,
   html.has-custom-cursor * {
     cursor: none !important;
+  }
+
+  html.has-custom-cursor :where(
+    a,
+    a *,
+    button:not(:disabled),
+    button:not(:disabled) *,
+    summary,
+    summary *,
+    [role="button"]:not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]) *,
+    [role="link"],
+    [role="link"] *,
+    input[type="button"]:not(:disabled),
+    input[type="submit"]:not(:disabled),
+    input[type="reset"]:not(:disabled),
+    input[type="checkbox"]:not(:disabled),
+    input[type="radio"]:not(:disabled),
+    label[for],
+    label[for] *
+  ) {
+    cursor: pointer !important;
+  }
+
+  html.has-custom-cursor :where(
+    input:not([type]),
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="text"],
+    input[type="url"],
+    textarea,
+    [contenteditable="true"]
+  ) {
+    cursor: text !important;
+  }
+
+  html.has-custom-cursor :where(
+    button:disabled,
+    button:disabled *,
+    input:disabled,
+    input:disabled *,
+    select:disabled,
+    select:disabled *,
+    textarea:disabled,
+    textarea:disabled *,
+    [aria-disabled="true"],
+    [aria-disabled="true"] *
+  ) {
+    cursor: not-allowed !important;
+  }
+}
+
+body.cursor-none {
+  cursor: none;
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  body.cursor-none {
+    cursor: auto;
   }
 }

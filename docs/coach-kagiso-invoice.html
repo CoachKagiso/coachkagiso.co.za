@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coach Kagiso Invoice - Kreative Reflow</title>
+  <style>
+    :root {
+      --orange: #fc6e20;
+      --black: #1b1b1b;
+      --charcoal: #323232;
+      --cream: #ffe7d0;
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #5f5f5f;
+      color: var(--black);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      width: 794px;
+      height: 1123px;
+      position: relative;
+      overflow: hidden;
+      background: var(--orange);
+      padding: 50px 54px 38px;
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+    }
+
+    .brand {
+      margin: 0;
+      font-size: 55px;
+      line-height: 0.9;
+      letter-spacing: 0;
+      font-weight: 900;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .meta-row {
+      position: absolute;
+      top: 214px;
+      left: 54px;
+      right: 54px;
+      display: grid;
+      grid-template-columns: 152px 222px 1fr;
+      align-items: end;
+      gap: 28px;
+      font-size: 13px;
+      line-height: 1.08;
+      font-weight: 800;
+    }
+
+    .invoice-word {
+      justify-self: end;
+      font-size: 42px;
+      line-height: 0.85;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .rule {
+      position: absolute;
+      left: 54px;
+      right: 54px;
+      height: 2px;
+      background: var(--black);
+    }
+
+    .rule.top {
+      top: 288px;
+    }
+
+    .items {
+      position: absolute;
+      top: 303px;
+      left: 54px;
+      right: 54px;
+      border-collapse: collapse;
+      width: calc(100% - 108px);
+      font-size: 8.7px;
+      line-height: 1.05;
+      font-weight: 800;
+      table-layout: fixed;
+    }
+
+    .items th {
+      text-align: left;
+      font-size: 8px;
+      padding: 0 0 8px;
+      text-transform: uppercase;
+      border-bottom: 1.7px solid var(--black);
+    }
+
+    .items td {
+      padding: 4.1px 0 4px;
+      border-bottom: 1px solid rgba(27, 27, 27, 0.48);
+      vertical-align: top;
+    }
+
+    .items .desc {
+      width: 68%;
+      padding-right: 12px;
+    }
+
+    .items .qty {
+      width: 7%;
+      text-align: center;
+    }
+
+    .items .money {
+      width: 12.5%;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .totals {
+      position: absolute;
+      top: 650px;
+      right: 54px;
+      width: 345px;
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 4px 18px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .totals span:nth-child(even) {
+      text-align: right;
+    }
+
+    .totals .due-label,
+    .totals .due-value {
+      margin-top: 7px;
+      padding-top: 8px;
+      border-top: 1.8px solid var(--black);
+      font-size: 14px;
+    }
+
+    .footer-band {
+      position: absolute;
+      left: 54px;
+      right: 54px;
+      bottom: 42px;
+      min-height: 214px;
+      background: var(--black);
+      color: #fff;
+      padding: 22px 22px 16px;
+    }
+
+    .footer-rule {
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      top: 18px;
+      height: 1.5px;
+      background: #fff;
+      opacity: 0.95;
+    }
+
+    .payment-grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: 168px 116px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .payment-title {
+      font-size: 35px;
+      line-height: 0.86;
+      font-weight: 900;
+      text-transform: uppercase;
+      margin: 0 0 13px;
+    }
+
+    .payment-copy {
+      font-size: 9px;
+      line-height: 1.32;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .mini-meta {
+      margin-top: 2px;
+      font-size: 7px;
+      line-height: 1.25;
+      font-weight: 800;
+    }
+
+    .qr-wrap {
+      width: 104px;
+      text-align: center;
+      color: #fff;
+      font-size: 8px;
+      line-height: 1;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .qr {
+      display: block;
+      width: 98px;
+      height: 98px;
+      margin: 2px auto 7px;
+      background: var(--cream);
+    }
+
+    .terms h2 {
+      margin: 0 0 5px;
+      font-size: 8px;
+      line-height: 1;
+      text-transform: uppercase;
+      font-weight: 900;
+    }
+
+    .terms ol {
+      margin: 0;
+      padding-left: 13px;
+      font-size: 6.6px;
+      line-height: 1.16;
+      font-weight: 700;
+    }
+
+    .bottom-line {
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      bottom: 16px;
+      padding-top: 10px;
+      border-top: 1.5px solid #fff;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      font-size: 6.4px;
+      line-height: 1.25;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      color: var(--cream);
+    }
+
+    @media print {
+      body {
+        background: var(--orange);
+      }
+
+      .page {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1 class="brand">[KREATIVE REFLOW]</h1>
+
+    <section class="meta-row" aria-label="Invoice metadata">
+      <div>
+        [15 May 2026]<br>
+        [Coach Kagiso]
+      </div>
+      <div>
+        [KR-CK-001]<br>
+        [Brand, Website &amp; Digital Launch Setup]
+      </div>
+      <div class="invoice-word">INVOICE</div>
+    </section>
+
+    <div class="rule top"></div>
+
+    <table class="items" aria-label="Invoice items">
+      <thead>
+        <tr>
+          <th class="desc">Item</th>
+          <th class="qty">Qty</th>
+          <th class="money">Amount</th>
+          <th class="money">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="desc">Digital launch strategy and project coordination</td><td class="qty">1</td><td class="money">R2,000</td><td class="money">R2,000</td></tr>
+        <tr><td class="desc">Logo creation and brand direction</td><td class="qty">1</td><td class="money">R2,500</td><td class="money">R2,500</td></tr>
+        <tr><td class="desc">Website copywriting and content structure</td><td class="qty">1</td><td class="money">R3,500</td><td class="money">R3,500</td></tr>
+        <tr><td class="desc">Custom website design and responsive build</td><td class="qty">1</td><td class="money">R12,000</td><td class="money">R12,000</td></tr>
+        <tr><td class="desc">Lead magnets, resources, forms and downloads setup</td><td class="qty">1</td><td class="money">R3,500</td><td class="money">R3,500</td></tr>
+        <tr><td class="desc">Booking, intake, payment and confirmation flow setup</td><td class="qty">1</td><td class="money">R4,500</td><td class="money">R4,500</td></tr>
+        <tr><td class="desc">Domain, DNS, Vercel hosting and deployment setup</td><td class="qty">1</td><td class="money">R2,000</td><td class="money">R2,000</td></tr>
+        <tr><td class="desc">Zoho business email setup and email authentication</td><td class="qty">1</td><td class="money">R1,500</td><td class="money">R1,500</td></tr>
+        <tr><td class="desc">Brevo email marketing and lead capture setup</td><td class="qty">1</td><td class="money">R1,000</td><td class="money">R1,000</td></tr>
+        <tr><td class="desc">Google Business Profile setup and service content</td><td class="qty">1</td><td class="money">R1,000</td><td class="money">R1,000</td></tr>
+        <tr><td class="desc">Basic SEO: metadata, sitemap, robots, indexing readiness</td><td class="qty">1</td><td class="money">R2,500</td><td class="money">R2,500</td></tr>
+        <tr><td class="desc">QA testing, mobile checks, launch support and handover</td><td class="qty">1</td><td class="money">R2,000</td><td class="money">R2,000</td></tr>
+        <tr><td class="desc">Fully functional client operations dashboard</td><td class="qty">1</td><td class="money">R22,000</td><td class="money">R22,000</td></tr>
+      </tbody>
+    </table>
+
+    <section class="totals" aria-label="Invoice totals">
+      <span>Sub total:</span><span>R60,000</span>
+      <span>VAT (0%):</span><span>R0.00</span>
+      <span>Discount:</span><span>R0.00</span>
+      <span class="due-label">Balance due (ZAR):</span><span class="due-value">R60,000</span>
+    </section>
+
+    <section class="footer-band" aria-label="Payment and terms">
+      <div class="footer-rule"></div>
+      <div class="payment-grid">
+        <div>
+          <h2 class="payment-title">Payment</h2>
+          <div class="payment-copy">
+            [Bank transfer]<br><br>
+            [Bank name]<br>
+            [Account name]<br>
+            Acc No: [Account number]<br><br>
+            [Terms: 7 days from issue date]
+          </div>
+        </div>
+
+        <div class="qr-wrap">
+          <svg class="qr" viewBox="0 0 98 98" role="img" aria-label="Payment QR code placeholder">
+            <rect width="98" height="98" fill="#ffe7d0"></rect>
+            <g fill="#1b1b1b">
+              <rect x="7" y="7" width="24" height="24"></rect><rect x="12" y="12" width="14" height="14" fill="#ffe7d0"></rect><rect x="16" y="16" width="6" height="6"></rect>
+              <rect x="67" y="7" width="24" height="24"></rect><rect x="72" y="12" width="14" height="14" fill="#ffe7d0"></rect><rect x="76" y="16" width="6" height="6"></rect>
+              <rect x="7" y="67" width="24" height="24"></rect><rect x="12" y="72" width="14" height="14" fill="#ffe7d0"></rect><rect x="16" y="76" width="6" height="6"></rect>
+              <rect x="39" y="8" width="6" height="6"></rect><rect x="51" y="8" width="6" height="6"></rect><rect x="39" y="20" width="18" height="6"></rect>
+              <rect x="39" y="36" width="6" height="6"></rect><rect x="51" y="36" width="12" height="6"></rect><rect x="75" y="38" width="6" height="6"></rect>
+              <rect x="35" y="50" width="12" height="6"></rect><rect x="55" y="50" width="6" height="6"></rect><rect x="67" y="50" width="18" height="6"></rect>
+              <rect x="39" y="62" width="6" height="6"></rect><rect x="51" y="62" width="18" height="6"></rect><rect x="81" y="62" width="6" height="6"></rect>
+              <rect x="39" y="74" width="12" height="6"></rect><rect x="61" y="74" width="6" height="6"></rect><rect x="73" y="74" width="18" height="6"></rect>
+              <rect x="35" y="86" width="6" height="6"></rect><rect x="49" y="86" width="18" height="6"></rect><rect x="79" y="86" width="6" height="6"></rect>
+              <rect x="8" y="38" width="6" height="6"></rect><rect x="20" y="38" width="12" height="6"></rect><rect x="8" y="50" width="18" height="6"></rect>
+            </g>
+          </svg>
+          Scan QR to pay
+        </div>
+
+        <div class="terms">
+          <h2>Terms &amp; Conditions:</h2>
+          <ol>
+            <li>This invoice covers the agreed brand, website, dashboard, setup, integration and launch support work for Coach Kagiso.</li>
+            <li>Third-party subscription fees, domain renewals, payment gateway fees and paid advertising spend are excluded unless stated otherwise.</li>
+            <li>Out-of-scope changes, new features, or major revisions are quoted separately.</li>
+            <li>Payment is due within 7 days from the issue date.</li>
+            <li>Work files, source access and handover support are provided once the invoice is settled.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="bottom-line">
+        <div><span class="badge">Kreative Reflow</span><br>Johannesburg, South Africa</div>
+        <div><span class="badge">Client</span><br>Coach Kagiso</div>
+        <div><span class="badge">Invoice</span><br>KR-CK-001</div>
+        <div><span class="badge">Contact</span><br>[email] | [phone] | [website]</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
