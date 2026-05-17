@@ -241,8 +241,151 @@ body.cursor-none {
   cursor: none;
 }
 
+@keyframes calendar-bell-wobble {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  76% {
+    transform: rotate(-14deg);
+  }
+
+  82% {
+    transform: rotate(12deg);
+  }
+
+  88% {
+    transform: rotate(-9deg);
+  }
+
+  94% {
+    transform: rotate(6deg);
+  }
+}
+
+.calendar-bell-wobble {
+  animation: calendar-bell-wobble 2.6s ease-in-out infinite;
+  transform-origin: 50% 12%;
+}
+
+@keyframes calendar-details-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.calendar-details-slide-in {
+  animation: calendar-details-slide-in 220ms ease-out both;
+}
+
+.studio-label {
+  color: #6b6b6b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.studio-input {
+  border: 1px solid #e4d8cb;
+  border-radius: 8px;
+  background: #fff;
+  color: #142334;
+  font-size: 13px;
+  outline: none;
+  padding-left: 12px;
+  padding-right: 12px;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.studio-input:focus {
+  border-color: #142334;
+}
+
+.studio-primary-button,
+.studio-secondary-button,
+.studio-ghost-button {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  letter-spacing: 0.14em;
+  min-height: 42px;
+  padding: 10px 16px;
+  text-transform: uppercase;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.studio-primary-button {
+  background: #142334;
+  color: #fff;
+}
+
+.studio-primary-button:hover {
+  background: #c9ad98;
+  color: #142334;
+}
+
+.studio-secondary-button {
+  background: #c9ad98;
+  color: #142334;
+}
+
+.studio-secondary-button:hover {
+  background: #142334;
+  color: #fff;
+}
+
+.studio-ghost-button {
+  border: 1px solid #142334;
+  color: #142334;
+}
+
+.studio-ghost-button:hover {
+  background: #142334;
+  color: #fff;
+}
+
+.studio-primary-button:disabled,
+.studio-secondary-button:disabled,
+.studio-ghost-button:disabled {
+  opacity: 0.55;
+}
+
+.studio-ghost-icon {
+  align-items: center;
+  border: 1px solid #e4d8cb;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  width: 38px;
+}
+
+.studio-ghost-icon:hover {
+  background: #f5f3ee;
+  border-color: #142334;
+}
+
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   body.cursor-none {
     cursor: auto;
+  }
+
+  .calendar-bell-wobble,
+  .calendar-details-slide-in {
+    animation: none;
   }
 }
