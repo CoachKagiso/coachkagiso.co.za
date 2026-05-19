@@ -8,9 +8,11 @@ import { Loader2, MailCheck, Save, Send, X } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
+  getEmailSequenceDots,
+  getEmailTemplateOptionLabel,
   getBookingLink,
   getEmailTemplate,
-  getTemplateIdForArchetype,
+  getTemplateIdForLeadStage,
   type EmailTemplateId,
 } from '@/lib/email-templates';
 
@@ -20,11 +22,15 @@ export type LeadEmailModalLead = {
   email: string;
   archetype: string;
   serviceInterest: string;
+  leadStatus?: string;
+  followUpCount?: number;
+  lastContactedAt?: string | null;
 };
 
 type SentLeadUpdate = {
   id: string;
   lead_status?: string;
+  follow_up_count?: number;
   last_contacted_at?: string | null;
   next_follow_up_at?: string | null;
 };
@@ -142,13 +148,22 @@ export default function LeadEmailModal({
 }: LeadEmailModalProps) {
   const searchParams = useSearchParams();
   const adminKey = searchParams.get('key') || '';
-  const { id, firstName, email, archetype, serviceInterest } = lead;
+  const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt } = lead;
   const modalLead = useMemo(
-    () => ({ id, firstName, email, archetype, serviceInterest }),
-    [archetype, email, firstName, id, serviceInterest],
+    () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt }),
+    [archetype, email, firstName, followUpCount, id, lastContactedAt, leadStatus, serviceInterest],
   );
   const initialNotesRef = useRef(initialNotes);
-  const defaultTemplateId = useMemo(() => getTemplateIdForArchetype(archetype), [archetype]);
+  const defaultTemplateId = useMemo(
+    () =>
+      getTemplateIdForLeadStage({
+        archetypeName: archetype,
+        followUpCount,
+        leadStatus,
+        lastContactedAt,
+      }),
+    [archetype, followUpCount, lastContactedAt, leadStatus]
+  );
   const [activeTab, setActiveTab] = useState<LeadEmailTab>('email');
   const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateId>(defaultTemplateId);
   const [subject, setSubject] = useState('');
@@ -161,6 +176,8 @@ export default function LeadEmailModal({
   const [noteError, setNoteError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const selectedTemplate = getEmailTemplate(selectedTemplateId);
+  const sequenceDots = getEmailSequenceDots(selectedTemplateId);
 
   useEffect(() => {
     initialNotesRef.current = initialNotes;
@@ -274,6 +291,7 @@ export default function LeadEmailModal({
             key: adminKey,
             leadStatus: 'contacted',
             markContacted: true,
+            templateId: selectedTemplateId,
           },
         );
 
@@ -348,7 +366,7 @@ export default function LeadEmailModal({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="mx-auto mt-3 h-1 w-9 shrink-0 rounded-full bg-[#E4D8CB] md:hidden" />
-            <header className="relative h-16 shrink-0 px-5 pt-4 md:px-6">
+            <header className="relative h-20 shrink-0 px-5 pt-4 md:px-6">
               <button
                 type="button"
                 onClick={closeWithAnimation}
@@ -361,6 +379,9 @@ export default function LeadEmailModal({
                 Email {getFirstName(modalLead)}
               </h2>
               <p className="mt-1 max-w-[calc(100%-44px)] truncate text-[13px] text-[#6B6B6B]">{modalLead.email}</p>
+              <p className="mt-2 max-w-[calc(100%-44px)] truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8C7466]">
+                Email {selectedTemplate.sequenceIndex} of 4 <span aria-hidden="true">{sequenceDots}</span> {selectedTemplate.stageLabel}
+              </p>
             </header>
 
             <nav className="flex h-11 shrink-0 border-b border-[#E4D8CB]" aria-label="Lead email modal tabs">
@@ -391,12 +412,15 @@ export default function LeadEmailModal({
                       onChange={(event) => switchTemplate(event.target.value as EmailTemplateId)}
                       className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
                     >
-                      {EMAIL_TEMPLATES.map((template) => (
+                          {EMAIL_TEMPLATES.map((template) => (
                         <option key={template.id} value={template.id}>
-                          {template.archetypeName}
+                          {getEmailTemplateOptionLabel(template)}
                         </option>
                       ))}
                     </select>
+                    <span className="text-[12px] leading-relaxed text-[#6B6B6B]">
+                      {selectedTemplate.stageLabel} - {selectedTemplate.archetypeName}
+                    </span>
                   </label>
 
                   <label className="grid gap-2">
@@ -435,6 +459,16 @@ export default function LeadEmailModal({
                       {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent ✓' : 'Send Email'}
                     </button>
                     {sendError && <p className="text-[12px] leading-relaxed text-[#DC2626]">Email failed to send. Try again.</p>}
+                    {selectedTemplate.sequenceIndex === 3 && (
+                      <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
+                        After this email, the newsletter bridge reminder will appear in 7 days if there&apos;s no response.
+                      </p>
+                    )}
+                    {selectedTemplate.sequenceIndex === 4 && (
+                      <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
+                        This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

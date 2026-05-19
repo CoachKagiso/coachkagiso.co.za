@@ -34,9 +34,13 @@ import ClientsDashboard from '@/components/clients/ClientsDashboard';
 import ContentStudio from '@/components/content/ContentStudio';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import DashboardDatePicker from '@/components/DashboardDatePicker';
+import DashboardTopBar from '@/components/dashboard/DashboardTopBar';
 import FinanceTab from '@/components/finance/FinanceTab';
+import FilterDropdown from '@/components/FilterDropdown';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import LeadListRow from '@/components/leads/LeadListRow';
+import MoveToNurtureButton from '@/components/leads/MoveToNurtureButton';
 import MessagesLog from '@/components/messages/MessagesLog';
 import TasksNotesWorkspace from '@/components/TasksNotesWorkspace';
 import Navbar from '@/components/Navbar';
@@ -53,7 +57,7 @@ import {
 } from '@/lib/diagnostic-submissions';
 import { listClientOperations, type ClientOperation } from '@/lib/client-operations';
 import { listClientRecords } from '@/lib/clients';
-import { buildDashboardContext, listContentBacklogItems, listContentCalendarItems } from '@/lib/content-studio';
+import { buildDashboardContext, listContentBacklogItems, listContentCalendarItems, listResearchEntries } from '@/lib/content-studio';
 import { BATCH_DELETE_CONFIRM_PHRASE } from '@/lib/dashboard-cleanup';
 import {
   generateTasks,
@@ -61,6 +65,7 @@ import {
 } from '@/lib/dashboard-tasks';
 import { listManualTasks, listNotes } from '@/lib/dashboard-task-records';
 import { getDiagnosticAdminKey } from '@/lib/env';
+import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { listSentEmails } from '@/lib/sent-emails';
 
 export const dynamic = 'force-dynamic';
@@ -101,6 +106,7 @@ const archetypeLabels = {
 } as const;
 
 const revenueStatuses: DiagnosticLeadStatus[] = ['discovery_booked', 'paid'];
+const inactiveLeadStatuses: DiagnosticLeadStatus[] = ['paid', 'archived', 'not_a_fit', 'nurture', 'closed'];
 const dashboardTimeZone = 'Africa/Johannesburg';
 const contentSignalByArchetype = {
   A: 'career plateau frustration',
@@ -240,6 +246,43 @@ function formatDateInput(value?: string | null) {
   }).format(date);
 }
 
+function getDashboardDateKey(value: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: dashboardTimeZone,
+    year: 'numeric',
+  }).format(value);
+}
+
+function addDashboardDays(value: Date, days: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getStoredDateKey(value?: string | null) {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return getDashboardDateKey(date);
+}
+
+function daysSince(value?: string | null, now = new Date()) {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000)));
+}
+
+function getFollowUpSequenceLabel(submission: DiagnosticSubmission) {
+  const followUpCount = submission.follow_up_count ?? 0;
+  if (followUpCount <= 0) return 'Follow-up 1 (Day 4)';
+  if (followUpCount === 1) return 'Follow-up 2 (Day 10)';
+  return 'Newsletter bridge (Day 17)';
+}
+
 function formatMoney(value: number) {
   return `R${value.toLocaleString('en-ZA')}`;
 }
@@ -299,7 +342,7 @@ function getDueFollowUps(submissions: DiagnosticSubmission[]) {
   return submissions.filter(
     (submission) =>
       submission.next_follow_up_at &&
-      !['paid', 'archived', 'not_a_fit', 'closed'].includes(submission.lead_status) &&
+      !['paid', 'archived', 'not_a_fit', 'nurture', 'closed'].includes(submission.lead_status) &&
       new Date(submission.next_follow_up_at).getTime() <= todayEnd.getTime()
   ).length;
 }
@@ -312,6 +355,7 @@ function getStatusClass(status: DiagnosticLeadStatus) {
   if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'nurture') return 'border-[#DDD6FE] bg-[#F3E8FF] text-[#7C3AED]';
   if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';
@@ -334,6 +378,7 @@ function getPriorityScore(submission: DiagnosticSubmission) {
 
   if (submission.lead_status === 'new') score += 35;
   if (submission.lead_status === 'follow_up_later') score += 15;
+  if (submission.lead_status === 'nurture') score -= 30;
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) score += 30;
   if (!submission.last_contacted_at) score += 10;
   if (ageDays <= 2) score += 20;
@@ -349,13 +394,46 @@ function getNextAction(submission: DiagnosticSubmission) {
   if (submission.lead_status === 'paid') return 'Confirm delivery and intake';
   if (submission.lead_status === 'discovery_booked') return 'Prep for the discovery call';
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) {
-    return 'Follow up today';
+    return (submission.follow_up_count ?? 0) >= 2 ? 'Send newsletter bridge' : 'Follow up today';
   }
   if (submission.lead_status === 'new') return 'Send first result follow-up';
+  if (submission.lead_status === 'contacted') return 'Waiting for their reply';
   if (submission.lead_status === 'follow_up_later') return 'Wait for scheduled follow-up';
+  if (submission.lead_status === 'nurture') return 'Keep in nurture';
   if (submission.lead_status === 'closed') return 'Closed';
   if (submission.lead_status === 'not_a_fit') return 'Keep archived unless they re-engage';
   return 'Check whether they need another nudge';
+}
+
+function isFollowUpDue(submission: DiagnosticSubmission, referenceDate: Date) {
+  return Boolean(
+    submission.next_follow_up_at &&
+      new Date(submission.next_follow_up_at).getTime() <= referenceDate.getTime()
+  );
+}
+
+function needsPipelineAction(submission: DiagnosticSubmission, referenceDate: Date) {
+  if (inactiveLeadStatuses.includes(submission.lead_status)) return false;
+  if (submission.lead_status === 'new') return true;
+  if (submission.lead_status === 'discovery_booked') return true;
+  return isFollowUpDue(submission, referenceDate);
+}
+
+function isWaitingForResponse(submission: DiagnosticSubmission, referenceDate: Date) {
+  if (submission.lead_status !== 'contacted') return false;
+  return !isFollowUpDue(submission, referenceDate);
+}
+
+function getLeadStatusSortRank(status: DiagnosticLeadStatus) {
+  if (status === 'new') return 1;
+  if (status === 'contacted') return 2;
+  if (status === 'discovery_booked') return 3;
+  if (status === 'paid') return 4;
+  if (status === 'follow_up_later') return 5;
+  if (status === 'nurture') return 8;
+  if (status === 'not_a_fit') return 9;
+  if (status === 'closed') return 10;
+  return 11;
 }
 
 function buildFilterHref(
@@ -402,6 +480,9 @@ function buildLeadEmailModalLead(submission: DiagnosticSubmission) {
     email: submission.email,
     archetype: submission.archetype_name,
     serviceInterest: submission.archetype_payload?.service || '',
+    leadStatus: submission.lead_status,
+    followUpCount: submission.follow_up_count,
+    lastContactedAt: submission.last_contacted_at,
   };
 }
 
@@ -495,6 +576,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     clientRecords,
     contentCalendarItems,
     contentBacklogItems,
+    researchItems,
+    followUpNotificationCount,
+    sidebarFollowUps,
   ] = await Promise.all([
     listDiagnosticSubmissions({
       archetype,
@@ -520,6 +604,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
     activeTab === 'content' ? listContentCalendarItems() : Promise.resolve([]),
     activeTab === 'content' ? listContentBacklogItems() : Promise.resolve([]),
+    activeTab === 'content' ? listResearchEntries() : Promise.resolve([]),
+    getFollowUpNotificationCount(),
+    listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
   ]);
   const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
@@ -535,8 +622,12 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     from,
     to,
   };
-  const sortedSubmissions = [...submissions].sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
-  const actionQueue = sortedSubmissions.filter((submission) => !['paid', 'archived', 'not_a_fit', 'closed'].includes(submission.lead_status)).slice(0, 8);
+  const sortedSubmissions = [...submissions].sort(
+    (a, b) => getLeadStatusSortRank(a.lead_status) - getLeadStatusSortRank(b.lead_status) || getPriorityScore(b) - getPriorityScore(a)
+  );
+  const dashboardNow = new Date();
+  const actionQueue = sortedSubmissions.filter((submission) => needsPipelineAction(submission, dashboardNow)).slice(0, 8);
+  const waitingForResponseQueue = sortedSubmissions.filter((submission) => isWaitingForResponse(submission, dashboardNow)).slice(0, 6);
   const serviceCounts = submissions.reduce<Record<string, number>>((acc, submission) => {
     const serviceName = submission.archetype_payload?.service || 'No recommendation';
     acc[serviceName] = (acc[serviceName] || 0) + 1;
@@ -566,10 +657,35 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     return acc;
   }, {});
   const maxOperationRevenue = Math.max(1, ...Object.values(operationServiceCounts));
-  const dashboardNow = new Date();
   const dashboardGreeting = getDashboardGreeting(dashboardNow);
   const dashboardDateLabel = formatDashboardDate(dashboardNow);
   const dashboardTimeLabel = formatDashboardTime(dashboardNow);
+  const dashboardTodayKey = getDashboardDateKey(dashboardNow);
+  const dashboardTomorrowKey = getDashboardDateKey(addDashboardDays(dashboardNow, 1));
+  const followUpsDueToday = submissions
+    .filter(
+      (submission) =>
+        submission.lead_status === 'contacted' &&
+        getStoredDateKey(submission.next_follow_up_at) === dashboardTodayKey &&
+        (submission.follow_up_count ?? 0) <= 2
+    )
+    .sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+  const followUpsDueTomorrow = submissions
+    .filter(
+      (submission) =>
+        submission.lead_status === 'contacted' &&
+        getStoredDateKey(submission.next_follow_up_at) === dashboardTomorrowKey &&
+        (submission.follow_up_count ?? 0) <= 2
+    )
+    .sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+  const nurtureSuggestions = submissions
+    .filter(
+      (submission) =>
+        submission.lead_status === 'contacted' &&
+        (submission.follow_up_count ?? 0) >= 3 &&
+        daysSince(submission.last_contacted_at, dashboardNow) >= 2
+    )
+    .sort((a, b) => daysSince(b.last_contacted_at, dashboardNow) - daysSince(a.last_contacted_at, dashboardNow));
   const recentLeadCount = getRecentCount(submissions);
   const dueFollowUpCount = getDueFollowUps(submissions);
   const topArchetype = getTopArchetype(submissions);
@@ -578,7 +694,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
   const newLeadCount = submissions.filter((submission) => submission.lead_status === 'new').length;
   const hotLeadCount = sortedSubmissions.filter(
     (submission) =>
-      !['paid', 'archived', 'not_a_fit', 'closed'].includes(submission.lead_status) &&
+      !['paid', 'archived', 'not_a_fit', 'nurture', 'closed'].includes(submission.lead_status) &&
       (submission.lead_status === 'discovery_booked' || getPriorityScore(submission) >= 70)
   ).length;
   const paidClientCount = confirmedOperations.length;
@@ -702,35 +818,81 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
   });
   const dashboardTasks = mergeTasks(generatedTasks, manualTasks, taskNotes, submissions, operations);
   const standaloneNotes = taskNotes.filter((note) => !note.linkedTaskId);
-  const dashboardTodayEnd = new Date(dashboardNow);
-  dashboardTodayEnd.setHours(23, 59, 59, 999);
-  const todayDueTaskCount = dashboardTasks.filter(
-    (task) => task.status !== 'done' && task.dueDate && new Date(task.dueDate).getTime() <= dashboardTodayEnd.getTime()
-  ).length;
   const briefingNumberClass =
     'inline-flex min-w-5 items-center justify-center rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] font-semibold leading-none text-[#8C7466]';
   const dashboardMetricCards = [
-    ['New leads', String(newLeadCount), `Updated ${dashboardTimeLabel}`, UserRoundCheck],
-    ['Hot leads', String(hotLeadCount), 'Priority score or booked call', Sparkles],
-    ['Follow-ups due', String(dueFollowUpCount), `Due by ${dashboardTimeLabel}`, CheckCircle2],
-    ['Paid clients', String(paidClientCount), 'Confirmed payments', WalletCards],
-    ['Revenue this month', formatMoney(monthlyRevenue), `As of ${dashboardTimeLabel}`, CreditCard],
-    ['Overdue delivery', String(overdueDeliveryCount), 'Needs attention', CircleAlert],
+    {
+      label: 'New leads',
+      value: String(newLeadCount),
+      caption: `Updated ${dashboardTimeLabel}`,
+      icon: UserRoundCheck,
+      href: buildFilterHref(key, currentFilters, { tab: 'leads', status: 'new' }),
+    },
+    {
+      label: 'Hot leads',
+      value: String(hotLeadCount),
+      caption: 'Priority score or booked call',
+      icon: Sparkles,
+      href: buildFilterHref(key, currentFilters, { tab: 'pipeline' }),
+    },
+    {
+      label: 'Follow-ups due',
+      value: String(dueFollowUpCount),
+      caption: `Due by ${dashboardTimeLabel}`,
+      icon: CheckCircle2,
+      href: buildFilterHref(key, currentFilters, { tab: 'pipeline', followUp: 'due' }),
+    },
+    {
+      label: 'Paid clients',
+      value: String(paidClientCount),
+      caption: 'Confirmed payments',
+      icon: WalletCards,
+      href: buildFilterHref(key, currentFilters, { tab: 'clients' }),
+    },
+    {
+      label: 'Revenue this month',
+      value: formatMoney(monthlyRevenue),
+      caption: `As of ${dashboardTimeLabel}`,
+      icon: CreditCard,
+      href: buildFilterHref(key, currentFilters, { tab: 'finance' }),
+    },
+    {
+      label: 'Overdue delivery',
+      value: String(overdueDeliveryCount),
+      caption: 'Needs attention',
+      icon: CircleAlert,
+      href: buildFilterHref(key, currentFilters, { tab: 'clients' }),
+    },
   ] as const;
   const contentDashboardContext = buildDashboardContext(submissions, operations);
 
   return (
-    <main className="coach-dashboard-clean min-h-screen overflow-x-hidden bg-[#EDEBE8] text-[#142334]">
+    <main className="coach-dashboard-clean min-h-screen overflow-x-clip bg-[#EDEBE8] text-[#142334]">
       <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3 xl:p-4">
-        <DashboardSidebar activeTab={activeTab} adminKey={key} todayTaskCount={todayDueTaskCount} />
+        <DashboardSidebar
+          activeTab={activeTab}
+          adminKey={key}
+          todayFollowUpCount={followUpNotificationCount}
+          todayFollowUps={sidebarFollowUps}
+        />
 
-        <section className="min-w-0 flex-1 overflow-hidden rounded-[8px] bg-transparent">
+        <section className="min-w-0 flex-1 overflow-x-clip rounded-[8px] bg-transparent">
           <div
             id="dashboard-command"
-            className={activeTab === 'calendar' ? 'space-y-5 p-0' : 'space-y-5 p-4 md:p-6 lg:p-7'}
+            className={activeTab === 'dashboard' || activeTab === 'calendar' || activeTab === 'content' || activeTab === 'leads' || activeTab === 'pipeline' ? 'space-y-3 p-0' : 'space-y-5 p-4 md:p-6 lg:p-7'}
           >
+            {activeTab !== 'content' && activeTab !== 'calendar' && (
+              <DashboardTopBar
+                activeTab={activeTab}
+                adminKey={key || ''}
+                query={q}
+                updatedTimeLabel={dashboardTimeLabel}
+                notificationCount={followUpNotificationCount}
+                showSearch={activeTab !== 'leads' && activeTab !== 'pipeline'}
+              />
+            )}
             {activeTab === 'dashboard' && (
-            <section className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[linear-gradient(115deg,#FCFBFA_0%,#F7F1EC_63%,#F3D97B_100%)] p-5 md:p-6 xl:p-7">
+            <section className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[linear-gradient(115deg,#FCFBFA_0%,#F7F1EC_62%,#BFA490_100%)] p-4 md:p-5 xl:p-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#7B695F]">
@@ -767,12 +929,20 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
-                <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-                  {dashboardMetricCards.map(([label, value, caption, Icon]) => {
+              <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                  {dashboardMetricCards.map(({ label, value, caption, icon: Icon, href }) => {
                     const MetricIcon = Icon as typeof UserRoundCheck;
                     return (
-                      <div key={label} className="min-h-[82px] px-1 py-1">
+                      <Link
+                        key={label}
+                        href={href}
+                        aria-label={`Open ${label}`}
+                        className="group relative min-h-[76px] rounded-[8px] px-3 py-2 transition hover:bg-white/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#142334]"
+                      >
+                        <span className="pointer-events-none absolute right-2 top-2 grid h-7 w-7 translate-x-1 place-items-center rounded-full bg-white text-[#142334] opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </span>
                         <div className="flex items-end gap-2">
                           <span className="mb-1 grid h-5 w-5 shrink-0 place-items-center rounded-[6px] bg-[#FCFBFA]/55 text-[#8C7466]">
                             <MetricIcon className="h-3.5 w-3.5" />
@@ -781,12 +951,12 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                         </div>
                         <p className="mt-2 text-[13px] font-medium leading-tight text-[#142334]/82">{label}</p>
                         <p className="mt-1 text-[11px] leading-relaxed text-[#142334]/52">{caption}</p>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
 
-                <div className="rounded-[8px] bg-[#142334] p-5 text-white">
+                <div className="rounded-[8px] bg-[#142334] p-4 text-white">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/58">
@@ -797,7 +967,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     <div
                       className="grid h-28 w-28 shrink-0 place-items-center rounded-full"
                       style={{
-                        background: `conic-gradient(#F3D97B ${conversionRate * 3.6}deg, rgba(255,255,255,0.18) 0deg)`,
+                        background: `conic-gradient(#BFA490 ${conversionRate * 3.6}deg, rgba(255,255,255,0.18) 0deg)`,
                       }}
                     >
                       <div className="grid h-20 w-20 place-items-center rounded-full bg-[#142334] text-[13px] font-semibold">
@@ -805,7 +975,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       </div>
                     </div>
                   </div>
-                  <div className="mt-7 rounded-[8px] border border-white/20 bg-white/10 p-4">
+                  <div className="mt-5 rounded-[8px] border border-white/20 bg-white/10 p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/58">Top signal</p>
                     <p className="mt-2 font-serif text-[28px] leading-none">{topArchetype}</p>
                   </div>
@@ -832,8 +1002,12 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
             {activeTab === 'dashboard' && (
             <>
-            <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.9fr)_minmax(320px,0.85fr)]">
-              <div className="min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4 md:p-5">
+            <section className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.9fr)_minmax(320px,0.85fr)]">
+              <Link
+                href={buildFilterHref(key, currentFilters, { tab: 'pipeline' })}
+                aria-label="Open lead pipeline"
+                className="group relative min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#142334]"
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A09086]">Lead pipeline</p>
@@ -841,7 +1015,12 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       High-intent prospects by stage
                     </h2>
                   </div>
-                  <p className="text-[13px] leading-relaxed text-[#142334]/62 sm:shrink-0">{activeLeadCount} active leads</p>
+                  <div className="flex items-center gap-2 sm:shrink-0">
+                    <p className="text-[13px] leading-relaxed text-[#142334]/62">{activeLeadCount} active leads</p>
+                    <span className="grid h-8 w-8 translate-x-1 place-items-center rounded-full bg-[#F5F3EE] text-[#142334] opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
+                      <ArrowUpRight className="h-4 w-4" />
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -891,9 +1070,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     })
                   )}
                 </div>
-              </div>
+              </Link>
 
-              <div className="min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4 md:p-5">
+              <div className="min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A09086]">Diagnostic archetypes</p>
                 <h2 className="mt-2 break-words font-serif text-[28px] leading-[0.95] text-[#142334] md:text-[31px]">
                   Where prospects are getting stuck
@@ -927,7 +1106,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 </div>
               </div>
 
-              <div className="min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4 md:p-5">
+              <div className="min-w-0 overflow-hidden rounded-[8px] bg-[#FCFBFA] p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A09086]">Revenue by service</p>
@@ -972,7 +1151,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 </div>
               </div>
             </section>
-            <section className="rounded-[8px] bg-[#FCFBFA] p-5 md:p-6">
+            <section className="rounded-[8px] bg-[#FCFBFA] p-4 md:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
@@ -983,9 +1162,90 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   </h2>
                 </div>
                 <p className="text-[13px] leading-relaxed text-[#142334]/62">
-                  {Math.max(todayTaskList.length, todayPriorityActions.length)} queued
+                  {Math.max(todayTaskList.length, todayPriorityActions.length, followUpsDueToday.length + nurtureSuggestions.length)} queued
                 </p>
               </div>
+
+              {(followUpsDueToday.length > 0 || followUpsDueTomorrow.length > 0 || nurtureSuggestions.length > 0) && (
+                <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
+                  <div className="rounded-[8px] bg-[#142334] p-4 text-white">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">
+                          Follow-up due today
+                        </p>
+                        <h3 className="mt-2 font-serif text-[28px] leading-none">
+                          {followUpsDueToday.length || 0} email{followUpsDueToday.length === 1 ? '' : 's'} waiting
+                        </h3>
+                      </div>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BFA490]">
+                        Manual send only
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-2">
+                      {followUpsDueToday.length === 0 ? (
+                        <div className="rounded-[8px] bg-white/8 px-3 py-3 text-[13px] leading-relaxed text-white/70">
+                          No sequence follow-ups are due today.
+                        </div>
+                      ) : (
+                        followUpsDueToday.slice(0, 4).map((submission) => (
+                          <div key={submission.id} className="grid gap-3 rounded-[8px] bg-white px-3 py-3 text-[#142334] sm:grid-cols-[1fr_auto] sm:items-center">
+                            <div className="min-w-0">
+                              <p className="truncate text-[14px] font-semibold">{submission.first_name || submission.email}</p>
+                              <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/60">
+                                {getFollowUpSequenceLabel(submission)} - {submission.archetype_payload?.service || submission.archetype_name}
+                              </p>
+                            </div>
+                            <LeadEmailButton
+                              lead={buildLeadEmailModalLead(submission)}
+                              initialNotes={taskNotes.filter((note) => note.linkedLeadId === submission.id)}
+                              label="Send now"
+                              icon="send"
+                              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#142334] px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {followUpsDueTomorrow.length > 0 && (
+                      <div className="mt-4 rounded-[8px] bg-white/8 px-3 py-3 text-[12px] leading-relaxed text-white/70">
+                        Tomorrow:{' '}
+                        {followUpsDueTomorrow.slice(0, 3).map((submission) => `${submission.first_name || submission.email} - ${getFollowUpSequenceLabel(submission)}`).join(', ')}
+                        {followUpsDueTomorrow.length > 3 ? `, +${followUpsDueTomorrow.length - 3} more` : ''}
+                      </div>
+                    )}
+                  </div>
+
+                  {nurtureSuggestions.length > 0 && (
+                    <div className="rounded-[8px] bg-[#FFF8EB] p-4 ring-1 ring-[#F1DFC1]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9A5C00]">
+                        Consider moving to Nurture
+                      </p>
+                      <h3 className="mt-2 font-serif text-[28px] leading-none text-[#142334]">
+                        Full sequence complete
+                      </h3>
+                      <div className="mt-4 grid gap-2">
+                        {nurtureSuggestions.slice(0, 3).map((submission) => {
+                          const waitDays = daysSince(submission.last_contacted_at, dashboardNow);
+                          return (
+                            <div key={submission.id} className="rounded-[8px] bg-white p-3">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-[14px] font-semibold text-[#142334]">{submission.first_name || submission.email}</p>
+                                  <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/62">
+                                    No response after full sequence - {waitDays} day{waitDays === 1 ? '' : 's'} since the newsletter bridge
+                                  </p>
+                                </div>
+                                <MoveToNurtureButton adminKey={key || ''} leadId={submission.id} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-6 grid gap-3">
                 {todayTaskList.length === 0 ? (
@@ -1040,8 +1300,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             )}
 
             {(activeTab === 'leads' || activeTab === 'pipeline') && (
-            <section className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-4">
-              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[1.4fr_0.8fr_0.8fr_0.78fr_0.7fr_0.7fr_auto]">
+            <section className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-3">
+              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[1.4fr_0.8fr_0.8fr_0.78fr_0.7fr_0.7fr_auto]">
                 <input type="hidden" name="key" value={key || ''} />
                 <input type="hidden" name="tab" value={activeTab} />
                 <label className="relative block md:col-span-2 xl:col-span-2 2xl:col-span-1">
@@ -1053,52 +1313,49 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     className="h-11 w-full rounded-[8px] border border-[#D8C8BB] bg-white pl-11 pr-4 text-[14px] outline-none transition focus:border-[#142334]"
                   />
                 </label>
-                <select
+                <FilterDropdown
                   name="status"
-                  defaultValue={selectedStatus}
-                  className="h-11 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[13px] outline-none transition focus:border-[#142334]"
-                >
-                  <option value="all">All statuses</option>
-                  {diagnosticLeadStatuses.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  name="archetype"
-                  defaultValue={selectedFilter}
-                  className="h-11 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[13px] outline-none transition focus:border-[#142334]"
-                >
-                  {Object.entries(archetypeLabels).map(([filterKey, label]) => (
-                    <option key={filterKey} value={filterKey}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  name="followUp"
-                  defaultValue={selectedFollowUp}
-                  className="h-11 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[13px] outline-none transition focus:border-[#142334]"
-                >
-                  <option value="all">All follow-ups</option>
-                  <option value="due">Due now</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="none">No follow-up set</option>
-                </select>
-                <input
-                  type="date"
-                  name="from"
-                  defaultValue={from || ''}
-                  aria-label="Date from"
-                  className="h-11 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[13px] outline-none transition focus:border-[#142334]"
+                  value={selectedStatus}
+                  ariaLabel="Filter by lead status"
+                  options={[
+                    { value: 'all', label: 'All statuses' },
+                    ...diagnosticLeadStatuses.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })),
+                  ]}
                 />
-                <input
-                  type="date"
+                <FilterDropdown
+                  name="archetype"
+                  value={selectedFilter}
+                  ariaLabel="Filter by archetype"
+                  options={Object.entries(archetypeLabels).map(([filterKey, label]) => ({
+                    value: filterKey,
+                    label,
+                  }))}
+                />
+                <FilterDropdown
+                  name="followUp"
+                  value={selectedFollowUp || 'all'}
+                  ariaLabel="Filter by follow-up status"
+                  options={[
+                    { value: 'all', label: 'All follow-ups' },
+                    { value: 'due', label: 'Due now' },
+                    { value: 'scheduled', label: 'Scheduled' },
+                    { value: 'none', label: 'No follow-up set' },
+                  ]}
+                />
+                <DashboardDatePicker
+                  name="from"
+                  ariaLabel="Date from"
+                  value={from || ''}
+                  placeholder="Start date"
+                />
+                <DashboardDatePicker
                   name="to"
-                  defaultValue={to || ''}
-                  aria-label="Date to"
-                  className="h-11 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[13px] outline-none transition focus:border-[#142334]"
+                  ariaLabel="Date to"
+                  value={to || ''}
+                  placeholder="End date"
                 />
                 <button
                   type="submit"
@@ -1117,11 +1374,11 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 error ? 'border-[#C98672] bg-[#FFF5F2] text-[#7A2F22]' : 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]'
               }`}>
                 {error === 'crm-schema'
-                  ? 'CRM fields are not live in Supabase yet. Apply the SQL additions in docs/Diagnostic-Lead-Magnet-Supabase.sql, then retry.'
+                  ? 'CRM fields are not live in Supabase yet. Run the CRM column additions in docs/Diagnostic-Lead-Magnet-Supabase.sql, then retry.'
                   : error === 'unauthorized'
                     ? 'The admin key was rejected. Re-open the dashboard with the correct key.'
                     : error === 'invalid'
-                      ? 'That delete request was missing its confirmation token. Nothing was removed.'
+                      ? 'That update could not be saved. Check the delete confirmation or choose a follow-up date from today onward.'
                       : updated === 'deleted'
                         ? `${deletedCount || 'Selected'} dashboard record${deletedCount === '1' ? '' : 's'} deleted.`
                         : 'Lead details updated.'}
@@ -1131,10 +1388,10 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
 
         {activeTab === 'leads' && (
-        <section className="pt-2">
+        <section>
           <div className="w-full">
             <div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {[
                   ['Total leads', String(submissions.length), UserRoundCheck],
                   ['Unique emails', String(uniqueEmails), Mail],
@@ -1144,7 +1401,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 ].map(([label, value, Icon]) => {
                   const StatIcon = Icon as typeof UserRoundCheck;
                   return (
-                    <div key={String(label)} className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-5">
+                    <div key={String(label)} className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-4">
                       <div className="flex items-center justify-between gap-4">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
                           {String(label)}
@@ -1190,11 +1447,14 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
                     Priority queue
                   </p>
-                  <h2 className="mt-2 font-serif text-[36px] leading-tight">Who needs attention next</h2>
+                  <h2 className="mt-2 font-serif text-[36px] leading-tight">Needs action now</h2>
+                  <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/62">
+                    New leads, due follow-ups, and booked calls stay here. People already emailed move into waiting until their follow-up date arrives.
+                  </p>
                 </div>
                 {actionQueue.length === 0 ? (
                   <div className="p-6 text-[15px] leading-relaxed text-[#142334]/70">
-                    No open follow-up actions for this filter.
+                    No first emails, due follow-ups, or discovery prep actions for this filter.
                   </div>
                 ) : (
                   <div className="divide-y divide-[#D8C8BB]">
@@ -1244,17 +1504,19 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                               label="Email"
                               className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
                             />
-                            <form action={`/api/diagnostic/submissions/${submission.id}`} method="post">
-                              <input type="hidden" name="key" value={key || ''} />
-                              <input type="hidden" name="redirectTo" value={redirectTo} />
-                              <input type="hidden" name="intent" value="mark_contacted" />
-                              <button
-                                type="submit"
-                                className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
-                              >
-                                Mark contacted
-                              </button>
-                            </form>
+                            {submission.lead_status !== 'discovery_booked' && (
+                              <form action={`/api/diagnostic/submissions/${submission.id}`} method="post">
+                                <input type="hidden" name="key" value={key || ''} />
+                                <input type="hidden" name="redirectTo" value={redirectTo} />
+                                <input type="hidden" name="intent" value="mark_contacted" />
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                                >
+                                  {submission.lead_status === 'new' ? 'Mark contacted' : 'Log follow-up'}
+                                </button>
+                              </form>
+                            )}
                           </div>
                         </div>
                       );
@@ -1284,6 +1546,50 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                         <span className="font-serif text-[22px] leading-none">{statusOption.count}</span>
                       </Link>
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                      Waiting for response
+                    </p>
+                    <span className="rounded-full bg-white px-3 py-1 font-serif text-[20px] leading-none text-[#142334]">
+                      {waitingForResponseQueue.length}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/62">
+                    Already emailed. These stay out of the action queue until the next follow-up date.
+                  </p>
+                  <div className="mt-5 grid gap-3">
+                    {waitingForResponseQueue.length === 0 ? (
+                      <div className="rounded-[8px] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#142334]/60">
+                        No contacted leads are waiting under this filter.
+                      </div>
+                    ) : (
+                      waitingForResponseQueue.map((submission) => (
+                        <Link
+                          key={submission.id}
+                          href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`}
+                          className="grid gap-2 rounded-[8px] bg-white px-4 py-3 transition hover:text-[#C9AD98]"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[14px] font-semibold text-[#142334]">{submission.first_name || submission.email}</p>
+                              <p className="mt-1 truncate text-[12px] text-[#142334]/58">
+                                {submission.archetype_payload?.service || submission.archetype_name}
+                              </p>
+                            </div>
+                            <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${getStatusClass(submission.lead_status)}`}>
+                              {getStatusLabel(submission.lead_status)}
+                            </span>
+                          </div>
+                          <p className="text-[12px] text-[#142334]/58">
+                            Next follow-up: {formatShortDate(submission.next_follow_up_at)}
+                          </p>
+                        </Link>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1321,10 +1627,14 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             context={contentDashboardContext}
             calendarItems={contentCalendarItems}
             backlogItems={contentBacklogItems}
+            researchItems={researchItems}
+            followUpNotificationCount={followUpNotificationCount}
           />
         )}
 
-        {activeTab === 'calendar' && <CustomCalendarDashboard adminKey={key || ''} leads={submissions} />}
+        {activeTab === 'calendar' && (
+          <CustomCalendarDashboard adminKey={key || ''} leads={submissions} followUpNotificationCount={followUpNotificationCount} />
+        )}
 
         {activeTab === 'messages' && (
           <MessagesLog

@@ -77,8 +77,8 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
                   </p>
                   <div className="mt-8 grid gap-3 border-y border-[#D8C8BB] py-6">
                     {[
-                      'Planned session: Saturday 4 July 2026 at 10:00 SAST',
-                      'Early bird closes on Sunday 28 June 2026 at 21:00 SAST',
+                      'Session date: To be confirmed',
+                      'Booking window: Opens when the date is confirmed',
                       'No payment is taken on this form',
                     ].map((item) => (
                       <div key={item} className="text-[15px] leading-relaxed text-[#142334]/72">
@@ -99,7 +99,7 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
                     {page.ctaLabel || 'Reserve my seat'}
                   </h3>
                   <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/68">
-                    Leave your details below and Coach Kagiso will email you when the July booking window opens.
+                    Leave your details below and Coach Kagiso will email you when the next booking window opens.
                   </p>
                   <MasterclassReserveForm source={`booking-page:${booking}`} />
                 </div>

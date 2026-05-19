@@ -1,6 +1,6 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { isDiagnosticLeadStatus, type DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
-import { getEmailTemplate, type EmailTemplateId } from '@/lib/email-templates';
+import { EMAIL_TEMPLATES, getEmailTemplate, type EmailTemplateId } from '@/lib/email-templates';
 
 type SentEmailRow = {
   id: string;
@@ -46,13 +46,7 @@ export type SentEmailResult = {
   hasFilters: boolean;
 };
 
-const knownTemplateIds = new Set<EmailTemplateId>([
-  'lost_pivoter',
-  'engaged_strategist',
-  'plateaued_performer',
-  'quiet_pivoter',
-  'burnt_out_builder',
-]);
+const knownTemplateIds = new Set<EmailTemplateId>(EMAIL_TEMPLATES.map((template) => template.id));
 
 function isMissingSentEmailsTable(message?: string) {
   return Boolean(message && (message.includes('sent_emails') || message.includes('schema cache')));
@@ -66,7 +60,8 @@ function getJoinedLeadStatus(row: SentEmailRow) {
 
 function getTemplateName(templateId?: string | null) {
   if (templateId && knownTemplateIds.has(templateId as EmailTemplateId)) {
-    return getEmailTemplate(templateId as EmailTemplateId).archetypeName;
+    const template = getEmailTemplate(templateId as EmailTemplateId);
+    return `${template.stageLabel} - ${template.archetypeName}`;
   }
 
   return templateId ? templateId.replace(/_/g, ' ') : 'Manual';

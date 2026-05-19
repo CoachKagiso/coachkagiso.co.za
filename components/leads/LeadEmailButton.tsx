@@ -8,6 +8,7 @@ import LeadEmailModal, { type LeadEmailModalLead } from './LeadEmailModal';
 type SentLeadUpdate = {
   id: string;
   lead_status?: string;
+  follow_up_count?: number;
   last_contacted_at?: string | null;
   next_follow_up_at?: string | null;
 };

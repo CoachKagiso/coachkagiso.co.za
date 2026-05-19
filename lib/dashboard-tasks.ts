@@ -86,6 +86,13 @@ function isOlderThanHours(value: string | null, hours: number, now = new Date())
   return now.getTime() - date.getTime() >= hours * 60 * 60 * 1000;
 }
 
+function daysSince(value: string | null, now = new Date()) {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000)));
+}
+
 function addWorkingDaysIso(value: string | null | undefined, days: number) {
   if (!value) return undefined;
   const date = new Date(value);
@@ -152,6 +159,12 @@ export function generateTasks(
   leads.forEach((lead) => {
     const clientName = lead.first_name || lead.email || 'Lead';
     const subtitle = getLeadSubtitle(lead);
+    const followUpCount = lead.follow_up_count ?? 0;
+    const hasDueSequenceFollowUp =
+      lead.lead_status === 'contacted' &&
+      Boolean(lead.next_follow_up_at) &&
+      isTodayOrPast(lead.next_follow_up_at, now) &&
+      followUpCount <= 2;
 
     if (lead.lead_status === 'new' && !lead.last_contacted_at) {
       tasks.push(
@@ -195,7 +208,113 @@ export function generateTasks(
       );
     }
 
-    if (lead.lead_status === 'contacted' && isOlderThanHours(lead.last_contacted_at, 48, now)) {
+    if (lead.lead_status === 'contacted' && followUpCount === 0 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+      tasks.push(
+        buildTask({
+          id: `followup1-${lead.id}`,
+          title: `${clientName} - Send Follow-up 1`,
+          subtitle: `${lead.archetype_payload?.service || 'Recommended route'} - ${lead.archetype_name} - Day 4 check-in`,
+          type: 'LEAD',
+          status: 'todo',
+          priority: 85,
+          dueDate: lead.next_follow_up_at,
+          clientName,
+          leadId: lead.id,
+          tags: ['FOLLOW-UP', 'DAY 4'],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+    }
+
+    if (lead.lead_status === 'contacted' && followUpCount === 1 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+      tasks.push(
+        buildTask({
+          id: `followup2-${lead.id}`,
+          title: `${clientName} - Send Follow-up 2`,
+          subtitle: `${lead.archetype_payload?.service || 'Recommended route'} - ${lead.archetype_name} - Soft close`,
+          type: 'LEAD',
+          status: 'todo',
+          priority: 80,
+          dueDate: lead.next_follow_up_at,
+          clientName,
+          leadId: lead.id,
+          tags: ['FOLLOW-UP', 'FINAL', 'DAY 10'],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+    }
+
+    if (lead.lead_status === 'contacted' && followUpCount === 2 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+      tasks.push(
+        buildTask({
+          id: `newsletter-bridge-${lead.id}`,
+          title: `${clientName} - Send newsletter bridge`,
+          subtitle: `${lead.archetype_payload?.service || 'Recommended route'} - ${lead.archetype_name} - Transition to newsletter`,
+          type: 'LEAD',
+          status: 'todo',
+          priority: 72,
+          dueDate: lead.next_follow_up_at,
+          clientName,
+          leadId: lead.id,
+          tags: ['NEWSLETTER', 'BRIDGE', 'DAY 17'],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+    }
+
+    if (lead.lead_status === 'contacted' && followUpCount >= 3 && lead.last_contacted_at && daysSince(lead.last_contacted_at, now) >= 2) {
+      const waitDays = daysSince(lead.last_contacted_at, now);
+      tasks.push(
+        buildTask({
+          id: `nurture-${lead.id}`,
+          title: `${clientName} - Move to Nurture`,
+          subtitle: `Full sequence sent - No response - ${waitDays} day${waitDays === 1 ? '' : 's'} since last contact`,
+          type: 'LEAD',
+          status: 'todo',
+          priority: 40,
+          dueDate: lead.last_contacted_at,
+          clientName,
+          leadId: lead.id,
+          tags: ['NURTURE', 'SEQUENCE COMPLETE'],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+    }
+
+    if (lead.lead_status === 'contacted' && followUpCount < 2 && !hasDueSequenceFollowUp && !isOlderThanHours(lead.last_contacted_at, 48, now)) {
+      tasks.push(
+        buildTask({
+          id: `lead-awaiting-response-${lead.id}`,
+          title: `${clientName} - Awaiting response`,
+          subtitle,
+          type: 'LEAD',
+          status: 'waiting',
+          priority: 75,
+          dueDate: lead.next_follow_up_at || lead.last_contacted_at || lead.updated_at || lead.submitted_at,
+          clientName,
+          leadId: lead.id,
+          tags: ['Awaiting response', lead.archetype_name],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+    }
+
+    if (lead.lead_status === 'contacted' && followUpCount < 2 && !hasDueSequenceFollowUp && isOlderThanHours(lead.last_contacted_at, 48, now)) {
       tasks.push(
         buildTask({
           id: `lead-response-check-${lead.id}`,

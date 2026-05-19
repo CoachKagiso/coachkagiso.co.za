@@ -171,13 +171,14 @@ function getPriorityScore(submission: DiagnosticSubmission) {
 
   if (submission.lead_status === 'new') score += 35;
   if (submission.lead_status === 'follow_up_later') score += 15;
+  if (submission.lead_status === 'nurture') score -= 30;
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) score += 30;
   if (!submission.last_contacted_at) score += 10;
   if (ageDays <= 2) score += 20;
   if (service.includes('Glow Up') || service.includes('Career Clarity')) score += 15;
   if (submission.archetype_key === 'D' || submission.archetype_key === 'C') score += 10;
   if (revenueStatuses.includes(submission.lead_status)) score -= 20;
-  if (submission.lead_status === 'not_a_fit' || submission.lead_status === 'archived' || submission.lead_status === 'closed') {
+  if (submission.lead_status === 'not_a_fit' || submission.lead_status === 'nurture' || submission.lead_status === 'archived' || submission.lead_status === 'closed') {
     score -= 45;
   }
 

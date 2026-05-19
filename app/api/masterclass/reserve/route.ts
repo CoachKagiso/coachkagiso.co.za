@@ -103,7 +103,7 @@ Name: ${fullName}
 Email: ${email}
 WhatsApp: ${whatsapp || 'Not supplied'}
 Source: ${source}
-Planned session: Saturday 4 July 2026, 10:00 SAST
+Planned session: Date to be confirmed
 
 What they want help with:
 ${focus}
@@ -111,13 +111,13 @@ ${focus}
         html: emailShell(
           `${fullName} joined the Saturday Masterclass reserve list.`,
           `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New Saturday Masterclass reserve request.</h1>
-          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">This person wants first access when booking opens for the Saturday 4 July 2026 session.</p>
+          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">This person wants first access when booking opens for the next Saturday Masterclass.</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
             ${detailRow('Name', fullName)}
             ${detailRow('Email', email)}
             ${detailRow('WhatsApp', whatsapp || 'Not supplied')}
             ${detailRow('Source', source)}
-            ${detailRow('Session', 'Saturday 4 July 2026, 10:00 SAST')}
+            ${detailRow('Session', 'Date to be confirmed')}
           </table>
           <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What they want help with</h2>
           <p style="margin:0;color:#4f5b66;font:15px/1.8 Arial,sans-serif;white-space:pre-line;">${escapeHtml(focus)}</p>`,
@@ -128,11 +128,11 @@ ${focus}
         subject: 'You are on the Saturday Masterclass reserve list',
         text: `Hi ${firstName},
 
-You are on the reserve list for the Saturday Masterclass planned for Saturday 4 July 2026 at 10:00 SAST.
+You are on the reserve list for the next Saturday Masterclass. The date is still being confirmed.
 
 What happens next:
-1. Coach Kagiso will open the July booking window.
-2. You will get the booking and payment link by email before early bird closes on Sunday 28 June 2026 at 21:00 SAST.
+1. Coach Kagiso will confirm the next session date.
+2. You will get the booking and payment link by email when the booking window opens.
 3. You can decide then whether you want to confirm your seat.
 
 For now, no payment is needed from you.
@@ -146,16 +146,16 @@ Coach Kagiso
         html: emailShell(
           `You are on the Saturday Masterclass reserve list.`,
           `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">You are on the reserve list, ${escapeHtml(firstName)}.</h1>
-          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Your seat interest is noted for the Saturday Masterclass planned for Saturday 4 July 2026 at 10:00 SAST.</p>
+          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Your seat interest is noted for the next Saturday Masterclass. The date is still being confirmed.</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
-            ${detailRow('Session', 'Saturday 4 July 2026, 10:00 SAST')}
-            ${detailRow('Early bird closes', 'Sunday 28 June 2026, 21:00 SAST')}
+            ${detailRow('Session', 'Date to be confirmed')}
+            ${detailRow('Booking window', 'Opens when the date is confirmed')}
             ${detailRow('Payment now', 'No payment needed yet')}
           </table>
           <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What happens next</h2>
           <ol style="margin:0;padding-left:20px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">
-            <li>Coach Kagiso will open the July booking window.</li>
-            <li>You will get the booking and payment link by email before early bird closes.</li>
+            <li>Coach Kagiso will confirm the next session date.</li>
+            <li>You will get the booking and payment link by email when the booking window opens.</li>
             <li>You can decide then whether you want to confirm your seat.</li>
           </ol>
           <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">For now, nothing else is needed from you.</p>

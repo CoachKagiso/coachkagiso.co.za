@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
 import { archetypes as diagnosticArchetypes } from '@/lib/career-diagnostic';
 import { getContactEmail } from '@/lib/env';
+import { getSastDateKey } from '@/lib/follow-up-utils';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E'] as const;
@@ -228,7 +229,7 @@ export async function POST(request: Request) {
     );
 
     const supabase = createSupabaseServiceClient();
-    const { error } = await supabase.from('diagnostic_submissions').insert({
+    const submissionPayload = {
       first_name: firstName,
       email,
       answers,
@@ -236,7 +237,10 @@ export async function POST(request: Request) {
       archetype_key: archetype.key,
       archetype_name: archetype.name,
       archetype_payload: archetype,
-    });
+      next_follow_up_at: getSastDateKey(),
+    };
+
+    const { error } = await supabase.from('diagnostic_submissions').insert(submissionPayload);
 
     if (error) {
       console.error(error);

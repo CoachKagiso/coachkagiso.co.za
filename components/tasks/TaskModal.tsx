@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { ManualTaskRecord, Task, TaskStatus } from '@/lib/dashboard-tasks';
+import type { EmailTemplateId } from '@/lib/email-templates';
 import { DetailTab } from './DetailTab';
 import { EmailTab } from './EmailTab';
 import { NotesTab } from './NotesTab';
@@ -47,7 +48,7 @@ export function TaskModal({
   leadStatusLabels: Record<DiagnosticLeadStatus, string>;
   onClose: () => void;
   onUpdate: (task: Task, values: Partial<ManualTaskRecord>) => Promise<void>;
-  onLeadStatusChange: (task: Task, nextStatus: TaskStatus) => Promise<void>;
+  onLeadStatusChange: (task: Task, nextStatus: TaskStatus, options?: { templateId?: EmailTemplateId }) => Promise<void>;
   onAddNote: (task: Task, body: string) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<TaskModalTab>('detail');
