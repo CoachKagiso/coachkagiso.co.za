@@ -6,7 +6,7 @@ export const contentPillars = ['career_growth', 'leadership', 'personal_brand', 
 export const contentPlatforms = ['linkedin', 'tiktok', 'instagram', 'facebook', 'email'] as const;
 export const contentCalendarStatuses = ['idea', 'draft', 'scheduled', 'published'] as const;
 export const contentBacklogStatuses = ['idea', 'draft', 'in_progress', 'used'] as const;
-export const contentBacklogSources = ['signal_brief', 'create', 'manual'] as const;
+export const contentBacklogSources = ['signal_brief', 'create', 'manual', 'insights'] as const;
 
 export type ContentPillar = (typeof contentPillars)[number];
 export type ContentPlatform = (typeof contentPlatforms)[number];
@@ -224,6 +224,7 @@ function getPriorityScore(submission: DiagnosticSubmission) {
 
   if (submission.lead_status === 'new') score += 35;
   if (submission.lead_status === 'follow_up_later') score += 15;
+  if (submission.lead_status === 'nurture') score -= 30;
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) score += 30;
   if (!submission.last_contacted_at) score += 10;
   if (ageDays <= 2) score += 20;
@@ -302,7 +303,7 @@ export function buildDashboardContext(
   const topServiceProjectedRevenue = topServiceCount * getServiceEstimate(topService);
   const hotLeadsCount = submissions.filter(
     (submission) =>
-      !['paid', 'archived', 'not_a_fit', 'closed'].includes(submission.lead_status) &&
+      !['paid', 'archived', 'not_a_fit', 'nurture', 'closed'].includes(submission.lead_status) &&
       (submission.lead_status === 'discovery_booked' || getPriorityScore(submission) >= 80)
   ).length;
   const commonAnxieties = getAnxietyThemes(submissions);
@@ -428,4 +429,137 @@ export async function deleteContentBacklogItem(id: string) {
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from('content_backlog').delete().eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+// ─── Research Vault ────────────────────────────────────────────────────────────
+
+export type ResearchStatus = 'active' | 'archived' | 'processing';
+
+export type ResearchContentAngle = {
+  angle: string;
+  angleName: string;
+  topic: string;
+};
+
+export type ResearchEntry = {
+  id: string;
+  title: string;
+  pillar: ContentPillar;
+  rawContent: string;
+  coreInsight: string | null;
+  keyFacts: string[];
+  audienceRelevance: string | null;
+  contentAngles: ResearchContentAngle[];
+  kagisoPerspective: string | null;
+  sources: string[];
+  expiresAt: string | null;
+  isEvergreen: boolean;
+  status: ResearchStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ResearchEntrySummary = {
+  title: string;
+  pillar: string;
+  coreInsight: string;
+  contentAngles: ResearchContentAngle[];
+  isEvergreen: boolean;
+  expiresAt: string | null;
+};
+
+type ResearchVaultRow = {
+  id: string;
+  title: string;
+  pillar: string;
+  raw_content: string;
+  core_insight: string | null;
+  key_facts: unknown;
+  audience_relevance: string | null;
+  content_angles: unknown;
+  kagiso_perspective: string | null;
+  sources: string[] | null;
+  expires_at: string | null;
+  is_evergreen: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+function normalizeResearchRow(row: ResearchVaultRow): ResearchEntry {
+  return {
+    id: row.id,
+    title: row.title,
+    pillar: isContentPillar(row.pillar) ? row.pillar : 'career_growth',
+    rawContent: row.raw_content,
+    coreInsight: row.core_insight,
+    keyFacts: Array.isArray(row.key_facts) ? (row.key_facts as string[]).map(String) : [],
+    audienceRelevance: row.audience_relevance,
+    contentAngles: Array.isArray(row.content_angles)
+      ? (row.content_angles as ResearchContentAngle[]).filter(
+          (a) => a && typeof a.angle === 'string',
+        )
+      : [],
+    kagisoPerspective: row.kagiso_perspective,
+    sources: Array.isArray(row.sources) ? row.sources.map(String) : [],
+    expiresAt: row.expires_at,
+    isEvergreen: Boolean(row.is_evergreen),
+    status: (row.status as ResearchStatus) ?? 'active',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function isMissingResearchTable(message?: string) {
+  return Boolean(
+    message &&
+      (message.includes('research_vault') ||
+        message.includes('Could not find the table') ||
+        message.includes('does not exist')),
+  );
+}
+
+export async function listResearchEntries() {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('research_vault')
+    .select(
+      'id, title, pillar, raw_content, core_insight, key_facts, audience_relevance, content_angles, kagiso_perspective, sources, expires_at, is_evergreen, status, created_at, updated_at',
+    )
+    .in('status', ['active', 'processing'])
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (isMissingResearchTable(error.message)) return [];
+    throw new Error(error.message);
+  }
+  return ((data || []) as ResearchVaultRow[]).map(normalizeResearchRow);
+}
+
+export async function listActiveResearchForSmartSuggest(): Promise<ResearchEntrySummary[]> {
+  const supabase = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('research_vault')
+    .select('title, pillar, core_insight, content_angles, is_evergreen, expires_at')
+    .eq('status', 'active')
+    .or(`is_evergreen.eq.true,expires_at.gt.${now}`)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) {
+    if (isMissingResearchTable(error.message)) return [];
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as ResearchVaultRow[]).map((row) => ({
+    title: String(row.title),
+    pillar: String(row.pillar),
+    coreInsight: row.core_insight ? String(row.core_insight) : '',
+    contentAngles: Array.isArray(row.content_angles)
+      ? (row.content_angles as ResearchContentAngle[]).filter((a) => a && typeof a.angle === 'string')
+      : [],
+    isEvergreen: Boolean(row.is_evergreen),
+    expiresAt: row.expires_at ? String(row.expires_at) : null,
+  }));
 }

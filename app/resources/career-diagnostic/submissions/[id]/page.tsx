@@ -7,15 +7,16 @@ import {
   CalendarClock,
   CheckCircle2,
   Mail,
+  Pencil,
   Printer,
   Save,
   Trash2,
 } from 'lucide-react';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
+import DashboardSidebar from '@/components/DashboardSidebar';
+import DashboardTopBar from '@/components/dashboard/DashboardTopBar';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import LeadProfileEmailButton from '@/components/leads/LeadProfileEmailButton';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import PrintButton from '@/components/PrintButton';
 import Reveal from '@/components/Reveal';
 import {
@@ -27,6 +28,8 @@ import {
 } from '@/lib/diagnostic-submissions';
 import { questions } from '@/lib/career-diagnostic';
 import { listNotes } from '@/lib/dashboard-task-records';
+import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
+import { getFollowUpUrgency, getSastDateKey } from '@/lib/follow-up-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,12 +50,37 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-ZA', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Africa/Johannesburg',
   }).format(new Date(value));
+}
+
+function formatDashboardTime(value: Date) {
+  return new Intl.DateTimeFormat('en-ZA', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    timeZone: 'Africa/Johannesburg',
+  }).format(value);
 }
 
 function formatDateInput(value?: string | null) {
   if (!value) return '';
   return new Date(value).toISOString().slice(0, 10);
+}
+
+function formatFollowUpDate(value: string) {
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${value}T00:00:00+02:00`));
+}
+
+function getFollowUpUrgencyClass(value: string) {
+  const urgency = getFollowUpUrgency(value);
+  if (urgency.urgency === 'overdue') return 'text-[#DC2626]';
+  if (urgency.urgency === 'today') return 'text-[#F59E0B]';
+  return 'text-[#6B6B6B]';
 }
 
 function getStatusLabel(status: DiagnosticLeadStatus) {
@@ -63,6 +91,7 @@ function getStatusClass(status: DiagnosticLeadStatus) {
   if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'nurture') return 'border-[#DDD6FE] bg-[#F3E8FF] text-[#7C3AED]';
   if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';
@@ -76,6 +105,7 @@ function getPriorityScore(submission: DiagnosticSubmission) {
 
   if (submission.lead_status === 'new') score += 35;
   if (submission.lead_status === 'follow_up_later') score += 15;
+  if (submission.lead_status === 'nurture') score -= 30;
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) score += 30;
   if (!submission.last_contacted_at) score += 10;
   if (ageDays <= 2) score += 20;
@@ -95,6 +125,7 @@ function getNextAction(submission: DiagnosticSubmission) {
   }
   if (submission.lead_status === 'new') return 'Send the first result follow-up while the diagnostic is still fresh.';
   if (submission.lead_status === 'follow_up_later') return 'Wait for the scheduled follow-up date.';
+  if (submission.lead_status === 'nurture') return 'Keep in a slower nurture rhythm unless they re-engage.';
   if (submission.lead_status === 'closed') return 'Closed.';
   if (submission.lead_status === 'not_a_fit') return 'Keep context saved, but do not prioritise active outreach.';
   return 'Check whether a second nudge or service route is useful.';
@@ -137,30 +168,59 @@ export default async function DiagnosticSubmissionSummaryPage({
   const payload = submission.archetype_payload || {};
   const answerRows = getAnswerRows(submission);
   const priority = getPriorityScore(submission);
-  const profileHref = `/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`;
-  const allNotes = await listNotes();
+  const encodedKey = encodeURIComponent(key || '');
+  const leadsHref = `/resources/career-diagnostic/submissions?key=${encodedKey}&tab=leads`;
+  const profileHref = `/resources/career-diagnostic/submissions/${submission.id}?key=${encodedKey}`;
+  const [allNotes, followUpNotificationCount, sidebarFollowUps] = await Promise.all([
+    listNotes(),
+    getFollowUpNotificationCount(),
+    listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
+  ]);
   const leadNotes = allNotes.filter((note) => note.linkedLeadId === submission.id);
+  const followUpUrgency = submission.next_follow_up_at ? getFollowUpUrgency(submission.next_follow_up_at) : null;
+  const dashboardTimeLabel = formatDashboardTime(new Date());
   const leadEmailModalLead = {
     id: submission.id,
     firstName: submission.first_name,
     email: submission.email,
     archetype: submission.archetype_name,
     serviceInterest: submission.archetype_payload?.service || '',
+    leadStatus: submission.lead_status,
+    followUpCount: submission.follow_up_count,
+    lastContactedAt: submission.last_contacted_at,
   };
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-[#FCFBFA] text-[#142334] pt-[124px] pb-24">
-        <div className="mx-auto max-w-[1120px] px-6 lg:px-8">
-          <Reveal>
+    <main className="coach-dashboard-clean min-h-screen overflow-x-clip bg-[#EDEBE8] text-[#142334]">
+      <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3 xl:p-4">
+        <DashboardSidebar
+          activeTab="leads"
+          adminKey={key}
+          todayFollowUpCount={followUpNotificationCount}
+          todayFollowUps={sidebarFollowUps}
+        />
+
+        <section className="min-w-0 flex-1 overflow-x-clip rounded-[8px] bg-transparent">
+          <div className="space-y-3 p-0">
+            <DashboardTopBar
+              activeTab="leads"
+              adminKey={key || ''}
+              query=""
+              updatedTimeLabel={dashboardTimeLabel}
+              notificationCount={followUpNotificationCount}
+              showSearch={false}
+            />
+
+            <div className="rounded-[8px] bg-[#FCFBFA] py-5 md:py-6">
+              <div className="mx-auto max-w-[1120px] px-4 lg:px-6">
+                <Reveal>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <Link
-                href={`/resources/career-diagnostic/submissions?key=${encodeURIComponent(key || '')}`}
+                href={leadsHref}
                 className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.2em] text-[#142334]/72 transition hover:text-[#142334]"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to command center
+                Back to Leads
               </Link>
               <div className="flex flex-wrap gap-3">
                 <LeadEmailButton
@@ -176,7 +236,7 @@ export default async function DiagnosticSubmissionSummaryPage({
                 </PrintButton>
                 <form action={`/api/diagnostic/submissions/${submission.id}`} method="post">
                   <input type="hidden" name="key" value={key || ''} />
-                  <input type="hidden" name="redirectTo" value={`/resources/career-diagnostic/submissions?key=${encodeURIComponent(key || '')}`} />
+                  <input type="hidden" name="redirectTo" value={leadsHref} />
                   <input type="hidden" name="intent" value="delete" />
                   <input type="hidden" name="confirm_delete" value={submission.id} />
                   <ConfirmSubmitButton
@@ -199,7 +259,7 @@ export default async function DiagnosticSubmissionSummaryPage({
                   : error === 'unauthorized'
                     ? 'The admin key was rejected. Re-open the dashboard with the correct key.'
                     : error === 'invalid'
-                      ? 'That delete request was missing its confirmation token. Nothing was removed.'
+                      ? 'That update could not be saved. Check the delete confirmation or choose a follow-up date from today onward.'
                       : 'Lead profile updated.'}
               </div>
             )}
@@ -316,17 +376,61 @@ export default async function DiagnosticSubmissionSummaryPage({
                         ))}
                       </select>
                     </label>
-                    <label className="grid gap-2">
+                    <div className="grid gap-2">
                       <span className="text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334]/62">
                         Next follow-up date
                       </span>
-                      <input
-                        type="date"
-                        name="next_follow_up_at"
-                        defaultValue={formatDateInput(submission.next_follow_up_at)}
-                        className="h-12 border border-[#D8C8BB] bg-[#FCFBFA] px-4 text-[14px] outline-none focus:border-[#142334]"
-                      />
-                    </label>
+                      {submission.next_follow_up_at ? (
+                        <div className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p data-next-follow-up-label className="font-serif text-[26px] leading-tight text-[#142334]">
+                                {formatFollowUpDate(submission.next_follow_up_at)}
+                              </p>
+                              {followUpUrgency && (
+                                <p
+                                  data-next-follow-up-urgency
+                                  className={`mt-1 text-[12px] font-semibold uppercase tracking-[0.12em] ${getFollowUpUrgencyClass(submission.next_follow_up_at)}`}
+                                >
+                                  {followUpUrgency.urgencyLabel}
+                                </p>
+                              )}
+                            </div>
+                            <details className="group">
+                              <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#142334] ring-1 ring-[#D8C8BB] transition hover:bg-[#142334] hover:text-white">
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </summary>
+                              <input
+                                type="date"
+                                name="next_follow_up_at"
+                                min={getSastDateKey()}
+                                data-next-follow-up-input
+                                defaultValue={formatDateInput(submission.next_follow_up_at)}
+                                className="mt-3 h-11 w-full rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[14px] outline-none focus:border-[#142334]"
+                              />
+                            </details>
+                          </div>
+                          <p className="mt-3 text-[12px] leading-relaxed text-[#142334]/58">
+                            Auto-set based on last contact.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            type="date"
+                            name="next_follow_up_at"
+                            min={getSastDateKey()}
+                            data-next-follow-up-input
+                            defaultValue=""
+                            className="h-12 rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] px-4 text-[14px] outline-none focus:border-[#142334]"
+                          />
+                          <p className="text-[12px] leading-relaxed text-[#142334]/58">
+                            Will be set automatically when you send an email.
+                          </p>
+                        </>
+                      )}
+                    </div>
                     <label className="grid gap-2">
                       <span className="text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334]/62">
                         Private notes
@@ -446,10 +550,12 @@ export default async function DiagnosticSubmissionSummaryPage({
                 </div>
               </div>
             </div>
-          </Reveal>
-        </div>
-      </main>
-      <Footer />
-    </>
+                </Reveal>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }

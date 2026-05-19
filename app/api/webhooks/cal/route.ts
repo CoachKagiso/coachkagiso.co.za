@@ -181,6 +181,7 @@ export async function POST(request: Request) {
     .from('diagnostic_submissions')
     .update({
       lead_status: 'discovery_booked',
+      next_follow_up_at: null,
       last_contacted_at: now,
       updated_at: now,
     })

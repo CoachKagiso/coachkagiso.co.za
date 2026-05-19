@@ -214,7 +214,7 @@ const tracks: Track[] = [
           'R100 off CV Revamp or LinkedIn Package for 48 hours after class',
         ],
         cta: 'Reserve my seat',
-        note: 'Next session planned for Saturday 4 July 2026, 10:00 SAST. Reserve your seat now and the booking link will be emailed before early bird closes on Sunday 28 June 2026 at 21:00 SAST.',
+        note: 'Next session date to be confirmed. Reserve your seat now and the booking link will be emailed when the booking window opens.',
       },
     ],
   },

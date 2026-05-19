@@ -44,7 +44,7 @@ export default function MasterclassReserveForm({ source }: MasterclassReserveFor
       }
 
       setState('success');
-      setMessage('You are on the July reserve list. We will email the booking link before Saturday 4 July 2026.');
+      setMessage('You are on the reserve list. We will email the booking link when the next date is confirmed.');
       form.reset();
     } catch (error) {
       setState('error');

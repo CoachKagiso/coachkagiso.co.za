@@ -16,9 +16,11 @@ type ContentAiMode =
   | 'polish'
   | 'alchemy_stage1'
   | 'alchemy_stage2'
+  | 'alchemy_critique'
   | 'format_recommendation'
   | 'voice_note'
-  | 'calendar_plan';
+  | 'calendar_plan'
+  | 'summarise_insights';
 
 const contentAiModes: ContentAiMode[] = [
   'signal_brief',
@@ -26,9 +28,11 @@ const contentAiModes: ContentAiMode[] = [
   'polish',
   'alchemy_stage1',
   'alchemy_stage2',
+  'alchemy_critique',
   'format_recommendation',
   'voice_note',
   'calendar_plan',
+  'summarise_insights',
 ];
 
 function isContentAiMode(value: unknown): value is ContentAiMode {
@@ -36,7 +40,15 @@ function isContentAiMode(value: unknown): value is ContentAiMode {
 }
 
 function getMaxTokens(mode: ContentAiMode) {
-  return mode === 'calendar_plan' ? 1600 : 1000;
+  if (mode === 'calendar_plan') return 2400;
+  if (mode === 'summarise_insights') return 900;
+  if (mode === 'write_post' || mode === 'voice_note' || mode === 'alchemy_stage2') return 1800;
+  if (mode === 'alchemy_critique') return 600;
+  return 1200;
+}
+
+function optionalString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 export async function POST(request: Request) {
@@ -77,9 +89,24 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [
-          { role: 'system', content: buildSystemPrompt(body.mode, body?.context ?? {}) },
+          {
+            role: 'system',
+            content: buildSystemPrompt(
+              body.mode,
+              body?.context ?? {},
+              optionalString(body?.contentType),
+              optionalString(body?.subType),
+              optionalString(body?.angle),
+              optionalString(body?.angleRegister),
+              Array.isArray(body?.researchEntries) ? body.researchEntries : undefined,
+              optionalString(body?.targetPillar),
+            ),
+          },
           { role: 'user', content: userPrompt },
         ],
+        thinking: {
+          type: 'disabled',
+        },
         max_tokens: getMaxTokens(body.mode),
         temperature: 0.7,
       }),

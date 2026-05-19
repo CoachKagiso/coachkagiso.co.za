@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowUpRight,
-  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +19,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import FollowUpNotificationBell, { type NotificationPanelSection } from '@/components/dashboard/FollowUpNotificationBell';
 import type {
   DashboardCalendarEvent,
   DashboardCalendarEventPayload,
@@ -31,6 +31,7 @@ import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 type CustomCalendarDashboardProps = {
   adminKey: string;
   leads: DiagnosticSubmission[];
+  followUpNotificationCount?: number;
 };
 
 type CalendarResponse = {
@@ -97,7 +98,7 @@ const formTextareaClass =
   'h-28 resize-none rounded-[8px] border border-[#CDB6A6] bg-[#F8F6F4] px-3 py-2.5 text-[14px] font-medium leading-relaxed text-[#142334] outline-none transition focus:border-[#142334] focus:bg-white focus:ring-2 focus:ring-[#C9AD98]/35';
 const tagBaseClass =
   'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1';
-const closedLeadStatuses = new Set(['paid', 'archived', 'not_a_fit', 'closed']);
+const closedLeadStatuses = new Set(['paid', 'archived', 'not_a_fit', 'nurture', 'closed']);
 
 function getDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -424,7 +425,7 @@ function isCoachingWindow(date: Date, time: string) {
   return false;
 }
 
-export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalendarDashboardProps) {
+export default function CustomCalendarDashboard({ adminKey, leads, followUpNotificationCount = 0 }: CustomCalendarDashboardProps) {
   const [view, setView] = useState<DashboardCalendarView>('week');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [events, setEvents] = useState<DashboardCalendarEvent[]>([]);
@@ -443,7 +444,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
   const [draggedEvent, setDraggedEvent] = useState<DashboardCalendarEvent | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [calendarSearch, setCalendarSearch] = useState('');
-  const [detailsPanelOpen, setDetailsPanelOpen] = useState(true);
+  const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const range = useMemo(() => getRangeForView(selectedDate, view), [selectedDate, view]);
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
   const selectedWeekKeys = useMemo(() => new Set(weekDays.map((day) => formatDateKey(day))), [weekDays]);
@@ -484,9 +485,6 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
     () => selectedDateActionEvents.filter((event) => event.source !== 'follow_up'),
     [selectedDateActionEvents],
   );
-  const attentionItemCount = diagnosticFollowUpsDue.length + selectedDateAppointmentEvents.length + selectedDateExtraActionEvents.length;
-  const hasUrgentAttention = diagnosticFollowUpsDue.length > 0 || selectedDateExtraActionEvents.length > 0;
-  const attentionBadgeLabel = attentionItemCount > 99 ? '99+' : String(attentionItemCount);
   const attentionStatusParts = [
     diagnosticFollowUpsDue.length > 0
       ? `${diagnosticFollowUpsDue.length} follow-up email${diagnosticFollowUpsDue.length === 1 ? '' : 's'}`
@@ -619,6 +617,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
       setDrawerMode('idle');
       setSelectedEvent(null);
       setDraft(getDefaultDraft(selectedDate));
+      setDetailsPanelOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save this event.');
     } finally {
@@ -646,6 +645,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
 
   function editPendingMove() {
     if (!pendingMove) return;
+    setDetailsPanelOpen(true);
     setSelectedEvent(pendingMove.event);
     setDrawerMode('edit');
     setDraft(pendingMove.draft);
@@ -677,6 +677,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
       setPendingMove(null);
       setSelectedEvent(null);
       setDrawerMode('idle');
+      setDetailsPanelOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not move this event.');
     } finally {
@@ -705,6 +706,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
       setDrawerMode('idle');
       setSelectedEvent(null);
       setConfirmDelete(false);
+      setDetailsPanelOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not delete this event.');
     } finally {
@@ -1091,7 +1093,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
   const timeLocked = Boolean(selectedEvent?.isCalBooking);
 
   const drawer = (
-    <aside className="rounded-[8px] bg-white p-5">
+    <aside className="h-full overflow-y-auto rounded-[8px] bg-white p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A09086]">Details</p>
@@ -1104,6 +1106,7 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
               setSelectedEvent(null);
               setDrawerMode('idle');
               setConfirmDelete(false);
+              setDetailsPanelOpen(false);
             }}
             className="grid h-8 w-8 place-items-center rounded-full bg-[#F8F6F4]"
           >
@@ -1401,6 +1404,34 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
     </aside>
   );
 
+  const selectedDayNotificationItems: NotificationPanelSection['items'] = selectedDateEvents.slice(0, 6).map((event) => {
+    const tag = getEventPillTag(event);
+    const eventTone =
+      event.type === 'delivery' ? 'overdue' : event.type === 'follow_up' || event.type === 'task' ? 'today' : event.type === 'personal' ? 'warm' : 'neutral';
+
+    return {
+      id: `selected-day-${event.id}`,
+      title: event.title,
+      description: `${formatDisplayDate(new Date(event.start), { day: '2-digit', month: 'short' })}, ${formatEventTime(event.start)} - ${formatEventTime(event.end)}`,
+      badge: tag.label,
+      actionLabel: event.readOnly ? 'View details' : 'Edit event',
+      tone: eventTone,
+      onSelect: () => openEvent(event),
+    };
+  });
+  const calendarNotificationSections: NotificationPanelSection[] = [
+    {
+      id: 'selected-day-schedule',
+      title: 'Selected day',
+      description: formatDisplayDate(selectedDate, { weekday: 'long', day: '2-digit', month: 'long' }),
+      count: selectedDateEvents.length,
+      emptyTitle: 'No events planned for this day.',
+      emptyDescription: 'Click an open slot on the calendar to add one.',
+      items: selectedDayNotificationItems,
+    },
+  ];
+  const calendarNotificationCount = followUpNotificationCount + selectedDateAppointmentEvents.length + selectedDateExtraActionEvents.length;
+
   const calendarTopBar = (
     <div className="rounded-[8px] bg-white px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -1460,26 +1491,12 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
               {formatDisplayDate(selectedDate, { weekday: 'short', day: '2-digit', month: 'short' })} · {selectedDateEvents.length} event{selectedDateEvents.length === 1 ? '' : 's'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setDetailsPanelOpen((current) => !current)}
-            aria-pressed={detailsPanelOpen}
-            className={`relative grid h-11 w-11 place-items-center rounded-full transition ${
-              hasUrgentAttention
-                ? 'bg-[#142334] text-white hover:bg-[#22364C]'
-                : detailsPanelOpen
-                  ? 'bg-[#F8F6F4] text-[#142334] hover:bg-[#EFE6DF]'
-                  : 'bg-[#EFE6DF] text-[#705746] hover:bg-[#E4D8CB]'
-            }`}
-            aria-label={`${detailsPanelOpen ? 'Hide' : 'Show'} details panel. ${attentionItemCount} attention item${attentionItemCount === 1 ? '' : 's'}.`}
-          >
-            <Bell className={`h-4 w-4 ${hasUrgentAttention ? 'calendar-bell-wobble' : ''}`} />
-            {attentionItemCount > 0 && (
-              <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#BFA490] px-1 text-[10px] font-bold text-[#142334] ring-2 ring-white">
-                {attentionBadgeLabel}
-              </span>
-            )}
-          </button>
+          <FollowUpNotificationBell
+            adminKey={adminKey}
+            notificationCount={calendarNotificationCount}
+            extraSections={calendarNotificationSections}
+            panelSubtitle={`${attentionStatusLabel} on the selected day, plus lead follow-up emails.`}
+          />
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">
             <Image
               src="/images/author/ck-profile.png"
@@ -1498,15 +1515,28 @@ export default function CustomCalendarDashboard({ adminKey, leads }: CustomCalen
   return (
     <section id="calendar-planning" className="pb-10">
       {calendarTopBar}
-      <div
-        className={`mt-3 grid w-full gap-3 transition-[grid-template-columns] duration-300 ${
-          detailsPanelOpen ? 'xl:grid-cols-[280px_minmax(0,1fr)_340px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'
-        }`}
-      >
+      <div className="mt-3 grid w-full gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
         {sidebar}
         {mainCalendar}
-        {detailsPanelOpen && <div className="calendar-details-slide-in">{drawer}</div>}
       </div>
+      {detailsPanelOpen && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Close event details"
+            className="absolute inset-0 h-full w-full cursor-default bg-[#142334]/5"
+            onClick={() => {
+              setDetailsPanelOpen(false);
+              setSelectedEvent(null);
+              setDrawerMode('idle');
+              setConfirmDelete(false);
+            }}
+          />
+          <div className="calendar-details-slide-in absolute bottom-3 right-3 top-3 w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-white">
+            {drawer}
+          </div>
+        </div>
+      )}
       {pendingMove && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#142334]/35 px-4">
           <div className="w-full max-w-[430px] rounded-[8px] bg-white p-5 text-[#142334]">

@@ -29,6 +29,7 @@ const statusLabels: Record<DiagnosticLeadStatus, string> = {
   paid: 'Paid',
   follow_up_later: 'Follow up',
   not_a_fit: 'Not a fit',
+  nurture: 'Nurture',
   closed: 'Closed',
   archived: 'Archived',
 };
@@ -37,6 +38,7 @@ function getStatusClass(status?: DiagnosticLeadStatus | null) {
   if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'nurture') return 'border-[#DDD6FE] bg-[#F3E8FF] text-[#7C3AED]';
   if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';

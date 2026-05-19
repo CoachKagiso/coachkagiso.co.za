@@ -53,6 +53,7 @@ function getLeadStatusBadgeClass(status: DiagnosticLeadStatus) {
   if (status === 'paid') return 'bg-[#EEF7EF] text-[#355C3A] ring-[#D8E8D9]';
   if (status === 'discovery_booked') return 'bg-[#EEF4FA] text-[#284B70] ring-[#D5E2EF]';
   if (status === 'contacted' || status === 'follow_up_later') return 'bg-[#FFF8EB] text-[#9A5C00] ring-[#F1DFC1]';
+  if (status === 'nurture') return 'bg-[#F3E8FF] text-[#7C3AED] ring-[#DDD6FE]';
   if (status === 'closed') return 'bg-[#EEF7EF] text-[#355C3A] ring-[#D8E8D9]';
   if (status === 'archived' || status === 'not_a_fit') return 'bg-white text-[#6B6B6B] ring-[#E4D8CB]';
   return 'bg-white text-[#142334] ring-[#E4D8CB]';

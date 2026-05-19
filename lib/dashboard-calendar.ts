@@ -138,7 +138,7 @@ function buildLeadFollowUpEvents(leads: DiagnosticSubmission[], range: CalendarR
   const events: DashboardCalendarEvent[] = [];
 
   for (const lead of leads) {
-    if (['paid', 'archived', 'not_a_fit', 'closed'].includes(lead.lead_status)) continue;
+    if (['paid', 'archived', 'not_a_fit', 'nurture', 'closed'].includes(lead.lead_status)) continue;
 
     const scheduledDate = lead.next_follow_up_at ? parseDate(lead.next_follow_up_at) : null;
     const contactedDate = lead.lead_status === 'contacted' && lead.last_contacted_at ? addDays(parseDate(lead.last_contacted_at), 7) : null;

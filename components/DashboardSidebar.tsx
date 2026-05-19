@@ -13,6 +13,8 @@ import {
   StickyNote,
   UsersRound,
 } from 'lucide-react';
+import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import type { FollowUpNotification } from '@/lib/follow-up-utils';
 
 const dashboardNavItems = [
   { label: 'Dashboard', tab: 'dashboard', icon: LayoutDashboard },
@@ -30,7 +32,8 @@ const dashboardNavItems = [
 type DashboardSidebarProps = {
   activeTab: string;
   adminKey?: string;
-  todayTaskCount: number;
+  todayFollowUpCount: number;
+  todayFollowUps?: FollowUpNotification[];
 };
 
 function buildTabHref(adminKey: string | undefined, tab: string) {
@@ -41,9 +44,16 @@ function buildTabHref(adminKey: string | undefined, tab: string) {
   return query ? `/resources/career-diagnostic/submissions?${query}` : '/resources/career-diagnostic/submissions';
 }
 
-export default function DashboardSidebar({ activeTab, adminKey, todayTaskCount }: DashboardSidebarProps) {
+export default function DashboardSidebar({
+  activeTab,
+  adminKey,
+  todayFollowUpCount,
+  todayFollowUps = [],
+}: DashboardSidebarProps) {
+  const hiddenFollowUpCount = Math.max(0, todayFollowUpCount - todayFollowUps.slice(0, 3).length);
+
   return (
-    <div className="hidden shrink-0 lg:block">
+    <div className="hidden shrink-0 self-start lg:sticky lg:top-3 lg:block xl:top-4">
       <input
         id="coach-kagiso-dashboard-sidebar-toggle"
         type="checkbox"
@@ -98,19 +108,50 @@ export default function DashboardSidebar({ activeTab, adminKey, todayTaskCount }
       </nav>
 
       <a
-        href={buildTabHref(adminKey, 'tasks')}
-        title={`${todayTaskCount} tasks due today`}
+        href={`${buildTabHref(adminKey, 'leads')}&followUp=due`}
+        title={`${todayFollowUpCount} follow-ups due today`}
         className="dashboard-sidebar-today-collapsed h-14 place-items-center rounded-[8px] border border-[#D8C8BB] bg-[#F7F1EC] text-center transition hover:border-[#142334]"
       >
-        <span className="font-serif text-[25px] leading-none">{todayTaskCount}</span>
-        <span className="sr-only">tasks due today</span>
+        <span className="font-serif text-[25px] leading-none">{todayFollowUpCount}</span>
+        <span className="sr-only">follow-ups due today</span>
       </a>
       <div className="dashboard-sidebar-today-expanded rounded-[8px] border border-[#D8C8BB] bg-[#F7F1EC] p-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A09086]">Today</p>
-        <p className="mt-2 font-serif text-[28px] leading-none">{todayTaskCount}</p>
+        <p className="mt-2 font-serif text-[28px] leading-none">{todayFollowUpCount}</p>
         <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/64">
-          Tasks due before the day closes.
+          Follow-ups due before the day closes.
         </p>
+        {todayFollowUps.length > 0 && (
+          <div className="mt-3 grid gap-2">
+            {todayFollowUps.slice(0, 3).map((item) => (
+              <LeadEmailButton
+                key={item.id}
+                lead={{
+                  id: item.id,
+                  firstName: item.firstName || item.name,
+                  email: item.email,
+                  archetype: item.archetype,
+                  serviceInterest: item.serviceInterest,
+                  leadStatus: item.leadStatus,
+                  followUpCount: item.followUpCount,
+                  lastContactedAt: item.lastContactedAt,
+                }}
+                label={`${item.name} - ${item.actionLabel}`}
+                icon="send"
+                initialNotes={[]}
+                className="inline-flex w-full items-center justify-between gap-2 rounded-[8px] bg-white px-3 py-2 text-left text-[11px] font-semibold leading-snug text-[#142334] transition hover:bg-[#142334] hover:text-white"
+              />
+            ))}
+            {hiddenFollowUpCount > 0 && (
+              <a
+                href={`${buildTabHref(adminKey, 'leads')}&followUp=due`}
+                className="text-[11px] font-semibold text-[#8C7466] transition hover:text-[#142334]"
+              >
+                and {hiddenFollowUpCount} more -&gt;
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </aside>
     </div>

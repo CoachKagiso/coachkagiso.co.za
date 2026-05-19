@@ -24,6 +24,7 @@ create index if not exists diagnostic_submissions_submitted_at_idx
 alter table public.diagnostic_submissions
   add column if not exists lead_status text not null default 'new',
   add column if not exists lead_notes text,
+  add column if not exists follow_up_count integer not null default 0,
   add column if not exists next_follow_up_at date,
   add column if not exists last_contacted_at timestamptz,
   add column if not exists updated_at timestamptz;
@@ -41,6 +42,7 @@ alter table public.diagnostic_submissions
       'paid',
       'follow_up_later',
       'not_a_fit',
+      'nurture',
       'closed',
       'archived'
     )

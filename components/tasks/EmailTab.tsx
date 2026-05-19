@@ -6,9 +6,11 @@ import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
+  getEmailSequenceDots,
+  getEmailTemplateOptionLabel,
   getBookingLink,
   getEmailTemplate,
-  getTemplateIdForArchetype,
+  getTemplateIdForLeadStage,
   type EmailTemplateId,
 } from '@/lib/email-templates';
 
@@ -81,16 +83,27 @@ export function EmailTab({
   task: Task;
   adminKey: string;
   lead?: DiagnosticSubmission;
-  onLeadStatusChange: (task: Task, nextStatus: TaskStatus) => Promise<void>;
+  onLeadStatusChange: (task: Task, nextStatus: TaskStatus, options?: { templateId?: EmailTemplateId }) => Promise<void>;
   onToast: (message: string) => void;
   onAfterSend: () => void;
 }) {
-  const defaultTemplateId = useMemo(() => getTemplateIdForArchetype(lead?.archetype_name, lead?.archetype_key), [lead]);
+  const defaultTemplateId = useMemo(
+    () =>
+      getTemplateIdForLeadStage({
+        archetypeName: lead?.archetype_name,
+        archetypeKey: lead?.archetype_key,
+        followUpCount: lead?.follow_up_count,
+        leadStatus: lead?.lead_status,
+        lastContactedAt: lead?.last_contacted_at,
+      }),
+    [lead]
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateId>(defaultTemplateId);
   const [emailSubject, setEmailSubject] = useState(() => injectEmailTemplate(getEmailTemplate(defaultTemplateId).subject, lead, defaultTemplateId));
   const [emailBody, setEmailBody] = useState(() => injectEmailTemplate(getEmailTemplate(defaultTemplateId).body, lead, defaultTemplateId));
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [sendError, setSendError] = useState<string | null>(null);
+  const selectedTemplate = getEmailTemplate(selectedTemplateId);
 
   function switchTemplate(nextTemplateId: EmailTemplateId) {
     const template = getEmailTemplate(nextTemplateId);
@@ -120,7 +133,7 @@ export function EmailTab({
         serviceInterest: lead.archetype_payload?.service || '',
       });
 
-      await onLeadStatusChange(task, 'waiting');
+      await onLeadStatusChange(task, 'waiting', { templateId: selectedTemplateId });
       setSendState('sent');
       onToast(`Email sent to ${getLeadFirstName(lead)}.`);
       window.setTimeout(onAfterSend, 650);
@@ -137,6 +150,9 @@ export function EmailTab({
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</p>
           <p className="mt-1 truncate text-[13px] text-[#142334]">{lead?.email || 'No email available'}</p>
+          <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8C7466]">
+            Email {selectedTemplate.sequenceIndex} of 4 <span aria-hidden="true">{getEmailSequenceDots(selectedTemplateId)}</span>
+          </p>
         </div>
         <MailCheck className="h-4 w-4 shrink-0 text-[#C9AD98]" />
       </div>
@@ -150,10 +166,13 @@ export function EmailTab({
         >
           {EMAIL_TEMPLATES.map((template) => (
             <option key={template.id} value={template.id}>
-              {template.archetypeName}
+              {getEmailTemplateOptionLabel(template)}
             </option>
           ))}
         </select>
+        <span className="text-[12px] leading-relaxed text-[#6B6B6B]">
+          {selectedTemplate.stageLabel} - {selectedTemplate.archetypeName}
+        </span>
       </label>
 
       <label className="grid gap-2">
@@ -189,6 +208,16 @@ export function EmailTab({
           {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent' : 'Send Email'}
         </button>
         {sendError && <p className="text-[12px] leading-relaxed text-[#A24E37]">Email failed to send. Try again.</p>}
+        {selectedTemplate.sequenceIndex === 3 && (
+          <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
+            After this email, the newsletter bridge reminder will appear in 7 days if there&apos;s no response.
+          </p>
+        )}
+        {selectedTemplate.sequenceIndex === 4 && (
+          <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
+            This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
+          </p>
+        )}
       </div>
     </div>
   );

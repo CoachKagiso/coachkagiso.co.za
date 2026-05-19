@@ -14,14 +14,32 @@ const statusLabels: Record<DiagnosticLeadStatus, string> = {
   paid: 'Paid',
   follow_up_later: 'Follow up',
   not_a_fit: 'Not a fit',
+  nurture: 'Nurture',
   closed: 'Closed',
   archived: 'Archived',
+};
+
+const archetypeLabels: Record<string, string> = {
+  A: 'Plateaued Performer',
+  B: 'Quiet Pivoter',
+  C: 'Burnt-Out Builder',
+  D: 'Lost Pivoter',
+  E: 'Engaged Strategist',
+};
+
+const archetypePillClasses: Record<string, string> = {
+  A: 'border-[#142334]/18 bg-[#F0F3F5] text-[#142334]',
+  B: 'border-[#C9AD98]/38 bg-[#F7F1EC] text-[#7B5D49]',
+  C: 'border-[#8AA6C8]/38 bg-[#EEF4FA] text-[#284B70]',
+  D: 'border-[#C98672]/35 bg-[#FFF1EC] text-[#8B3F2E]',
+  E: 'border-[#79A580]/35 bg-[#EEF7EF] text-[#355C3A]',
 };
 
 function getStatusClass(status: DiagnosticLeadStatus) {
   if (status === 'paid') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'discovery_booked') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
   if (status === 'new') return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+  if (status === 'nurture') return 'border-[#DDD6FE] bg-[#F3E8FF] text-[#7C3AED]';
   if (status === 'closed') return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   if (status === 'not_a_fit' || status === 'archived') return 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/55';
   return 'border-[#D8C8BB] bg-white text-[#142334]';
@@ -55,6 +73,7 @@ export default function LeadListRow({
   initialNotes: DashboardNote[];
 }) {
   const [leadStatus, setLeadStatus] = useState<DiagnosticLeadStatus>(submission.lead_status);
+  const [followUpCount, setFollowUpCount] = useState(submission.follow_up_count);
   const [lastContactedAt, setLastContactedAt] = useState<string | null>(submission.last_contacted_at);
   const [nextFollowUpAt, setNextFollowUpAt] = useState<string | null>(submission.next_follow_up_at);
   const [notes, setNotes] = useState(initialNotes);
@@ -64,10 +83,13 @@ export default function LeadListRow({
     email: submission.email,
     archetype: submission.archetype_name,
     serviceInterest: submission.archetype_payload?.service || '',
+    leadStatus,
+    followUpCount,
+    lastContactedAt,
   };
 
   return (
-    <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.25fr_0.7fr_0.72fr_0.5fr_0.72fr_auto] lg:items-center">
+    <div className="grid gap-4 px-4 py-4 lg:grid-cols-[1.25fr_0.78fr_0.72fr_0.5fr_0.72fr_auto] lg:items-center">
       <div className="flex items-start gap-4">
         <input
           type="checkbox"
@@ -93,35 +115,49 @@ export default function LeadListRow({
           </a>
         </div>
       </div>
-      <div className="mt-5 lg:mt-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">{submission.archetype_key}</p>
+      <div className="mt-4 lg:mt-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
+            {submission.archetype_key}
+          </span>
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+              archetypePillClasses[submission.archetype_key] || 'border-[#D8C8BB] bg-[#FCFBFA] text-[#142334]/62'
+            }`}
+          >
+            {archetypeLabels[submission.archetype_key] || submission.archetype_name}
+          </span>
+        </div>
         <p className="mt-2 text-[15px] leading-relaxed text-[#142334]">
           {submission.archetype_payload?.service || 'Not set'}
         </p>
       </div>
-      <div className="mt-5 lg:mt-0">
+      <div className="mt-4 lg:mt-0">
         <span className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.17em] ${getStatusClass(leadStatus)}`}>
           {statusLabels[leadStatus]}
         </span>
         <p className="mt-3 text-[12px] text-[#142334]/58">Submitted {formatDate(submission.submitted_at)}</p>
       </div>
-      <div className="mt-5 lg:mt-0">
+      <div className="mt-4 lg:mt-0">
         <p className="font-serif text-[30px] leading-none text-[#142334]">{priority}</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
           <div className="h-full bg-[#C9AD98]" style={{ width: `${priority}%` }} />
         </div>
       </div>
-      <div className="mt-5 lg:mt-0">
+      <div className="mt-4 lg:mt-0">
         <p className="text-[14px] leading-relaxed text-[#142334]/72">{formatShortDate(nextFollowUpAt)}</p>
         <p className="mt-1 text-[12px] text-[#142334]/58">Last contact: {formatShortDate(lastContactedAt)}</p>
       </div>
-      <div className="mt-5 flex flex-wrap gap-3 lg:mt-0">
+      <div className="mt-4 flex flex-wrap gap-2 lg:mt-0">
         <LeadEmailButton
           lead={lead}
           initialNotes={notes}
           className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
           onSent={(nextSubmission) => {
             if (nextSubmission.lead_status) setLeadStatus(nextSubmission.lead_status as DiagnosticLeadStatus);
+            if (typeof nextSubmission.follow_up_count !== 'undefined') {
+              setFollowUpCount(nextSubmission.follow_up_count);
+            }
             if (typeof nextSubmission.last_contacted_at !== 'undefined') {
               setLastContactedAt(nextSubmission.last_contacted_at || null);
             }

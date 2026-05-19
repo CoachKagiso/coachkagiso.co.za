@@ -1,10 +1,12 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { getDiagnosticAdminKey } from '@/lib/env';
+import { getEffectiveNextFollowUpAt } from '@/lib/follow-up-utils';
 
 const ARCHETYPE_KEYS = ['A', 'B', 'C', 'D', 'E'] as const;
 const LEGACY_SELECT =
   'id, first_name, email, answers, score, archetype_key, archetype_name, archetype_payload, submitted_at';
-const CRM_SELECT = `${LEGACY_SELECT}, lead_status, lead_notes, next_follow_up_at, last_contacted_at, updated_at`;
+const CRM_BASE_SELECT = `${LEGACY_SELECT}, lead_status, lead_notes, next_follow_up_at, last_contacted_at, updated_at`;
+const CRM_SELECT = `${LEGACY_SELECT}, lead_status, lead_notes, follow_up_count, next_follow_up_at, last_contacted_at, updated_at`;
 
 export type DiagnosticArchetypeKey = (typeof ARCHETYPE_KEYS)[number];
 export type DiagnosticLeadStatus =
@@ -14,6 +16,7 @@ export type DiagnosticLeadStatus =
   | 'paid'
   | 'follow_up_later'
   | 'not_a_fit'
+  | 'nurture'
   | 'closed'
   | 'archived';
 
@@ -28,6 +31,7 @@ export const diagnosticLeadStatuses: {
   { value: 'paid', label: 'Paid client', shortLabel: 'Paid' },
   { value: 'follow_up_later', label: 'Follow up later', shortLabel: 'Follow up' },
   { value: 'not_a_fit', label: 'Not a fit', shortLabel: 'Not a fit' },
+  { value: 'nurture', label: 'Nurture', shortLabel: 'Nurture' },
   { value: 'closed', label: 'Closed', shortLabel: 'Closed' },
   { value: 'archived', label: 'Archived', shortLabel: 'Archived' },
 ];
@@ -51,6 +55,7 @@ export type DiagnosticSubmission = {
   submitted_at: string;
   lead_status: DiagnosticLeadStatus;
   lead_notes: string | null;
+  follow_up_count: number;
   next_follow_up_at: string | null;
   last_contacted_at: string | null;
   updated_at: string | null;
@@ -90,14 +95,27 @@ function isMissingCrmColumn(message?: string) {
   );
 }
 
+function isMissingFollowUpCountColumn(message?: string) {
+  return Boolean(message && message.includes('follow_up_count'));
+}
+
 function normalizeSubmission(row: Partial<DiagnosticSubmission>) {
   const status = isDiagnosticLeadStatus(row.lead_status) ? row.lead_status : 'new';
+  const followUpCount = Number.isFinite(Number(row.follow_up_count)) ? Number(row.follow_up_count) : 0;
+  const nextFollowUpAt = getEffectiveNextFollowUpAt({
+    followUpCount,
+    lastContactedAt: row.last_contacted_at,
+    leadStatus: status,
+    nextFollowUpAt: row.next_follow_up_at,
+    submittedAt: row.submitted_at,
+  });
 
   return {
     ...row,
     lead_status: status,
     lead_notes: row.lead_notes || null,
-    next_follow_up_at: row.next_follow_up_at || null,
+    follow_up_count: followUpCount,
+    next_follow_up_at: nextFollowUpAt,
     last_contacted_at: row.last_contacted_at || null,
     updated_at: row.updated_at || null,
   } as DiagnosticSubmission;
@@ -156,6 +174,34 @@ export async function listDiagnosticSubmissions(
   const result = await query;
   let data: unknown[] | null = result.data;
   let error = result.error;
+
+  if (error && isMissingFollowUpCountColumn(error.message)) {
+    let baseCrmQuery = supabase
+      .from('diagnostic_submissions')
+      .select(CRM_BASE_SELECT)
+      .order('submitted_at', { ascending: false })
+      .limit(250);
+
+    if (isDiagnosticArchetypeKey(filters.archetype)) {
+      baseCrmQuery = baseCrmQuery.eq('archetype_key', filters.archetype);
+    }
+
+    if (isDiagnosticLeadStatus(filters.status)) {
+      baseCrmQuery = baseCrmQuery.eq('lead_status', filters.status);
+    }
+
+    if (submittedFrom) {
+      baseCrmQuery = baseCrmQuery.gte('submitted_at', submittedFrom);
+    }
+
+    if (submittedTo) {
+      baseCrmQuery = baseCrmQuery.lte('submitted_at', submittedTo);
+    }
+
+    const baseCrmResult = await baseCrmQuery;
+    data = baseCrmResult.data;
+    error = baseCrmResult.error;
+  }
 
   if (error && isMissingCrmColumn(error.message)) {
     let legacyQuery = supabase
@@ -237,6 +283,16 @@ export async function getDiagnosticSubmissionById(id: string) {
   let data: unknown | null = result.data;
   let error = result.error;
 
+  if (error && isMissingFollowUpCountColumn(error.message)) {
+    const baseCrmResult = await supabase
+      .from('diagnostic_submissions')
+      .select(CRM_BASE_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    data = baseCrmResult.data;
+    error = baseCrmResult.error;
+  }
+
   if (error && isMissingCrmColumn(error.message)) {
     const legacyResult = await supabase
       .from('diagnostic_submissions')
@@ -259,6 +315,7 @@ export async function updateDiagnosticSubmissionCrm(
   values: {
     lead_status?: DiagnosticLeadStatus;
     lead_notes?: string | null;
+    follow_up_count?: number;
     next_follow_up_at?: string | null;
     last_contacted_at?: string | null;
   }
@@ -275,6 +332,17 @@ export async function updateDiagnosticSubmissionCrm(
     .eq('id', id);
 
   if (error) {
+    if (isMissingFollowUpCountColumn(error.message) && 'follow_up_count' in updatePayload) {
+      const { follow_up_count: _followUpCount, ...payloadWithoutFollowUpCount } = updatePayload;
+      const retry = await supabase
+        .from('diagnostic_submissions')
+        .update(payloadWithoutFollowUpCount)
+        .eq('id', id);
+
+      if (!retry.error) return;
+      throw new Error(retry.error.message);
+    }
+
     throw new Error(error.message);
   }
 }
@@ -321,6 +389,7 @@ export function buildDiagnosticCsv(submissions: DiagnosticSubmission[]) {
     'archetype_key',
     'archetype_name',
     'lead_status',
+    'follow_up_count',
     'next_follow_up_at',
     'last_contacted_at',
     'lead_notes',
@@ -358,6 +427,7 @@ export function buildDiagnosticCsv(submissions: DiagnosticSubmission[]) {
       submission.archetype_key,
       submission.archetype_name,
       submission.lead_status,
+      submission.follow_up_count,
       submission.next_follow_up_at,
       submission.last_contacted_at,
       submission.lead_notes,

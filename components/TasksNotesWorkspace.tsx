@@ -24,6 +24,7 @@ import {
 import { TaskModal } from '@/components/tasks/TaskModal';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import type { EmailTemplateId } from '@/lib/email-templates';
 import {
   getPaymentClientName,
   mergeTasks,
@@ -122,6 +123,7 @@ const leadStatusLabels: Record<DiagnosticLeadStatus, string> = {
   paid: 'Paid',
   follow_up_later: 'Follow up',
   not_a_fit: 'Not a fit',
+  nurture: 'Nurture',
   closed: 'Closed',
   archived: 'Archived',
 };
@@ -353,7 +355,7 @@ export default function TasksNotesWorkspace({
     }
   }
 
-  async function updateLeadTaskStatus(task: Task, nextStatus: TaskStatus) {
+  async function updateLeadTaskStatus(task: Task, nextStatus: TaskStatus, options: { templateId?: EmailTemplateId } = {}) {
     if (!task.leadId) return;
 
     setError(null);
@@ -386,6 +388,7 @@ export default function TasksNotesWorkspace({
           key: adminKey,
           leadStatus: nextLeadStatus,
           markContacted: nextLeadStatus === 'contacted',
+          templateId: options.templateId,
         }
       );
 

@@ -11,6 +11,8 @@ import {
   type ContentPillar,
   type ContentPlatform,
 } from '@/lib/content-studio';
+import { pruneExpiredVaultItems } from '@/lib/content/vault-maintenance';
+import { getVaultSectionForItem, vaultPolicies } from '@/lib/content/vault-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
   const platform = body?.platform ? String(body.platform) : null;
   const status = String(body?.status || 'idea');
   const source = String(body?.source || 'manual');
+  const notes = body?.notes ? String(body.notes) : null;
 
   if (!title) return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
   let normalizedPillar: ContentPillar | null = null;
@@ -54,6 +57,19 @@ export async function POST(request: Request) {
   if (!isContentBacklogStatus(status)) return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
   if (!isContentBacklogSource(source)) return NextResponse.json({ error: 'Invalid source.' }, { status: 400 });
 
+  const section = getVaultSectionForItem({ source, notes });
+  const { activeItems, deletedIds } = await pruneExpiredVaultItems();
+  if (deletedIds.length > 0) revalidatePath('/resources/career-diagnostic/submissions');
+
+  const currentCount = activeItems.filter((item) => getVaultSectionForItem(item) === section).length;
+  const policy = vaultPolicies[section];
+  if (currentCount >= policy.maxItems) {
+    return NextResponse.json(
+      { error: `${policy.label} is full. Delete older items before saving a new one.` },
+      { status: 409 },
+    );
+  }
+
   const item = await createContentBacklogItem({
     title,
     pillar: normalizedPillar,
@@ -61,7 +77,7 @@ export async function POST(request: Request) {
     status,
     source,
     content: body?.content ? String(body.content) : null,
-    notes: body?.notes ? String(body.notes) : null,
+    notes,
   });
 
   revalidatePath('/resources/career-diagnostic/submissions');
