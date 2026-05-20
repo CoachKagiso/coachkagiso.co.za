@@ -56,6 +56,11 @@ body {
   padding-right: 0;
 }
 
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-studio-children,
+.dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-studio-chevron {
+  display: none;
+}
+
 .dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-copy,
 .dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-collapse-icon,
 .dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-today-expanded {

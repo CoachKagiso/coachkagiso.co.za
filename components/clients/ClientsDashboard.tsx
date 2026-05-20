@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Check, ChevronDown, ChevronRight, CreditCard, Mail, Search } from 'lucide-react';
+import FilterDropdown from '@/components/FilterDropdown';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import type { ClientMilestone, ClientRecord } from '@/lib/clients';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
@@ -375,7 +376,7 @@ export default function ClientsDashboard({
   }
 
   return (
-    <section id="clients-overview" className="rounded-[8px] bg-[#F5F3EE] p-5 md:p-6">
+    <section id="clients-overview" className="rounded-[8px] bg-[#F5F3EE] p-4 md:p-5">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Clients / Overview</p>
         <h2 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">Active clients</h2>
@@ -384,7 +385,7 @@ export default function ClientsDashboard({
         </p>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-4">
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
         {[
           ['Active', String(stats.active), 'Active clients'],
           ['Delivered', String(stats.deliveredThisMonth), 'Delivered this month'],
@@ -401,7 +402,7 @@ export default function ClientsDashboard({
         ))}
       </div>
 
-      <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_190px_auto_auto] lg:items-center">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_190px_auto_auto] lg:items-center">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6B6B]" />
           <input
@@ -411,29 +412,32 @@ export default function ClientsDashboard({
             className="h-10 w-full rounded-[8px] border border-[#E4D8CB] bg-white py-2 pl-10 pr-3 text-[14px] text-[#142334] outline-none transition placeholder:text-[#6B6B6B]/65 focus:border-[#142334]"
           />
         </label>
-        <select
+        <FilterDropdown
+          name="clientService"
           value={service}
-          onChange={(event) => setService(event.target.value)}
-          className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
-        >
-          <option value="all">All services</option>
-          {serviceOptions.map((serviceName) => (
-            <option key={serviceName} value={serviceName}>
-              {serviceName}
-            </option>
-          ))}
-        </select>
-        <select
+          onChange={setService}
+          ariaLabel="Filter clients by service"
+          options={[
+            { value: 'all', label: 'All services' },
+            ...serviceOptions.map((serviceName) => ({
+              value: serviceName,
+              label: serviceName,
+            })),
+          ]}
+        />
+        <FilterDropdown
+          name="clientStatus"
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="overdue">Overdue</option>
-          <option value="awaiting_intake">Awaiting intake</option>
-          <option value="delivered">Delivered</option>
-        </select>
+          onChange={setStatus}
+          ariaLabel="Filter clients by status"
+          options={[
+            { value: 'all', label: 'All statuses' },
+            { value: 'active', label: 'Active' },
+            { value: 'overdue', label: 'Overdue' },
+            { value: 'awaiting_intake', label: 'Awaiting intake' },
+            { value: 'delivered', label: 'Delivered' },
+          ]}
+        />
         <button
           type="button"
           className="inline-flex h-10 items-center justify-center rounded-full bg-[#142334] px-6 text-[13px] font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
@@ -458,7 +462,7 @@ export default function ClientsDashboard({
         </div>
       )}
 
-      <div className="mt-6 grid gap-4">
+      <div className="mt-5 grid gap-3">
         {records.length === 0 ? (
           <div className="grid min-h-[260px] place-items-center rounded-[16px] bg-white px-6 py-10 text-center">
             <div>

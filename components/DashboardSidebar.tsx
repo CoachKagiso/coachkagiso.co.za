@@ -1,28 +1,39 @@
 import {
   BarChart3,
   CalendarDays,
+  ChevronDown,
   ClipboardList,
   Coins,
+  Layers3,
   LayoutDashboard,
-  Lightbulb,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  PenLine,
   Settings,
   Sparkles,
   StickyNote,
   UsersRound,
+  WandSparkles,
 } from 'lucide-react';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import type { FollowUpNotification } from '@/lib/follow-up-utils';
 
-const dashboardNavItems = [
+const primaryDashboardNavItems = [
   { label: 'Dashboard', tab: 'dashboard', icon: LayoutDashboard },
   { label: 'Leads', tab: 'leads', icon: UsersRound },
   { label: 'Pipeline', tab: 'pipeline', icon: BarChart3 },
   { label: 'Clients', tab: 'clients', icon: ClipboardList },
   { label: 'Finance', tab: 'finance', icon: Coins },
-  { label: 'Content', tab: 'content', icon: Lightbulb },
+] as const;
+
+const studioNavItems = [
+  { label: 'Content Studio', workspace: 'content', icon: LayoutDashboard },
+  { label: 'Carousel Studio', workspace: 'carousel', icon: Layers3 },
+  { label: 'Tools', workspace: 'tools', icon: WandSparkles },
+] as const;
+
+const secondaryDashboardNavItems = [
   { label: 'Calendar', tab: 'calendar', icon: CalendarDays },
   { label: 'Messages', tab: 'messages', icon: MessageSquare },
   { label: 'Tasks & Notes', tab: 'tasks', icon: StickyNote },
@@ -31,26 +42,30 @@ const dashboardNavItems = [
 
 type DashboardSidebarProps = {
   activeTab: string;
+  activeStudioWorkspace?: string;
   adminKey?: string;
   todayFollowUpCount: number;
   todayFollowUps?: FollowUpNotification[];
 };
 
-function buildTabHref(adminKey: string | undefined, tab: string) {
+function buildTabHref(adminKey: string | undefined, tab: string, options?: { studio?: string }) {
   const params = new URLSearchParams();
   if (adminKey) params.set('key', adminKey);
   if (tab !== 'dashboard') params.set('tab', tab);
+  if (tab === 'content' && options?.studio) params.set('studio', options.studio);
   const query = params.toString();
   return query ? `/resources/career-diagnostic/submissions?${query}` : '/resources/career-diagnostic/submissions';
 }
 
 export default function DashboardSidebar({
   activeTab,
+  activeStudioWorkspace = 'content',
   adminKey,
   todayFollowUpCount,
   todayFollowUps = [],
 }: DashboardSidebarProps) {
   const hiddenFollowUpCount = Math.max(0, todayFollowUpCount - todayFollowUps.slice(0, 3).length);
+  const studioActive = activeTab === 'content';
 
   return (
     <div className="hidden shrink-0 self-start lg:sticky lg:top-3 lg:block xl:top-4">
@@ -87,7 +102,59 @@ export default function DashboardSidebar({
       </div>
 
       <nav className="mt-5 flex flex-1 flex-col gap-1.5">
-        {dashboardNavItems.map(({ label, tab, icon: Icon }) => {
+        {primaryDashboardNavItems.map(({ label, tab, icon: Icon }) => {
+          const active = activeTab === tab;
+          return (
+          <a
+            key={label}
+            href={buildTabHref(adminKey, tab)}
+            title={label}
+            className={`dashboard-sidebar-link flex items-center gap-3 rounded-[8px] px-3 py-3 text-[13px] font-semibold transition ${
+              active
+                ? 'bg-[#142334] text-white'
+                : 'text-[#142334]/70 hover:bg-[#F7F1EC] hover:text-[#142334]'
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="dashboard-sidebar-copy">{label}</span>
+          </a>
+          );
+        })}
+        <details open={studioActive} className="dashboard-sidebar-studio-group group">
+          <summary
+            title="Studio"
+            className={`dashboard-sidebar-link flex cursor-pointer list-none items-center gap-3 rounded-[8px] px-3 py-3 text-[13px] font-semibold transition [&::-webkit-details-marker]:hidden ${
+              studioActive
+                ? 'bg-[#142334] text-white'
+                : 'text-[#142334]/70 hover:bg-[#F7F1EC] hover:text-[#142334]'
+            }`}
+          >
+            <PenLine className="h-4 w-4 shrink-0" />
+            <span className="dashboard-sidebar-copy">Studio</span>
+            <ChevronDown className="dashboard-sidebar-studio-chevron ml-auto h-4 w-4 shrink-0 transition group-open:rotate-180" />
+          </summary>
+          <div className="dashboard-sidebar-studio-children mt-1 grid gap-1 border-l border-[#D8C8BB] pl-4">
+            {studioNavItems.map(({ label, workspace, icon: Icon }) => {
+              const active = studioActive && activeStudioWorkspace === workspace;
+              return (
+                <a
+                  key={workspace}
+                  href={buildTabHref(adminKey, 'content', { studio: workspace })}
+                  title={label}
+                  className={`dashboard-sidebar-studio-child flex items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] font-semibold transition ${
+                    active
+                      ? 'bg-[#F7F1EC] text-[#142334]'
+                      : 'text-[#142334]/58 hover:bg-[#F7F1EC] hover:text-[#142334]'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="dashboard-sidebar-copy">{label}</span>
+                </a>
+              );
+            })}
+          </div>
+        </details>
+        {secondaryDashboardNavItems.map(({ label, tab, icon: Icon }) => {
           const active = activeTab === tab;
           return (
           <a

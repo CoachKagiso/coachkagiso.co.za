@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, MailCheck, Send } from 'lucide-react';
 import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
@@ -13,6 +13,7 @@ import {
   getTemplateIdForLeadStage,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import type { StoredEmailTemplate } from '@/lib/settings';
 
 function getLeadFirstName(lead?: DiagnosticSubmission) {
   return lead?.first_name?.trim().split(/\s+/)[0] || 'there';
@@ -103,10 +104,41 @@ export function EmailTab({
   const [emailBody, setEmailBody] = useState(() => injectEmailTemplate(getEmailTemplate(defaultTemplateId).body, lead, defaultTemplateId));
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [sendError, setSendError] = useState<string | null>(null);
-  const selectedTemplate = getEmailTemplate(selectedTemplateId);
+  const [availableTemplates, setAvailableTemplates] = useState<StoredEmailTemplate[]>(
+    EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
+  );
+  const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
+
+  useEffect(() => {
+    if (!adminKey) return;
+    let cancelled = false;
+
+    async function loadTemplates() {
+      try {
+        const response = await fetch(`/api/email/templates?key=${encodeURIComponent(adminKey)}`);
+        const data = (await response.json().catch(() => ({}))) as { templates?: StoredEmailTemplate[] };
+        if (!response.ok || !data.templates?.length || cancelled) return;
+        setAvailableTemplates(data.templates);
+
+        const template = data.templates.find((item) => item.id === defaultTemplateId) || data.templates[0];
+        if (template) {
+          setSelectedTemplateId(template.id);
+          setEmailSubject(injectEmailTemplate(template.subject, lead, template.id));
+          setEmailBody(injectEmailTemplate(template.body, lead, template.id));
+        }
+      } catch {
+        // File templates remain the fallback.
+      }
+    }
+
+    void loadTemplates();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, defaultTemplateId, lead]);
 
   function switchTemplate(nextTemplateId: EmailTemplateId) {
-    const template = getEmailTemplate(nextTemplateId);
+    const template = availableTemplates.find((item) => item.id === nextTemplateId) || getEmailTemplate(nextTemplateId);
     setSelectedTemplateId(nextTemplateId);
     setEmailSubject(injectEmailTemplate(template.subject, lead, nextTemplateId));
     setEmailBody(injectEmailTemplate(template.body, lead, nextTemplateId));
@@ -164,7 +196,7 @@ export function EmailTab({
           onChange={(event) => switchTemplate(event.target.value as EmailTemplateId)}
           className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
         >
-          {EMAIL_TEMPLATES.map((template) => (
+          {availableTemplates.filter((template) => template.active).map((template) => (
             <option key={template.id} value={template.id}>
               {getEmailTemplateOptionLabel(template)}
             </option>

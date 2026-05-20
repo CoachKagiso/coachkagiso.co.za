@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dashboard Filter Controls"
+  short_description: "Reuse Coach Kagiso branded filters"
+  default_prompt: "Use $dashboard-filter-controls to apply the Coach Kagiso branded dropdown and date picker styling to dashboard filters."

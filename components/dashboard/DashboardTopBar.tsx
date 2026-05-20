@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import { Search } from 'lucide-react';
 import FollowUpNotificationBell from '@/components/dashboard/FollowUpNotificationBell';
+import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 
 function buildHiddenTabValue(activeTab: string) {
   return activeTab === 'dashboard' ? '' : activeTab;
@@ -13,6 +13,7 @@ export default function DashboardTopBar({
   updatedTimeLabel,
   notificationCount,
   showSearch = true,
+  profilePhotoUrl,
 }: {
   activeTab: string;
   adminKey: string;
@@ -20,6 +21,7 @@ export default function DashboardTopBar({
   updatedTimeLabel: string;
   notificationCount: number;
   showSearch?: boolean;
+  profilePhotoUrl?: string | null;
 }) {
   return (
     <div className="rounded-[8px] bg-white px-4 py-3">
@@ -57,13 +59,7 @@ export default function DashboardTopBar({
           <FollowUpNotificationBell adminKey={adminKey} notificationCount={notificationCount} />
 
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">
-            <Image
-              src="/images/author/ck-profile.png"
-              alt="Kagiso"
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-full object-cover"
-            />
+            <DashboardProfileAvatar src={profilePhotoUrl} />
             <span className="hidden text-[12px] font-semibold text-[#142334] sm:inline">Coach Kagiso</span>
           </div>
         </div>

@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Vault,
 } from 'lucide-react';
-import { extractCleanTitle, extractPostBody, extractPreview } from '@/lib/content/utils';
+import { extractCleanTitle, extractPreview } from '@/lib/content/utils';
 import type {
   ContentBacklogItem,
   ContentBacklogStatus,
@@ -23,13 +23,14 @@ import type {
   DashboardContext,
 } from '@/lib/content-studio';
 
-type ContentSection = 'home' | 'briefs' | 'studio' | 'vault' | 'editorial';
+type ContentSection = 'home' | 'briefs' | 'studio' | 'vault' | 'editorial' | 'research';
 
 type HomeTabProps = {
   context: DashboardContext;
   calendarItems: ContentCalendarItem[];
   backlogItems: ContentBacklogItem[];
   onNavigate: (section: ContentSection, options?: { topic?: string }) => void;
+  onOpenVaultItem: (itemId: string) => void;
 };
 
 const statusLabels: Record<ContentBacklogStatus | ContentCalendarStatus, string> = {
@@ -133,7 +134,7 @@ function EmptyPanel({ children }: { children: ReactNode }) {
   return <p className="rounded-[8px] bg-[#F8F6F4] p-4 text-[13px] leading-relaxed text-[#142334]/62">{children}</p>;
 }
 
-export function HomeTab({ context, calendarItems, backlogItems, onNavigate }: HomeTabProps) {
+export function HomeTab({ context, calendarItems, backlogItems, onNavigate, onOpenVaultItem }: HomeTabProps) {
   const todayKey = getDateOffsetKey(0);
   const weekEndKey = getDateOffsetKey(6);
   const upcomingCalendar = [...calendarItems]
@@ -410,7 +411,7 @@ export function HomeTab({ context, calendarItems, backlogItems, onNavigate }: Ho
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => onNavigate('studio', { topic: extractPostBody(item.content || item.title) })}
+                    onClick={() => onOpenVaultItem(item.id)}
                     className="rounded-[8px] border border-[#E4D8CB] p-4 text-left transition hover:border-[#142334] hover:bg-[#F8F6F4]"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">

@@ -28,7 +28,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 import BatchDeleteControls from '@/components/BatchDeleteControls';
-import AiConfigurationPanel from '@/components/settings/AiConfigurationPanel';
+import SettingsPageComponent from '@/components/settings/SettingsPageComponent';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
 import ClientsDashboard from '@/components/clients/ClientsDashboard';
 import ContentStudio from '@/components/content/ContentStudio';
@@ -67,6 +67,18 @@ import { listManualTasks, listNotes } from '@/lib/dashboard-task-records';
 import { getDiagnosticAdminKey } from '@/lib/env';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { listSentEmails } from '@/lib/sent-emails';
+import { EMAIL_TEMPLATES } from '@/lib/email-templates';
+import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import {
+  DEFAULT_SETTINGS,
+  type BusinessProfileSettings,
+  listStoredEmailTemplates,
+  loadSettings,
+  seedSettings,
+  stripSecretsFromSettings,
+  type SettingsMap,
+  type StoredEmailTemplate,
+} from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +102,7 @@ type DiagnosticSubmissionsPageProps = {
     q?: string;
     from?: string;
     to?: string;
+    studio?: string;
     updated?: string;
     deletedCount?: string;
     error?: string;
@@ -125,13 +138,15 @@ const archetypeColors = {
 } as const;
 const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'content', 'calendar', 'messages', 'tasks', 'settings'] as const;
 type DashboardTab = (typeof dashboardTabValues)[number];
+const studioWorkspaceValues = ['content', 'carousel', 'tools'] as const;
+type StudioWorkspace = (typeof studioWorkspaceValues)[number];
 const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
   { tab: 'dashboard', label: 'Dashboard' },
   { tab: 'leads', label: 'Leads' },
   { tab: 'pipeline', label: 'Pipeline' },
   { tab: 'clients', label: 'Clients' },
   { tab: 'finance', label: 'Finance' },
-  { tab: 'content', label: 'Content' },
+  { tab: 'content', label: 'Studio' },
   { tab: 'calendar', label: 'Calendar' },
   { tab: 'messages', label: 'Messages' },
   { tab: 'tasks', label: 'Tasks & Notes' },
@@ -140,6 +155,10 @@ const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
 
 function isDashboardTab(value?: string | null): value is DashboardTab {
   return Boolean(value && dashboardTabValues.includes(value as DashboardTab));
+}
+
+function isStudioWorkspace(value?: string | null): value is StudioWorkspace {
+  return Boolean(value && studioWorkspaceValues.includes(value as StudioWorkspace));
 }
 
 function formatDate(value: string) {
@@ -486,6 +505,43 @@ function buildLeadEmailModalLead(submission: DiagnosticSubmission) {
   };
 }
 
+async function loadSettingsBundle(): Promise<{ settings: SettingsMap; emailTemplates: StoredEmailTemplate[] }> {
+  try {
+    const supabase = createSupabaseServiceClient();
+    await seedSettings(supabase);
+    const [settings, emailTemplates] = await Promise.all([
+      loadSettings(supabase),
+      listStoredEmailTemplates(supabase),
+    ]);
+
+    return {
+      settings: stripSecretsFromSettings(settings),
+      emailTemplates,
+    };
+  } catch {
+    return {
+      settings: DEFAULT_SETTINGS,
+      emailTemplates: EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
+    };
+  }
+}
+
+async function loadDashboardProfilePhoto() {
+  try {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase.from('settings').select('value').eq('key', 'business_profile').single();
+    if (error || !data?.value) return DEFAULT_SETTINGS.business_profile.profilePhotoUrl;
+
+    const profile = {
+      ...DEFAULT_SETTINGS.business_profile,
+      ...(data.value as Partial<BusinessProfileSettings>),
+    };
+    return profile.profilePhotoUrl || DEFAULT_SETTINGS.business_profile.profilePhotoUrl;
+  } catch {
+    return DEFAULT_SETTINGS.business_profile.profilePhotoUrl;
+  }
+}
+
 function AccessGate() {
   const hasKeyConfigured = Boolean(getDiagnosticAdminKey());
 
@@ -548,6 +604,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     q,
     from,
     to,
+    studio,
     updated,
     deletedCount,
     error,
@@ -561,6 +618,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
   const selectedStatus = isDiagnosticLeadStatus(status) ? status : 'all';
   const selectedFollowUp = ['due', 'scheduled', 'none'].includes(followUp || '') ? followUp : 'all';
   const activeTab = isDashboardTab(tab) ? tab : 'dashboard';
+  const activeStudioWorkspace = isStudioWorkspace(studio) ? studio : 'content';
   const sentEmailFilters = {
     query: activeTab === 'messages' ? q : null,
     archetype: activeTab === 'messages' ? archetype : null,
@@ -579,6 +637,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     researchItems,
     followUpNotificationCount,
     sidebarFollowUps,
+    settingsBundle,
+    profilePhotoUrl,
   ] = await Promise.all([
     listDiagnosticSubmissions({
       archetype,
@@ -607,6 +667,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     activeTab === 'content' ? listResearchEntries() : Promise.resolve([]),
     getFollowUpNotificationCount(),
     listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
+    activeTab === 'settings' ? loadSettingsBundle() : Promise.resolve(null),
+    loadDashboardProfilePhoto(),
   ]);
   const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
@@ -871,6 +933,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
       <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3 xl:p-4">
         <DashboardSidebar
           activeTab={activeTab}
+          activeStudioWorkspace={activeStudioWorkspace}
           adminKey={key}
           todayFollowUpCount={followUpNotificationCount}
           todayFollowUps={sidebarFollowUps}
@@ -879,7 +942,20 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         <section className="min-w-0 flex-1 overflow-x-clip rounded-[8px] bg-transparent">
           <div
             id="dashboard-command"
-            className={activeTab === 'dashboard' || activeTab === 'calendar' || activeTab === 'content' || activeTab === 'leads' || activeTab === 'pipeline' ? 'space-y-3 p-0' : 'space-y-5 p-4 md:p-6 lg:p-7'}
+            className={
+              activeTab === 'dashboard' ||
+              activeTab === 'calendar' ||
+              activeTab === 'content' ||
+              activeTab === 'leads' ||
+              activeTab === 'pipeline' ||
+              activeTab === 'clients' ||
+              activeTab === 'finance' ||
+              activeTab === 'messages' ||
+              activeTab === 'tasks' ||
+              activeTab === 'settings'
+                ? 'space-y-3 p-0'
+                : 'space-y-5 p-4 md:p-6 lg:p-7'
+            }
           >
             {activeTab !== 'content' && activeTab !== 'calendar' && (
               <DashboardTopBar
@@ -889,6 +965,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 updatedTimeLabel={dashboardTimeLabel}
                 notificationCount={followUpNotificationCount}
                 showSearch={activeTab !== 'leads' && activeTab !== 'pipeline'}
+                profilePhotoUrl={profilePhotoUrl}
               />
             )}
             {activeTab === 'dashboard' && (
@@ -1623,17 +1700,20 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
         {activeTab === 'content' && (
           <ContentStudio
+            key={activeStudioWorkspace}
             adminKey={key || ''}
+            initialWorkspace={activeStudioWorkspace}
             context={contentDashboardContext}
             calendarItems={contentCalendarItems}
             backlogItems={contentBacklogItems}
             researchItems={researchItems}
             followUpNotificationCount={followUpNotificationCount}
+            profilePhotoUrl={profilePhotoUrl}
           />
         )}
 
         {activeTab === 'calendar' && (
-          <CustomCalendarDashboard adminKey={key || ''} leads={submissions} followUpNotificationCount={followUpNotificationCount} />
+          <CustomCalendarDashboard adminKey={key || ''} leads={submissions} followUpNotificationCount={followUpNotificationCount} profilePhotoUrl={profilePhotoUrl} />
         )}
 
         {activeTab === 'messages' && (
@@ -1667,9 +1747,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           />
         )}
         {activeTab === 'settings' && (
-        <section className="pb-10">
-          <div className="grid w-full gap-5">
-            <AiConfigurationPanel adminKey={key || ''} />
+        <section className="pb-8">
+          <div className="grid w-full gap-3">
+            <SettingsPageComponent
+              adminKey={key || ''}
+              settings={settingsBundle?.settings || DEFAULT_SETTINGS}
+              emailTemplates={settingsBundle?.emailTemplates || EMAIL_TEMPLATES.map((template) => ({ ...template, active: true }))}
+            />
             <div>
               <div className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA]">
                 <div className="flex items-start justify-between gap-4 border-b border-[#D8C8BB] px-6 py-5">
