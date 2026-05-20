@@ -501,21 +501,21 @@ export default function TasksNotesWorkspace({
   }
 
   return (
-    <section id="tasks-notes" className="pb-10">
-      <div className="space-y-5">
+    <section id="tasks-notes" className="pb-8">
+      <div className="space-y-3">
         {error && (
           <div className="rounded-[16px] bg-[#FFF5F2] px-4 py-3 text-[13px] leading-relaxed text-[#8A2F1D] ring-1 ring-[#F2C6B8]">
             {error}
           </div>
         )}
 
-        <div className="rounded-[16px] bg-[#FCFBFA] p-5 ring-1 ring-[#E6DDD6] md:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="rounded-[12px] bg-[#FCFBFA] p-4 ring-1 ring-[#E6DDD6] md:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#7B695F]">
                 Tasks / Overview
               </p>
-              <h2 className="mt-5 max-w-3xl font-serif text-[34px] leading-[1.02] md:text-[48px]">
+              <h2 className="mt-4 max-w-3xl font-serif text-[34px] leading-[1.02] md:text-[48px]">
                 Welcome back, Coach Kagiso.
               </h2>
               <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-[#142334]/64">
@@ -548,7 +548,7 @@ export default function TasksNotesWorkspace({
             </div>
           </div>
 
-          <div className="mt-6 rounded-[16px] bg-[#F8F6F4] px-4 py-3">
+          <div className="mt-4 rounded-[12px] bg-[#F8F6F4] px-4 py-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F3D97B] text-[#142334]">
@@ -570,11 +570,11 @@ export default function TasksNotesWorkspace({
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {statCards.map((card) => {
               const StatIcon = card.Icon;
               return (
-                <div key={card.label} className="rounded-[16px] bg-[#F8F6F4] p-4 ring-1 ring-[#E6DDD6]">
+                <div key={card.label} className="rounded-[12px] bg-[#F8F6F4] p-4 ring-1 ring-[#E6DDD6]">
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white text-[#A09086]">
                       <StatIcon className="h-4 w-4" />
@@ -590,7 +590,7 @@ export default function TasksNotesWorkspace({
           </div>
         </div>
 
-        <div className="rounded-[16px] bg-[#FCFBFA] p-4 ring-1 ring-[#E6DDD6] md:p-5">
+        <div className="rounded-[12px] bg-[#FCFBFA] p-4 ring-1 ring-[#E6DDD6]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap gap-2">
               {taskViewModes.map((mode) => {
@@ -652,9 +652,9 @@ export default function TasksNotesWorkspace({
           </div>
 
           {view === 'kanban' && (
-            <div id="task-board" className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <div id="task-board" className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
               {columns.map((column) => (
-                <div key={column.value} className="rounded-[16px] bg-[#F8F6F4] p-3 ring-1 ring-[#E6DDD6]">
+                <div key={column.value} className="rounded-[12px] bg-[#F8F6F4] p-3 ring-1 ring-[#E6DDD6]">
                   <div className="flex items-center justify-between gap-3 px-1 py-1">
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex h-2.5 w-2.5 rounded-full ${column.dot}`} />

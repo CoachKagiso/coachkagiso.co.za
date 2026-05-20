@@ -1,0 +1,4 @@
+interface:
+  display_name: "Carousel Studio Styles"
+  short_description: "Design Coach Kagiso carousel templates"
+  default_prompt: "Use $carousel-studio-styles to add or refine Carousel Studio templates and export-ready slide rendering."

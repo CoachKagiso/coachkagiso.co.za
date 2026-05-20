@@ -7,6 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 type DashboardDatePickerProps = {
   name: string;
   value?: string;
+  onChange?: (value: string) => void;
   ariaLabel: string;
   placeholder: string;
 };
@@ -53,12 +54,13 @@ function buildCalendarDays(monthDate: Date) {
   });
 }
 
-export default function DashboardDatePicker({ name, value = '', ariaLabel, placeholder }: DashboardDatePickerProps) {
+export default function DashboardDatePicker({ name, value = '', onChange, ariaLabel, placeholder }: DashboardDatePickerProps) {
   const initialDate = parseDateValue(value);
-  const [selectedValue, setSelectedValue] = useState(value);
+  const [uncontrolledValue, setUncontrolledValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(initialDate || new Date());
   const pickerRef = useRef<HTMLDivElement>(null);
+  const selectedValue = onChange ? value : uncontrolledValue;
 
   const selectedDate = parseDateValue(selectedValue);
   const calendarDays = useMemo(() => buildCalendarDays(viewDate), [viewDate]);
@@ -89,7 +91,12 @@ export default function DashboardDatePicker({ name, value = '', ariaLabel, place
   }
 
   function chooseDate(date: Date) {
-    setSelectedValue(toDateValue(date));
+    const nextValue = toDateValue(date);
+    if (onChange) {
+      onChange(nextValue);
+    } else {
+      setUncontrolledValue(nextValue);
+    }
     setViewDate(date);
     setIsOpen(false);
   }
@@ -101,7 +108,10 @@ export default function DashboardDatePicker({ name, value = '', ariaLabel, place
         type="button"
         aria-label={ariaLabel}
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => {
+          if (!isOpen && selectedDate) setViewDate(selectedDate);
+          setIsOpen((current) => !current);
+        }}
         className="dashboard-date-picker-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
       >
         <span className={selectedDate ? 'truncate' : 'truncate text-[#7C6F66]'}>
@@ -178,8 +188,12 @@ export default function DashboardDatePicker({ name, value = '', ariaLabel, place
               {selectedValue && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedValue('');
+                onClick={() => {
+                    if (onChange) {
+                      onChange('');
+                    } else {
+                      setUncontrolledValue('');
+                    }
                     setIsOpen(false);
                   }}
                   className="inline-flex items-center gap-1 rounded-[8px] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7C6F66] transition hover:bg-[#F8F6F4] hover:text-[#142334]"

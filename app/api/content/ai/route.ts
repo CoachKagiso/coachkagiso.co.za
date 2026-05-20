@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { buildAiRequestBody, resolveAiRuntimeConfig, SIMPLE_AI_MODES } from '@/lib/ai-config';
 
 export const dynamic = 'force-dynamic';
-
-// TEST: Z.ai GLM direct integration.
-// PRODUCTION: swap these constants to the production provider when testing is complete.
-const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.1';
-const AI_API_KEY_ENV = 'ZAI_API_KEY';
 
 type ContentAiMode =
   | 'signal_brief'
   | 'write_post'
   | 'polish'
+  | 'hook_generator'
+  | 'cta_generator'
   | 'alchemy_stage1'
   | 'alchemy_stage2'
   | 'alchemy_critique'
@@ -26,6 +23,8 @@ const contentAiModes: ContentAiMode[] = [
   'signal_brief',
   'write_post',
   'polish',
+  'hook_generator',
+  'cta_generator',
   'alchemy_stage1',
   'alchemy_stage2',
   'alchemy_critique',
@@ -39,10 +38,13 @@ function isContentAiMode(value: unknown): value is ContentAiMode {
   return typeof value === 'string' && contentAiModes.includes(value as ContentAiMode);
 }
 
-function getMaxTokens(mode: ContentAiMode) {
+function getMaxTokens(mode: ContentAiMode, contentType?: string) {
   if (mode === 'calendar_plan') return 2400;
   if (mode === 'summarise_insights') return 900;
+  if (mode === 'write_post' && contentType === 'carousel') return 2600;
   if (mode === 'write_post' || mode === 'voice_note' || mode === 'alchemy_stage2') return 1800;
+  if (mode === 'hook_generator') return 1700;
+  if (mode === 'cta_generator') return 1100;
   if (mode === 'alchemy_critique') return 600;
   return 1200;
 }
@@ -68,26 +70,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
   }
 
-  const apiKey = process.env[AI_API_KEY_ENV];
+  const runtime = await resolveAiRuntimeConfig({ simpleMode: SIMPLE_AI_MODES.has(body.mode) });
 
-  if (!apiKey) {
-    console.error(`${AI_API_KEY_ENV} is not set`);
+  if (!runtime) {
+    console.error('AI runtime is not configured');
     return NextResponse.json(
-      { error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' },
+      { error: 'AI service not configured. Add the active provider API key in Settings.' },
       { status: 503 }
     );
   }
 
   let response: Response;
   try {
-    response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    response = await fetch(`${runtime.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
+      headers: runtime.headers,
+      body: JSON.stringify(buildAiRequestBody(runtime, {
+        model: runtime.model,
         messages: [
           {
             role: 'system',
@@ -104,15 +103,12 @@ export async function POST(request: Request) {
           },
           { role: 'user', content: userPrompt },
         ],
-        thinking: {
-          type: 'disabled',
-        },
-        max_tokens: getMaxTokens(body.mode),
+        max_tokens: getMaxTokens(body.mode, optionalString(body?.contentType)),
         temperature: 0.7,
-      }),
+      })),
     });
   } catch (error) {
-    console.error('Z.ai network error:', error);
+    console.error(`${runtime.provider} network error:`, error);
     return NextResponse.json(
       { error: 'Failed to reach AI service. Check network and try again.' },
       { status: 502 }
@@ -122,7 +118,7 @@ export async function POST(request: Request) {
   const responseText = await response.text();
 
   if (!response.ok) {
-    console.error(`Z.ai API error ${response.status}:`, responseText);
+    console.error(`${runtime.provider} API error ${response.status}:`, responseText);
     return NextResponse.json(
       { error: `AI service returned an error (${response.status}). Try again.` },
       { status: response.status }
@@ -142,7 +138,7 @@ export async function POST(request: Request) {
   const text = data.choices?.[0]?.message?.content?.trim() || '';
 
   if (!text) {
-    console.error('Z.ai returned empty content:', responseText);
+    console.error(`${runtime.provider} returned empty content:`, responseText);
     return NextResponse.json(
       { error: 'AI service returned an empty response. Try again.' },
       { status: 500 }

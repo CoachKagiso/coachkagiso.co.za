@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useRef, useState } from 'react';
 import type { ReactNode, WheelEvent } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { extractOutputMetadata } from '@/lib/content/utils';
+import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 
 type DraftMode = 'edit' | 'preview' | 'details';
 
@@ -125,11 +125,13 @@ export function OutputWithActions({
   contentTypeLabel,
   registerLabel,
   pillarLabel = 'Career Growth',
+  profilePhotoUrl,
   onChange,
   onRegenerate,
   onPolish,
   onSave,
   onCalendar,
+  saveLabel = 'Save to Vault',
   extraAction,
   outputNote,
 }: {
@@ -140,11 +142,13 @@ export function OutputWithActions({
   contentTypeLabel?: string;
   registerLabel?: string;
   pillarLabel?: string;
+  profilePhotoUrl?: string | null;
   onChange?: (value: string) => void;
   onRegenerate: () => void;
   onPolish: () => void;
   onSave: () => void;
   onCalendar: () => void;
+  saveLabel?: string;
   extraAction?: ReactNode;
   outputNote?: ReactNode;
 }) {
@@ -326,7 +330,7 @@ export function OutputWithActions({
       )}
 
       {mode === 'preview' && hasDraft && (
-        <LinkedInPreview value={editableValue} platformLabel={displayPlatform} />
+        <LinkedInPreview value={editableValue} platformLabel={displayPlatform} profilePhotoUrl={profilePhotoUrl} />
       )}
 
       {mode === 'details' && hasDraft && (
@@ -354,7 +358,7 @@ export function OutputWithActions({
             Polish this
           </button>
           <button type="button" onClick={onSave} className="studio-secondary-button">
-            Save to Vault
+            {saveLabel}
           </button>
           <button type="button" onClick={onCalendar} className="studio-primary-button">
             Add to Editorial Calendar
@@ -410,7 +414,7 @@ function DraftDetails({
   );
 }
 
-function LinkedInPreview({ value, platformLabel }: { value: string; platformLabel: string }) {
+function LinkedInPreview({ value, platformLabel, profilePhotoUrl }: { value: string; platformLabel: string; profilePhotoUrl?: string | null }) {
   return (
     <div className="mt-4 rounded-[10px] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
@@ -422,12 +426,10 @@ function LinkedInPreview({ value, platformLabel }: { value: string; platformLabe
       <article className="mt-4 overflow-hidden rounded-[10px] border border-[#E4D8CB] bg-white">
         <div className="flex items-start gap-3 border-b border-[#E4D8CB] p-4">
           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-[#E4D8CB] bg-[#F5F3EE]">
-            <Image
-              src="/images/author/ck-profile.png"
+            <DashboardProfileAvatar
+              src={profilePhotoUrl}
               alt="Kagiso Shabangu"
-              fill
-              sizes="44px"
-              className="object-cover"
+              className="h-full w-full object-cover"
             />
           </div>
           <div className="min-w-0">

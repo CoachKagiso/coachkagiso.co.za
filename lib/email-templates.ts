@@ -116,7 +116,7 @@ That's what the Glow Up VIP Package is. It's 30 days where we build the picture 
 
 If you want that, here's where you book: [BOOKING LINK]
 
-If you're not ready, I'll stop sending these direct emails. But you'll keep getting my weekly newsletter where I share what I'm thinking about careers, pivots, and personal branding. Real examples, no fluff.
+If you're not ready, I'll stop sending these direct emails. But you'll keep getting my weekly newsletter where I share what I'm thinking about careers, pivots, and personal branding. Real examples, no fluff. You'll always have the option to opt out.
 
 If you ever want to talk, just reply. I'll make time.
 
@@ -136,7 +136,7 @@ hello@coachkagiso.co.za`,
 
 I said I'd stop sending you personalized follow-ups, and I meant it. This is the last one.
 
-I just wanted to let you know you're now on my weekly newsletter list. Every Thursday I send one email with something I'm thinking about related to careers, pivots, and personal branding.
+I'm adding you to my upcoming newsletter. When it launches, it'll be a regular email with something I'm thinking about related to careers, pivots, and personal branding.
 
 Usually it's a real example from someone I'm working with (anonymized), sometimes it's a pattern I'm seeing across multiple clients, sometimes it's just a useful reframe that helped someone get unstuck.
 
@@ -224,7 +224,7 @@ You're already moving in the right direction. You don't need me to tell you what
 
 Details here if you want them: [BOOKING LINK]
 
-If not, keep going. You'll still get my weekly newsletter with what I'm thinking about, but I'll stop sending these direct follow-ups.
+If not, keep going. I'm adding you to my upcoming newsletter with what I'm thinking about, but I'll stop sending these direct follow-ups.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -240,15 +240,13 @@ hello@coachkagiso.co.za`,
     subject: 'One last admin thing, {{firstName}}',
     body: `Hi {{firstName}},
 
-Quick heads up: you're now on my weekly newsletter.
+Quick heads up: I'm adding you to my upcoming newsletter.
 
-Every Thursday I send one email about something I'm seeing in my work with clients. Career moves that worked, pivots that didn't, patterns that keep showing up.
+When it launches, it'll be a regular email about something I'm seeing in my work with clients. Career moves that worked, pivots that didn't, patterns that keep showing up.
 
 It's not promotional. It's just me thinking out loud about the stuff you're probably already dealing with.
 
-If you don't want it, unsubscribe at the bottom. If you do, I'll see you Thursday.
-
-And if you ever want to continue the conversation we started, just reply.
+You'll always have the option to opt out. If you do want to continue the conversation we started, just reply.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -348,7 +346,7 @@ hello@coachkagiso.co.za`,
 
 I said I'd stop sending personalized follow-ups, so this is the last one.
 
-You're now on my weekly newsletter list. Every Thursday I send one email about career moves, growth, and what to do when you've plateaued but don't want to leave.
+I'm adding you to my upcoming newsletter. When it launches, it'll be a regular email about career moves, growth, and what to do when you've plateaued but don't want to leave.
 
 Most of it comes from real situations I'm seeing with clients. Pattern recognition stuff that might help you spot your own next move.
 
@@ -435,10 +433,9 @@ I've reached out a few times now and I'm going to stop sending these personalize
 Before I do, I want to say: the internal work matters. The quiet figuring out, the private journaling, the thinking it through on your own. That's not wasted time.
 
 But at some point, the thinking has to turn into something visible. A different resume. A different LinkedIn. A different way of talking about what you do.
-
 If you want help with that, the CV + LinkedIn Bundle is here: [BOOKING LINK]
 
-If you're not there yet, you'll keep getting my weekly newsletter. I write about visibility, positioning, and how to make your work actually seen by the people who matter.
+If you're not there yet, I'm adding you to my upcoming newsletter. I write about visibility, positioning, and how to make your work seen by the people who matter.
 
 When you're ready to make the change, just reply.
 
@@ -458,7 +455,7 @@ hello@coachkagiso.co.za`,
 
 I'm done with the personalized follow-ups. This is just a quick note to let you know what's next.
 
-You're on my weekly newsletter now. Every Thursday I send one email about visibility, positioning, and making career moves when you're the type of person who doesn't naturally self-promote.
+I'm adding you to my upcoming newsletter. When it launches, it'll be a regular email about visibility, positioning, and making career moves when you're the type of person who doesn't naturally self-promote.
 
 It's for people like you. People who do good work quietly and then wonder why no one notices.
 
@@ -486,7 +483,7 @@ hello@coachkagiso.co.za`,
 
 I just read your diagnostic responses and I'm not going to pitch you anything in this email.
 
-I just want to ask: how are you actually doing right now?
+I just want to ask: how are you doing right now?
 
 Not the work stuff. Not the career stuff. Just you.
 
@@ -544,7 +541,7 @@ If you ever want to just talk through what's going on without any pressure to fi
 
 It's here if you want it: [BOOKING LINK]
 
-If you're not ready, you'll keep getting my weekly newsletter. I write a lot about burnout, boundaries, and what to do when the career you built is costing you too much.
+If you're not ready, I'm adding you to my upcoming newsletter. I write about burnout, boundaries, and what to do when the career you built is costing you too much.
 
 Rest when you need to. I'll be here if you ever want to talk.
 
@@ -564,7 +561,7 @@ hello@coachkagiso.co.za`,
 
 I said I'd stop the personalized emails, so this is the last one.
 
-You're now on my weekly newsletter. Every Thursday I send something about burnout, career sustainability, and what to do when the thing you built is wearing you down.
+I'm adding you to my upcoming newsletter. When it launches, it'll cover burnout, career sustainability, and what to do when the thing you built is wearing you down.
 
 I don't have all the answers. But I work with a lot of people who are where you are, and I share what's actually helping them.
 

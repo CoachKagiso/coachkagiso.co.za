@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, Mail, Search } from 'lucide-react';
+import DashboardDatePicker from '@/components/DashboardDatePicker';
+import FilterDropdown from '@/components/FilterDropdown';
 import type { DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
 import type { SentEmail } from '@/lib/sent-emails';
 
@@ -127,14 +129,14 @@ export default function MessagesLog({
   const emptyAll = totalCount === 0;
 
   return (
-    <section id="messages-log" className="rounded-[8px] bg-[#F5F3EE] p-5 md:p-6">
+    <section id="messages-log" className="rounded-[8px] bg-[#F5F3EE] p-4 md:p-5">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Messages / Sent</p>
         <h2 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">Sent emails</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[#6B6B6B]">{subtitle}</p>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
         {[
           ['Total sent', String(totalCount), 'Emails sent'],
           ['This week', String(thisWeekCount), 'Last 7 days'],
@@ -148,7 +150,7 @@ export default function MessagesLog({
         ))}
       </div>
 
-      <form action="/resources/career-diagnostic/submissions" method="get" className="mt-6 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_200px_150px_150px_auto_auto] lg:items-center">
+      <form action="/resources/career-diagnostic/submissions" method="get" className="mt-5 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_200px_150px_150px_auto_auto] lg:items-center">
         <input type="hidden" name="key" value={adminKey} />
         <input type="hidden" name="tab" value="messages" />
         <label className="relative block">
@@ -160,31 +162,29 @@ export default function MessagesLog({
             className="h-10 w-full rounded-[8px] border border-[#E4D8CB] bg-white py-2 pl-10 pr-3 text-[14px] text-[#142334] outline-none transition placeholder:text-[#6B6B6B]/65 focus:border-[#142334]"
           />
         </label>
-        <select
+        <FilterDropdown
           name="archetype"
-          defaultValue={filters.archetype || ''}
-          className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
-        >
-          <option value="">All archetypes</option>
-          {archetypeOptions.map((archetype) => (
-            <option key={archetype} value={archetype}>
-              {archetype}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          name="from"
-          defaultValue={filters.from || ''}
-          aria-label="From date"
-          className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
+          value={filters.archetype || ''}
+          ariaLabel="Filter messages by archetype"
+          options={[
+            { value: '', label: 'All archetypes' },
+            ...archetypeOptions.map((archetype) => ({
+              value: archetype,
+              label: archetype,
+            })),
+          ]}
         />
-        <input
-          type="date"
+        <DashboardDatePicker
+          name="from"
+          value={filters.from || ''}
+          ariaLabel="From date"
+          placeholder="From date"
+        />
+        <DashboardDatePicker
           name="to"
-          defaultValue={filters.to || ''}
-          aria-label="To date"
-          className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
+          value={filters.to || ''}
+          ariaLabel="To date"
+          placeholder="To date"
         />
         <button
           type="submit"
@@ -199,7 +199,7 @@ export default function MessagesLog({
         )}
       </form>
 
-      <div className="mt-6 overflow-hidden rounded-[8px] bg-white">
+      <div className="mt-5 overflow-hidden rounded-[8px] bg-white">
         {emails.length === 0 ? (
           <div className="grid min-h-[260px] place-items-center px-6 py-10 text-center">
             <div>

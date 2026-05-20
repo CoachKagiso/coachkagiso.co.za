@@ -15,6 +15,7 @@ import {
   getTemplateIdForLeadStage,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
   id: string;
@@ -176,7 +177,10 @@ export default function LeadEmailModal({
   const [noteError, setNoteError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
-  const selectedTemplate = getEmailTemplate(selectedTemplateId);
+  const [availableTemplates, setAvailableTemplates] = useState<StoredEmailTemplate[]>(
+    EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
+  );
+  const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
   const sequenceDots = getEmailSequenceDots(selectedTemplateId);
 
   useEffect(() => {
@@ -239,6 +243,34 @@ export default function LeadEmailModal({
   }, [defaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
 
   useEffect(() => {
+    if (!isOpen || !adminKey) return;
+    let cancelled = false;
+
+    async function loadTemplates() {
+      try {
+        const response = await fetch(`/api/email/templates?key=${encodeURIComponent(adminKey)}`);
+        const data = (await response.json().catch(() => ({}))) as { templates?: StoredEmailTemplate[] };
+        if (!response.ok || !data.templates?.length || cancelled) return;
+        setAvailableTemplates(data.templates);
+
+        const defaultTemplate = data.templates.find((template) => template.id === defaultTemplateId) || data.templates[0];
+        if (defaultTemplate && !initialSubject && !initialBody) {
+          setSelectedTemplateId(defaultTemplate.id);
+          setSubject(injectTemplate(defaultTemplate.subject, modalLead, defaultTemplate.id));
+          setBody(injectTemplate(defaultTemplate.body, modalLead, defaultTemplate.id));
+        }
+      } catch {
+        // File templates remain the fallback.
+      }
+    }
+
+    void loadTemplates();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, defaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -256,7 +288,7 @@ export default function LeadEmailModal({
   }, [toast]);
 
   function switchTemplate(templateId: EmailTemplateId) {
-    const template = getEmailTemplate(templateId);
+    const template = availableTemplates.find((item) => item.id === templateId) || getEmailTemplate(templateId);
     setSelectedTemplateId(templateId);
     setSubject(injectTemplate(template.subject, modalLead, templateId));
     setBody(injectTemplate(template.body, modalLead, templateId));
@@ -412,7 +444,7 @@ export default function LeadEmailModal({
                       onChange={(event) => switchTemplate(event.target.value as EmailTemplateId)}
                       className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
                     >
-                          {EMAIL_TEMPLATES.map((template) => (
+                          {availableTemplates.filter((template) => template.active).map((template) => (
                         <option key={template.id} value={template.id}>
                           {getEmailTemplateOptionLabel(template)}
                         </option>

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 
 export const dynamic = 'force-dynamic';
-
-const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.1';
-const AI_API_KEY_ENV = 'ZAI_API_KEY';
 
 type ExtractedFramework = {
   hookPattern?: string;
@@ -88,11 +85,6 @@ BUILD RULES:
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env[AI_API_KEY_ENV];
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' }, { status: 503 });
-  }
-
   const body = await req.json().catch(() => null);
   const key = String(body?.key || '');
 
@@ -114,16 +106,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Extracted framework is required.' }, { status: 400 });
   }
 
+  const runtime = await resolveAiRuntimeConfig({ simpleMode: false });
+  if (!runtime) {
+    return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    response = await fetch(`${runtime.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
+      headers: runtime.headers,
+      body: JSON.stringify(buildAiRequestBody(runtime, {
+        model: runtime.model,
         messages: [
           {
             role: 'system',
@@ -140,10 +134,9 @@ export async function POST(req: NextRequest) {
           },
           { role: 'user', content: buildStage2UserPrompt(framework, platform, contentType, subType, targetPillar, targetRegister, userDirection, calendarContext) },
         ],
-        thinking: { type: 'disabled' },
         max_tokens: 1800,
         temperature: 0.75,
-      }),
+      })),
     });
   } catch (error) {
     console.error('Transform Stage 2 network error:', error);

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardCheck,
+  Download,
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
@@ -37,12 +38,45 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import FollowUpNotificationBell, { type NotificationPanelSection } from '@/components/dashboard/FollowUpNotificationBell';
+import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
+import FilterDropdown from '@/components/FilterDropdown';
 import { OutputPanel, OutputWithActions } from '@/components/content/shared/OutputPanel';
 import { EditorialCalendarTab } from '@/components/content/tabs/EditorialCalendarTab';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
+import {
+  DEFAULT_CAROUSEL_ASPECT_RATIO,
+  DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+  DEFAULT_CAROUSEL_SLIDE_COUNT,
+  DEFAULT_CAROUSEL_TEMPLATE,
+  buildCarouselTemplatePromptBlock,
+  carouselAspectRatioOptions,
+  carouselLayoutRecipeOptions,
+  carouselSlideCountOptions,
+  carouselTemplateOptions,
+  getCarouselAspectRatioLabel,
+  getCarouselAspectRatioOption,
+  getCarouselCompositionOption,
+  getCarouselCompositionOptionsForRole,
+  getCarouselExportDimensions,
+  getCarouselLayoutRecipeOption,
+  getCarouselSlideCountOption,
+  getCarouselTemplateOption,
+  isCarouselAspectRatio,
+  isCarouselComposition,
+  isCarouselLayoutRecipe,
+  isCarouselSlideRole,
+  isCarouselTemplate,
+  type CarouselAspectRatio,
+  type CarouselComposition,
+  type CarouselLayoutRecipe,
+  type CarouselPlatform,
+  type CarouselSlideCount,
+  type CarouselSlideRole,
+  type CarouselTemplate,
+} from '@/lib/content/carousel-template-registry';
 import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
 import {
   cleanMessyMiddleNotes,
@@ -72,23 +106,28 @@ import type { SmartSuggestSource, SmartSuggestSources, SmartSuggestion } from '@
 
 type ContentStudioProps = {
   adminKey: string;
+  initialWorkspace?: StudioWorkspace;
   context: DashboardContext;
   calendarItems: ContentCalendarItem[];
   backlogItems: ContentBacklogItem[];
   researchItems: ResearchEntry[];
   followUpNotificationCount: number;
+  profilePhotoUrl?: string | null;
 };
 
+type StudioWorkspace = 'content' | 'carousel' | 'tools';
 type ContentSection = 'home' | 'briefs' | 'studio' | 'vault' | 'editorial' | 'research';
 type StudioMode = 'create' | 'transform';
-type CreatePlatform = 'linkedin' | 'instagram_facebook' | 'tiktok' | 'email_voice';
+type CreatePlatform = CarouselPlatform;
 type TopicSource = 'manual' | 'signal' | 'brief';
 type CreatePillarFocus = ContentPillar | 'auto';
-type CarouselSlideCount = 'auto' | 'quick' | 'full';
+type CarouselExportMode = 'pdf' | 'png';
 type AiMode =
   | 'signal_brief'
   | 'write_post'
   | 'polish'
+  | 'hook_generator'
+  | 'cta_generator'
   | 'alchemy_stage1'
   | 'alchemy_stage2'
   | 'alchemy_critique'
@@ -96,6 +135,56 @@ type AiMode =
   | 'voice_note'
   | 'calendar_plan'
   | 'summarise_insights';
+type StudioToolKind = 'hook' | 'cta' | 'caption' | 'reply';
+type StudioGeneratedToolKind = 'hook' | 'cta';
+type StudioToolPayload = {
+  source: string;
+  platform: ContentPlatform | 'auto';
+  pillar: ContentPillar | 'auto';
+  goal: string;
+  quantity: '6' | '10' | '15';
+  hookType?: HookType;
+};
+type StudioToolResult = {
+  kind: StudioGeneratedToolKind;
+  output: string;
+  payload: StudioToolPayload;
+  generatedAt: string;
+};
+type CaptionPlatform = Exclude<ContentPlatform, 'email'>;
+type CaptionTone =
+  | 'auto'
+  | 'tactical_teacher'
+  | 'reflective_leader'
+  | 'conviction_reframe'
+  | 'reflection_friday'
+  | 'the_challenger'
+  | 'celebration_gratitude';
+type CaptionInputMode = 'text' | 'image';
+type CaptionResult = {
+  captions: Array<{ caption: string; angle: string }>;
+};
+type ReplyPlatform = Exclude<ContentPlatform, 'email'> | 'email_dm';
+type ReplyInputMode = 'text' | 'image';
+type ReplyResponseType = 'own_post' | 'other_post';
+type ReplyGoal =
+  | 'auto'
+  | 'continue_conversation'
+  | 'answer_question'
+  | 'ask_question'
+  | 'invite_dm_book'
+  | 'acknowledge'
+  | 'agree_expand'
+  | 'challenge_respectfully'
+  | 'add_perspective'
+  | 'build_visibility';
+type ReplyPersonType = 'lead' | 'client' | 'general_audience' | 'peer' | 'unknown';
+type ReplyResult = {
+  reply: string;
+  shortReply: string;
+  chosenGoal?: string;
+};
+type HookType = 'text_post' | 'spoken_video' | 'visual' | 'visual_spoken';
 type TransformInputType = 'text' | 'image';
 type AiPromptSelection = Pick<CreateSelection, 'contentType' | 'subType' | 'angle' | 'angleRegister'>;
 type SmartPulseKey = 'platform' | 'content' | 'angle' | 'topic';
@@ -119,6 +208,9 @@ interface CreateSelection {
   angle: string | null;
   angleRegister: string | null;
   carouselSlideCount: CarouselSlideCount;
+  carouselAspectRatio: CarouselAspectRatio;
+  carouselTemplate: CarouselTemplate;
+  carouselLayoutRecipe: CarouselLayoutRecipe;
 }
 
 type ExtractedFramework = {
@@ -128,6 +220,43 @@ type ExtractedFramework = {
   ctaStyle: string;
   formatLogic: string;
   suggestedPillar?: string;
+};
+
+type CarouselSlide = {
+  id: string;
+  role: CarouselSlideRole;
+  composition: CarouselComposition;
+  headline: string;
+  body: string;
+  cta?: string;
+  visualSuggestion?: string;
+};
+
+type CarouselDraftPayload = {
+  kind: 'carousel_draft';
+  version: 1;
+  title: string;
+  caption: string;
+  coverDesign?: string;
+  platform: CreatePlatform;
+  outputPlatform: ContentPlatform;
+  pillar: ContentPillar | null;
+  register: string | null;
+  angle: string | null;
+  angleLabel: string | null;
+  topic: string;
+  slideCount: CarouselSlideCount;
+  aspectRatio: CarouselAspectRatio;
+  template: CarouselTemplate;
+  layoutRecipe: CarouselLayoutRecipe;
+  slides: CarouselSlide[];
+  accessibilityNote?: string;
+  createdAt: string;
+};
+
+type CarouselDraftRecord = {
+  item: ContentBacklogItem;
+  draft: CarouselDraftPayload;
 };
 
 type TransformStage = 'idle' | 'extracting' | 'extracted' | 'rebuilding' | 'complete';
@@ -243,6 +372,157 @@ const platformLabels: Record<ContentPlatform, string> = {
 };
 
 const defaultOutputPlatform: ContentPlatform = 'linkedin';
+const captionPlatformLabels: Record<CaptionPlatform, string> = {
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  facebook: 'Facebook',
+};
+const replyPlatformLabels: Record<ReplyPlatform, string> = {
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  facebook: 'Facebook',
+  email_dm: 'Email / DM',
+};
+const captionToneLabels: Record<CaptionTone, string> = {
+  auto: 'Auto',
+  tactical_teacher: 'Tactical Teacher',
+  reflective_leader: 'Reflective Leader',
+  conviction_reframe: 'Conviction Reframe',
+  reflection_friday: 'Reflection Friday',
+  the_challenger: 'The Challenger',
+  celebration_gratitude: 'Celebration',
+};
+const replyResponseTypeLabels: Record<ReplyResponseType, { label: string; detail: string }> = {
+  own_post: {
+    label: 'Reply to my post',
+    detail: "Someone commented on Kagiso's content.",
+  },
+  other_post: {
+    label: "Comment on someone else's post",
+    detail: "Kagiso wants to engage with another creator's content.",
+  },
+};
+const replyGoalLabels: Record<ReplyGoal, { label: string; detail: string }> = {
+  auto: { label: 'Auto', detail: 'Let the AI read the context and pick the best approach.' },
+  continue_conversation: { label: 'Continue the conversation', detail: 'Keep it going with an open question or observation.' },
+  answer_question: { label: 'Answer their question', detail: 'Give a real, specific answer — not a vague one.' },
+  ask_question: { label: 'Ask a thoughtful question', detail: 'Spark a deeper conversation with a genuine question.' },
+  invite_dm_book: { label: 'Invite them to DM or book', detail: 'A warm, natural nudge toward a conversation or booking.' },
+  acknowledge: { label: 'Simply acknowledge', detail: 'Warm and brief — no CTA, just presence.' },
+  agree_expand: { label: 'Agree and expand', detail: 'Validate the point, then deepen it with your own insight or pattern.' },
+  challenge_respectfully: { label: 'Challenge the idea', detail: 'Lead with agreement, then push back with nuance.' },
+  add_perspective: { label: 'Add your perspective', detail: 'Share a specific observation from your coaching experience.' },
+  build_visibility: { label: 'Build visibility', detail: 'Add value while positioning yourself as the authority.' },
+};
+const replyPersonTypeLabels: Record<ReplyPersonType, string> = {
+  lead: 'Lead / potential client',
+  client: 'Existing client',
+  general_audience: 'General audience',
+  peer: 'Peer / fellow professional',
+  unknown: 'Unknown',
+};
+const hookTypeLabels: Record<HookType, { label: string; detail: string; placeholder: string }> = {
+  text_post: {
+    label: 'Text / post hook',
+    detail: 'First line for a LinkedIn post, caption, carousel cover, or written draft.',
+    placeholder: 'Paste the post draft, carousel idea, topic, or audience tension...',
+  },
+  spoken_video: {
+    label: 'Video spoken hook',
+    detail: 'Opening sentence Kagiso says at the start of a video.',
+    placeholder: 'Paste the video idea, rough script, talking points, or the lesson you want to open with...',
+  },
+  visual: {
+    label: 'Visual hook',
+    detail: 'First frame, prop, gesture, overlay, or visual interruption before speaking.',
+    placeholder: 'Describe the video/photo situation, scene, prop, before/after, or first-frame idea...',
+  },
+  visual_spoken: {
+    label: 'Visual + spoken hook',
+    detail: 'First frame plus the first line Kagiso says.',
+    placeholder: 'Paste the video idea and any scene details so AI can suggest the visual opening and spoken opener...',
+  },
+};
+const captionLoadingMessages = ['Reading your image...', 'Finding three angles...', "Writing in Kagiso's voice..."];
+const replyLoadingMessages = ['Reading the content...', 'Finding the right tone...', 'Writing your reply...'];
+
+const studioToolMeta: Record<StudioToolKind, {
+  label: string;
+  eyebrow: string;
+  description: string;
+  buttonLabel: string;
+  icon: LucideIcon;
+  status: 'ready' | 'planned';
+  planningNote?: string;
+}> = {
+  hook: {
+    label: 'Hook Generator',
+    eyebrow: 'Stop the scroll',
+    description: 'First lines that create tension without sounding like generic LinkedIn bait.',
+    buttonLabel: 'Generate hooks',
+    icon: Zap,
+    status: 'ready',
+  },
+  cta: {
+    label: 'CTA Generator',
+    eyebrow: 'Move the reader',
+    description: 'Clean next steps for replies, saves, DMs, bookings, and soft offers.',
+    buttonLabel: 'Generate CTAs',
+    icon: Link2,
+    status: 'ready',
+  },
+  caption: {
+    label: 'Caption Generator',
+    eyebrow: 'Package the post',
+    description: 'Caption options for posts, carousels, reels, and saved drafts.',
+    buttonLabel: 'Generate captions',
+    icon: PenLine,
+    status: 'ready',
+  },
+  reply: {
+    label: 'Reply Generator',
+    eyebrow: 'Join the conversation',
+    description: 'Reply ideas from pasted post text or an uploaded screenshot.',
+    buttonLabel: 'Generate replies',
+    icon: MessageSquare,
+    status: 'ready',
+  },
+};
+
+const studioToolGoalOptions: Record<StudioToolKind, string[]> = {
+  hook: [
+    'Stop the scroll',
+    'Create a visual interruption',
+    'Open a personal story',
+    'Challenge a belief',
+    'Start a conversation',
+    'Make the first frame sharper',
+    'Make a carousel cover sharper',
+  ],
+  cta: [
+    'Ask for replies',
+    'Invite a DM',
+    'Drive a discovery booking',
+    'Encourage save or share',
+    'Move to a lead magnet',
+  ],
+  caption: [
+    'Educate clearly',
+    'Tell a story',
+    'Drive comments',
+    'Promote softly',
+    'Set a carousel caption',
+  ],
+  reply: [
+    'Support the post',
+    'Add a useful insight',
+    'Ask a thoughtful question',
+    'Respectfully disagree',
+    'Open a DM bridge',
+  ],
+};
 
 const calendarStatusMeta: Record<ContentCalendarStatus, { label: string; className: string }> = {
   idea: { label: 'Idea', className: 'bg-[#F5F3EE] text-[#6B6B6B]' },
@@ -338,7 +618,7 @@ const transformInputTypes: {
 const contentSections: { value: ContentSection; label: string; icon: LucideIcon }[] = [
   { value: 'home', label: 'Home', icon: LayoutDashboard },
   { value: 'briefs', label: 'Signal Briefs', icon: Lightbulb },
-  { value: 'studio', label: 'Studio', icon: PenLine },
+  { value: 'studio', label: 'Create / Transform', icon: PenLine },
   { value: 'vault', label: 'Vault', icon: Archive },
   { value: 'editorial', label: 'Editorial Calendar', icon: CalendarDays },
   { value: 'research', label: 'Research', icon: BookOpen },
@@ -391,27 +671,6 @@ const createPlatformToContentPlatform: Record<CreatePlatform, ContentPlatform> =
   tiktok: 'tiktok',
   email_voice: 'email',
 };
-
-const carouselSlideCountOptions: Array<{ value: CarouselSlideCount; label: string; description: string; prompt: string }> = [
-  {
-    value: 'auto',
-    label: 'Auto',
-    description: 'AI decides the ideal number of slides based on your content',
-    prompt: 'AI should decide the ideal number of carousel slides based on the topic, angle, and audience pressure.',
-  },
-  {
-    value: 'quick',
-    label: 'Quick',
-    description: '5 to 6 slides, lean and fast to consume',
-    prompt: 'Create a quick carousel with 5 to 6 slides. Keep it lean, easy to consume, and focused on one useful idea.',
-  },
-  {
-    value: 'full',
-    label: 'Full',
-    description: '8 to 10 slides, comprehensive and in depth',
-    prompt: 'Create a full carousel with 8 to 10 slides. Make it comprehensive, structured, and in depth without padding.',
-  },
-];
 
 const platformGuidance: Record<CreatePlatform, StudioGuidance> = {
   linkedin: {
@@ -1168,8 +1427,34 @@ function getRegisterLabel(register?: string | null) {
       .join(' ');
 }
 
-function getCarouselSlideCountOption(value: CarouselSlideCount) {
-  return carouselSlideCountOptions.find((option) => option.value === value) || carouselSlideCountOptions[0];
+function getSafeCarouselFileSegment(value: string) {
+  const safe = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 52);
+  return safe || 'carousel';
+}
+
+function getCarouselExportBaseName(draft: CarouselDraftPayload, aspectOption: ReturnType<typeof getCarouselAspectRatioOption>) {
+  return `${getSafeCarouselFileSegment(draft.title)}-${getSafeCarouselFileSegment(aspectOption.label)}`;
+}
+
+function buildStudioToolUserPrompt(kind: StudioToolKind, payload: StudioToolPayload) {
+  const toolLabel = studioToolMeta[kind].label;
+  const platformLabel = payload.platform === 'auto' ? 'AI decides the strongest platform fit' : platformLabels[payload.platform];
+  const pillarLabel = payload.pillar === 'auto' ? 'AI decides the strongest pillar fit' : pillarMeta[payload.pillar].label;
+  return [
+    `TOOL: ${toolLabel}`,
+    kind === 'hook' && payload.hookType ? `HOOK TYPE: ${hookTypeLabels[payload.hookType].label}` : '',
+    `OUTPUT COUNT: ${payload.quantity}`,
+    `PLATFORM: ${platformLabel}`,
+    `PILLAR: ${pillarLabel}`,
+    `GOAL: ${payload.goal}`,
+    'SOURCE / IDEA:',
+    payload.source.trim(),
+  ].filter(Boolean).join('\n');
 }
 
 function getPillarFocusLabel(pillar: CreatePillarFocus) {
@@ -1200,16 +1485,30 @@ function buildCreateUserPrompt(selection: CreateSelection, topicValue: string, p
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === selection.subType);
   const angle = findAngleOption(selection);
+  const carouselStructuredOutput = selection.contentType === 'carousel'
+    ? [
+        'CAROUSEL STUDIO STRUCTURED OUTPUT:',
+        'Return valid JSON only. Do not wrap it in markdown or add commentary before or after it.',
+        'Use this exact top-level shape: { "kind": "carousel_draft", "version": 1, "title": string, "caption": string, "coverDesign": string, "platform": string, "pillar": string, "register": string, "aspectRatio": string, "template": string, "layoutRecipe": string, "slides": [{ "role": string, "composition": "auto", "headline": string, "body": string, "cta": string, "visualSuggestion": string }], "accessibilityNote": string }.',
+        'Every slide must include a role from the allowed slide roles. Use cover for the first slide and cta for the final slide.',
+        'Set composition to "auto" unless you have a clear reason to force a layout.',
+        'Each slide headline must be 8 words or fewer. Each slide body must be 40 words or fewer.',
+        'Every slide must be usable as an HTML/CSS visual slide later. Put layout or image direction in visualSuggestion, not in body.',
+        `Carousel slide count: ${getCarouselSlideCountOption(selection.carouselSlideCount).prompt}`,
+        `Output frame: ${getCarouselAspectRatioLabel(selection.carouselAspectRatio, selection.platform)}. ${getCarouselAspectRatioOption(selection.carouselAspectRatio, selection.platform).prompt}`,
+        buildCarouselTemplatePromptBlock(selection.carouselTemplate, selection.carouselLayoutRecipe),
+      ].join('\n')
+    : '';
   return [
     `Platform: ${platformLabel}`,
     `Content type: ${contentType?.label || selection.contentType || ''}${subType ? ` (${subType.label})` : ''}`,
     `Angle: ${angle?.label || selection.angle || ''}`,
     `Register: ${getRegisterLabel(selection.angleRegister)}`,
     `Pillar: ${getPillarFocusPrompt(pillarFocus)}`,
-    selection.contentType === 'carousel' ? `Carousel slide count: ${getCarouselSlideCountOption(selection.carouselSlideCount).prompt}` : '',
+    carouselStructuredOutput,
     `Topic: ${topicValue.trim() || 'Suggest the strongest topic from the dashboard signal and selected angle.'}`,
   ]
-    .filter((item) => !item.endsWith(': '))
+    .filter((item) => item && !item.endsWith(': '))
     .join('\n');
 }
 
@@ -1236,6 +1535,304 @@ function normalizeGeneratedPillar(value?: string | null): ContentPillar | null {
   if (normalized.includes('career_growth') || normalized.includes('career')) return 'career_growth';
 
   return null;
+}
+
+function isContentPlatformValue(value?: string | null): value is ContentPlatform {
+  return Boolean(value && Object.prototype.hasOwnProperty.call(platformLabels, value));
+}
+
+function createPlatformFromContentPlatform(platform?: ContentPlatform | null): CreatePlatform {
+  if (platform === 'instagram' || platform === 'facebook') return 'instagram_facebook';
+  if (platform === 'tiktok') return 'tiktok';
+  if (platform === 'email') return 'email_voice';
+  return 'linkedin';
+}
+
+function compactString(value: unknown) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+}
+
+function multilineString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function asPlainObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function extractJsonCandidates(raw: string) {
+  const trimmed = raw.trim();
+  const candidates: string[] = [];
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(fenced[1].trim());
+  if (trimmed) candidates.push(trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim());
+
+  const objectStart = trimmed.indexOf('{');
+  const objectEnd = trimmed.lastIndexOf('}');
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    candidates.push(trimmed.slice(objectStart, objectEnd + 1));
+  }
+
+  const arrayStart = trimmed.indexOf('[');
+  const arrayEnd = trimmed.lastIndexOf(']');
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    candidates.push(trimmed.slice(arrayStart, arrayEnd + 1));
+  }
+
+  return Array.from(new Set(candidates.filter(Boolean)));
+}
+
+function parseJsonFromAiOutput(raw: string): unknown | null {
+  for (const candidate of extractJsonCandidates(raw)) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function getRawCarouselDraft(value: unknown): Record<string, unknown> | null {
+  if (Array.isArray(value)) return { slides: value };
+
+  const record = asPlainObject(value);
+  if (!record) return null;
+
+  const nested =
+    asPlainObject(record.carouselDraft) ||
+    asPlainObject(record.carousel_draft) ||
+    asPlainObject(record.carousel) ||
+    asPlainObject(record.draft);
+
+  if (nested) return nested;
+  return record;
+}
+
+const carouselSlideRoleLabels: Record<CarouselSlideRole, string> = {
+  cover: 'Cover',
+  reframe: 'Reframe',
+  framework: 'Framework',
+  step: 'Step',
+  proof: 'Proof cue',
+  cta: 'CTA',
+  mirror: 'Mirror',
+  checklist: 'Checklist',
+  reflection: 'Reflection',
+  diagnosis: 'Diagnosis',
+  myth: 'Myth',
+  cost: 'Cost',
+  rule: 'Rule',
+};
+
+function normalizeCarouselComposition(value: unknown, role: CarouselSlideRole): CarouselComposition {
+  const rawComposition = compactString(value);
+  const allowed = getCarouselCompositionOptionsForRole(role).map((option) => option.value);
+  return isCarouselComposition(rawComposition) && allowed.includes(rawComposition) ? rawComposition : 'auto';
+}
+
+function getDefaultCarouselSlideRole(layoutRecipe: CarouselLayoutRecipe, index: number, totalSlides: number): CarouselSlideRole {
+  const recipe = getCarouselLayoutRecipeOption(layoutRecipe);
+  if (index === 0) return recipe.slideTypes[0] || 'cover';
+  if (index === totalSlides - 1) return recipe.slideTypes[recipe.slideTypes.length - 1] || 'cta';
+  const middleRoles = recipe.slideTypes.slice(1, -1);
+  return middleRoles[Math.min(index - 1, middleRoles.length - 1)] || 'step';
+}
+
+function normalizeCarouselSlide(
+  value: unknown,
+  index: number,
+  layoutRecipe: CarouselLayoutRecipe,
+  totalSlides: number,
+): CarouselSlide | null {
+  const record = asPlainObject(value);
+  if (!record) return null;
+
+  const rawRole = compactString(record.role ?? record.slideRole ?? record.slide_role ?? record.type ?? record.slideType ?? record.slide_type);
+  const role = isCarouselSlideRole(rawRole)
+    ? rawRole
+    : getDefaultCarouselSlideRole(layoutRecipe, index, totalSlides);
+  const composition = normalizeCarouselComposition(record.composition ?? record.layout ?? record.variant, role);
+  const headline = compactString(record.headline ?? record.title ?? record.hook);
+  const body = multilineString(record.body ?? record.copy ?? record.text ?? record.description);
+  const cta = compactString(record.cta ?? record.callToAction ?? record.call_to_action);
+  const visualSuggestion = multilineString(
+    record.visualSuggestion ?? record.visual_suggestion ?? record.visual ?? record.design ?? record.note,
+  );
+
+  if (!headline && !body) return null;
+
+  return {
+    id: compactString(record.id) || `slide-${index + 1}`,
+    role,
+    composition,
+    headline: headline || `Slide ${index + 1}`,
+    body,
+    ...(cta ? { cta } : {}),
+    ...(visualSuggestion ? { visualSuggestion } : {}),
+  };
+}
+
+function buildCarouselDraftFromAiOutput(
+  rawOutput: string,
+  selection: CreateSelection,
+  topicValue: string,
+  pillarFocus: CreatePillarFocus,
+) {
+  const parsed = parseJsonFromAiOutput(rawOutput);
+  const rawDraft = getRawCarouselDraft(parsed);
+  if (!rawDraft) {
+    throw new Error('The AI did not return structured carousel JSON. Try Generate again.');
+  }
+
+  const rawSlides = Array.isArray(rawDraft.slides)
+    ? rawDraft.slides
+    : Array.isArray(rawDraft.carouselSlides)
+      ? rawDraft.carouselSlides
+      : Array.isArray(rawDraft.carousel_slides)
+        ? rawDraft.carousel_slides
+        : null;
+
+  const slides = rawSlides
+    ?.map((slide, index) => normalizeCarouselSlide(slide, index, selection.carouselLayoutRecipe, rawSlides.length))
+    .filter((slide): slide is CarouselSlide => Boolean(slide)) || [];
+
+  if (slides.length < 4) {
+    throw new Error('The carousel draft needs at least 4 structured slides. Try Generate again.');
+  }
+
+  const platform = selection.platform || 'linkedin';
+  const outputPlatform = createPlatformToContentPlatform[platform];
+  const topic = topicValue.trim() || 'Dashboard signal carousel';
+  const angle = findAngleOption(selection);
+  const rawPillar = compactString(rawDraft.pillar ?? rawDraft.contentPillar ?? rawDraft.content_pillar);
+  const pillar = normalizeGeneratedPillar(rawPillar) || (pillarFocus !== 'auto' ? pillarFocus : null);
+  return {
+    kind: 'carousel_draft',
+    version: 1,
+    title: compactString(rawDraft.title) || titleFromText(slides[0]?.headline || topic, topic),
+    caption: multilineString(rawDraft.caption ?? rawDraft.postCaption ?? rawDraft.post_caption),
+    coverDesign: multilineString(rawDraft.coverDesign ?? rawDraft.cover_design ?? rawDraft.suggestedCoverDesign),
+    platform,
+    outputPlatform,
+    pillar,
+    register: compactString(rawDraft.register ?? rawDraft.writingRegister ?? rawDraft.writing_register) || selection.angleRegister,
+    angle: selection.angle,
+    angleLabel: angle?.label || selection.angle,
+    topic,
+    slideCount: selection.carouselSlideCount,
+    aspectRatio: selection.carouselAspectRatio,
+    template: selection.carouselTemplate,
+    layoutRecipe: selection.carouselLayoutRecipe,
+    slides,
+    accessibilityNote: multilineString(rawDraft.accessibilityNote ?? rawDraft.accessibility_note),
+    createdAt: new Date().toISOString(),
+  } satisfies CarouselDraftPayload;
+}
+
+function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem): CarouselDraftPayload | null {
+  const rawDraft = getRawCarouselDraft(value);
+  if (!rawDraft) return null;
+
+  const rawSlides = Array.isArray(rawDraft.slides) ? rawDraft.slides : null;
+  const rawPlatform = compactString(rawDraft.platform);
+  const platform = isCreatePlatform(rawPlatform)
+    ? rawPlatform
+    : createPlatformFromContentPlatform(item?.platform || null);
+  const rawOutputPlatform = compactString(rawDraft.outputPlatform ?? rawDraft.output_platform);
+  const outputPlatform = isContentPlatformValue(rawOutputPlatform)
+    ? rawOutputPlatform
+    : item?.platform || createPlatformToContentPlatform[platform];
+  const rawPillar = compactString(rawDraft.pillar);
+  const pillar = normalizeGeneratedPillar(rawPillar) || item?.pillar || null;
+  const rawSlideCount = compactString(rawDraft.slideCount ?? rawDraft.slide_count);
+  const rawAspectRatio = compactString(rawDraft.aspectRatio ?? rawDraft.aspect_ratio);
+  const rawTemplate = compactString(rawDraft.template ?? rawDraft.visualTemplate ?? rawDraft.visual_template);
+  const template = isCarouselTemplate(rawTemplate) ? rawTemplate : DEFAULT_CAROUSEL_TEMPLATE;
+  const rawLayoutRecipe = compactString(rawDraft.layoutRecipe ?? rawDraft.layout_recipe);
+  const layoutRecipe = isCarouselLayoutRecipe(rawLayoutRecipe)
+    ? rawLayoutRecipe
+    : getCarouselTemplateOption(template).layoutRecipe.value;
+  const slides = rawSlides
+    ?.map((slide, index) => normalizeCarouselSlide(slide, index, layoutRecipe, rawSlides.length))
+    .filter((slide): slide is CarouselSlide => Boolean(slide)) || [];
+
+  if (slides.length < 4) return null;
+
+  return {
+    kind: 'carousel_draft',
+    version: 1,
+    title: compactString(rawDraft.title) || item?.title || titleFromText(slides[0]?.headline || 'Carousel draft', 'Carousel draft'),
+    caption: multilineString(rawDraft.caption),
+    coverDesign: multilineString(rawDraft.coverDesign ?? rawDraft.cover_design),
+    platform,
+    outputPlatform,
+    pillar,
+    register: compactString(rawDraft.register ?? rawDraft.writingRegister ?? rawDraft.writing_register) || null,
+    angle: compactString(rawDraft.angle) || null,
+    angleLabel: compactString(rawDraft.angleLabel ?? rawDraft.angle_label) || null,
+    topic: multilineString(rawDraft.topic) || item?.title || 'Carousel draft',
+    slideCount: rawSlideCount === 'quick' || rawSlideCount === 'full' ? rawSlideCount : DEFAULT_CAROUSEL_SLIDE_COUNT,
+    aspectRatio: isCarouselAspectRatio(rawAspectRatio) ? rawAspectRatio : DEFAULT_CAROUSEL_ASPECT_RATIO,
+    template,
+    layoutRecipe,
+    slides,
+    accessibilityNote: multilineString(rawDraft.accessibilityNote ?? rawDraft.accessibility_note),
+    createdAt: compactString(rawDraft.createdAt ?? rawDraft.created_at) || item?.createdAt || new Date().toISOString(),
+  };
+}
+
+function getCarouselDraftFromBacklogItem(item: ContentBacklogItem): CarouselDraftPayload | null {
+  if (!item.notes) return null;
+  try {
+    const parsed = JSON.parse(item.notes);
+    const record = asPlainObject(parsed);
+    if (!record || record.kind !== 'carousel_draft') return null;
+    return normalizeStoredCarouselDraft(record.draft || record, item);
+  } catch {
+    return null;
+  }
+}
+
+function formatCarouselDraftForOutput(draft: CarouselDraftPayload) {
+  const pillarLabel = draft.pillar ? pillarMeta[draft.pillar].label : 'AI selected';
+  const registerLabel = draft.register ? getRegisterLabel(draft.register) : 'AI selected';
+  const slideText = draft.slides
+    .map((slide, index) =>
+      [
+        `SLIDE ${index + 1}`,
+        `Role: ${carouselSlideRoleLabels[slide.role]}`,
+        `Composition: ${getCarouselCompositionOption(slide.composition).label}`,
+        `Headline: ${slide.headline}`,
+        slide.body ? `Body: ${slide.body}` : '',
+        slide.cta ? `CTA: ${slide.cta}` : '',
+        slide.visualSuggestion ? `Visual: ${slide.visualSuggestion}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
+    .join('\n\n');
+
+  return [
+    `PLATFORM: ${platformLabels[draft.outputPlatform]}`,
+    `PILLAR: ${pillarLabel}`,
+    `WRITING REGISTER: ${registerLabel}`,
+    '',
+    `CAROUSEL DRAFT: ${draft.title}`,
+    `Slide count: ${draft.slides.length}`,
+    `Output frame: ${getCarouselAspectRatioLabel(draft.aspectRatio, draft.platform)}`,
+    `Visual template: ${getCarouselTemplateOption(draft.template).label}`,
+    `Layout recipe: ${getCarouselLayoutRecipeOption(draft.layoutRecipe).label}`,
+    '',
+    draft.caption ? `POST CAPTION:\n${draft.caption}` : '',
+    draft.coverDesign ? `COVER DESIGN:\n${draft.coverDesign}` : '',
+    slideText,
+    draft.accessibilityNote ? `ACCESSIBILITY NOTE:\n${draft.accessibilityNote}` : '',
+  ]
+    .filter((part) => part !== '')
+    .join('\n\n');
 }
 
 function isSmartSuggestSource(value?: string | null): value is SmartSuggestSource {
@@ -1301,7 +1898,10 @@ function getSmartSuggestionContentLabel(suggestion: SmartSuggestion) {
     subType: suggestion.subType,
     angle: suggestion.angle,
     angleRegister: suggestion.angleRegister,
-    carouselSlideCount: 'auto',
+    carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+    carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+    carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+    carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
   };
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === suggestion.subType);
@@ -1606,12 +2206,15 @@ function SignalBriefEmptyState({ busy, onGenerate }: { busy: boolean; onGenerate
 
 export default function ContentStudio({
   adminKey,
+  initialWorkspace = 'content',
   context,
   calendarItems,
   backlogItems,
   researchItems,
   followUpNotificationCount,
+  profilePhotoUrl,
 }: ContentStudioProps) {
+  const [activeWorkspace, setActiveWorkspace] = useState<StudioWorkspace>(initialWorkspace);
   const [activeSection, setActiveSection] = useState<ContentSection>('home');
   const [studioMode, setStudioMode] = useState<StudioMode>('create');
   const [createSelection, setCreateSelection] = useState<CreateSelection>({
@@ -1620,7 +2223,10 @@ export default function ContentStudio({
     subType: null,
     angle: null,
     angleRegister: null,
-    carouselSlideCount: 'auto',
+    carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+    carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+    carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+    carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
   });
   const [createPillarFocus, setCreatePillarFocus] = useState<CreatePillarFocus>('auto');
   const [brief, setBrief] = useState<string | null>(null);
@@ -1650,6 +2256,13 @@ export default function ContentStudio({
   const [smartPrepopulateNotice, setSmartPrepopulateNotice] = useState<string | null>(null);
   const [smartPulseKey, setSmartPulseKey] = useState<SmartPulseKey | null>(null);
   const [generatedPost, setGeneratedPost] = useState('');
+  const [generatedCarouselDraft, setGeneratedCarouselDraft] = useState<CarouselDraftPayload | null>(null);
+  const [carouselStudioSavingId, setCarouselStudioSavingId] = useState<string | null>(null);
+  const [carouselStudioError, setCarouselStudioError] = useState<string | null>(null);
+  const [selectedCarouselDraftId, setSelectedCarouselDraftId] = useState<string | null>(null);
+  const [studioToolBusy, setStudioToolBusy] = useState<StudioToolKind | null>(null);
+  const [studioToolError, setStudioToolError] = useState<string | null>(null);
+  const [studioToolResult, setStudioToolResult] = useState<StudioToolResult | null>(null);
   const [alchemyInputType, setAlchemyInputType] = useState<TransformInputType>('text');
   const [alchemySource, setAlchemySource] = useState('');
   const [alchemyImageFile, setAlchemyImageFile] = useState<File | null>(null);
@@ -1861,19 +2474,22 @@ export default function ContentStudio({
   const smartSuggestSources = useMemo<SmartSuggestSources>(() => {
     const fourteenDaysAgoKey = getDateOffsetKey(-13);
     const sevenDaysAgoKey = getDateOffsetKey(-6);
+    const actionableRecords = calendarRecords.filter(
+      (item) => item.status !== 'idea',
+    );
     const pillarCoverage = (Object.keys(pillarMeta) as ContentPillar[]).reduce<Record<string, number>>((acc, pillar) => {
-      acc[pillar] = calendarRecords.filter(
+      acc[pillar] = actionableRecords.filter(
         (item) => item.pillar === pillar && item.publishDate >= fourteenDaysAgoKey && item.publishDate <= todayKey,
       ).length;
       return acc;
     }, {});
     const platformCoverage = {
-      linkedin: calendarRecords.filter((item) => item.platform === 'linkedin' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
-      tiktok: calendarRecords.filter((item) => item.platform === 'tiktok' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
-      instagram_facebook: calendarRecords.filter(
+      linkedin: actionableRecords.filter((item) => item.platform === 'linkedin' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
+      tiktok: actionableRecords.filter((item) => item.platform === 'tiktok' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
+      instagram_facebook: actionableRecords.filter(
         (item) => (item.platform === 'instagram' || item.platform === 'facebook') && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey,
       ).length,
-      email: calendarRecords.filter((item) => item.platform === 'email' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
+      email: actionableRecords.filter((item) => item.platform === 'email' && item.publishDate >= sevenDaysAgoKey && item.publishDate <= todayKey).length,
     };
     const vaultDrafts = backlogRecords
       .filter((item) => item.source !== 'insights' && (item.status === 'draft' || item.status === 'idea'))
@@ -1888,6 +2504,11 @@ export default function ContentStudio({
     const now = new Date().toISOString();
     const activeResearch = researchRecords
       .filter((r) => r.status === 'active' && (r.isEvergreen || !r.expiresAt || r.expiresAt > now))
+      .sort((a, b) => {
+        const aCov = pillarCoverage[a.pillar] ?? 0;
+        const bCov = pillarCoverage[b.pillar] ?? 0;
+        return aCov - bCov;
+      })
       .slice(0, 10)
       .map((r) => ({
         title: r.title,
@@ -1988,6 +2609,20 @@ export default function ContentStudio({
       .map((item) => ({ id: item.id, title: item.title, text: item.content || '' }));
     return [...current, ...history, ...saved].slice(0, 6);
   }, [backlogRecords, brief, briefHistory, context.strongestTheme]);
+  const carouselDraftRecords = useMemo<CarouselDraftRecord[]>(() => {
+    const records = backlogRecords
+      .map((item) => {
+        const draft = getCarouselDraftFromBacklogItem(item);
+        return draft ? { item, draft } : null;
+      })
+      .filter((record): record is CarouselDraftRecord => Boolean(record));
+    if (!selectedCarouselDraftId) return records;
+    return [...records].sort((a, b) => {
+      if (a.item.id === selectedCarouselDraftId) return -1;
+      if (b.item.id === selectedCarouselDraftId) return 1;
+      return 0;
+    });
+  }, [backlogRecords, selectedCarouselDraftId]);
   const canGenerateCreate = isCreateSelectionReady(createSelection);
 
   function resetSmartSuggestSession() {
@@ -2000,8 +2635,16 @@ export default function ContentStudio({
   }
 
   function navigateContent(section: ContentSection, options?: { topic?: string }) {
+    setActiveWorkspace('content');
     if (section !== 'studio' || activeSection !== 'studio') {
       resetSmartSuggestSession();
+    }
+    if (section === 'vault') {
+      setBacklogSearch('');
+      setBacklogPillarFilter('all');
+      setBacklogStatusFilter('all');
+      setBacklogPlatformFilter('all');
+      setActiveVaultSection('ideas');
     }
     if (options?.topic) {
       setTopic(options.topic);
@@ -2024,7 +2667,10 @@ export default function ContentStudio({
             subType: null,
             angle: null,
             angleRegister: null,
-            carouselSlideCount: 'auto',
+            carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+            carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+            carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+            carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
           }
         : {
             platform: nextPlatform,
@@ -2032,10 +2678,14 @@ export default function ContentStudio({
             subType: null,
             angle: null,
             angleRegister: null,
-            carouselSlideCount: 'auto',
+            carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+            carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+            carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+            carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
           }
     );
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
   }
 
@@ -2049,7 +2699,10 @@ export default function ContentStudio({
             subType: null,
             angle: null,
             angleRegister: null,
-            carouselSlideCount: 'auto',
+            carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+            carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+            carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+            carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
           }
         : {
             ...current,
@@ -2057,10 +2710,14 @@ export default function ContentStudio({
             subType: null,
             angle: null,
             angleRegister: null,
-            carouselSlideCount: 'auto',
+            carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+            carouselAspectRatio: type.id === 'carousel' ? current.carouselAspectRatio : DEFAULT_CAROUSEL_ASPECT_RATIO,
+            carouselTemplate: type.id === 'carousel' ? current.carouselTemplate : DEFAULT_CAROUSEL_TEMPLATE,
+            carouselLayoutRecipe: type.id === 'carousel' ? current.carouselLayoutRecipe : DEFAULT_CAROUSEL_LAYOUT_RECIPE,
           }
     );
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
   }
 
@@ -2073,7 +2730,10 @@ export default function ContentStudio({
             subType: null,
             angle: null,
             angleRegister: null,
-            carouselSlideCount: 'auto',
+            carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+            carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+            carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+            carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
           }
         : {
             ...current,
@@ -2083,6 +2743,7 @@ export default function ContentStudio({
           }
     );
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
   }
 
@@ -2102,6 +2763,7 @@ export default function ContentStudio({
           }
     );
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
   }
 
@@ -2111,11 +2773,43 @@ export default function ContentStudio({
       carouselSlideCount: slideCount,
     }));
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
+    setCreateFormatOutput('');
+  }
+
+  function selectCarouselAspectRatio(aspectRatio: CarouselAspectRatio) {
+    setCreateSelection((current) => ({
+      ...current,
+      carouselAspectRatio: aspectRatio,
+    }));
+    setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
+    setCreateFormatOutput('');
+  }
+
+  function selectCarouselTemplate(template: CarouselTemplate) {
+    setCreateSelection((current) => ({
+      ...current,
+      carouselTemplate: template,
+    }));
+    setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
+    setCreateFormatOutput('');
+  }
+
+  function selectCarouselLayoutRecipe(layoutRecipe: CarouselLayoutRecipe) {
+    setCreateSelection((current) => ({
+      ...current,
+      carouselLayoutRecipe: layoutRecipe,
+    }));
+    setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
   }
 
   function applyTopicSource(source: TopicSource) {
     setSmartPrepopulateNotice(null);
+    setGeneratedCarouselDraft(null);
     setTopicSource(source);
     if (source === 'signal') {
       setTopic(context.strongestTheme);
@@ -2123,8 +2817,39 @@ export default function ContentStudio({
   }
 
   function openVaultSection(section: VaultSection) {
+    setActiveWorkspace('content');
     setActiveVaultSection(section);
     setActiveSection('vault');
+  }
+
+  function openVaultItem(item: ContentBacklogItem) {
+    resetSmartSuggestSession();
+    setBacklogSearch('');
+    setBacklogPillarFilter('all');
+    setBacklogStatusFilter('all');
+    setBacklogPlatformFilter('all');
+
+    const carouselDraft = getCarouselDraftFromBacklogItem(item);
+    if (carouselDraft) {
+      setSelectedCarouselDraftId(item.id);
+      setCarouselStudioError(null);
+      setActiveWorkspace('carousel');
+      return;
+    }
+
+    const section = getVaultSectionForItem(item);
+    setActiveVaultSection(section);
+    setActiveWorkspace('content');
+    setActiveSection('vault');
+
+    if (section !== 'messy') {
+      setBacklogModal({ mode: 'edit', item });
+    }
+  }
+
+  function openVaultItemById(itemId: string) {
+    const item = backlogRecords.find((record) => record.id === itemId);
+    if (item) openVaultItem(item);
   }
 
   function canAddToVaultSection(section: VaultSection) {
@@ -2141,6 +2866,7 @@ export default function ContentStudio({
     event.preventDefault();
     const query = contentSearch.trim();
     if (!query) return;
+    setActiveWorkspace('content');
     setBacklogSearch(query);
     setBacklogPillarFilter('all');
     setBacklogStatusFilter('all');
@@ -2149,6 +2875,7 @@ export default function ContentStudio({
   }
 
   function openContentSearchResult(result: ContentSearchResult) {
+    setActiveWorkspace('content');
     if (result.section === 'vault') {
       setBacklogSearch(contentSearch.trim());
       setBacklogPillarFilter('all');
@@ -2180,6 +2907,7 @@ export default function ContentStudio({
       content: text,
     });
     setBacklogRecords((current) => [data.item, ...current]);
+    setActiveWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -2205,7 +2933,86 @@ export default function ContentStudio({
       content: cleanContent,
     });
     setBacklogRecords((current) => [data.item, ...current]);
+    setActiveWorkspace('content');
     setActiveSection('vault');
+  }
+
+  async function saveCarouselDraftToBacklog(draft: CarouselDraftPayload) {
+    if (!canAddToVaultSection('ideas')) return;
+    const body = formatCarouselDraftForOutput(draft);
+    const data = await requestJson<{ item: ContentBacklogItem }>('/api/content/backlog', 'POST', {
+      key: adminKey,
+      title: draft.title,
+      pillar: draft.pillar,
+      platform: draft.outputPlatform,
+      source: 'create',
+      status: 'draft',
+      content: body,
+      notes: JSON.stringify(
+        {
+          kind: 'carousel_draft',
+          version: 1,
+          draft,
+        },
+        null,
+        2,
+      ),
+    });
+    setBacklogRecords((current) => [data.item, ...current]);
+    setSelectedCarouselDraftId(data.item.id);
+    setActiveWorkspace('carousel');
+  }
+
+  async function updateCarouselDraftSettings(
+    record: CarouselDraftRecord,
+    settings: Partial<Pick<CarouselDraftPayload, 'aspectRatio' | 'template' | 'layoutRecipe'>>,
+  ) {
+    const layoutRecipe = settings.layoutRecipe || record.draft.layoutRecipe;
+    const nextDraft = { ...record.draft, ...settings, layoutRecipe };
+    const shouldReassignRoles = Boolean(settings.layoutRecipe && settings.layoutRecipe !== record.draft.layoutRecipe);
+    await saveCarouselDraftRecord(record, {
+      ...nextDraft,
+      slides: shouldReassignRoles
+        ? nextDraft.slides.map((slide, index) => ({
+          ...slide,
+          role: getDefaultCarouselSlideRole(layoutRecipe, index, nextDraft.slides.length),
+          composition: 'auto',
+        }))
+        : nextDraft.slides,
+    });
+  }
+
+  async function saveCarouselDraftRecord(record: CarouselDraftRecord, nextDraft: CarouselDraftPayload) {
+    setCarouselStudioSavingId(record.item.id);
+    setCarouselStudioError(null);
+    try {
+      const data = await requestJson<{ item: ContentBacklogItem }>(`/api/content/backlog/${record.item.id}`, 'PATCH', {
+        key: adminKey,
+        content: formatCarouselDraftForOutput(nextDraft),
+        notes: JSON.stringify(
+          {
+            kind: 'carousel_draft',
+            version: 1,
+            draft: nextDraft,
+          },
+          null,
+          2,
+        ),
+      });
+      setBacklogRecords((current) => [data.item, ...current.filter((item) => item.id !== data.item.id)]);
+      setSelectedCarouselDraftId(data.item.id);
+      setCreateSelection((current) => ({
+        ...current,
+        carouselAspectRatio: nextDraft.aspectRatio,
+        carouselTemplate: nextDraft.template,
+        carouselLayoutRecipe: nextDraft.layoutRecipe,
+      }));
+      setGeneratedCarouselDraft((current) => current && current.title === record.draft.title ? nextDraft : current);
+    } catch (error) {
+      setCarouselStudioError(error instanceof Error ? error.message : 'Could not save the carousel draft.');
+    } finally {
+      setCarouselStudioSavingId(null);
+    }
   }
 
   async function saveSmartSuggestionToVault(suggestion: SmartSuggestion) {
@@ -2278,6 +3085,7 @@ export default function ContentStudio({
     setBacklogRecords((current) => [data.item, ...current]);
     setMessyModalOpen(false);
     setActiveVaultSection('messy');
+    setActiveWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -2312,6 +3120,7 @@ export default function ContentStudio({
     setInsightsSuccess('Article added to Vault. Smart Suggest will now include it in recommendations.');
     setInsightsModalOpen(false);
     setActiveVaultSection('insights');
+    setActiveWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -2338,6 +3147,7 @@ export default function ContentStudio({
 
   function startFromBrief(text: string) {
     if (activeSection !== 'studio') resetSmartSuggestSession();
+    setActiveWorkspace('content');
     setTopic(text);
     setTopicSource('brief');
     setStudioMode('create');
@@ -2386,12 +3196,16 @@ export default function ContentStudio({
       subType: normalized.subType,
       angle: normalized.angle,
       angleRegister: normalized.angleRegister,
-      carouselSlideCount: normalized.contentType === 'carousel' ? createSelection.carouselSlideCount : 'auto',
+      carouselSlideCount: normalized.contentType === 'carousel' ? createSelection.carouselSlideCount : DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: normalized.contentType === 'carousel' ? createSelection.carouselAspectRatio : DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: normalized.contentType === 'carousel' ? createSelection.carouselTemplate : DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: normalized.contentType === 'carousel' ? createSelection.carouselLayoutRecipe : DEFAULT_CAROUSEL_LAYOUT_RECIPE,
     };
 
     setStudioMode('create');
     setCreatePillarFocus(normalized.pillar);
     setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
     setCreateFormatOutput('');
     setCreateError(null);
     setSmartPrepopulateNotice(null);
@@ -2403,6 +3217,9 @@ export default function ContentStudio({
       angle: null,
       angleRegister: null,
       carouselSlideCount: nextSelection.carouselSlideCount,
+      carouselAspectRatio: nextSelection.carouselAspectRatio,
+      carouselTemplate: nextSelection.carouselTemplate,
+      carouselLayoutRecipe: nextSelection.carouselLayoutRecipe,
     });
 
     await wait(150);
@@ -2453,7 +3270,14 @@ export default function ContentStudio({
         buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse),
         selectionToUse,
       );
-      setGeneratedPost(result);
+      if (selectionToUse.contentType === 'carousel') {
+        const carouselDraft = buildCarouselDraftFromAiOutput(result, selectionToUse, topicToUse, pillarToUse);
+        setGeneratedCarouselDraft(carouselDraft);
+        setGeneratedPost(formatCarouselDraftForOutput(carouselDraft));
+      } else {
+        setGeneratedCarouselDraft(null);
+        setGeneratedPost(result);
+      }
       setCreateFormatOutput('');
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not generate the content.');
@@ -2469,6 +3293,7 @@ export default function ContentStudio({
     setCreateError(null);
     try {
       const result = await callAi('polish', cleanPost);
+      setGeneratedCarouselDraft(null);
       setGeneratedPost(result);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not polish the content.');
@@ -2504,6 +3329,31 @@ export default function ContentStudio({
       setCreateError(error instanceof Error ? error.message : 'Could not recommend a format.');
     } finally {
       setCreateBusy(false);
+    }
+  }
+
+  async function generateStudioTool(kind: StudioGeneratedToolKind, payload: StudioToolPayload) {
+    if (!payload.source.trim()) {
+      setStudioToolError('Add a topic, draft, or idea first.');
+      return;
+    }
+    setStudioToolBusy(kind);
+    setStudioToolError(null);
+    try {
+      const result = await callAi(
+        kind === 'hook' ? 'hook_generator' : 'cta_generator',
+        buildStudioToolUserPrompt(kind, payload),
+      );
+      setStudioToolResult({
+        kind,
+        output: result,
+        payload,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      setStudioToolError(error instanceof Error ? error.message : 'Could not generate this tool output.');
+    } finally {
+      setStudioToolBusy(null);
     }
   }
 
@@ -2749,11 +3599,13 @@ export default function ContentStudio({
   async function deleteBacklogItem(item: ContentBacklogItem) {
     const previous = backlogRecords;
     setConfirmingBacklogDeleteId(null);
+    if (selectedCarouselDraftId === item.id) setSelectedCarouselDraftId(null);
     setBacklogRecords((current) => current.filter((record) => record.id !== item.id));
     try {
       await requestJson<{ ok: true }>(`/api/content/backlog/${item.id}`, 'DELETE', { key: adminKey });
     } catch (error) {
       setBacklogRecords(previous);
+      if (selectedCarouselDraftId === item.id) setSelectedCarouselDraftId(item.id);
       setCreateError(error instanceof Error ? error.message : 'Could not delete the idea.');
     }
   }
@@ -2813,7 +3665,7 @@ export default function ContentStudio({
           description: 'Put one useful post on the editorial calendar so the content machine keeps moving.',
           actionLabel: 'Open calendar',
           tone: 'overdue',
-          onSelect: () => setActiveSection('editorial'),
+          onSelect: () => navigateContent('editorial'),
         }
       : null,
     expiringVaultRecords.length > 0
@@ -2844,6 +3696,7 @@ export default function ContentStudio({
       <div className="space-y-3">
         <ContentTopBar
           adminKey={adminKey}
+          profilePhotoUrl={profilePhotoUrl}
           searchValue={contentSearch}
           searchResults={contentSearchMatches}
           updatedTimeLabel={contentUpdatedTimeLabel}
@@ -2857,34 +3710,42 @@ export default function ContentStudio({
           onNewDraft={() => navigateContent('studio', { topic: context.strongestTheme })}
         />
 
-        <nav className="grid w-full grid-cols-2 gap-2 rounded-[8px] bg-white p-2 md:grid-cols-6" aria-label="Content workspace tabs">
-          {contentSections.map((tab) => {
-            const TabIcon = tab.icon;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => navigateContent(tab.value)}
-                className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] px-3 py-3 text-center text-[12px] font-semibold uppercase tracking-[0.06em] transition ${
-                  activeSection === tab.value
-                    ? 'bg-[#142334] text-white'
-                    : 'text-[#142334]/62 hover:bg-[#F5F3EE] hover:text-[#142334]'
-                }`}
-              >
-                <TabIcon className="h-4 w-4 shrink-0" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {createError && <Notice tone="error">{createError}</Notice>}
-
-        {activeSection === 'home' && (
-          <HomeTab context={context} calendarItems={calendarRecords} backlogItems={backlogRecords} onNavigate={navigateContent} />
+        {activeWorkspace === 'content' && (
+          <nav className="grid w-full grid-cols-2 gap-2 rounded-[8px] bg-white p-2 md:grid-cols-6" aria-label="Content Studio tabs">
+            {contentSections.map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => navigateContent(tab.value)}
+                  className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[8px] px-3 py-3 text-center text-[12px] font-semibold uppercase tracking-[0.06em] transition ${
+                    activeSection === tab.value
+                      ? 'bg-[#142334] text-white'
+                      : 'text-[#142334]/62 hover:bg-[#F5F3EE] hover:text-[#142334]'
+                  }`}
+                >
+                  <TabIcon className="h-4 w-4 shrink-0" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
         )}
 
-        {activeSection === 'briefs' && (
+        {activeWorkspace === 'content' && createError && <Notice tone="error">{createError}</Notice>}
+
+        {activeWorkspace === 'content' && activeSection === 'home' && (
+          <HomeTab
+            context={context}
+            calendarItems={calendarRecords}
+            backlogItems={backlogRecords}
+            onNavigate={navigateContent}
+            onOpenVaultItem={openVaultItemById}
+          />
+        )}
+
+        {activeWorkspace === 'content' && activeSection === 'briefs' && (
           <SignalBriefsTab>
             {briefError && <Notice tone="error">{briefError}</Notice>}
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
@@ -2954,7 +3815,7 @@ export default function ContentStudio({
           </SignalBriefsTab>
         )}
 
-        {activeSection === 'studio' && (
+        {activeWorkspace === 'content' && activeSection === 'studio' && (
           <StudioTab>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
@@ -3036,29 +3897,42 @@ export default function ContentStudio({
                 onSubTypeSelect={selectCreateSubType}
                 onAngleSelect={selectCreateAngle}
                 onCarouselSlideCountSelect={selectCarouselSlideCount}
+                onCarouselAspectRatioSelect={selectCarouselAspectRatio}
+                onCarouselTemplateSelect={selectCarouselTemplate}
+                onCarouselLayoutRecipeSelect={selectCarouselLayoutRecipe}
                 onTopicChange={(value) => {
                   setSmartPrepopulateNotice(null);
                   setTopic(value);
                   setTopicSource('manual');
+                  setGeneratedCarouselDraft(null);
                 }}
                 onTopicSourceSelect={applyTopicSource}
                 onBriefSelect={(text) => {
                   setTopic(text);
                   setTopicSource('brief');
+                  setGeneratedCarouselDraft(null);
                 }}
                 onGenerate={() => generatePost()}
-                onGeneratedPostChange={setGeneratedPost}
+                onGeneratedPostChange={(value) => {
+                  setGeneratedPost(value);
+                  setGeneratedCarouselDraft(null);
+                }}
                 onPolish={polishGeneratedPost}
                 onFormatCheck={checkGeneratedFormat}
-                onSave={() =>
-                  saveOutputToBacklog(
+                carouselDraft={generatedCarouselDraft}
+                onSave={() => {
+                  if (generatedCarouselDraft) {
+                    void saveCarouselDraftToBacklog(generatedCarouselDraft);
+                    return;
+                  }
+                  void saveOutputToBacklog(
                     generatedPost,
                     topic,
                     selectedOutputPlatform,
                     topic,
                     createPillarFocus === 'auto' ? null : createPillarFocus,
-                  )
-                }
+                  );
+                }}
                 onCalendar={() =>
                   setCalendarModal({
                     mode: 'create',
@@ -3069,6 +3943,7 @@ export default function ContentStudio({
                     },
                   })
                 }
+                profilePhotoUrl={profilePhotoUrl}
               />
             )}
 
@@ -3129,6 +4004,7 @@ export default function ContentStudio({
                 directionRegister={alchemyDirectionRegister}
                 direction={alchemyDirection}
                 rebuildMode={alchemyRebuildMode}
+                profilePhotoUrl={profilePhotoUrl}
                 onDirectionPillarChange={setAlchemyDirectionPillar}
                 onDirectionRegisterChange={setAlchemyDirectionRegister}
                 onDirectionChange={setAlchemyDirection}
@@ -3139,7 +4015,54 @@ export default function ContentStudio({
           </StudioTab>
         )}
 
-        {activeSection === 'editorial' && (
+        {activeWorkspace === 'carousel' && (
+          <CarouselStudioPanel
+            key={`carousel-${selectedCarouselDraftId || carouselDraftRecords[0]?.item.id || 'empty'}`}
+            drafts={carouselDraftRecords}
+            defaultAspectRatio={createSelection.carouselAspectRatio}
+            defaultTemplate={createSelection.carouselTemplate}
+            defaultLayoutRecipe={createSelection.carouselLayoutRecipe}
+            savingDraftId={carouselStudioSavingId}
+            error={carouselStudioError}
+            onDefaultAspectRatioChange={selectCarouselAspectRatio}
+            onDefaultTemplateChange={selectCarouselTemplate}
+            onDefaultLayoutRecipeChange={selectCarouselLayoutRecipe}
+            onDraftAspectRatioChange={(record, aspectRatio) => {
+              void updateCarouselDraftSettings(record, { aspectRatio });
+            }}
+            onDraftTemplateChange={(record, template) => {
+              void updateCarouselDraftSettings(record, { template });
+            }}
+            onDraftLayoutRecipeChange={(record, layoutRecipe) => {
+              void updateCarouselDraftSettings(record, { layoutRecipe });
+            }}
+            onDraftSave={(record, draft) => {
+              void saveCarouselDraftRecord(record, draft);
+            }}
+            selectedDraftId={selectedCarouselDraftId}
+            onDraftSelect={(record) => {
+              setSelectedCarouselDraftId(record.item.id);
+              setCarouselStudioError(null);
+            }}
+            onStartDraft={() => navigateContent('studio', { topic: context.strongestTheme })}
+          />
+        )}
+
+        {activeWorkspace === 'tools' && (
+          <StudioToolsPanel
+            adminKey={adminKey}
+            defaultSource={cleanDraftContent(generatedPost).trim() || cleanDraftContent(alchemyOutput).trim() || topic.trim() || context.strongestTheme}
+            defaultPlatform={selectedOutputPlatform}
+            defaultPillar={createPillarFocus === 'auto' ? 'auto' : createPillarFocus}
+            busyTool={studioToolBusy}
+            error={studioToolError}
+            result={studioToolResult}
+            onGenerate={(kind, payload) => void generateStudioTool(kind, payload)}
+            onOpenDrafting={() => navigateContent('studio', { topic: context.strongestTheme })}
+          />
+        )}
+
+        {activeWorkspace === 'content' && activeSection === 'editorial' && (
           <EditorialCalendarTab>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -3265,7 +4188,7 @@ export default function ContentStudio({
           </EditorialCalendarTab>
         )}
 
-        {activeSection === 'vault' && (
+        {activeWorkspace === 'content' && activeSection === 'vault' && (
           <VaultTab>
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -3465,6 +4388,7 @@ export default function ContentStudio({
                 ) : (
                   activeVaultRecords.map((item) => {
                     const expiryInfo = vaultExpiryById.get(item.id) || getVaultExpiryInfo(item);
+                    const carouselDraft = getCarouselDraftFromBacklogItem(item);
                     return (
                       <article key={item.id} className="flex min-h-[260px] flex-col justify-between rounded-[10px] border border-[#E4D8CB] bg-white p-4">
                       <div>
@@ -3490,23 +4414,10 @@ export default function ContentStudio({
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E4D8CB] pt-3">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           {activeVaultSection !== 'messy' && (
-                            <button type="button" onClick={() => setBacklogModal({ mode: 'edit', item })} className="studio-card-action-button">
-                              Edit
+                            <button type="button" onClick={() => openVaultItem(item)} className="studio-card-action-button">
+                              {carouselDraft ? 'Open Carousel Studio' : 'Edit Draft'}
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              resetSmartSuggestSession();
-                              setTopic(extractPostBody(item.content || item.title));
-                              setStudioMode('create');
-                              setTopicSource('manual');
-                              setActiveSection('studio');
-                            }}
-                            className="studio-card-action-button"
-                          >
-                            Open in Studio
-                          </button>
                           {activeVaultSection === 'messy' ? (
                             <>
                               <button type="button" onClick={() => moveMessyMiddleToBacklog(item)} className="studio-card-action-button">
@@ -3576,7 +4487,7 @@ export default function ContentStudio({
           </VaultTab>
         )}
 
-        {activeSection === 'research' && (
+        {activeWorkspace === 'content' && activeSection === 'research' && (
           <ResearchVaultTab
             entries={researchRecords}
             adminKey={adminKey}
@@ -3606,6 +4517,7 @@ export default function ContentStudio({
                 : [...current, item].sort((a, b) => a.publishDate.localeCompare(b.publishDate)),
             );
             setCalendarModal(null);
+            setActiveWorkspace('content');
             setActiveSection('editorial');
           }}
           onDelete={
@@ -3634,6 +4546,7 @@ export default function ContentStudio({
             );
             setBacklogModal(null);
             setActiveVaultSection(isSmartSuggestItem(item) ? 'smart' : isInsightsBacklogItem(item) ? 'insights' : isMessyMiddleItem(item) ? 'messy' : 'ideas');
+            setActiveWorkspace('content');
             setActiveSection('vault');
           }}
         />
@@ -3684,6 +4597,7 @@ function ContentTopBar({
   attentionLabel,
   notificationCount,
   extraNotificationSections,
+  profilePhotoUrl,
   onSearchChange,
   onSearchSubmit,
   onSearchResultSelect,
@@ -3697,6 +4611,7 @@ function ContentTopBar({
   attentionLabel: string;
   notificationCount: number;
   extraNotificationSections: NotificationPanelSection[];
+  profilePhotoUrl?: string | null;
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSearchResultSelect: (result: ContentSearchResult) => void;
@@ -3764,13 +4679,7 @@ function ContentTopBar({
           />
 
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">
-            <Image
-              src="/images/author/ck-profile.png"
-              alt="Kagiso"
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-full object-cover"
-            />
+            <DashboardProfileAvatar src={profilePhotoUrl} />
             <span className="hidden text-[12px] font-semibold text-[#142334] sm:inline">Coach Kagiso</span>
           </div>
 
@@ -4000,6 +4909,7 @@ function TransformFlow({
   onQualityCheck,
   onSave,
   onCalendar,
+  profilePhotoUrl,
   onDirectionPillarChange,
   onDirectionRegisterChange,
   onDirectionChange,
@@ -4045,6 +4955,7 @@ function TransformFlow({
   onQualityCheck: () => void;
   onSave: () => void;
   onCalendar: () => void;
+  profilePhotoUrl?: string | null;
   onDirectionPillarChange: (value: ContentPillar | 'auto') => void;
   onDirectionRegisterChange: (value: string) => void;
   onDirectionChange: (value: string) => void;
@@ -4323,6 +5234,7 @@ function TransformFlow({
               wordCount={getWordCount(outputBody)}
               platformLabel={selectedPlatformLabel || 'LinkedIn'}
               contentTypeLabel="Transform rebuild"
+              profilePhotoUrl={profilePhotoUrl}
               onChange={onOutputChange}
               onRegenerate={onRebuild}
               onPolish={onPolish}
@@ -4416,6 +5328,7 @@ function CreateFlow({
   topicSource,
   topicPlaceholder,
   generatedPost,
+  carouselDraft,
   formatOutput,
   signalBriefOptions,
   canGenerate,
@@ -4428,6 +5341,9 @@ function CreateFlow({
   onSubTypeSelect,
   onAngleSelect,
   onCarouselSlideCountSelect,
+  onCarouselAspectRatioSelect,
+  onCarouselTemplateSelect,
+  onCarouselLayoutRecipeSelect,
   onTopicChange,
   onTopicSourceSelect,
   onBriefSelect,
@@ -4437,6 +5353,7 @@ function CreateFlow({
   onFormatCheck,
   onSave,
   onCalendar,
+  profilePhotoUrl,
 }: {
   selection: CreateSelection;
   selectedType: ContentTypeOption | null;
@@ -4449,6 +5366,7 @@ function CreateFlow({
   topicSource: TopicSource;
   topicPlaceholder: string;
   generatedPost: string;
+  carouselDraft: CarouselDraftPayload | null;
   formatOutput: string;
   signalBriefOptions: Array<{ id: string; title: string; text: string }>;
   canGenerate: boolean;
@@ -4461,6 +5379,9 @@ function CreateFlow({
   onSubTypeSelect: (subType: string) => void;
   onAngleSelect: (angle: AngleOption) => void;
   onCarouselSlideCountSelect: (slideCount: CarouselSlideCount) => void;
+  onCarouselAspectRatioSelect: (aspectRatio: CarouselAspectRatio) => void;
+  onCarouselTemplateSelect: (template: CarouselTemplate) => void;
+  onCarouselLayoutRecipeSelect: (layoutRecipe: CarouselLayoutRecipe) => void;
   onTopicChange: (value: string) => void;
   onTopicSourceSelect: (source: TopicSource) => void;
   onBriefSelect: (text: string) => void;
@@ -4470,6 +5391,7 @@ function CreateFlow({
   onFormatCheck: () => void;
   onSave: () => void;
   onCalendar: () => void;
+  profilePhotoUrl?: string | null;
 }) {
   const contentTypeGroups = selection.platform ? contentTypesByPlatform[selection.platform] : [];
   const contentTypes = contentTypeGroups.flatMap((group) => group.types);
@@ -4477,11 +5399,19 @@ function CreateFlow({
   const selectedSubType = selectedType?.subTypes.find((item) => item.id === selection.subType) || null;
   const angleReady = Boolean(selectedType && (selectedType.subTypes.length === 0 || selection.subType));
   const needsCarouselSlideCount = selection.contentType === 'carousel' && Boolean(selection.angle);
-  const outputTitle = selection.contentType === 'voice_note' ? 'Voice note script' : 'Content preview';
+  const outputTitle = selection.contentType === 'voice_note'
+    ? 'Voice note script'
+    : selection.contentType === 'carousel'
+      ? 'Carousel draft'
+      : 'Content preview';
   const generatedPostBody = cleanDraftContent(generatedPost);
   const outputNote = generatedPost ? (
     selection.contentType === 'voice_note' ? (
       <>~{getEstimatedReadSeconds(generatedPostBody)} seconds read time</>
+    ) : carouselDraft ? (
+      <>
+        Structured carousel draft - {carouselDraft.slides.length} slides - {getCarouselTemplateOption(carouselDraft.template).label} - {getCarouselLayoutRecipeOption(carouselDraft.layoutRecipe).label}
+      </>
     ) : (
       <>
         {selectedPlatformLabel}
@@ -4529,6 +5459,31 @@ function CreateFlow({
         {getCarouselSlideCountOption(selection.carouselSlideCount).description}
       </p>
     </section>
+  ) : null;
+  const carouselAspectRatioSection = needsCarouselSlideCount ? (
+    <CarouselAspectRatioSelector
+      value={selection.carouselAspectRatio}
+      platform={selection.platform}
+      onChange={onCarouselAspectRatioSelect}
+      eyebrow="05 Output frame"
+      title="Choose the slide shape"
+    />
+  ) : null;
+  const carouselTemplateSection = needsCarouselSlideCount ? (
+    <CarouselTemplateSelector
+      value={selection.carouselTemplate}
+      onChange={onCarouselTemplateSelect}
+      eyebrow="06 Visual style"
+      title="Choose the styling system"
+    />
+  ) : null;
+  const carouselLayoutRecipeSection = needsCarouselSlideCount ? (
+    <CarouselLayoutRecipeSelector
+      value={selection.carouselLayoutRecipe}
+      onChange={onCarouselLayoutRecipeSelect}
+      eyebrow="07 Story structure"
+      title="Choose the slide arc"
+    />
   ) : null;
 
   return (
@@ -4673,6 +5628,9 @@ function CreateFlow({
                     )}
 
                     {rowHasSelected && carouselSlideCountSection}
+                    {rowHasSelected && carouselAspectRatioSection}
+                    {rowHasSelected && carouselTemplateSection}
+                    {rowHasSelected && carouselLayoutRecipeSection}
                   </div>
                 );
               })}
@@ -4685,7 +5643,7 @@ function CreateFlow({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">
-                  {needsCarouselSlideCount ? '05 Core idea' : '04 Core idea'}
+                  {needsCarouselSlideCount ? '08 Core idea' : '04 Core idea'}
                 </p>
                 <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">Add a topic, or let AI suggest one</h3>
               </div>
@@ -4768,10 +5726,12 @@ function CreateFlow({
             contentTypeLabel={selectedType ? `${selectedType.label}${selectedSubType ? ` / ${selectedSubType.label}` : ''}` : outputTitle}
             registerLabel={selectedAngle ? getRegisterLabel(selectedAngle.register) : undefined}
             pillarLabel={getPillarFocusLabel(pillarFocus)}
+            profilePhotoUrl={profilePhotoUrl}
             onChange={onGeneratedPostChange}
             onRegenerate={onGenerate}
             onPolish={onPolish}
             onSave={onSave}
+            saveLabel={carouselDraft ? 'Save to Carousel Studio' : undefined}
             onCalendar={onCalendar}
             outputNote={outputNote}
             extraAction={
@@ -4911,6 +5871,3071 @@ function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info
       }`}
     >
       {children}
+    </div>
+  );
+}
+
+function CarouselAspectRatioSelector({
+  value,
+  platform,
+  onChange,
+  eyebrow = 'Output frame',
+  title = 'Aspect ratio',
+  disabled = false,
+}: {
+  value: CarouselAspectRatio;
+  platform?: CreatePlatform | null;
+  onChange: (value: CarouselAspectRatio) => void;
+  eyebrow?: string;
+  title?: string;
+  disabled?: boolean;
+}) {
+  const selectedOption = carouselAspectRatioOptions.find((option) => option.value === value) || carouselAspectRatioOptions[0];
+  const resolvedOption = getCarouselAspectRatioOption(value, platform);
+
+  return (
+    <section className="rounded-[8px] border border-[#E4D8CB] bg-white p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">{eyebrow}</p>
+          <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{title}</h3>
+        </div>
+        <Badge className="bg-[#F5F3EE] text-[#8C7466]">
+          {value === 'auto' ? `Auto: ${resolvedOption.label}` : selectedOption.label}
+        </Badge>
+      </div>
+
+      <div className="mt-4 grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
+        {carouselAspectRatioOptions.map((option) => {
+          const isSelected = value === option.value;
+          const previewOption = option.value === 'auto' ? resolvedOption : option;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              disabled={disabled}
+              style={isSelected ? { outline: '2px solid #C9AD98' } : undefined}
+              className={`group min-h-[132px] rounded-[8px] border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                isSelected
+                  ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                  : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+              }`}
+            >
+              <span className="flex items-start gap-3">
+                <span
+                  className={`grid w-12 shrink-0 place-items-center rounded-[6px] border ${
+                    isSelected ? 'border-white/18 bg-white/12' : 'border-[#D8C8BA] bg-white'
+                  }`}
+                  style={{ aspectRatio: previewOption.cssRatio }}
+                >
+                  <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-[#C9AD98]' : 'bg-[#142334]'}`} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-bold">{option.label}</span>
+                  <span className={`mt-1 block text-[11px] font-semibold ${isSelected ? 'text-white/68' : 'text-[#8C7466]'}`}>
+                    {option.value === 'auto' ? resolvedOption.size : option.size}
+                  </span>
+                </span>
+              </span>
+              <span className={`mt-3 block text-[12px] leading-relaxed ${isSelected ? 'text-white/68' : 'text-[#142334]/62'}`}>
+                {option.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CarouselTemplateSelector({
+  value,
+  onChange,
+  eyebrow = 'Visual style',
+  title = 'Template',
+  disabled = false,
+}: {
+  value: CarouselTemplate;
+  onChange: (value: CarouselTemplate) => void;
+  eyebrow?: string;
+  title?: string;
+  disabled?: boolean;
+}) {
+  const selectedOption = getCarouselTemplateOption(value);
+
+  return (
+    <section className="rounded-[8px] border border-[#E4D8CB] bg-white p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">{eyebrow}</p>
+          <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{title}</h3>
+        </div>
+        <Badge className="bg-[#F5F3EE] text-[#8C7466]">{selectedOption.label}</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {carouselTemplateOptions.map((option) => {
+          const isSelected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              disabled={disabled}
+              style={isSelected ? { outline: '2px solid #C9AD98' } : undefined}
+              className={`min-h-[176px] rounded-[8px] border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                isSelected
+                  ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                  : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+              }`}
+            >
+              <span className="grid grid-cols-3 gap-1">
+                {[
+                  option.palette.background,
+                  option.palette.foreground,
+                  option.palette.accent,
+                ].map((color) => (
+                  <span
+                    key={color}
+                    className={`h-8 rounded-[6px] border ${isSelected ? 'border-white/20' : 'border-[#E4D8CB]'}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </span>
+              <span className="mt-4 block text-[13px] font-bold">{option.label}</span>
+              <span className={`mt-1 block text-[11px] font-semibold ${isSelected ? 'text-white/68' : 'text-[#8C7466]'}`}>
+                {option.bestFor}
+              </span>
+              <span className={`mt-2 block text-[12px] leading-relaxed ${isSelected ? 'text-white/68' : 'text-[#142334]/62'}`}>
+                {option.description}
+              </span>
+              <span className={`mt-3 block rounded-[6px] border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                isSelected
+                  ? 'border-white/15 bg-white/10 text-white/76'
+                  : 'border-[#E4D8CB] bg-white text-[#8C7466]'
+              }`}>
+                {option.designDirection.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CarouselLayoutRecipeSelector({
+  value,
+  onChange,
+  eyebrow = 'Story structure',
+  title = 'Slide arc',
+  disabled = false,
+}: {
+  value: CarouselLayoutRecipe;
+  onChange: (value: CarouselLayoutRecipe) => void;
+  eyebrow?: string;
+  title?: string;
+  disabled?: boolean;
+}) {
+  const selectedOption = getCarouselLayoutRecipeOption(value);
+
+  return (
+    <section className="rounded-[8px] border border-[#E4D8CB] bg-white p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">{eyebrow}</p>
+          <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{title}</h3>
+        </div>
+        <Badge className="bg-[#F5F3EE] text-[#8C7466]">{selectedOption.label}</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {carouselLayoutRecipeOptions.map((option) => {
+          const isSelected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              disabled={disabled}
+              style={isSelected ? { outline: '2px solid #C9AD98' } : undefined}
+              className={`min-h-[168px] rounded-[8px] border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                isSelected
+                  ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                  : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+              }`}
+            >
+              <span className="block text-[13px] font-bold">{option.label}</span>
+              <span className={`mt-2 block text-[12px] leading-relaxed ${isSelected ? 'text-white/68' : 'text-[#142334]/62'}`}>
+                {option.description}
+              </span>
+              <span className={`mt-3 block rounded-[6px] border px-2 py-2 text-[11px] font-semibold leading-relaxed ${
+                isSelected
+                  ? 'border-white/15 bg-white/10 text-white/76'
+                  : 'border-[#E4D8CB] bg-white text-[#8C7466]'
+              }`}>
+                {option.slideArc.join(' -> ')}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function getCarouselSlideBodyPoints(body: string, limit = 4) {
+  return body
+    .split(/\n+|;\s+|(?<=\.)\s+/)
+    .map((point) => point.trim().replace(/\.$/, ''))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function getCarouselSlideTextStats(slide: CarouselSlide) {
+  const headlineWords = slide.headline.trim().split(/\s+/).filter(Boolean).length;
+  const bodyWords = slide.body.trim().split(/\s+/).filter(Boolean).length;
+  const totalChars = `${slide.headline} ${slide.body} ${slide.cta || ''}`.trim().length;
+
+  return {
+    headlineWords,
+    bodyWords,
+    totalChars,
+    density: totalChars > 260 || bodyWords > 44 ? 'dense' : totalChars > 160 || bodyWords > 26 ? 'medium' : 'light',
+  };
+}
+
+function resolveCarouselComposition(
+  slide: CarouselSlide,
+  role: CarouselSlideRole,
+  template: ReturnType<typeof getCarouselTemplateOption>,
+  bodyPoints: string[],
+): CarouselComposition {
+  const selected = normalizeCarouselComposition(slide.composition, role);
+  if (selected !== 'auto') return selected;
+
+  const stats = getCarouselSlideTextStats(slide);
+
+  if (role === 'cover') {
+    if (stats.headlineWords <= 6 && stats.bodyWords <= 18 && template.value === 'bold_diagnostic') return 'bold_claim';
+    if (stats.headlineWords > 10 || stats.bodyWords > 28) return 'quiet_intro';
+    return 'editorial_cover';
+  }
+
+  if (role === 'cta') {
+    const actionText = `${slide.headline} ${slide.body} ${slide.cta || ''}`.toLowerCase();
+    if (actionText.includes('save') || actionText.includes('share')) return 'save_share_close';
+    if (slide.cta || stats.bodyWords <= 18) return 'direct_action';
+    return 'soft_reflection';
+  }
+
+  if (role === 'proof') {
+    if (stats.bodyWords > 30) return 'example_note';
+    if (stats.headlineWords <= 6 && stats.bodyWords <= 18) return 'credibility_cue';
+    return 'evidence_card';
+  }
+
+  if (role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule') {
+    if (bodyPoints.length >= 3 && stats.density !== 'dense') return 'card_grid';
+    if (stats.density === 'dense') return 'side_rail';
+    return 'numbered_stack';
+  }
+
+  if (stats.bodyWords > 34) return 'note_card';
+  if (slide.body.includes(':') || slide.body.toLowerCase().includes('not ')) return 'contrast_block';
+  return 'quote_panel';
+}
+
+function getCarouselHeadlineSize(composition: CarouselComposition, stats: ReturnType<typeof getCarouselSlideTextStats>) {
+  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 40 : 48;
+  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 36 : 42;
+  if (composition === 'quiet_intro') return 32;
+  if (composition === 'direct_action') return 38;
+  if (composition === 'save_share_close') return 34;
+  if (composition === 'credibility_cue') return 38;
+  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 30;
+  return stats.headlineWords > 9 ? 30 : 34;
+}
+
+type CarouselDeckQualityTone = 'ready' | 'watch' | 'fix';
+
+type CarouselDeckFixAction =
+  | { type: 'set_role'; label: string; slideIndex: number; role: CarouselSlideRole }
+  | { type: 'set_composition'; label: string; slideIndex: number; composition: CarouselComposition }
+  | { type: 'split_slide'; label: string; slideIndex: number }
+  | { type: 'add_role_slide'; label: string; role: CarouselSlideRole; insertIndex: number }
+  | { type: 'strengthen_cta'; label: string; slideIndex: number }
+  | { type: 'rebalance_compositions'; label: string; composition: CarouselComposition };
+
+type CarouselDeckQualityItem = {
+  id: string;
+  tone: CarouselDeckQualityTone;
+  title: string;
+  detail: string;
+  slideIndex?: number;
+  action?: CarouselDeckFixAction;
+};
+
+type CarouselDeckQualityReport = {
+  score: number;
+  tone: CarouselDeckQualityTone;
+  statusLabel: string;
+  summary: string;
+  metrics: {
+    denseSlides: number;
+    uniqueCompositions: number;
+    forcedCompositions: number;
+  };
+  items: CarouselDeckQualityItem[];
+};
+
+type CarouselDraftUndoEntry = {
+  draft: CarouselDraftPayload;
+  label: string;
+  createdAt: string;
+};
+
+type CarouselDraftHistoryState = {
+  recordId: string | null;
+  originalDraft: CarouselDraftPayload | null;
+  undoStack: CarouselDraftUndoEntry[];
+  notice: string | null;
+};
+
+function addCarouselDeckQualityItem(
+  items: CarouselDeckQualityItem[],
+  item: CarouselDeckQualityItem,
+) {
+  if (items.some((existing) => existing.id === item.id)) return;
+  items.push(item);
+}
+
+function getDensitySafeCarouselComposition(role: CarouselSlideRole): CarouselComposition {
+  if (role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule') return 'side_rail';
+  if (role === 'proof') return 'example_note';
+  if (role === 'cta') return 'soft_reflection';
+  if (role === 'cover') return 'quiet_intro';
+  return 'note_card';
+}
+
+function getDefaultCarouselSlideCopy(role: CarouselSlideRole, title: string) {
+  const topic = title || 'this idea';
+  const copy: Record<CarouselSlideRole, { headline: string; body: string; cta?: string }> = {
+    cover: {
+      headline: topic,
+      body: 'A focused carousel for turning the idea into a clear, useful sequence.',
+    },
+    reframe: {
+      headline: 'The better way to see this',
+      body: 'Most people solve the visible problem. The real shift starts when you name the pattern underneath it.',
+    },
+    framework: {
+      headline: 'A simple framework',
+      body: 'Name the pattern. Choose the next move. Make it visible. Repeat with proof.',
+    },
+    step: {
+      headline: 'The next practical step',
+      body: 'Choose one small action that makes the idea easier to apply today.',
+    },
+    proof: {
+      headline: 'Why this matters',
+      body: 'This is where the idea moves from opinion to evidence, example, or lived pattern.',
+    },
+    cta: {
+      headline: 'Your next move',
+      body: 'Save this for the moment you need a clearer path forward.',
+      cta: 'Save this and message me when you are ready to take the next step.',
+    },
+    mirror: {
+      headline: 'If this feels familiar',
+      body: 'You are not the only one navigating this. Naming it clearly is often the first relief.',
+    },
+    checklist: {
+      headline: 'Quick checklist',
+      body: 'Check the signal. Clarify the goal. Choose one action. Review what changed.',
+    },
+    reflection: {
+      headline: 'A question to sit with',
+      body: 'What would change if you stopped treating this as a personal flaw and started treating it as a pattern?',
+    },
+    diagnosis: {
+      headline: 'The hidden problem',
+      body: 'The obvious issue is not always the real blocker. Look for the repeated pattern.',
+    },
+    myth: {
+      headline: 'The myth to drop',
+      body: 'The familiar advice sounds useful, but it can keep you solving the wrong problem.',
+    },
+    cost: {
+      headline: 'The cost of ignoring it',
+      body: 'When this stays unnamed, the same decision keeps showing up in different forms.',
+    },
+    rule: {
+      headline: 'A better rule',
+      body: 'If the action does not create clarity, feedback, or movement, it is probably not the next step.',
+    },
+  };
+
+  return copy[role];
+}
+
+function createCarouselRoleSlide(
+  role: CarouselSlideRole,
+  index: number,
+  title: string,
+): CarouselSlide {
+  const copy = getDefaultCarouselSlideCopy(role, title);
+  return {
+    id: `slide-${Date.now()}-${role}-${index}`,
+    role,
+    composition: 'auto',
+    headline: copy.headline,
+    body: copy.body,
+    ...(copy.cta ? { cta: copy.cta } : {}),
+    visualSuggestion: '',
+  };
+}
+
+function splitCarouselSlideLocally(draft: CarouselDraftPayload, slideIndex: number): CarouselDraftPayload {
+  if (draft.slides.length >= carouselMaxSlides) return draft;
+  const slide = draft.slides[slideIndex];
+  if (!slide) return draft;
+
+  const bodyPoints = getCarouselSlideBodyPoints(slide.body, 8);
+  const bodyWords = slide.body.trim().split(/\s+/).filter(Boolean);
+  const splitAt = Math.max(1, Math.ceil((bodyPoints.length || bodyWords.length) / 2));
+  const firstBody = bodyPoints.length >= 2
+    ? bodyPoints.slice(0, splitAt).join('. ')
+    : bodyWords.slice(0, Math.ceil(bodyWords.length / 2)).join(' ');
+  const secondBody = bodyPoints.length >= 2
+    ? bodyPoints.slice(splitAt).join('. ')
+    : bodyWords.slice(Math.ceil(bodyWords.length / 2)).join(' ');
+
+  if (!secondBody.trim()) return draft;
+
+  const nextSlide: CarouselSlide = {
+    ...slide,
+    id: `slide-${Date.now()}-split-${slideIndex}`,
+    role: slide.role === 'cover' || slide.role === 'cta' ? 'step' : slide.role,
+    composition: 'auto',
+    headline: slide.role === 'cover' ? 'The missing context' : `${slide.headline} continued`,
+    body: secondBody,
+    cta: undefined,
+  };
+
+  return {
+    ...draft,
+    slides: draft.slides.flatMap((currentSlide, index) =>
+      index === slideIndex
+        ? [{ ...currentSlide, body: firstBody, composition: 'auto' }, nextSlide]
+        : [currentSlide],
+    ),
+  };
+}
+
+function rebalanceCarouselCompositions(
+  draft: CarouselDraftPayload,
+  repeatedComposition: CarouselComposition,
+): CarouselDraftPayload {
+  let changed = 0;
+  return {
+    ...draft,
+    slides: draft.slides.map((slide, index) => {
+      const role = slide.role || getDefaultCarouselSlideRole(draft.layoutRecipe, index, draft.slides.length);
+      const resolved = resolveCarouselComposition(
+        slide,
+        role,
+        getCarouselTemplateOption(draft.template),
+        getCarouselSlideBodyPoints(slide.body),
+      );
+      if (resolved !== repeatedComposition || changed >= 2) return slide;
+      const alternative = getCarouselCompositionOptionsForRole(role)
+        .map((option) => option.value)
+        .find((composition) => composition !== 'auto' && composition !== repeatedComposition);
+      if (!alternative) return slide;
+      changed += 1;
+      return { ...slide, composition: alternative };
+    }),
+  };
+}
+
+function applyCarouselDeckFixAction(
+  draft: CarouselDraftPayload,
+  action: CarouselDeckFixAction,
+): CarouselDraftPayload {
+  if (action.type === 'split_slide') return splitCarouselSlideLocally(draft, action.slideIndex);
+
+  if (action.type === 'add_role_slide') {
+    if (draft.slides.length >= carouselMaxSlides) return draft;
+    const insertIndex = Math.max(0, Math.min(action.insertIndex, draft.slides.length));
+    const nextSlide = createCarouselRoleSlide(action.role, insertIndex, draft.title);
+    return {
+      ...draft,
+      slides: [
+        ...draft.slides.slice(0, insertIndex),
+        nextSlide,
+        ...draft.slides.slice(insertIndex),
+      ],
+    };
+  }
+
+  if (action.type === 'rebalance_compositions') {
+    return rebalanceCarouselCompositions(draft, action.composition);
+  }
+
+  return {
+    ...draft,
+    slides: draft.slides.map((slide, index) => {
+      if (index !== action.slideIndex) return slide;
+
+      if (action.type === 'set_role') {
+        return {
+          ...slide,
+          role: action.role,
+          composition: 'auto',
+        };
+      }
+
+      if (action.type === 'set_composition') {
+        return {
+          ...slide,
+          composition: normalizeCarouselComposition(action.composition, slide.role),
+        };
+      }
+
+      if (action.type === 'strengthen_cta') {
+        return {
+          ...slide,
+          role: 'cta',
+          composition: slide.composition === 'auto' ? 'direct_action' : slide.composition,
+          cta: slide.cta?.trim() || 'Save this and message me when you are ready to take the next step.',
+          body: slide.body.trim() || 'Choose one next move from this deck and act on it before the week closes.',
+        };
+      }
+
+      return slide;
+    }),
+  };
+}
+
+function buildCarouselDeckQualityReport(
+  draft: CarouselDraftPayload,
+  template: ReturnType<typeof getCarouselTemplateOption>,
+): CarouselDeckQualityReport {
+  const items: CarouselDeckQualityItem[] = [];
+  const slideReports = draft.slides.map((slide, index) => {
+    const role = slide.role || getDefaultCarouselSlideRole(draft.layoutRecipe, index, draft.slides.length);
+    const bodyPoints = getCarouselSlideBodyPoints(slide.body, 8);
+    const stats = getCarouselSlideTextStats(slide);
+    const composition = resolveCarouselComposition(slide, role, template, bodyPoints);
+
+    return {
+      slide,
+      index,
+      role,
+      bodyPoints,
+      stats,
+      composition,
+    };
+  });
+
+  const firstSlide = slideReports[0];
+  const lastSlide = slideReports[slideReports.length - 1];
+
+  if (firstSlide && firstSlide.role !== 'cover') {
+    addCarouselDeckQualityItem(items, {
+      id: 'cover-role',
+      tone: 'fix',
+      title: 'First slide is not a cover',
+      detail: 'Set slide 1 to Cover so the export opens like a deck, not a middle slide.',
+      slideIndex: 0,
+      action: { type: 'set_role', label: 'Set as cover', slideIndex: 0, role: 'cover' },
+    });
+  }
+
+  if (firstSlide && (firstSlide.stats.headlineWords > 12 || firstSlide.stats.totalChars > 240)) {
+    addCarouselDeckQualityItem(items, {
+      id: 'cover-density',
+      tone: firstSlide.stats.headlineWords > 15 ? 'fix' : 'watch',
+      title: 'Cover is carrying too much text',
+      detail: 'Trim the cover or move context to slide 2 so the opening frame feels sharper.',
+      slideIndex: 0,
+      action: { type: 'set_composition', label: 'Use quiet intro', slideIndex: 0, composition: 'quiet_intro' },
+    });
+  }
+
+  slideReports.forEach(({ index, role, stats, composition, bodyPoints }) => {
+    if (stats.bodyWords > 58 || stats.totalChars > 360) {
+      addCarouselDeckQualityItem(items, {
+        id: `slide-${index}-overloaded`,
+        tone: 'fix',
+        title: `Slide ${index + 1} is overloaded`,
+        detail: 'Split this into two slides or cut the body copy before exporting.',
+        slideIndex: index,
+        ...(draft.slides.length < carouselMaxSlides
+          ? { action: { type: 'split_slide', label: 'Split slide', slideIndex: index } satisfies CarouselDeckFixAction }
+          : {}),
+      });
+      return;
+    }
+
+    if (stats.density === 'dense') {
+      const safeComposition = getDensitySafeCarouselComposition(role);
+      addCarouselDeckQualityItem(items, {
+        id: `slide-${index}-dense`,
+        tone: 'watch',
+        title: `Slide ${index + 1} is text-heavy`,
+        detail: `Auto fit is using ${getCarouselCompositionOption(composition).label}; still check the exported frame for breathing room.`,
+        slideIndex: index,
+        action: { type: 'set_composition', label: `Use ${getCarouselCompositionOption(safeComposition).label}`, slideIndex: index, composition: safeComposition },
+      });
+    }
+
+    if (stats.headlineWords > 13) {
+      addCarouselDeckQualityItem(items, {
+        id: `slide-${index}-headline`,
+        tone: 'watch',
+        title: `Slide ${index + 1} headline is long`,
+        detail: 'A shorter headline will give the layout more visual authority.',
+        slideIndex: index,
+        action: { type: 'set_composition', label: 'Use safer layout', slideIndex: index, composition: getDensitySafeCarouselComposition(role) },
+      });
+    }
+
+    if (bodyPoints.length > 4 && composition !== 'side_rail') {
+      const safeComposition = getDensitySafeCarouselComposition(role);
+      addCarouselDeckQualityItem(items, {
+        id: `slide-${index}-points`,
+        tone: 'watch',
+        title: `Slide ${index + 1} has many points`,
+        detail: 'Consider Side rail or split the list so the slide does not become a mini article.',
+        slideIndex: index,
+        action: { type: 'set_composition', label: `Use ${getCarouselCompositionOption(safeComposition).label}`, slideIndex: index, composition: safeComposition },
+      });
+    }
+  });
+
+  const compositionCounts = new Map<CarouselComposition, number>();
+  slideReports.forEach(({ composition }) => {
+    compositionCounts.set(composition, (compositionCounts.get(composition) || 0) + 1);
+  });
+  const mostRepeated = Array.from(compositionCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+
+  if (mostRepeated && mostRepeated[1] >= Math.max(4, Math.ceil(draft.slides.length * 0.55))) {
+    addCarouselDeckQualityItem(items, {
+      id: 'composition-repetition',
+      tone: 'watch',
+      title: 'Composition rhythm is repetitive',
+      detail: `${getCarouselCompositionOption(mostRepeated[0]).label} appears on ${mostRepeated[1]} slides. Override 1 or 2 slides for better rhythm.`,
+      action: { type: 'rebalance_compositions', label: 'Rebalance layouts', composition: mostRepeated[0] },
+    });
+  }
+
+  const hasTeachingSlide = slideReports.some(({ role }) =>
+    role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule',
+  );
+  const hasTensionSlide = slideReports.some(({ role }) =>
+    role === 'reframe' || role === 'mirror' || role === 'diagnosis' || role === 'myth' || role === 'cost',
+  );
+  const hasProofSlide = slideReports.some(({ role }) => role === 'proof');
+
+  if (!hasTensionSlide) {
+    addCarouselDeckQualityItem(items, {
+      id: 'missing-tension',
+      tone: 'watch',
+      title: 'Deck needs a clearer turn',
+      detail: 'Add a reframe, myth, diagnosis, or mirror slide so the story has a stronger shift.',
+      ...(draft.slides.length < carouselMaxSlides
+        ? { action: { type: 'add_role_slide', label: 'Add reframe slide', role: 'reframe', insertIndex: 1 } satisfies CarouselDeckFixAction }
+        : {}),
+    });
+  }
+
+  if (!hasTeachingSlide) {
+    addCarouselDeckQualityItem(items, {
+      id: 'missing-teaching',
+      tone: 'watch',
+      title: 'Deck needs a teaching slide',
+      detail: 'Add a framework, step, checklist, or rule slide so the reader leaves with something usable.',
+      ...(draft.slides.length < carouselMaxSlides
+        ? { action: { type: 'add_role_slide', label: 'Add step slide', role: 'step', insertIndex: Math.max(1, draft.slides.length - 1) } satisfies CarouselDeckFixAction }
+        : {}),
+    });
+  }
+
+  if (draft.slides.length >= 6 && !hasProofSlide) {
+    addCarouselDeckQualityItem(items, {
+      id: 'missing-proof',
+      tone: 'watch',
+      title: 'Proof cue is missing',
+      detail: 'A proof, example, or credibility slide would make the deck feel less theoretical.',
+      ...(draft.slides.length < carouselMaxSlides
+        ? { action: { type: 'add_role_slide', label: 'Add proof slide', role: 'proof', insertIndex: Math.max(1, draft.slides.length - 1) } satisfies CarouselDeckFixAction }
+        : {}),
+    });
+  }
+
+  if (lastSlide && lastSlide.role !== 'cta') {
+    addCarouselDeckQualityItem(items, {
+      id: 'cta-role',
+      tone: 'fix',
+      title: 'Final slide is not a CTA',
+      detail: 'Set the last slide to CTA so the deck closes with a clear next move.',
+      slideIndex: lastSlide.index,
+      action: { type: 'set_role', label: 'Set as CTA', slideIndex: lastSlide.index, role: 'cta' },
+    });
+  }
+
+  if (lastSlide) {
+    const ctaText = `${lastSlide.slide.headline} ${lastSlide.slide.body} ${lastSlide.slide.cta || ''}`.toLowerCase();
+    const hasActionVerb = /\b(reply|book|save|share|comment|dm|message|download|send|start|choose|apply|audit|reach out)\b/.test(ctaText);
+    if (!hasActionVerb) {
+      addCarouselDeckQualityItem(items, {
+        id: 'cta-strength',
+        tone: 'watch',
+        title: 'CTA could be stronger',
+        detail: 'Give the reader one clear action: save, reply, book, comment, or send a message.',
+        slideIndex: lastSlide.index,
+        action: { type: 'strengthen_cta', label: 'Strengthen CTA', slideIndex: lastSlide.index },
+      });
+    }
+  }
+
+  const denseSlides = slideReports.filter(({ stats }) => stats.density === 'dense').length;
+  const forcedCompositions = draft.slides.filter((slide) => slide.composition !== 'auto').length;
+  const fixCount = items.filter((item) => item.tone === 'fix').length;
+  const watchCount = items.filter((item) => item.tone === 'watch').length;
+  const score = Math.max(0, Math.min(100, 100 - fixCount * 16 - watchCount * 7 - Math.max(0, denseSlides - 1) * 3));
+  const tone: CarouselDeckQualityTone = fixCount > 0 ? 'fix' : watchCount > 0 ? 'watch' : 'ready';
+
+  if (items.length === 0) {
+    items.push({
+      id: 'export-ready',
+      tone: 'ready',
+      title: 'Deck is export-ready',
+      detail: 'Density, rhythm, cover, and CTA all look healthy from the local checks.',
+    });
+  }
+
+  return {
+    score,
+    tone,
+    statusLabel: tone === 'ready' ? 'Export ready' : tone === 'fix' ? 'Needs fixes' : 'Review before export',
+    summary:
+      tone === 'ready'
+        ? 'The deck has a clean rhythm and should survive export well.'
+        : tone === 'fix'
+          ? 'A few structural issues should be fixed before export.'
+          : 'The deck is close, but a few slides deserve a final pass.',
+    metrics: {
+      denseSlides,
+      uniqueCompositions: compositionCounts.size,
+      forcedCompositions,
+    },
+    items,
+  };
+}
+
+function CarouselSlideFrame({
+  slide,
+  index,
+  total,
+  aspectOption,
+  template,
+  layoutRecipe,
+  exportDimensions,
+  frameRef,
+}: {
+  slide: CarouselSlide;
+  index: number;
+  total: number;
+  aspectOption: ReturnType<typeof getCarouselAspectRatioOption>;
+  template: ReturnType<typeof getCarouselTemplateOption>;
+  layoutRecipe?: ReturnType<typeof getCarouselLayoutRecipeOption>;
+  exportDimensions?: { width: number; height: number };
+  frameRef?: Ref<HTMLElement>;
+}) {
+  const isBold = template.value === 'bold_diagnostic';
+  const isWarm = template.value === 'warm_coaching';
+  const palette = template.palette;
+  const role = slide.role || getDefaultCarouselSlideRole((layoutRecipe || template.layoutRecipe).value, index, total);
+  const roleLabel = carouselSlideRoleLabels[role];
+  const bodyPoints = getCarouselSlideBodyPoints(slide.body);
+  const textStats = getCarouselSlideTextStats(slide);
+  const composition = resolveCarouselComposition(slide, role, template, bodyPoints);
+  const compositionOption = getCarouselCompositionOption(composition);
+  const contrastPoints = bodyPoints.length > 1 ? bodyPoints : slide.body.split(/(?:\s+but\s+|\s+instead\s+|\s+not\s+)/i).map((point) => point.trim()).filter(Boolean).slice(0, 2);
+  const isCover = role === 'cover';
+  const isCta = role === 'cta';
+  const headlineSize = getCarouselHeadlineSize(composition, textStats);
+  const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
+  const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
+  const exportFrameStyles = exportDimensions
+    ? {
+        width: `${exportDimensions.width}px`,
+        height: `${exportDimensions.height}px`,
+        minWidth: `${exportDimensions.width}px`,
+        maxWidth: `${exportDimensions.width}px`,
+        minHeight: `${exportDimensions.height}px`,
+        maxHeight: `${exportDimensions.height}px`,
+        padding: exportSize(20),
+      }
+    : {};
+
+  return (
+    <article
+      ref={frameRef}
+      data-carousel-export-slide="true"
+      data-carousel-export-index={index}
+      data-carousel-template={template.value}
+      data-carousel-layout-recipe={(layoutRecipe || template.layoutRecipe).value}
+      data-carousel-slide-role={role}
+      data-carousel-composition={composition}
+      className={`relative flex w-full overflow-hidden rounded-[8px] border ${
+        exportDimensions ? '' : 'min-h-[240px] p-5 shadow-lg shadow-black/15'
+      }`}
+      style={{
+        aspectRatio: aspectOption.cssRatio,
+        background: palette.background,
+        color: palette.foreground,
+        borderColor: palette.border,
+        fontFamily: 'var(--font-sans)',
+        ...exportFrameStyles,
+      }}
+    >
+      {isBold && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 w-1/3"
+          style={{ background: 'linear-gradient(180deg, rgba(201,173,152,0.34), rgba(201,173,152,0))' }}
+        />
+      )}
+      {isWarm && (
+        <div
+          aria-hidden="true"
+          className={`absolute rounded-full ${exportDimensions ? '' : '-right-10 -top-10 h-32 w-32'}`}
+          style={{
+            backgroundColor: 'rgba(185,133,103,0.18)',
+            height: exportDimensions ? exportSize(128) : undefined,
+            right: exportDimensions ? `-${exportSize(40)}` : undefined,
+            top: exportDimensions ? `-${exportSize(40)}` : undefined,
+            width: exportDimensions ? exportSize(128) : undefined,
+          }}
+        />
+      )}
+
+      <div className="relative z-10 flex w-full flex-col justify-between" style={{ gap: exportDimensions ? exportSize(20) : undefined }}>
+        <div className="flex items-start justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
+          <div>
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.18em]"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
+                fontSize: exportDimensions ? exportSize(10) : undefined,
+              }}
+            >
+              Coach Kagiso
+            </p>
+            <div
+              className="mt-3 h-1 w-14 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(4) : undefined,
+                marginTop: exportDimensions ? exportSize(12) : undefined,
+                width: exportDimensions ? exportSize(56) : undefined,
+              }}
+            />
+          </div>
+          <span
+            className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+            style={{
+              backgroundColor: palette.chipBackground,
+              color: palette.chipText,
+              fontSize: exportDimensions ? exportSize(10) : undefined,
+              padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
+            }}
+          >
+            {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+          </span>
+        </div>
+
+        <div
+          className={isCover || isCta ? 'my-auto' : ''}
+          style={{
+            marginBottom: isCover || isCta ? 'auto' : undefined,
+            marginTop: isCover || isCta ? 'auto' : undefined,
+          }}
+        >
+          <span
+            className="mb-4 inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]"
+            style={{
+              backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+              borderColor: palette.border,
+              color: isBold ? 'rgba(255,255,255,0.72)' : palette.muted,
+              fontSize: exportDimensions ? exportSize(10) : undefined,
+              marginBottom: exportDimensions ? exportSize(16) : undefined,
+              padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
+            }}
+          >
+            {roleLabel}
+            {slide.composition === 'auto' ? ` / ${compositionOption.label}` : ''}
+          </span>
+          <h3
+            className="font-serif text-[28px] leading-[1.02] tracking-normal md:text-[34px]"
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: exportDimensions ? exportSize(headlineSize) : `${Math.min(headlineSize, 42)}px`,
+            }}
+          >
+            {slide.headline}
+          </h3>
+          {composition === 'card_grid' && bodyPoints.length > 1 ? (
+            <div
+              className="mt-4 grid max-w-[44ch] grid-cols-2 gap-2"
+              style={{
+                gap: exportDimensions ? exportSize(8) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
+              }}
+            >
+              {bodyPoints.map((point, pointIndex) => (
+                <div
+                  key={`${slide.id}-card-${pointIndex}`}
+                  className="rounded-[8px] border p-3 text-[11px] font-semibold leading-snug md:text-[12px]"
+                  style={{
+                    backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+                    borderColor: palette.border,
+                    color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                    fontSize: exportDimensions ? exportSize(12) : undefined,
+                    padding: exportDimensions ? exportSize(12) : undefined,
+                  }}
+                >
+                  <span className="mb-2 block font-serif text-[18px] leading-none" style={{ color: palette.accent, fontFamily: 'var(--font-serif)', fontSize: exportDimensions ? exportSize(18) : undefined }}>
+                    {String(pointIndex + 1).padStart(2, '0')}
+                  </span>
+                  {point}
+                </div>
+              ))}
+            </div>
+          ) : composition === 'numbered_stack' && bodyPoints.length > 1 ? (
+            <ol
+              className="mt-4 grid max-w-[42ch] gap-2 text-[12px] font-semibold leading-relaxed md:text-[13px]"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                fontSize: exportDimensions ? exportSize(13) : undefined,
+                gap: exportDimensions ? exportSize(8) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+              }}
+            >
+              {bodyPoints.map((point, pointIndex) => (
+                <li key={`${slide.id}-point-${pointIndex}`} className="flex gap-2">
+                  <span
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                    style={{
+                      backgroundColor: palette.accent,
+                      color: template.value === 'bold_diagnostic' ? '#142334' : palette.panel,
+                      fontSize: exportDimensions ? exportSize(10) : undefined,
+                      height: exportDimensions ? exportSize(24) : undefined,
+                      width: exportDimensions ? exportSize(24) : undefined,
+                    }}
+                  >
+                    {pointIndex + 1}
+                  </span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ol>
+          ) : composition === 'side_rail' && slide.body ? (
+            <div className="mt-4 flex max-w-[44ch] gap-4" style={{ gap: exportDimensions ? exportSize(16) : undefined, marginTop: exportDimensions ? exportSize(16) : undefined, maxWidth: exportDimensions ? `${44 * 14 * exportScale}px` : undefined }}>
+              <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: palette.accent, width: exportDimensions ? exportSize(4) : undefined }} />
+              <p
+                className="text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                }}
+              >
+                {slide.body}
+              </p>
+            </div>
+          ) : composition === 'contrast_block' && slide.body ? (
+            <div
+              className="mt-4 grid max-w-[44ch] gap-2 sm:grid-cols-2"
+              style={{
+                gap: exportDimensions ? exportSize(8) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
+              }}
+            >
+              {['Old frame', 'Sharper frame'].map((label, pointIndex) => (
+                <div
+                  key={`${slide.id}-contrast-${label}`}
+                  className="rounded-[8px] border p-3"
+                  style={{
+                    backgroundColor: pointIndex === 0 ? 'transparent' : isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+                    borderColor: pointIndex === 0 ? palette.border : palette.accent,
+                    padding: exportDimensions ? exportSize(12) : undefined,
+                  }}
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: palette.accent, fontSize: exportDimensions ? exportSize(9) : undefined }}>{label}</p>
+                  <p
+                    className="mt-2 text-[12px] font-semibold leading-snug"
+                    style={{
+                      color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                      fontSize: exportDimensions ? exportSize(12) : undefined,
+                      marginTop: exportDimensions ? exportSize(8) : undefined,
+                    }}
+                  >
+                    {contrastPoints[pointIndex] || slide.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : composition === 'quote_panel' && slide.body ? (
+            <div
+              className="mt-4 max-w-[40ch] rounded-[8px] border-l-4 px-4 py-3 text-[14px] font-medium leading-relaxed md:text-[15px]"
+              style={{
+                backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+                borderColor: palette.accent,
+                color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                fontSize: exportDimensions ? exportSize(15) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${40 * 15 * exportScale}px` : undefined,
+                padding: exportDimensions ? `${exportSize(12)} ${exportSize(16)}` : undefined,
+              }}
+            >
+              {slide.body}
+            </div>
+          ) : (composition === 'evidence_card' || composition === 'example_note' || composition === 'credibility_cue') && slide.body ? (
+            <div
+              className="mt-4 max-w-[42ch] rounded-[8px] border p-4"
+              style={{
+                backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+                borderColor: composition === 'credibility_cue' ? palette.accent : palette.border,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${42 * 14 * exportScale}px` : undefined,
+                padding: exportDimensions ? exportSize(16) : undefined,
+              }}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: palette.accent, fontSize: exportDimensions ? exportSize(10) : undefined }}>
+                {composition === 'example_note' ? 'Example' : 'Proof cue'}
+              </p>
+              <p
+                className="mt-2 text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                  marginTop: exportDimensions ? exportSize(8) : undefined,
+                }}
+              >
+                {slide.body}
+              </p>
+            </div>
+          ) : slide.body && isCta ? (
+            <div
+              className="mt-5 max-w-[38ch] rounded-[8px] border p-4 text-[13px] font-semibold leading-relaxed md:text-[14px]"
+              style={{
+                backgroundColor: composition === 'direct_action' ? palette.accent : isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+                borderColor: composition === 'direct_action' ? palette.accent : palette.border,
+                color: composition === 'direct_action' ? '#142334' : isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                fontSize: exportDimensions ? exportSize(14) : undefined,
+                marginTop: exportDimensions ? exportSize(20) : undefined,
+                maxWidth: exportDimensions ? `${38 * 14 * exportScale}px` : undefined,
+                padding: exportDimensions ? exportSize(16) : undefined,
+              }}
+            >
+              {slide.body}
+            </div>
+          ) : slide.body ? (
+            <p
+              className="mt-4 max-w-[38ch] text-[13px] font-medium leading-relaxed md:text-[14px]"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                fontSize: exportDimensions ? exportSize(14) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                maxWidth: exportDimensions ? `${38 * 14 * exportScale}px` : undefined,
+              }}
+            >
+              {slide.body}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
+          {slide.cta ? (
+            <p
+              className="max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
+              style={{
+                color: palette.accent,
+                fontSize: exportDimensions ? exportSize(11) : undefined,
+                maxWidth: exportDimensions ? `${30 * 11 * exportScale}px` : undefined,
+              }}
+            >
+              {slide.cta}
+            </p>
+          ) : (
+            <span
+              className="h-2 w-20 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(8) : undefined,
+                width: exportDimensions ? exportSize(80) : undefined,
+              }}
+            />
+          )}
+          <span
+            className="h-10 w-10 shrink-0 rounded-full border"
+            style={{
+              borderColor: palette.accent,
+              backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
+              height: exportDimensions ? exportSize(40) : undefined,
+              width: exportDimensions ? exportSize(40) : undefined,
+            }}
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+const carouselMinSlides = 4;
+const carouselMaxSlides = 10;
+
+function createBlankCarouselSlide(index: number, layoutRecipe: CarouselLayoutRecipe, totalSlides: number): CarouselSlide {
+  return {
+    id: `slide-${Date.now()}-${index}`,
+    role: getDefaultCarouselSlideRole(layoutRecipe, index, totalSlides),
+    composition: 'auto',
+    headline: `Slide ${index + 1}`,
+    body: 'Add one clear point for this slide.',
+    cta: '',
+    visualSuggestion: '',
+  };
+}
+
+function sanitizeCarouselDraft(draft: CarouselDraftPayload, fallbackTitle: string): CarouselDraftPayload {
+  return {
+    ...draft,
+    title: draft.title.trim() || fallbackTitle,
+    caption: draft.caption.trim(),
+    coverDesign: draft.coverDesign?.trim() || '',
+    accessibilityNote: draft.accessibilityNote?.trim() || '',
+    slides: draft.slides.map((slide, index) => {
+      const role = isCarouselSlideRole(slide.role)
+        ? slide.role
+        : getDefaultCarouselSlideRole(draft.layoutRecipe, index, draft.slides.length);
+      return {
+        id: slide.id || `slide-${index + 1}`,
+        role,
+        composition: normalizeCarouselComposition(slide.composition, role),
+        headline: slide.headline.trim() || `Slide ${index + 1}`,
+        body: slide.body.trim(),
+        ...(slide.cta?.trim() ? { cta: slide.cta.trim() } : {}),
+        ...(slide.visualSuggestion?.trim() ? { visualSuggestion: slide.visualSuggestion.trim() } : {}),
+      };
+    }),
+  };
+}
+
+function cloneCarouselDraft(draft: CarouselDraftPayload): CarouselDraftPayload {
+  return JSON.parse(JSON.stringify(draft)) as CarouselDraftPayload;
+}
+
+function areCarouselDraftsEqual(left: CarouselDraftPayload, right: CarouselDraftPayload): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function getCarouselExportFontFamilies() {
+  const rootStyles = getComputedStyle(document.documentElement);
+  return {
+    sans: rootStyles.getPropertyValue('--font-sans').trim() || getComputedStyle(document.body).fontFamily || 'Raleway, Arial, sans-serif',
+    serif: rootStyles.getPropertyValue('--font-serif').trim() || 'Georgia, "Times New Roman", serif',
+  };
+}
+
+async function waitForCarouselExportFonts(element: HTMLElement) {
+  if (!('fonts' in document)) return;
+
+  await document.fonts.ready;
+  const nodes = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
+  const fontRequests = new Set<string>();
+
+  nodes.forEach((node) => {
+    const styles = getComputedStyle(node);
+    if (!styles.fontFamily || !styles.fontSize) return;
+    fontRequests.add(`${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`);
+  });
+
+  await Promise.all(
+    Array.from(fontRequests)
+      .slice(0, 40)
+      .map((request) => document.fonts.load(request).catch(() => null)),
+  );
+  await document.fonts.ready;
+}
+
+async function captureCarouselSlideCanvas(
+  element: HTMLElement,
+  dimensions: { width: number; height: number },
+  html2canvas: typeof import('html2canvas').default,
+) {
+  const fonts = getCarouselExportFontFamilies();
+  const rect = element.getBoundingClientRect();
+  const layoutWidth = Math.max(1, Math.ceil(rect.width));
+  const layoutHeight = Math.max(1, Math.round(layoutWidth * (dimensions.height / dimensions.width)));
+  const scale = dimensions.width / layoutWidth;
+  const captureId = `carousel-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const exportHost = document.createElement('div');
+  const exportElement = element.cloneNode(true) as HTMLElement;
+
+  exportHost.setAttribute('aria-hidden', 'true');
+  exportHost.style.position = 'fixed';
+  exportHost.style.left = '-10000px';
+  exportHost.style.top = '0';
+  exportHost.style.width = `${layoutWidth}px`;
+  exportHost.style.height = `${layoutHeight}px`;
+  exportHost.style.overflow = 'hidden';
+  exportHost.style.pointerEvents = 'none';
+  exportHost.style.zIndex = '-1';
+
+  exportElement.dataset.carouselExportCaptureId = captureId;
+  exportElement.style.width = `${layoutWidth}px`;
+  exportElement.style.height = `${layoutHeight}px`;
+  exportElement.style.minWidth = `${layoutWidth}px`;
+  exportElement.style.maxWidth = `${layoutWidth}px`;
+  exportElement.style.minHeight = `${layoutHeight}px`;
+  exportElement.style.maxHeight = `${layoutHeight}px`;
+  exportElement.style.boxSizing = 'border-box';
+  exportElement.style.margin = '0';
+  exportElement.style.transform = 'none';
+
+  exportHost.append(exportElement);
+  document.body.append(exportHost);
+
+  let captured: HTMLCanvasElement;
+  try {
+    await waitForCarouselExportFonts(exportElement);
+    captured = await html2canvas(exportElement, {
+      backgroundColor: null,
+      logging: false,
+      onclone: (clonedDocument) => {
+        clonedDocument.documentElement.className = document.documentElement.className;
+        clonedDocument.documentElement.style.setProperty('--font-sans', fonts.sans);
+        clonedDocument.documentElement.style.setProperty('--font-serif', fonts.serif);
+        const clonedSlide = clonedDocument.querySelector<HTMLElement>(
+          `[data-carousel-export-capture-id="${captureId}"]`,
+        );
+
+        if (clonedSlide) {
+          clonedSlide.style.width = `${layoutWidth}px`;
+          clonedSlide.style.height = `${layoutHeight}px`;
+          clonedSlide.style.minWidth = `${layoutWidth}px`;
+          clonedSlide.style.maxWidth = `${layoutWidth}px`;
+          clonedSlide.style.minHeight = `${layoutHeight}px`;
+          clonedSlide.style.maxHeight = `${layoutHeight}px`;
+          clonedSlide.style.boxSizing = 'border-box';
+          clonedSlide.style.margin = '0';
+          clonedSlide.style.transform = 'none';
+        }
+
+        const fontStyle = clonedDocument.createElement('style');
+        fontStyle.textContent = `
+          [data-carousel-export-slide="true"] {
+            font-family: ${fonts.sans} !important;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: geometricPrecision;
+          }
+
+          [data-carousel-export-slide="true"] .font-serif,
+          [data-carousel-export-slide="true"] h1,
+          [data-carousel-export-slide="true"] h2,
+          [data-carousel-export-slide="true"] h3 {
+            font-family: ${fonts.serif} !important;
+          }
+        `;
+        clonedDocument.head.append(fontStyle);
+      },
+      scale,
+      width: layoutWidth,
+      height: layoutHeight,
+      useCORS: true,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight,
+    });
+  } finally {
+    exportHost.remove();
+  }
+
+  if (captured.width === dimensions.width && captured.height === dimensions.height) return captured;
+
+  const resized = document.createElement('canvas');
+  resized.width = dimensions.width;
+  resized.height = dimensions.height;
+  const context = resized.getContext('2d');
+  if (!context) throw new Error('Could not prepare the carousel export canvas.');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(captured, 0, 0, dimensions.width, dimensions.height);
+  return resized;
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error('Could not create the PNG export.'));
+    }, 'image/png');
+  });
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function CarouselDraftEditor({
+  record,
+  isSaving,
+  onSave,
+}: {
+  record: CarouselDraftRecord;
+  isSaving: boolean;
+  onSave: (record: CarouselDraftRecord, draft: CarouselDraftPayload) => void;
+}) {
+  const [draft, setDraft] = useState<CarouselDraftPayload>(record.draft);
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(record.draft);
+  const hasEnoughSlides = draft.slides.length >= carouselMinSlides;
+  const hasValidSlides = draft.slides.every((slide) => slide.headline.trim());
+  const canSave = hasChanges && hasEnoughSlides && hasValidSlides && !isSaving;
+  const activeRecipeOption = getCarouselLayoutRecipeOption(draft.layoutRecipe);
+
+  function updateDraftField<K extends keyof Pick<CarouselDraftPayload, 'title' | 'caption' | 'coverDesign' | 'accessibilityNote'>>(
+    field: K,
+    value: CarouselDraftPayload[K],
+  ) {
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function updateSlide(slideId: string, updates: Partial<CarouselSlide>) {
+    setDraft((current) => ({
+      ...current,
+      slides: current.slides.map((slide) => (slide.id === slideId ? { ...slide, ...updates } : slide)),
+    }));
+  }
+
+  function moveSlide(slideId: string, direction: -1 | 1) {
+    setDraft((current) => {
+      const fromIndex = current.slides.findIndex((slide) => slide.id === slideId);
+      const toIndex = fromIndex + direction;
+      if (fromIndex < 0 || toIndex < 0 || toIndex >= current.slides.length) return current;
+      const nextSlides = [...current.slides];
+      const [moved] = nextSlides.splice(fromIndex, 1);
+      nextSlides.splice(toIndex, 0, moved);
+      return { ...current, slides: nextSlides };
+    });
+  }
+
+  function addSlide() {
+    setDraft((current) => {
+      if (current.slides.length >= carouselMaxSlides) return current;
+      const nextIndex = current.slides.length;
+      return {
+        ...current,
+        slides: [...current.slides, createBlankCarouselSlide(nextIndex, current.layoutRecipe, nextIndex + 1)],
+      };
+    });
+  }
+
+  function removeSlide(slideId: string) {
+    setDraft((current) => {
+      if (current.slides.length <= carouselMinSlides) return current;
+      return {
+        ...current,
+        slides: current.slides.filter((slide) => slide.id !== slideId),
+      };
+    });
+  }
+
+  function saveDraft() {
+    if (!canSave) return;
+    const sanitized = sanitizeCarouselDraft(draft, record.draft.title);
+    setDraft(sanitized);
+    onSave(record, sanitized);
+  }
+
+  return (
+    <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Slide editor</p>
+          <h4 className="mt-1 font-serif text-[24px] leading-tight text-[#142334]">Shape the carousel before export</h4>
+          <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+            Edit each slide, reorder the flow, then save once when it feels ready.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={addSlide}
+            disabled={draft.slides.length >= carouselMaxSlides || isSaving}
+            className="studio-ghost-button"
+          >
+            <Plus className="h-4 w-4" /> Add slide
+          </button>
+          <button
+            type="button"
+            onClick={saveDraft}
+            disabled={!canSave}
+            className="studio-primary-button"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save edits
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="grid gap-2">
+          <span className="studio-label">Carousel title</span>
+          <input
+            value={draft.title}
+            onChange={(event) => updateDraftField('title', event.target.value)}
+            className="studio-input h-11 px-3"
+          />
+        </label>
+        <label className="grid gap-2">
+          <span className="studio-label">Cover design note</span>
+          <input
+            value={draft.coverDesign || ''}
+            onChange={(event) => updateDraftField('coverDesign', event.target.value)}
+            className="studio-input h-11 px-3"
+          />
+        </label>
+      </div>
+
+      <label className="mt-3 grid gap-2">
+        <span className="studio-label">Post caption</span>
+        <textarea
+          value={draft.caption}
+          onChange={(event) => updateDraftField('caption', event.target.value)}
+          onWheel={trapWheel}
+          rows={3}
+          className="studio-input resize-y px-3 py-3 leading-relaxed"
+        />
+      </label>
+
+      <div className="mt-4 grid gap-3">
+        {draft.slides.map((slide, index) => {
+          const canMoveUp = index > 0;
+          const canMoveDown = index < draft.slides.length - 1;
+          const canDelete = draft.slides.length > carouselMinSlides;
+          const compositionOptions = getCarouselCompositionOptionsForRole(slide.role);
+          const previewComposition = resolveCarouselComposition(
+            slide,
+            slide.role,
+            getCarouselTemplateOption(draft.template),
+            getCarouselSlideBodyPoints(slide.body),
+          );
+
+          return (
+            <article key={slide.id} className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white font-serif text-[18px] text-[#C9AD98]">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <div>
+                    <p className="text-[12px] font-bold text-[#142334]">Slide {index + 1} - {carouselSlideRoleLabels[slide.role]}</p>
+                    <p className="text-[11px] text-[#142334]/50">
+                      {slide.body.trim().split(/\s+/).filter(Boolean).length} body words - {getCarouselCompositionOption(previewComposition).label}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => moveSlide(slide.id, -1)}
+                    disabled={!canMoveUp || isSaving}
+                    className="studio-card-action-icon disabled:opacity-40"
+                    aria-label={`Move slide ${index + 1} up`}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveSlide(slide.id, 1)}
+                    disabled={!canMoveDown || isSaving}
+                    className="studio-card-action-icon disabled:opacity-40"
+                    aria-label={`Move slide ${index + 1} down`}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSlide(slide.id)}
+                    disabled={!canDelete || isSaving}
+                    className="studio-card-action-icon text-[#8A2F1D] disabled:opacity-40"
+                    aria-label={`Remove slide ${index + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,0.58fr)_minmax(0,0.72fr)_minmax(0,0.9fr)_minmax(0,0.76fr)]">
+                <label className="grid gap-2">
+                  <span className="studio-label">Role</span>
+                  <select
+                    value={slide.role}
+                    onChange={(event) => updateSlide(slide.id, { role: event.target.value as CarouselSlideRole, composition: 'auto' })}
+                    className="studio-input h-11 px-3"
+                  >
+                    {activeRecipeOption.slideTypes.map((role) => (
+                      <option key={role} value={role}>
+                        {carouselSlideRoleLabels[role]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
+                  <span className="studio-label">Composition</span>
+                  <select
+                    value={slide.composition}
+                    onChange={(event) => updateSlide(slide.id, { composition: event.target.value as CarouselComposition })}
+                    className="studio-input h-11 px-3"
+                  >
+                    {compositionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
+                  <span className="studio-label">Headline</span>
+                  <input
+                    value={slide.headline}
+                    onChange={(event) => updateSlide(slide.id, { headline: event.target.value })}
+                    className="studio-input h-11 px-3"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="studio-label">CTA</span>
+                  <input
+                    value={slide.cta || ''}
+                    onChange={(event) => updateSlide(slide.id, { cta: event.target.value })}
+                    placeholder="Optional"
+                    className="studio-input h-11 px-3"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-3 grid gap-2">
+                <span className="studio-label">Body</span>
+                <textarea
+                  value={slide.body}
+                  onChange={(event) => updateSlide(slide.id, { body: event.target.value })}
+                  onWheel={trapWheel}
+                  rows={3}
+                  className="studio-input resize-y px-3 py-3 leading-relaxed"
+                />
+              </label>
+
+              <label className="mt-3 grid gap-2">
+                <span className="studio-label">Visual suggestion</span>
+                <input
+                  value={slide.visualSuggestion || ''}
+                  onChange={(event) => updateSlide(slide.id, { visualSuggestion: event.target.value })}
+                  placeholder="Optional layout note for this slide"
+                  className="studio-input h-11 px-3"
+                />
+              </label>
+            </article>
+          );
+        })}
+      </div>
+
+      {(!hasEnoughSlides || !hasValidSlides) && (
+        <div className="mt-3">
+          <Notice tone="error">
+            Carousels need at least {carouselMinSlides} slides, and every slide needs a headline before saving.
+          </Notice>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getCarouselQualityToneClasses(tone: CarouselDeckQualityTone) {
+  if (tone === 'ready') {
+    return {
+      shell: 'border-[#D7E2D0] bg-[#F7FAF5] text-[#2E4D34]',
+      chip: 'bg-[#E2ECDD] text-[#2E4D34]',
+      dot: 'bg-[#6F8F62]',
+      bar: 'bg-[#6F8F62]',
+    };
+  }
+
+  if (tone === 'fix') {
+    return {
+      shell: 'border-[#F0C5B8] bg-[#FFF7F4] text-[#8A2F1D]',
+      chip: 'bg-[#F8DED5] text-[#8A2F1D]',
+      dot: 'bg-[#C56D52]',
+      bar: 'bg-[#C56D52]',
+    };
+  }
+
+  return {
+    shell: 'border-[#E4D8CB] bg-[#FBFAF8] text-[#8C7466]',
+    chip: 'bg-[#F1E5DA] text-[#8C7466]',
+    dot: 'bg-[#C9AD98]',
+    bar: 'bg-[#C9AD98]',
+  };
+}
+
+function CarouselDeckQualityPanel({
+  report,
+  onApplyFix,
+  onUndo,
+  onRestore,
+  canUndo = false,
+  canRestore = false,
+  historyNotice,
+  disabled = false,
+}: {
+  report: CarouselDeckQualityReport;
+  onApplyFix?: (action: CarouselDeckFixAction) => void;
+  onUndo?: () => void;
+  onRestore?: () => void;
+  canUndo?: boolean;
+  canRestore?: boolean;
+  historyNotice?: string | null;
+  disabled?: boolean;
+}) {
+  const toneClasses = getCarouselQualityToneClasses(report.tone);
+
+  return (
+    <section className={`mt-4 rounded-[8px] border p-4 ${toneClasses.shell}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">Deck quality</p>
+          <h4 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{report.statusLabel}</h4>
+          <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-[#142334]/62">{report.summary}</p>
+        </div>
+        <div className="text-right">
+          <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] ${toneClasses.chip}`}>
+            {report.score}/100
+          </span>
+          <div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-white/80">
+            <span className={`block h-full rounded-full ${toneClasses.bar}`} style={{ width: `${report.score}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 md:grid-cols-3">
+        <div className="rounded-[8px] bg-white/80 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Dense slides</p>
+          <p className="mt-1 font-serif text-[26px] leading-none text-[#142334]">{report.metrics.denseSlides}</p>
+        </div>
+        <div className="rounded-[8px] bg-white/80 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Compositions</p>
+          <p className="mt-1 font-serif text-[26px] leading-none text-[#142334]">{report.metrics.uniqueCompositions}</p>
+        </div>
+        <div className="rounded-[8px] bg-white/80 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Overrides</p>
+          <p className="mt-1 font-serif text-[26px] leading-none text-[#142334]">{report.metrics.forcedCompositions}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2">
+        {report.items.slice(0, 5).map((item) => {
+          const itemTone = getCarouselQualityToneClasses(item.tone);
+          return (
+            <article key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-[8px] bg-white/80 p-3">
+              <div className="flex min-w-0 flex-1 gap-3">
+              <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${itemTone.dot}`} />
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold text-[#142334]">
+                  {item.slideIndex !== undefined ? `Slide ${item.slideIndex + 1}: ` : ''}
+                  {item.title}
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/62">{item.detail}</p>
+              </div>
+              </div>
+              {item.action && onApplyFix && (
+                <button
+                  type="button"
+                  onClick={() => onApplyFix(item.action!)}
+                  disabled={disabled}
+                  className="shrink-0 rounded-full border border-[#E4D8CB] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {item.action.label}
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      {(historyNotice || onUndo || onRestore) && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/80 bg-white/70 p-3">
+          <p className="max-w-xl text-[12px] leading-relaxed text-[#142334]/62">
+            {historyNotice || 'Quality fixes are saved to the active draft. Undo appears after the first fix.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {onUndo && (
+              <button
+                type="button"
+                onClick={onUndo}
+                disabled={disabled || !canUndo}
+                className="inline-flex items-center gap-2 rounded-full border border-[#E4D8CB] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <RefreshCcw className="h-3.5 w-3.5" />
+                Undo last fix
+              </button>
+            )}
+            {onRestore && (
+              <button
+                type="button"
+                onClick={onRestore}
+                disabled={disabled || !canRestore}
+                className="inline-flex items-center gap-2 rounded-full border border-[#E4D8CB] bg-[#F8F6F4] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Restore original
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CarouselStudioPanel({
+  drafts,
+  defaultAspectRatio,
+  defaultTemplate,
+  defaultLayoutRecipe,
+  savingDraftId,
+  error,
+  onDefaultAspectRatioChange,
+  onDefaultTemplateChange,
+  onDefaultLayoutRecipeChange,
+  onDraftAspectRatioChange,
+  onDraftTemplateChange,
+  onDraftLayoutRecipeChange,
+  onDraftSave,
+  selectedDraftId,
+  onDraftSelect,
+  onStartDraft,
+}: {
+  drafts: CarouselDraftRecord[];
+  defaultAspectRatio: CarouselAspectRatio;
+  defaultTemplate: CarouselTemplate;
+  defaultLayoutRecipe: CarouselLayoutRecipe;
+  savingDraftId: string | null;
+  error: string | null;
+  onDefaultAspectRatioChange: (value: CarouselAspectRatio) => void;
+  onDefaultTemplateChange: (value: CarouselTemplate) => void;
+  onDefaultLayoutRecipeChange: (value: CarouselLayoutRecipe) => void;
+  onDraftAspectRatioChange: (record: CarouselDraftRecord, value: CarouselAspectRatio) => void;
+  onDraftTemplateChange: (record: CarouselDraftRecord, value: CarouselTemplate) => void;
+  onDraftLayoutRecipeChange: (record: CarouselDraftRecord, value: CarouselLayoutRecipe) => void;
+  onDraftSave: (record: CarouselDraftRecord, draft: CarouselDraftPayload) => void;
+  selectedDraftId: string | null;
+  onDraftSelect: (record: CarouselDraftRecord) => void;
+  onStartDraft: () => void;
+}) {
+  const selectedRecord = selectedDraftId
+    ? drafts.find((record) => record.item.id === selectedDraftId) || null
+    : null;
+  const latestRecord = selectedRecord || drafts[0] || null;
+  const latestDraft = latestRecord?.draft || null;
+  const displayedAspectRatio = latestDraft?.aspectRatio || defaultAspectRatio;
+  const displayedAspectOption = getCarouselAspectRatioOption(displayedAspectRatio, latestDraft?.platform);
+  const displayedExportDimensions = getCarouselExportDimensions(displayedAspectOption);
+  const displayedTemplate = latestDraft?.template || defaultTemplate;
+  const displayedTemplateOption = getCarouselTemplateOption(displayedTemplate);
+  const displayedLayoutRecipe = latestDraft?.layoutRecipe || defaultLayoutRecipe;
+  const displayedLayoutRecipeOption = getCarouselLayoutRecipeOption(displayedLayoutRecipe);
+  const deckQualityReport = latestDraft ? buildCarouselDeckQualityReport(latestDraft, displayedTemplateOption) : null;
+  const isSavingLatest = Boolean(latestRecord && savingDraftId === latestRecord.item.id);
+  const activeRecordId = latestRecord?.item.id || null;
+  const renderedSlides: CarouselSlide[] = latestDraft?.slides || [
+    {
+      id: 'placeholder-1',
+      role: 'cover',
+      composition: 'auto',
+      headline: displayedTemplateOption.preview.headline,
+      body: displayedTemplateOption.preview.body,
+    },
+    {
+      id: 'placeholder-2',
+      role: getDefaultCarouselSlideRole(displayedLayoutRecipe, 1, 3),
+      composition: 'auto',
+      headline: displayedLayoutRecipeOption.label,
+      body: displayedLayoutRecipeOption.description,
+    },
+    {
+      id: 'placeholder-3',
+      role: 'cta',
+      composition: 'auto',
+      headline: 'Export stays predictable.',
+      body: displayedTemplateOption.exportRules.pdf,
+    },
+  ];
+  const exportSlideFrameRefs = useRef<Array<HTMLElement | null>>([]);
+  const [exportState, setExportState] = useState<{
+    busy: boolean;
+    mode: CarouselExportMode | null;
+    message: string;
+    tone: 'info' | 'error';
+  } | null>(null);
+  const [draftHistory, setDraftHistory] = useState<CarouselDraftHistoryState>({
+    recordId: null,
+    originalDraft: null,
+    undoStack: [],
+    notice: null,
+  });
+  const lastHistoryRecordIdRef = useRef<string | null>(null);
+  const isExporting = Boolean(exportState?.busy);
+  const canUndoDeckFix = draftHistory.recordId === activeRecordId && draftHistory.undoStack.length > 0;
+  const canRestoreOriginalDraft = Boolean(
+    draftHistory.recordId === activeRecordId
+      && draftHistory.originalDraft
+      && latestDraft
+      && !areCarouselDraftsEqual(draftHistory.originalDraft, latestDraft),
+  );
+
+  useEffect(() => {
+    if (lastHistoryRecordIdRef.current === activeRecordId) return;
+    lastHistoryRecordIdRef.current = activeRecordId;
+    setDraftHistory({
+      recordId: activeRecordId,
+      originalDraft: latestDraft ? cloneCarouselDraft(latestDraft) : null,
+      undoStack: [],
+      notice: null,
+    });
+  }, [activeRecordId, latestDraft]);
+
+  async function exportCarousel(mode: CarouselExportMode) {
+    if (!latestDraft) return;
+
+    const elements = exportSlideFrameRefs.current
+      .slice(0, latestDraft.slides.length)
+      .filter((element): element is HTMLElement => Boolean(element));
+
+    if (elements.length !== latestDraft.slides.length) {
+      setExportState({
+        busy: false,
+        mode,
+        message: 'The slides are still rendering. Give the preview a second, then export again.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    const dimensions = displayedExportDimensions;
+    const baseName = getCarouselExportBaseName(latestDraft, displayedAspectOption);
+
+    try {
+      setExportState({
+        busy: true,
+        mode,
+        message: mode === 'pdf' ? 'Preparing LinkedIn PDF...' : 'Preparing PNG frames...',
+        tone: 'info',
+      });
+
+      const html2canvas = (await import('html2canvas')).default;
+      const canvases: HTMLCanvasElement[] = [];
+      await waitForCarouselExportFonts(elements[0]);
+
+      for (const [index, element] of elements.entries()) {
+        setExportState({
+          busy: true,
+          mode,
+          message: `Rendering slide ${index + 1} of ${elements.length}...`,
+          tone: 'info',
+        });
+        canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
+      }
+
+      if (mode === 'pdf') {
+        setExportState({ busy: true, mode, message: 'Building PDF...', tone: 'info' });
+        const { jsPDF } = await import('jspdf');
+        const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({
+          orientation,
+          unit: 'px',
+          format: [dimensions.width, dimensions.height],
+          compress: true,
+        });
+
+        canvases.forEach((canvas, index) => {
+          if (index > 0) pdf.addPage([dimensions.width, dimensions.height], orientation);
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
+        });
+        pdf.save(`${baseName}.pdf`);
+        setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page PDF.`, tone: 'info' });
+        return;
+      }
+
+      setExportState({ busy: true, mode, message: 'Downloading PNG frames...', tone: 'info' });
+      for (const [index, canvas] of canvases.entries()) {
+        const blob = await canvasToPngBlob(canvas);
+        downloadBlob(blob, `${baseName}-slide-${String(index + 1).padStart(2, '0')}.png`);
+      }
+      setExportState({ busy: false, mode, message: `Downloaded ${canvases.length} PNG frames.`, tone: 'info' });
+    } catch (error) {
+      setExportState({
+        busy: false,
+        mode,
+        message: error instanceof Error ? error.message : 'Could not export this carousel.',
+        tone: 'error',
+      });
+    }
+  }
+
+  function applyDeckQualityFix(action: CarouselDeckFixAction) {
+    if (!latestRecord || !latestDraft || isSavingLatest) return;
+    const nextDraft = sanitizeCarouselDraft(
+      applyCarouselDeckFixAction(latestDraft, action),
+      latestDraft.title,
+    );
+    if (areCarouselDraftsEqual(latestDraft, nextDraft)) {
+      setDraftHistory((current) => ({
+        ...current,
+        notice: 'That fix is already reflected in this draft.',
+      }));
+      return;
+    }
+    setDraftHistory((current) => {
+      const isSameRecord = current.recordId === activeRecordId;
+      return {
+        recordId: activeRecordId,
+        originalDraft: isSameRecord
+          ? current.originalDraft || cloneCarouselDraft(latestDraft)
+          : cloneCarouselDraft(latestDraft),
+        undoStack: [
+          ...(isSameRecord ? current.undoStack : []),
+          {
+            draft: cloneCarouselDraft(latestDraft),
+            label: action.label,
+            createdAt: new Date().toISOString(),
+          },
+        ].slice(-8),
+        notice: `${action.label} applied. You can undo it before you keep moving.`,
+      };
+    });
+    onDraftSave(latestRecord, nextDraft);
+  }
+
+  function undoLastDeckQualityFix() {
+    if (!latestRecord || !canUndoDeckFix || isSavingLatest) return;
+    const previousEntry = draftHistory.undoStack[draftHistory.undoStack.length - 1];
+    if (!previousEntry) return;
+    const previousDraft = sanitizeCarouselDraft(
+      cloneCarouselDraft(previousEntry.draft),
+      previousEntry.draft.title,
+    );
+    setDraftHistory((current) => ({
+      ...current,
+      undoStack: current.undoStack.slice(0, -1),
+      notice: `Undid ${previousEntry.label}.`,
+    }));
+    onDraftSave(latestRecord, previousDraft);
+  }
+
+  function restoreOriginalCarouselDraft() {
+    if (!latestRecord || !latestDraft || !canRestoreOriginalDraft || isSavingLatest || !draftHistory.originalDraft) return;
+    const originalDraft = sanitizeCarouselDraft(
+      cloneCarouselDraft(draftHistory.originalDraft),
+      draftHistory.originalDraft.title,
+    );
+    setDraftHistory((current) => ({
+      ...current,
+      undoStack: [
+        ...current.undoStack,
+        {
+          draft: cloneCarouselDraft(latestDraft),
+          label: 'restore original',
+          createdAt: new Date().toISOString(),
+        },
+      ].slice(-8),
+      notice: 'Restored the version from when this draft was opened.',
+    }));
+    onDraftSave(latestRecord, originalDraft);
+  }
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+      <div className="rounded-[8px] bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Studio / Carousel</p>
+            <h2 className="mt-2 font-serif text-[32px] leading-tight text-[#142334]">Carousel Studio</h2>
+            <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/64">
+              HTML/CSS slide design for LinkedIn PDF decks and Instagram image carousels.
+            </p>
+          </div>
+          <Badge className="bg-[#F5F3EE] text-[#8C7466]">
+            {latestDraft ? `${latestDraft.slides.length} slides - ${displayedTemplateOption.label} + ${displayedLayoutRecipeOption.label}` : 'Build lane'}
+          </Badge>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <CarouselAspectRatioSelector
+            value={displayedAspectRatio}
+            platform={latestDraft?.platform}
+            onChange={(nextAspectRatio) => {
+              if (latestRecord) {
+                onDraftAspectRatioChange(latestRecord, nextAspectRatio);
+                return;
+              }
+              onDefaultAspectRatioChange(nextAspectRatio);
+            }}
+            eyebrow="Output frame"
+            title="Choose before visual export"
+            disabled={isSavingLatest}
+          />
+          <CarouselTemplateSelector
+            value={displayedTemplate}
+            onChange={(nextTemplate) => {
+              if (latestRecord) {
+                onDraftTemplateChange(latestRecord, nextTemplate);
+                return;
+              }
+              onDefaultTemplateChange(nextTemplate);
+            }}
+            eyebrow="Visual style"
+            title="Choose the carousel skin"
+            disabled={isSavingLatest}
+          />
+          <CarouselLayoutRecipeSelector
+            value={displayedLayoutRecipe}
+            onChange={(nextLayoutRecipe) => {
+              if (latestRecord) {
+                onDraftLayoutRecipeChange(latestRecord, nextLayoutRecipe);
+                return;
+              }
+              onDefaultLayoutRecipeChange(nextLayoutRecipe);
+            }}
+            eyebrow="Story structure"
+            title="Choose the slide arc"
+            disabled={isSavingLatest}
+          />
+        </div>
+
+        {error && (
+          <div className="mt-3">
+            <Notice tone="error">{error}</Notice>
+          </div>
+        )}
+
+        {latestDraft ? (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Current draft</p>
+                <h3 className="mt-2 font-serif text-[28px] leading-tight text-[#142334]">{latestDraft.title}</h3>
+                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[#142334]/64">
+                  {platformLabels[latestDraft.outputPlatform]} - {latestDraft.pillar ? pillarMeta[latestDraft.pillar].label : 'AI selected pillar'} - {getCarouselAspectRatioLabel(latestDraft.aspectRatio, latestDraft.platform)} - {getCarouselTemplateOption(latestDraft.template).label} - {getCarouselLayoutRecipeOption(latestDraft.layoutRecipe).label}
+                </p>
+              </div>
+              <Badge className="bg-white text-[#8C7466]">
+                {new Date(latestDraft.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+              </Badge>
+            </div>
+
+            {deckQualityReport && (
+              <CarouselDeckQualityPanel
+                report={deckQualityReport}
+                onApplyFix={applyDeckQualityFix}
+                onUndo={undoLastDeckQualityFix}
+                onRestore={restoreOriginalCarouselDraft}
+                canUndo={canUndoDeckFix}
+                canRestore={canRestoreOriginalDraft}
+                historyNotice={draftHistory.recordId === activeRecordId ? draftHistory.notice : null}
+                disabled={isSavingLatest}
+              />
+            )}
+
+            {latestDraft.caption && (
+              <div className="mt-4 rounded-[8px] bg-white p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Caption</p>
+                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-[#142334]/70">{latestDraft.caption}</p>
+              </div>
+            )}
+
+            {latestRecord && (
+              <CarouselDraftEditor
+                key={`${latestRecord.item.id}-${latestRecord.draft.layoutRecipe}`}
+                record={latestRecord}
+                isSaving={isSavingLatest}
+                onSave={onDraftSave}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {[
+              ['01', 'Structure', 'Turn an idea into a slide-by-slide story.'],
+              ['02', 'Design', 'Render branded slides as real HTML/CSS.'],
+              ['03', 'Export', 'PDF for LinkedIn, PNG frames for Instagram.'],
+            ].map(([step, title, detail]) => (
+              <article key={step} className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+                <span className="font-serif text-[28px] leading-none text-[#C9AD98]">{step}</span>
+                <p className="mt-3 text-[13px] font-bold text-[#142334]">{title}</p>
+                <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/62">{detail}</p>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {drafts.length > 0 && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Saved carousel drafts</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                  Choose which saved draft you want to edit, preview, or export.
+                </p>
+              </div>
+              <Badge className="bg-[#F5F3EE] text-[#8C7466]">{drafts.length} saved</Badge>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {drafts.slice(0, 6).map((record) => {
+                const { item, draft } = record;
+                const isSelected = latestRecord?.item.id === item.id;
+                return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onDraftSelect(record)}
+                  className={`flex items-center justify-between gap-3 rounded-[8px] border px-3 py-2 text-left transition ${
+                    isSelected
+                      ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                      : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold">{draft.title}</p>
+                    <p className={`text-[11px] ${isSelected ? 'text-white/62' : 'text-[#142334]/55'}`}>
+                      {draft.slides.length} slides - {getCarouselTemplateOption(draft.template).label} - {getCarouselLayoutRecipeOption(draft.layoutRecipe).label}
+                    </p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <Badge className={isSelected ? 'bg-white/10 text-white' : 'bg-white text-[#8C7466]'}>
+                      {isSelected ? 'Active' : item.status}
+                    </Badge>
+                    {!isSelected && <ChevronRight className="h-4 w-4 text-[#8C7466]" />}
+                  </span>
+                </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button type="button" onClick={onStartDraft} className="studio-primary-button">
+            Start from Content Studio <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportCarousel('pdf')}
+            disabled={!latestDraft || isExporting}
+            className="studio-secondary-button"
+          >
+            {isExporting && exportState?.mode === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportCarousel('png')}
+            disabled={!latestDraft || isExporting}
+            className="studio-ghost-button"
+          >
+            {isExporting && exportState?.mode === 'png' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Export PNGs
+          </button>
+        </div>
+        {exportState?.message && (
+          <div className="mt-3">
+            <Notice tone={exportState.tone}>{exportState.message}</Notice>
+          </div>
+        )}
+      </div>
+
+      <aside className="rounded-[8px] bg-[#142334] p-5 text-white">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Rendered slides</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-white/60">
+              {displayedTemplateOption.label} + {displayedLayoutRecipeOption.label} - {displayedAspectOption.size}
+            </p>
+          </div>
+          <Badge className="bg-white/10 text-white">HTML/CSS</Badge>
+        </div>
+        <div className="mt-5 grid gap-3">
+          {renderedSlides.map((slide, index) => (
+            <CarouselSlideFrame
+              key={slide.id}
+              slide={slide}
+              index={index}
+              total={renderedSlides.length}
+              aspectOption={displayedAspectOption}
+              template={displayedTemplateOption}
+              layoutRecipe={displayedLayoutRecipeOption}
+            />
+          ))}
+        </div>
+      </aside>
+      {latestDraft && (
+        <div
+          aria-hidden="true"
+          className="fixed left-[-10000px] top-0 grid pointer-events-none"
+          style={{
+            gap: 0,
+            width: `${displayedExportDimensions.width}px`,
+            zIndex: -1,
+          }}
+        >
+          {latestDraft.slides.map((slide, index) => (
+            <CarouselSlideFrame
+              key={`export-${slide.id}`}
+              slide={slide}
+              index={index}
+              total={latestDraft.slides.length}
+              aspectOption={displayedAspectOption}
+              template={displayedTemplateOption}
+              layoutRecipe={displayedLayoutRecipeOption}
+              exportDimensions={displayedExportDimensions}
+              frameRef={(node) => {
+                exportSlideFrameRefs.current[index] = node;
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StudioToolsPanel({
+  adminKey,
+  defaultSource,
+  defaultPlatform,
+  defaultPillar,
+  busyTool,
+  error,
+  result,
+  onGenerate,
+  onOpenDrafting,
+}: {
+  adminKey: string;
+  defaultSource: string;
+  defaultPlatform: ContentPlatform;
+  defaultPillar: ContentPillar | 'auto';
+  busyTool: StudioToolKind | null;
+  error: string | null;
+  result: StudioToolResult | null;
+  onGenerate: (kind: StudioGeneratedToolKind, payload: StudioToolPayload) => void;
+  onOpenDrafting: () => void;
+}) {
+  const [activeTool, setActiveTool] = useState<StudioToolKind | null>(null);
+  const [source, setSource] = useState('');
+  const [platform, setPlatform] = useState<ContentPlatform | 'auto'>(defaultPlatform);
+  const [pillar, setPillar] = useState<ContentPillar | 'auto'>(defaultPillar);
+  const [goal, setGoal] = useState(studioToolGoalOptions.hook[0]);
+  const [quantity, setQuantity] = useState<StudioToolPayload['quantity']>('10');
+  const [hookType, setHookType] = useState<HookType>('text_post');
+  const [copied, setCopied] = useState(false);
+  const [captionInputMode, setCaptionInputMode] = useState<CaptionInputMode>('text');
+  const [captionImageFile, setCaptionImageFile] = useState<File | null>(null);
+  const [captionSourceText, setCaptionSourceText] = useState('');
+  const [captionPlatform, setCaptionPlatform] = useState<CaptionPlatform>('linkedin');
+  const [captionTone, setCaptionTone] = useState<CaptionTone>('auto');
+  const [captionResult, setCaptionResult] = useState<CaptionResult | null>(null);
+  const [replyInputMode, setReplyInputMode] = useState<ReplyInputMode>('text');
+  const [replyImageFile, setReplyImageFile] = useState<File | null>(null);
+  const [replyOriginalText, setReplyOriginalText] = useState('');
+  const [replyPlatform, setReplyPlatform] = useState<ReplyPlatform>('linkedin');
+  const [replyResponseType, setReplyResponseType] = useState<ReplyResponseType>('own_post');
+  const [replyGoal, setReplyGoal] = useState<ReplyGoal>('auto');
+  const [replyPersonType, setReplyPersonType] = useState<ReplyPersonType>('general_audience');
+  const [replyResult, setReplyResult] = useState<ReplyResult | null>(null);
+  const [localBusyTool, setLocalBusyTool] = useState<'caption' | 'reply' | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [loadingIndex, setLoadingIndex] = useState(0);
+  const activeMeta = activeTool ? studioToolMeta[activeTool] : null;
+  const activeGoalOptions = activeTool ? studioToolGoalOptions[activeTool] : studioToolGoalOptions.hook;
+  const resolvedGoal = activeGoalOptions.includes(goal) ? goal : activeGoalOptions[0];
+  const platformOptions = [
+    { value: 'auto', label: 'Auto' },
+    ...Object.entries(platformLabels).map(([value, label]) => ({ value, label })),
+  ];
+  const pillarOptions = [
+    { value: 'auto', label: 'Auto' },
+    ...Object.entries(pillarMeta).map(([value, meta]) => ({ value, label: meta.label })),
+  ];
+  const goalOptions = activeGoalOptions.map((option) => ({ value: option, label: option }));
+  const quantityOptions = [
+    { value: '6', label: '6 options' },
+    { value: '10', label: '10 options' },
+    { value: '15', label: '15 options' },
+  ];
+  const hookTypeOptions = Object.entries(hookTypeLabels).map(([value, item]) => ({
+    value,
+    label: item.label,
+    detail: item.detail,
+  }));
+  const ActiveIcon = activeMeta?.icon || WandSparkles;
+  const effectiveBusyTool = busyTool || localBusyTool;
+  const isBusy = effectiveBusyTool === activeTool;
+  const hasSource = Boolean(source.trim());
+  const canGenerateActiveTool = activeTool === 'hook' || activeTool === 'cta';
+  const allowedReplyGoals = replyResponseType === 'other_post'
+    ? (Object.keys(replyGoalLabels) as ReplyGoal[]).filter((item) => item !== 'invite_dm_book')
+    : (Object.keys(replyGoalLabels) as ReplyGoal[]);
+  const resolvedReplyGoal = allowedReplyGoals.includes(replyGoal) ? replyGoal : allowedReplyGoals[0];
+  const currentLoadingMessage = localBusyTool === 'caption'
+    ? captionLoadingMessages[loadingIndex % captionLoadingMessages.length]
+    : localBusyTool === 'reply'
+      ? replyLoadingMessages[loadingIndex % replyLoadingMessages.length]
+      : '';
+  const generatedToolResult = result && (!activeTool || activeTool === result.kind) ? result : null;
+  const hasCaptionOutput = activeTool === 'caption' && Boolean(captionResult?.captions.length);
+  const hasReplyOutput = activeTool === 'reply' && Boolean(replyResult?.reply);
+  const outputTitle = activeTool
+    ? studioToolMeta[activeTool].label
+    : generatedToolResult
+      ? studioToolMeta[generatedToolResult.kind].label
+      : 'Ready when the idea is';
+  const outputSubtitle = activeTool === 'caption'
+    ? `${captionPlatformLabels[captionPlatform]} - ${captionToneLabels[captionTone]}`
+    : activeTool === 'reply'
+      ? `${replyPlatformLabels[replyPlatform]} - ${replyResponseTypeLabels[replyResponseType].label}${replyGoal === 'auto' && replyResult?.chosenGoal ? ` - Auto → ${replyGoalLabels[replyResult.chosenGoal as ReplyGoal]?.label ?? replyResult.chosenGoal}` : ` - ${replyGoalLabels[resolvedReplyGoal].label}`}`
+      : generatedToolResult
+        ? `${generatedToolResult.kind === 'hook' && generatedToolResult.payload.hookType ? `${hookTypeLabels[generatedToolResult.payload.hookType].label} - ` : ''}${generatedToolResult.payload.platform === 'auto' ? 'Auto platform' : platformLabels[generatedToolResult.payload.platform]} - ${generatedToolResult.payload.pillar === 'auto' ? 'Auto pillar' : pillarMeta[generatedToolResult.payload.pillar].label} - ${generatedToolResult.payload.goal}`
+        : '';
+  const outputBadge = activeTool === 'caption'
+    ? '3 captions'
+    : activeTool === 'reply'
+      ? '2 versions'
+      : generatedToolResult
+        ? `${generatedToolResult.payload.quantity} options`
+        : '';
+
+  useEffect(() => {
+    if (!localBusyTool) return;
+    const interval = window.setInterval(() => {
+      setLoadingIndex((current) => current + 1);
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [localBusyTool]);
+
+  async function copyToolOutput() {
+    if (!result?.output) return;
+    await navigator.clipboard.writeText(result.output);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  async function copyText(value: string) {
+    if (!value.trim()) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function getImageValidationError(file: File) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return 'Use a JPEG, PNG, or WebP image.';
+    if (file.size > 10 * 1024 * 1024) return 'Image must be 10MB or smaller.';
+    return '';
+  }
+
+  function handleCaptionImageSelect(file: File | null) {
+    if (!file) return;
+    const validationError = getImageValidationError(file);
+    if (validationError) {
+      setLocalError(validationError);
+      return;
+    }
+    setLocalError(null);
+    setCaptionImageFile(file);
+    setCaptionInputMode('image');
+  }
+
+  function handleReplyImageSelect(file: File | null) {
+    if (!file) return;
+    const validationError = getImageValidationError(file);
+    if (validationError) {
+      setLocalError(validationError);
+      return;
+    }
+    setLocalError(null);
+    setReplyImageFile(file);
+    setReplyInputMode('image');
+  }
+
+  function generateActiveTool() {
+    if (activeTool !== 'hook' && activeTool !== 'cta') return;
+    onGenerate(activeTool, {
+      source,
+      platform,
+      pillar,
+      goal: resolvedGoal,
+      quantity,
+      hookType: activeTool === 'hook' ? hookType : undefined,
+    });
+  }
+
+  async function generateCaption() {
+    if (captionInputMode === 'text' && !captionSourceText.trim()) {
+      setLocalError('Paste the post text or upload an image first.');
+      return;
+    }
+    if (captionInputMode === 'image' && !captionImageFile) {
+      setLocalError('Upload an image or switch to Text and paste the post text first.');
+      return;
+    }
+
+    setLocalBusyTool('caption');
+    setLoadingIndex(0);
+    setLocalError(null);
+    try {
+      const formData = new FormData();
+      formData.append('key', adminKey);
+      formData.append('platform', captionPlatform);
+      formData.append('tone', captionTone);
+      if (captionInputMode === 'text') {
+        formData.append('sourceText', captionSourceText);
+      }
+      if (captionInputMode === 'image' && captionImageFile) {
+        formData.append('image', captionImageFile);
+      }
+
+      const response = await fetch('/api/tools/caption', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json().catch(() => null) as CaptionResult & { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error || 'Something went wrong. Try again or simplify your inputs.');
+      setCaptionResult({ captions: data?.captions || [] });
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Something went wrong. Try again or simplify your inputs.');
+    } finally {
+      setLocalBusyTool(null);
+    }
+  }
+
+  async function generateReply() {
+    if (replyInputMode === 'text' && !replyOriginalText.trim()) {
+      setLocalError('Paste the original text or upload a screenshot first.');
+      return;
+    }
+    if (replyInputMode === 'image' && !replyImageFile && !replyOriginalText.trim()) {
+      setLocalError('Upload a screenshot or paste the original text first.');
+      return;
+    }
+
+    setLocalBusyTool('reply');
+    setLoadingIndex(0);
+    setLocalError(null);
+    try {
+      const formData = new FormData();
+      formData.append('key', adminKey);
+      formData.append('platform', replyPlatform);
+      formData.append('responseType', replyResponseType);
+      formData.append('goal', resolvedReplyGoal);
+      formData.append('personType', replyPersonType);
+      formData.append('originalText', replyOriginalText);
+      if (replyInputMode === 'image' && replyImageFile) {
+        formData.append('image', replyImageFile);
+      }
+
+      const response = await fetch('/api/tools/reply', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json().catch(() => null) as ReplyResult & { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error || 'Something went wrong. Try again or simplify your inputs.');
+      setReplyResult({
+        reply: data?.reply || '',
+        shortReply: data?.shortReply || '',
+        chosenGoal: data?.chosenGoal,
+      });
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Something went wrong. Try again or simplify your inputs.');
+    } finally {
+      setLocalBusyTool(null);
+    }
+  }
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
+      <div className="rounded-[8px] bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Studio / Tools</p>
+            <h2 className="mt-2 font-serif text-[32px] leading-tight text-[#142334]">Tools</h2>
+            <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/64">
+              Build the opening line and the next step before a post goes live.
+            </p>
+          </div>
+          <button type="button" onClick={onOpenDrafting} className="studio-secondary-button">
+            Open drafting <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {(Object.keys(studioToolMeta) as StudioToolKind[]).map((kind) => {
+            const meta = studioToolMeta[kind];
+            const Icon = meta.icon;
+            const isSelected = activeTool === kind;
+            return (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => {
+                  setLocalError(null);
+                  setCopied(false);
+                  setActiveTool((current) => (current === kind ? null : kind));
+                }}
+                className={`rounded-[8px] border p-4 text-left transition ${
+                  isSelected
+                    ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                    : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                }`}
+              >
+                <span className="flex items-start justify-between gap-3">
+                  <span className={`grid h-10 w-10 place-items-center rounded-[8px] ${isSelected ? 'bg-white/10 text-white' : 'bg-white text-[#C9AD98]'}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${isSelected ? 'bg-white/10 text-white/75' : 'bg-white text-[#8C7466]'}`}>
+                    {meta.status === 'ready' ? 'Ready' : 'Next'}
+                  </span>
+                </span>
+                <span className={`mt-4 block text-[10px] font-bold uppercase tracking-[0.16em] ${isSelected ? 'text-white/62' : 'text-[#8C7466]'}`}>
+                  {meta.eyebrow}
+                </span>
+                <span className="mt-1 block font-serif text-[25px] leading-tight">{meta.label}</span>
+                <span className={`mt-2 block text-[12px] leading-relaxed ${isSelected ? 'text-white/65' : 'text-[#142334]/62'}`}>
+                  {meta.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {(activeTool === 'hook' || activeTool === 'cta') && activeMeta && (
+        <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">{activeMeta.eyebrow}</p>
+              <h3 className="mt-1 font-serif text-[27px] leading-tight text-[#142334]">{activeMeta.label}</h3>
+            </div>
+            <Badge className="bg-white text-[#8C7466]">{quantity} options</Badge>
+          </div>
+
+          {activeTool === 'hook' && (
+            <div className="mt-4">
+              <span className="studio-label">Hook type</span>
+              <div className="mt-2">
+                <ToolPillGroup
+                  value={hookType}
+                  onChange={(value) => setHookType(value as HookType)}
+                  options={hookTypeOptions}
+                />
+              </div>
+            </div>
+          )}
+
+          <label className="mt-4 grid gap-2">
+            <span className="studio-label">{activeTool === 'hook' ? 'Draft / topic / scene' : 'Topic or draft'}</span>
+            <textarea
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              onWheel={trapWheel}
+              rows={7}
+              placeholder={activeTool === 'hook' ? hookTypeLabels[hookType].placeholder : 'Paste a draft, carousel slide, content idea, or audience tension...'}
+              className="studio-input resize-y px-4 py-3 leading-relaxed"
+            />
+          </label>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSource(defaultSource)}
+              disabled={!defaultSource.trim()}
+              className="studio-ghost-button"
+            >
+              Use current context
+            </button>
+            <button type="button" onClick={() => setSource('')} className="studio-ghost-button">
+              Clear
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2">
+              <span className="studio-label">Platform</span>
+              <FilterDropdown
+                name="studioToolPlatform"
+                value={platform}
+                onChange={(value) => setPlatform(value as ContentPlatform | 'auto')}
+                ariaLabel="Choose tool platform"
+                options={platformOptions}
+              />
+            </div>
+            <div className="grid gap-2">
+              <span className="studio-label">Pillar</span>
+              <FilterDropdown
+                name="studioToolPillar"
+                value={pillar}
+                onChange={(value) => setPillar(value as ContentPillar | 'auto')}
+                ariaLabel="Choose tool pillar"
+                options={pillarOptions}
+              />
+            </div>
+            <div className="grid gap-2">
+              <span className="studio-label">Goal</span>
+              <FilterDropdown
+                name="studioToolGoal"
+                value={resolvedGoal}
+                onChange={setGoal}
+                ariaLabel="Choose tool goal"
+                options={goalOptions}
+              />
+            </div>
+            <div className="grid gap-2">
+              <span className="studio-label">Options</span>
+              <FilterDropdown
+                name="studioToolQuantity"
+                value={quantity}
+                onChange={(value) => setQuantity(value as StudioToolPayload['quantity'])}
+                ariaLabel="Choose number of tool options"
+                options={quantityOptions}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4">
+              <Notice tone="error">{error}</Notice>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={generateActiveTool}
+            disabled={!hasSource || Boolean(effectiveBusyTool) || !canGenerateActiveTool}
+            className="studio-primary-button mt-5 w-full justify-center"
+          >
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ActiveIcon className="h-4 w-4" />}
+            {isBusy ? 'Generating...' : activeMeta.buttonLabel}
+          </button>
+        </div>
+        )}
+
+        {activeTool === 'caption' && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Package the post</p>
+                <h3 className="mt-1 font-serif text-[27px] leading-tight text-[#142334]">Caption Generator</h3>
+              </div>
+              <Badge className="bg-white text-[#8C7466]">3 captions</Badge>
+            </div>
+
+            <ToolStep number="01" title="Paste text or upload image">
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setCaptionInputMode('text')}
+                  className={`rounded-[8px] border p-3 text-left text-[13px] font-bold transition ${captionInputMode === 'text' ? 'border-[#142334] bg-[#142334] text-white' : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98]'}`}
+                >
+                  <span className="block">Text</span>
+                  <span className={`mt-1 block text-[11px] leading-relaxed ${captionInputMode === 'text' ? 'text-white/62' : 'text-[#142334]/55'}`}>
+                    Explain the video, paste a script, or paste the post text.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCaptionInputMode('image')}
+                  className={`rounded-[8px] border p-3 text-left text-[13px] font-bold transition ${captionInputMode === 'image' ? 'border-[#142334] bg-[#142334] text-white' : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98]'}`}
+                >
+                  <span className="block">Image</span>
+                  <span className={`mt-1 block text-[11px] leading-relaxed ${captionInputMode === 'image' ? 'text-white/62' : 'text-[#142334]/55'}`}>
+                    Upload the photo or visual you want captioned.
+                  </span>
+                </button>
+              </div>
+              {captionInputMode === 'text' ? (
+                <textarea
+                  value={captionSourceText}
+                  onChange={(event) => setCaptionSourceText(event.target.value)}
+                  onWheel={trapWheel}
+                  rows={5}
+                  placeholder="Explain what your video is about, paste the video script, or paste the post text..."
+                  className="studio-input mt-3 w-full resize-y px-4 py-3 leading-relaxed"
+                />
+              ) : (
+                <label className="mt-3 grid min-h-[118px] w-full cursor-pointer place-items-center rounded-[8px] border-2 border-dashed border-[#E4D8CB] bg-white p-5 text-center transition hover:border-[#C9AD98] hover:bg-[#FBFAF8]">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(event) => handleCaptionImageSelect(event.target.files?.[0] || null)}
+                  />
+                  <span className="grid justify-items-center">
+                    <Upload className="h-6 w-6 text-[#C9AD98]" />
+                    <span className="mt-2 text-[13px] font-bold text-[#142334]">{captionImageFile ? captionImageFile.name : 'Drop your image here or click to upload'}</span>
+                    <span className="mt-1 text-[11px] text-[#142334]/55">JPEG, PNG, WebP. Max 10MB.</span>
+                  </span>
+                </label>
+              )}
+            </ToolStep>
+
+            <ToolStep number="02" title="Select platform">
+              <ToolPillGroup
+                value={captionPlatform}
+                onChange={(value) => setCaptionPlatform(value as CaptionPlatform)}
+                options={Object.entries(captionPlatformLabels).map(([value, label]) => ({ value, label }))}
+              />
+            </ToolStep>
+
+            <ToolStep number="03" title="Caption tone">
+              <ToolPillGroup
+                value={captionTone}
+                onChange={(value) => setCaptionTone(value as CaptionTone)}
+                options={Object.entries(captionToneLabels).map(([value, label]) => ({ value, label }))}
+              />
+            </ToolStep>
+
+            {localError && activeTool === 'caption' && (
+              <div className="mt-4">
+                <Notice tone="error">{localError}</Notice>
+              </div>
+            )}
+            {localBusyTool === 'caption' && (
+              <p className="mt-4 rounded-[8px] bg-white px-4 py-3 text-[13px] font-semibold text-[#142334]/70">{currentLoadingMessage}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => void generateCaption()}
+              disabled={Boolean(effectiveBusyTool)}
+              className="studio-primary-button mt-5 w-full justify-center"
+            >
+              {localBusyTool === 'caption' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+              Generate 3 captions
+            </button>
+          </div>
+        )}
+
+        {activeTool === 'reply' && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Join the conversation</p>
+                <h3 className="mt-1 font-serif text-[27px] leading-tight text-[#142334]">Reply Generator</h3>
+              </div>
+              <Badge className="bg-white text-[#8C7466]">Full + short</Badge>
+            </div>
+
+            <ToolStep number="01" title="What are you responding to?">
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setReplyInputMode('text')}
+                  className={`rounded-[8px] border p-3 text-left text-[13px] font-bold transition ${replyInputMode === 'text' ? 'border-[#142334] bg-[#142334] text-white' : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98]'}`}
+                >
+                  Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReplyInputMode('image')}
+                  className={`rounded-[8px] border p-3 text-left text-[13px] font-bold transition ${replyInputMode === 'image' ? 'border-[#142334] bg-[#142334] text-white' : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98]'}`}
+                >
+                  Image / screenshot
+                </button>
+              </div>
+              {replyInputMode === 'text' ? (
+                <textarea
+                  value={replyOriginalText}
+                  onChange={(event) => setReplyOriginalText(event.target.value)}
+                  onWheel={trapWheel}
+                  rows={6}
+                  placeholder="Paste the comment, message, post, or email you want to respond to..."
+                  className="studio-input mt-3 w-full resize-y px-4 py-3 leading-relaxed"
+                />
+              ) : (
+                <div className="mt-3 grid w-full gap-3">
+                  <label className="grid min-h-[118px] w-full cursor-pointer place-items-center rounded-[8px] border-2 border-dashed border-[#E4D8CB] bg-white p-5 text-center transition hover:border-[#C9AD98] hover:bg-[#FBFAF8]">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(event) => handleReplyImageSelect(event.target.files?.[0] || null)}
+                    />
+                    <span className="grid justify-items-center">
+                      <ImageIcon className="h-6 w-6 text-[#C9AD98]" />
+                      <span className="mt-2 text-[13px] font-bold text-[#142334]">{replyImageFile ? replyImageFile.name : 'Upload a screenshot of the comment or post'}</span>
+                      <span className="mt-1 text-[11px] text-[#142334]/55">JPEG, PNG, WebP. Max 10MB.</span>
+                    </span>
+                  </label>
+                  <textarea
+                    value={replyOriginalText}
+                    onChange={(event) => setReplyOriginalText(event.target.value)}
+                    onWheel={trapWheel}
+                    rows={3}
+                    placeholder="Optional: paste or correct the text from the screenshot..."
+                    className="studio-input w-full resize-y px-4 py-3 leading-relaxed"
+                  />
+                </div>
+              )}
+            </ToolStep>
+
+            <ToolStep number="02" title="Select platform">
+              <ToolPillGroup
+                value={replyPlatform}
+                onChange={(value) => setReplyPlatform(value as ReplyPlatform)}
+                options={Object.entries(replyPlatformLabels).map(([value, label]) => ({ value, label }))}
+              />
+            </ToolStep>
+
+            <ToolStep number="03" title="What type of response is this?">
+              <ToolPillGroup
+                value={replyResponseType}
+                onChange={(value) => setReplyResponseType(value as ReplyResponseType)}
+                options={Object.entries(replyResponseTypeLabels).map(([value, item]) => ({
+                  value,
+                  label: item.label,
+                  detail: item.detail,
+                }))}
+              />
+            </ToolStep>
+
+            <ToolStep number="04" title="What's the goal of this reply?">
+              <ToolPillGroup
+                value={resolvedReplyGoal}
+                onChange={(value) => setReplyGoal(value as ReplyGoal)}
+                options={allowedReplyGoals.map((value) => ({ value, label: replyGoalLabels[value].label, detail: replyGoalLabels[value].detail }))}
+              />
+            </ToolStep>
+
+            <ToolStep number="05" title="Who is this person?">
+              <ToolPillGroup
+                value={replyPersonType}
+                onChange={(value) => setReplyPersonType(value as ReplyPersonType)}
+                options={Object.entries(replyPersonTypeLabels).map(([value, label]) => ({ value, label }))}
+              />
+            </ToolStep>
+
+            {localError && activeTool === 'reply' && (
+              <div className="mt-4">
+                <Notice tone="error">{localError}</Notice>
+              </div>
+            )}
+            {localBusyTool === 'reply' && (
+              <p className="mt-4 rounded-[8px] bg-white px-4 py-3 text-[13px] font-semibold text-[#142334]/70">{currentLoadingMessage}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => void generateReply()}
+              disabled={Boolean(effectiveBusyTool)}
+              className="studio-primary-button mt-5 w-full justify-center"
+            >
+              {localBusyTool === 'reply' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+              Generate reply
+            </button>
+          </div>
+        )}
+      </div>
+
+      <aside className="rounded-[8px] bg-[#142334] p-5 text-white">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Tool output</p>
+            <h3 className="mt-2 font-serif text-[30px] leading-tight">
+              {outputTitle}
+            </h3>
+            {outputSubtitle && (
+              <p className="mt-2 text-[12px] leading-relaxed text-white/60">
+                {outputSubtitle}
+              </p>
+            )}
+          </div>
+          {outputBadge && <Badge className="bg-white/10 text-white">{outputBadge}</Badge>}
+        </div>
+
+        {generatedToolResult?.output ? (
+          <>
+            <div className="mt-5 rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
+              <pre className="max-h-[620px] overflow-y-auto whitespace-pre-wrap font-sans text-[14px] leading-[1.7]">{generatedToolResult.output}</pre>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={copyToolOutput} className="studio-primary-button">
+                <ClipboardCheck className="h-4 w-4" />
+                {copied ? 'Copied' : 'Copy output'}
+              </button>
+              <button type="button" onClick={() => setSource(generatedToolResult.output)} className="studio-secondary-button">
+                Use as source
+              </button>
+            </div>
+          </>
+        ) : hasCaptionOutput ? (
+          <>
+            <div className="mt-5 grid gap-3">
+              {captionResult?.captions.map((item, index) => (
+                <div key={`${item.angle}-${index}`} className="rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Option {String(index + 1).padStart(2, '0')}</p>
+                      {item.angle && <p className="mt-1 text-[12px] font-semibold text-[#142334]/58">{item.angle}</p>}
+                    </div>
+                    <Badge className="bg-[#F5F3EE] text-[#8C7466]">{captionPlatformLabels[captionPlatform]}</Badge>
+                  </div>
+                  <p className="mt-4 whitespace-pre-wrap text-[14px] leading-[1.7] text-[#142334]/78">{item.caption}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void copyText(item.caption)} className="studio-primary-button">
+                      <ClipboardCheck className="h-4 w-4" />
+                      {copied ? 'Copied' : 'Copy caption'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSource(item.caption);
+                        setActiveTool('hook');
+                      }}
+                      className="studio-secondary-button"
+                    >
+                      Use for hooks
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : hasReplyOutput ? (
+          <>
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Suggested reply</p>
+                    <p className="mt-1 text-[12px] font-semibold text-[#142334]/58">{replyGoal === 'auto' && replyResult?.chosenGoal ? `Auto → ${replyGoalLabels[replyResult.chosenGoal as ReplyGoal]?.label ?? replyResult.chosenGoal}` : replyGoalLabels[resolvedReplyGoal].label}</p>
+                  </div>
+                  <Badge className="bg-[#F5F3EE] text-[#8C7466]">{replyPlatformLabels[replyPlatform]}</Badge>
+                </div>
+                <p className="mt-4 whitespace-pre-wrap text-[14px] leading-[1.7] text-[#142334]/78">{replyResult?.reply}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void copyText(replyResult?.reply || '')} className="studio-primary-button">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {copied ? 'Copied' : 'Copy reply'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSource(replyResult?.reply || '');
+                      setActiveTool('cta');
+                    }}
+                    className="studio-secondary-button"
+                  >
+                    Use for CTAs
+                  </button>
+                </div>
+              </div>
+              {replyResult?.shortReply && (
+                <div className="rounded-[8px] border border-white/10 bg-white/[0.08] p-4 text-white">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/58">Shorter version</p>
+                  <p className="mt-3 whitespace-pre-wrap text-[14px] leading-[1.7] text-white/80">{replyResult.shortReply}</p>
+                  <button type="button" onClick={() => void copyText(replyResult.shortReply)} className="studio-secondary-button mt-4">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {copied ? 'Copied' : 'Copy short reply'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="mt-5 grid min-h-[420px] place-items-center rounded-[8px] border border-white/10 bg-white/5 p-6 text-center">
+            <div className="max-w-sm">
+              <WandSparkles className="mx-auto h-9 w-9 text-[#C9AD98]" />
+              <p className="mt-5 font-serif text-[26px] leading-tight">Choose a tool, add context, generate.</p>
+              <p className="mt-3 text-[13px] leading-relaxed text-white/58">
+                Hooks, CTAs, captions, and replies will stay inside Kagiso&apos;s voice rules and the selected platform.
+              </p>
+            </div>
+          </div>
+        )}
+      </aside>
+    </section>
+  );
+}
+
+function ToolStep({ number, title, children }: { number: string; title: string; children: ReactNode }) {
+  return (
+    <div className="mt-5">
+      <div className="mb-3 flex items-center gap-3">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#142334] text-[12px] font-bold text-white">
+          {number}
+        </span>
+        <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{title}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ToolPillGroup({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string; detail?: string }>;
+}) {
+  return (
+    <div className="grid gap-2 md:grid-cols-2">
+      {options.map((option) => {
+        const isSelected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded-[8px] border px-4 py-3 text-left transition ${
+              isSelected
+                ? 'border-[#142334] bg-[#142334] text-white'
+                : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98] hover:bg-[#FBFAF8]'
+            }`}
+          >
+            <span className="block text-[13px] font-bold">{option.label}</span>
+            {option.detail && (
+              <span className={`mt-1 block text-[11px] leading-relaxed ${isSelected ? 'text-white/62' : 'text-[#142334]/55'}`}>
+                {option.detail}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

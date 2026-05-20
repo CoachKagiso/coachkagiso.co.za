@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { buildAiRequestBody, type AiRuntimeConfig, resolveAiRuntimeConfig } from '@/lib/ai-config';
 
 export const dynamic = 'force-dynamic';
 
-const AI_TEXT_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_VISION_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_TEXT_MODEL = 'glm-5.1';
 const AI_VISION_MODEL = 'GLM-4.6V-Flash';
 const AI_VISION_FALLBACK_MODEL = 'glm-4.5v';
-const AI_API_KEY_ENV = 'ZAI_API_KEY';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 30;
 
@@ -79,25 +76,21 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callAi(baseUrl: string, model: string, apiKey: string, messages: Array<Record<string, unknown>>, maxTokens: number, temperature: number) {
-  return fetch(`${baseUrl}/chat/completions`, {
+async function callAi(runtime: AiRuntimeConfig, model: string, messages: Array<Record<string, unknown>>, maxTokens: number, temperature: number) {
+  return fetch(`${runtime.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+    headers: runtime.headers,
+    body: JSON.stringify(buildAiRequestBody(runtime, {
       model,
       messages,
-      thinking: { type: 'disabled' },
       max_tokens: maxTokens,
       temperature,
       response_format: { type: 'json_object' },
-    }),
+    })),
   });
 }
 
-async function extractTextFromImage(imageBase64: string, imageMediaType: string, apiKey: string): Promise<{ text: string; hasText: boolean }> {
+async function extractTextFromImage(imageBase64: string, imageMediaType: string, runtime: AiRuntimeConfig): Promise<{ text: string; hasText: boolean }> {
   const messages = [
     { role: 'system', content: OCR_SYSTEM_PROMPT },
     {
@@ -115,21 +108,16 @@ async function extractTextFromImage(imageBase64: string, imageMediaType: string,
     },
   ];
 
-  const attempts = [
-    { model: AI_VISION_MODEL, retries: 3 },
-    { model: AI_VISION_FALLBACK_MODEL, retries: 1 },
-  ];
+  const attempts = runtime.provider === 'zai'
+    ? [
+        { model: AI_VISION_MODEL, retries: 3 },
+        { model: AI_VISION_FALLBACK_MODEL, retries: 1 },
+      ]
+    : [{ model: runtime.model, retries: 2 }];
 
   for (const attempt of attempts) {
     for (let index = 0; index < attempt.retries; index += 1) {
-      const response = await callAi(
-        AI_VISION_BASE_URL,
-        attempt.model,
-        apiKey,
-        messages,
-        800,
-        0.1,
-      );
+      const response = await callAi(runtime, attempt.model, messages, 800, 0.1);
 
       const responseText = await response.text();
       if (!response.ok) {
@@ -167,11 +155,10 @@ async function extractTextFromImage(imageBase64: string, imageMediaType: string,
   throw new Error('VISION_UNAVAILABLE');
 }
 
-async function extractStructureFromText(textContent: string, apiKey: string): Promise<Record<string, unknown>> {
+async function extractStructureFromText(textContent: string, runtime: AiRuntimeConfig): Promise<Record<string, unknown>> {
   const response = await callAi(
-    AI_TEXT_BASE_URL,
-    AI_TEXT_MODEL,
-    apiKey,
+    runtime,
+    runtime.model,
     [
       { role: 'system', content: STAGE1_SYSTEM_PROMPT },
       {
@@ -195,11 +182,6 @@ async function extractStructureFromText(textContent: string, apiKey: string): Pr
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env[AI_API_KEY_ENV];
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' }, { status: 503 });
-  }
-
   const contentType = req.headers.get('content-type') ?? '';
   let key = '';
   let textContent = '';
@@ -238,6 +220,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const runtime = await resolveAiRuntimeConfig({ simpleMode: false });
+  if (!runtime) {
+    return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
+  }
+
   if (!imageBase64 && !textContent) {
     return NextResponse.json({ error: 'Paste source content first.' }, { status: 400 });
   }
@@ -250,7 +237,7 @@ export async function POST(req: NextRequest) {
 
   if (imageBase64) {
     try {
-      const ocrResult = await extractTextFromImage(imageBase64, imageMediaType, apiKey);
+      const ocrResult = await extractTextFromImage(imageBase64, imageMediaType, runtime);
 
       if (!ocrResult.hasText || ocrResult.text.length < MIN_TEXT_LENGTH) {
         return NextResponse.json(
@@ -274,7 +261,7 @@ export async function POST(req: NextRequest) {
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = await extractStructureFromText(sourceText, apiKey);
+    parsed = await extractStructureFromText(sourceText, runtime);
   } catch (error) {
     console.error('Transform Stage 1 structure extraction error:', error);
     return NextResponse.json({ error: 'Could not extract the structure from this content.' }, { status: 502 });

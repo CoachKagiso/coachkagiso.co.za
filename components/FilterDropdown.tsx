@@ -12,14 +12,17 @@ type FilterDropdownOption = {
 type FilterDropdownProps = {
   name: string;
   value: string;
+  onChange?: (value: string) => void;
   options: FilterDropdownOption[];
   ariaLabel: string;
+  className?: string;
 };
 
-export default function FilterDropdown({ name, value, options, ariaLabel }: FilterDropdownProps) {
-  const [selectedValue, setSelectedValue] = useState(value);
+export default function FilterDropdown({ name, value, onChange, options, ariaLabel, className = '' }: FilterDropdownProps) {
+  const [uncontrolledValue, setUncontrolledValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const selectedValue = onChange ? value : uncontrolledValue;
   const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export default function FilterDropdown({ name, value, options, ariaLabel }: Filt
   }, []);
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} className={`relative ${className}`}>
       <input type="hidden" name={name} value={selectedValue} />
       <button
         type="button"
@@ -75,7 +78,11 @@ export default function FilterDropdown({ name, value, options, ariaLabel }: Filt
                   key={option.value}
                   type="button"
                   onClick={() => {
-                    setSelectedValue(option.value);
+                    if (onChange) {
+                      onChange(option.value);
+                    } else {
+                      setUncontrolledValue(option.value);
+                    }
                     setIsOpen(false);
                   }}
                   className={`w-full border-b border-[#F0E8E0] px-4 py-3 text-left text-[13px] font-semibold text-[#142334] transition-all duration-200 ease-out last:border-0 hover:bg-[#F5F0EA] hover:pl-5 ${

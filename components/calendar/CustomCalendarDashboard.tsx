@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -20,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import FollowUpNotificationBell, { type NotificationPanelSection } from '@/components/dashboard/FollowUpNotificationBell';
+import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 import type {
   DashboardCalendarEvent,
   DashboardCalendarEventPayload,
@@ -32,6 +32,7 @@ type CustomCalendarDashboardProps = {
   adminKey: string;
   leads: DiagnosticSubmission[];
   followUpNotificationCount?: number;
+  profilePhotoUrl?: string | null;
 };
 
 type CalendarResponse = {
@@ -425,7 +426,7 @@ function isCoachingWindow(date: Date, time: string) {
   return false;
 }
 
-export default function CustomCalendarDashboard({ adminKey, leads, followUpNotificationCount = 0 }: CustomCalendarDashboardProps) {
+export default function CustomCalendarDashboard({ adminKey, leads, followUpNotificationCount = 0, profilePhotoUrl }: CustomCalendarDashboardProps) {
   const [view, setView] = useState<DashboardCalendarView>('week');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [events, setEvents] = useState<DashboardCalendarEvent[]>([]);
@@ -1498,13 +1499,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, followUpNotif
             panelSubtitle={`${attentionStatusLabel} on the selected day, plus lead follow-up emails.`}
           />
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">
-            <Image
-              src="/images/author/ck-profile.png"
-              alt="Kagiso"
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-full object-cover"
-            />
+            <DashboardProfileAvatar src={profilePhotoUrl} />
             <span className="hidden text-[12px] font-semibold text-[#142334] sm:inline">Coach Kagiso</span>
           </div>
         </div>

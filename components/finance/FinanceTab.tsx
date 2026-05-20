@@ -11,6 +11,8 @@ import {
   Search,
   WalletCards,
 } from 'lucide-react';
+import DashboardDatePicker from '@/components/DashboardDatePicker';
+import FilterDropdown from '@/components/FilterDropdown';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
@@ -289,6 +291,16 @@ export default function FinanceTab({
       ),
     [transactionOperations],
   );
+  const serviceFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All services' },
+      ...serviceOptions.map((service) => ({
+        value: service,
+        label: transactionOperations.find((operation) => operation.payment.service_slug === service)?.serviceTitle || service,
+      })),
+    ],
+    [serviceOptions, transactionOperations],
+  );
 
   const filteredTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -411,26 +423,28 @@ export default function FinanceTab({
   ] as const;
 
   return (
-    <section id="finance-summary" className="pb-10">
+    <section id="finance-summary" className="pb-8">
       <div className="w-full">
         <div className="rounded-[8px] bg-white p-4">
           <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto_auto_auto] lg:items-end">
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">From</span>
-              <input
-                type="date"
+              <DashboardDatePicker
+                name="financeFrom"
                 value={draftFrom}
-                onChange={(event) => setDraftFrom(event.target.value)}
-                className="h-11 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
+                onChange={setDraftFrom}
+                ariaLabel="Finance date from"
+                placeholder="Start date"
               />
             </label>
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</span>
-              <input
-                type="date"
+              <DashboardDatePicker
+                name="financeTo"
                 value={draftTo}
-                onChange={(event) => setDraftTo(event.target.value)}
-                className="h-11 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
+                onChange={setDraftTo}
+                ariaLabel="Finance date to"
+                placeholder="End date"
               />
             </label>
             <button
@@ -461,7 +475,7 @@ export default function FinanceTab({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {statCards.map(([label, value, Icon]) => {
             const StatIcon = Icon as typeof WalletCards;
             return (
@@ -476,7 +490,7 @@ export default function FinanceTab({
           })}
         </div>
 
-        <div className="mt-5 rounded-[8px] bg-[#FCFBFA] p-6">
+        <div className="mt-4 rounded-[8px] bg-[#FCFBFA] p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">Revenue by service</p>
           {Object.keys(operationServiceCounts).length === 0 ? (
             <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
@@ -499,7 +513,7 @@ export default function FinanceTab({
           )}
         </div>
 
-        <div className="my-12 border-t border-[#E4D8CB]" />
+        <div className="my-7 border-t border-[#E4D8CB]" />
 
         <section aria-labelledby="transaction-log-heading">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -519,7 +533,7 @@ export default function FinanceTab({
             </button>
           </div>
 
-          <div className="mt-5 grid gap-3 rounded-[8px] bg-white p-4 xl:grid-cols-[minmax(220px,1.4fr)_minmax(160px,0.8fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto_auto] xl:items-end">
+          <div className="mt-4 grid gap-3 rounded-[8px] bg-white p-4 xl:grid-cols-[minmax(220px,1.4fr)_minmax(160px,0.8fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto_auto] xl:items-end">
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Search</span>
               <span className="relative">
@@ -534,35 +548,32 @@ export default function FinanceTab({
             </label>
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Service</span>
-              <select
+              <FilterDropdown
+                name="transactionService"
                 value={serviceFilter}
-                onChange={(event) => setServiceFilter(event.target.value)}
-                className="h-11 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
-              >
-                <option value="all">All services</option>
-                {serviceOptions.map((service) => (
-                  <option key={service} value={service}>
-                    {service}
-                  </option>
-                ))}
-              </select>
+                onChange={setServiceFilter}
+                ariaLabel="Filter transactions by service"
+                options={serviceFilterOptions}
+              />
             </label>
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">From</span>
-              <input
-                type="date"
+              <DashboardDatePicker
+                name="transactionFrom"
                 value={logDraftFrom}
-                onChange={(event) => setLogDraftFrom(event.target.value)}
-                className="h-11 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
+                onChange={setLogDraftFrom}
+                ariaLabel="Transaction date from"
+                placeholder="Start date"
               />
             </label>
             <label className="grid gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</span>
-              <input
-                type="date"
+              <DashboardDatePicker
+                name="transactionTo"
                 value={logDraftTo}
-                onChange={(event) => setLogDraftTo(event.target.value)}
-                className="h-11 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
+                onChange={setLogDraftTo}
+                ariaLabel="Transaction date to"
+                placeholder="End date"
               />
             </label>
             <button
