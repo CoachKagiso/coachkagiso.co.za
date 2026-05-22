@@ -372,10 +372,10 @@ function buildDeliverableUserPrompt({
 
 /* ---------------------------- docx rendering ----------------------------- */
 
-const CV_BODY_FONT_SIZE = 23; // 11.5pt
-const CV_SECTION_HEADING_FONT_SIZE = 26; // 13pt
-const CV_SUBHEADING_FONT_SIZE = 24; // 12pt
-const CV_META_FONT_SIZE = 22; // 11pt
+const CV_BODY_FONT_SIZE = 24; // 12pt
+const CV_SECTION_HEADING_FONT_SIZE = 28; // 14pt
+const CV_SUBHEADING_FONT_SIZE = 26; // 13pt
+const CV_META_FONT_SIZE = 23; // 11.5pt
 
 function sectionHeading(text: string) {
   return new Paragraph({
