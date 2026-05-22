@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { EMAIL_TEMPLATES, getBookingLink } from '@/lib/email-templates';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
+import FilterDropdown from '@/components/FilterDropdown';
+import DashboardTimePicker from '@/components/DashboardTimePicker';
 import type {
   AiConfigSettings,
   BusinessHoursSettings,
@@ -474,12 +476,18 @@ export default function SettingsPageComponent({
                   <span className="studio-label">Website</span>
                   <input className="studio-input h-11" value={profile.website} onChange={(event) => setProfile({ ...profile, website: event.target.value })} />
                 </label>
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <span className="studio-label">Timezone</span>
-                  <select className="studio-input h-11" value={profile.timezone} onChange={(event) => setProfile({ ...profile, timezone: event.target.value })}>
-                    <option value="Africa/Johannesburg">Africa/Johannesburg (SAST, UTC+2)</option>
-                  </select>
-                </label>
+                  <FilterDropdown
+                    name="timezone"
+                    value={profile.timezone}
+                    onChange={(value) => setProfile({ ...profile, timezone: value })}
+                    ariaLabel="Choose business profile timezone"
+                    options={[
+                      { value: 'Africa/Johannesburg', label: 'Africa/Johannesburg (SAST, UTC+2)' },
+                    ]}
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <SaveButton state={saveStates.business_profile || 'idle'} label="Save profile" />
@@ -574,8 +582,20 @@ export default function SettingsPageComponent({
                 <div className="grid gap-3 rounded-[8px] bg-[#F8F6F4] p-4">
                   <p className="studio-label">Weekday coaching window</p>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <input type="time" className="studio-input h-11" value={hours.weekdays.start} onChange={(event) => setHours({ ...hours, weekdays: { ...hours.weekdays, start: event.target.value } })} />
-                    <input type="time" className="studio-input h-11" value={hours.weekdays.end} onChange={(event) => setHours({ ...hours, weekdays: { ...hours.weekdays, end: event.target.value } })} />
+                    <DashboardTimePicker
+                      name="weekdayStart"
+                      value={hours.weekdays.start}
+                      onChange={(value) => setHours({ ...hours, weekdays: { ...hours.weekdays, start: value } })}
+                      ariaLabel="Choose weekday coaching start time"
+                      placeholder="Start time"
+                    />
+                    <DashboardTimePicker
+                      name="weekdayEnd"
+                      value={hours.weekdays.end}
+                      onChange={(value) => setHours({ ...hours, weekdays: { ...hours.weekdays, end: value } })}
+                      ariaLabel="Choose weekday coaching end time"
+                      placeholder="End time"
+                    />
                   </div>
                   <p className="text-[12px] text-[#6B6B6B]">Mon-Fri fixed</p>
                 </div>
@@ -593,8 +613,22 @@ export default function SettingsPageComponent({
                     </label>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <input type="time" disabled={!hours.saturday} className="studio-input h-11" value={hours.saturday?.start || ''} onChange={(event) => setHours({ ...hours, saturday: { start: event.target.value, end: hours.saturday?.end || '12:00' } })} />
-                    <input type="time" disabled={!hours.saturday} className="studio-input h-11" value={hours.saturday?.end || ''} onChange={(event) => setHours({ ...hours, saturday: { start: hours.saturday?.start || '09:00', end: event.target.value } })} />
+                    <DashboardTimePicker
+                      name="saturdayStart"
+                      value={hours.saturday?.start || ''}
+                      onChange={(value) => setHours({ ...hours, saturday: { start: value, end: hours.saturday?.end || '12:00' } })}
+                      ariaLabel="Choose Saturday coaching start time"
+                      placeholder="Start time"
+                      disabled={!hours.saturday}
+                    />
+                    <DashboardTimePicker
+                      name="saturdayEnd"
+                      value={hours.saturday?.end || ''}
+                      onChange={(value) => setHours({ ...hours, saturday: { start: hours.saturday?.start || '09:00', end: value } })}
+                      ariaLabel="Choose Saturday coaching end time"
+                      placeholder="End time"
+                      disabled={!hours.saturday}
+                    />
                   </div>
                 </div>
               </div>
@@ -706,20 +740,32 @@ export default function SettingsPageComponent({
                     </span>
                   </label>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="grid gap-2">
+                    <div className="grid gap-2">
                       <span className="studio-label">Primary model</span>
-                      <select className="studio-input h-11" value={aiConfig.primary_model || 'google/gemini-pro-3.1'} onChange={(event) => setAiConfig({ ...aiConfig, primary_model: event.target.value })}>
-                        <option value="google/gemini-pro-3.1">google/gemini-pro-3.1</option>
-                      </select>
+                      <FilterDropdown
+                        name="primary_model"
+                        value={aiConfig.primary_model || 'google/gemini-pro-3.1'}
+                        onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value })}
+                        ariaLabel="Choose primary AI model"
+                        options={[
+                          { value: 'google/gemini-pro-3.1', label: 'google/gemini-pro-3.1' },
+                        ]}
+                      />
                       <span className="text-[12px] text-[#6B6B6B]">Used for content generation, brand voice, and Transform mode guardrail.</span>
-                    </label>
-                    <label className="grid gap-2">
+                    </div>
+                    <div className="grid gap-2">
                       <span className="studio-label">Secondary model</span>
-                      <select className="studio-input h-11" value={aiConfig.secondary_model || 'google/gemini-flash-3.1'} onChange={(event) => setAiConfig({ ...aiConfig, secondary_model: event.target.value })}>
-                        <option value="google/gemini-flash-3.1">google/gemini-flash-3.1</option>
-                      </select>
+                      <FilterDropdown
+                        name="secondary_model"
+                        value={aiConfig.secondary_model || 'google/gemini-flash-3.1'}
+                        onChange={(value) => setAiConfig({ ...aiConfig, secondary_model: value })}
+                        ariaLabel="Choose secondary AI model"
+                        options={[
+                          { value: 'google/gemini-flash-3.1', label: 'google/gemini-flash-3.1' },
+                        ]}
+                      />
                       <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. Faster and cheaper.</span>
-                    </label>
+                    </div>
                   </div>
                   <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the Primary model. This is required for the copyright guardrail to function reliably.</p>
                   <div className="flex flex-wrap items-center gap-3">

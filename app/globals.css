@@ -95,6 +95,11 @@ body {
   border-color: #d8c8bb !important;
 }
 
+.coach-dashboard-clean .dashboard-time-picker-trigger,
+.coach-dashboard-clean .dashboard-time-picker-popover {
+  border-color: #d8c8bb !important;
+}
+
 .coach-dashboard-clean input.dashboard-date-picker {
   border-color: #d8c8bb !important;
   color-scheme: light;

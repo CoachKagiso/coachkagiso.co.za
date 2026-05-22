@@ -33,9 +33,25 @@ function includesValue<T extends readonly string[]>(values: T, value: string): v
 
 function buildReplySystemPrompt(isAuto: boolean) {
   const autoBlock = isAuto ? `
-AUTO GOAL MODE: The user selected "auto" — you must analyse the original content and choose the best reply goal from this list:
-continue_conversation, answer_question, ask_question, acknowledge, agree_expand, challenge_respectfully, add_perspective, build_visibility.
-Do NOT choose invite_dm_book. Read what the original content is about, who posted it, and what would be the most natural, valuable reply. Apply that goal's rules to your reply. Include your chosen goal in the output.
+AUTO GOAL MODE — You must first analyse the original content, then choose exactly ONE reply goal from the ALLOWED list below, then write the reply using that goal's rules.
+
+ALLOWED REPLY GOALS (pick exactly one — do NOT invent new goals):
+- continue_conversation: Keep the dialogue flowing naturally without a direct question. Best when the post is casual or open-ended.
+- answer_question: Provide a direct, helpful answer to a specific query in the post. Best when the author explicitly asks something.
+- ask_question: Prompt the author for more information or clarification to drive engagement. Best when there is room to deepen the topic.
+- acknowledge: Validate the author's point or thank them for sharing. Best for simple announcements, milestones, or celebrations.
+- agree_expand: Agree with the premise and add a supporting point, example, or nuance ("Yes, and..."). Best when the author makes a point you genuinely agree with and can deepen.
+- challenge_respectfully: Politely offer a counterpoint or alternative view to spark healthy debate. Best when you have a legitimate, nuanced disagreement.
+- add_perspective: Introduce a completely new angle, framework, or observation from your coaching experience. Best when you can enrich the conversation with a lens the author hasn't considered.
+- build_visibility: Craft a high-value, insightful response designed to attract attention from the broader audience reading the thread. Best when the thread is active and your expertise can add standout value.
+
+STRICT CONSTRAINT:
+- You MUST NOT choose "invite_dm_book" or suggest taking the conversation to direct messages under any circumstances.
+- Your choice must be based on what provides the most value to the original author and the audience.
+
+STEP 1 — ANALYSE: Before choosing, write a brief 1-2 sentence analysis of what the author is saying, their likely intent, and what kind of response would be most natural and valuable.
+STEP 2 — CHOOSE: Based on your analysis, pick exactly one goal from the allowed list.
+STEP 3 — REPLY: Write the reply using that goal's specific rules from the GOAL-SPECIFIC RULES section below.
 ` : '';
   return `
 You are a reply writer for Kagiso Shabangu, a South African Career Development and Personal Brand Coach.
@@ -84,7 +100,7 @@ PLATFORM LENGTH RULES:
 OUTPUT: Respond ONLY with valid JSON, no other text:
 {
   "reply": "Full reply text",
-  "shortReply": "Shorter version of the same reply, roughly half the length"${isAuto ? ',\n  "chosenGoal": "the goal you chose from the list above"' : ''}
+  "shortReply": "Shorter version of the same reply, roughly half the length"${isAuto ? ',\n  "analysis": "Brief 1-2 sentence analysis of what the author is saying and the best response approach",\n  "chosenGoal": "the goal you chose from the ALLOWED REPLY GOALS list above"' : ''}
 }
 `.trim();
 }
@@ -106,12 +122,15 @@ function buildReplyUserMessage({
   imageBase64: string;
   imageMediaType: string;
 }): ToolAiMessage {
+  const isAuto = goal === 'auto';
+  const contentTag = isAuto ? '<original_content>' : '';
+  const contentClose = isAuto ? '</original_content>' : '';
   const textInstruction = [
     `Platform: ${platform}`,
     `Response type: ${responseType}`,
     `Goal: ${goal}`,
     `Person type: ${personType}`,
-    originalText ? `Original content to respond to:\n"${originalText}"` : '',
+    originalText ? `${isAuto ? '<original_content>\n' : ''}${originalText}${isAuto ? '\n</original_content>' : ''}` : '',
     '',
     "Write a reply in Kagiso's voice. Follow all the rules for this goal and person type.",
   ].filter(Boolean).join('\n');
@@ -133,11 +152,12 @@ function buildReplyUserMessage({
 }
 
 function normalizeReply(value: unknown) {
-  const record = value && typeof value === 'object' ? value as { reply?: unknown; shortReply?: unknown; chosenGoal?: unknown } : {};
+  const record = value && typeof value === 'object' ? value as { reply?: unknown; shortReply?: unknown; chosenGoal?: unknown; analysis?: unknown } : {};
   return {
     reply: String(record.reply || '').trim(),
     shortReply: String(record.shortReply || '').trim(),
     chosenGoal: typeof record.chosenGoal === 'string' ? record.chosenGoal.trim() : undefined,
+    analysis: typeof record.analysis === 'string' ? record.analysis.trim() : undefined,
   };
 }
 
