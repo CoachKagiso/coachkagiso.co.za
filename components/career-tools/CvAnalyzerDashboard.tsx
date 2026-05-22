@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Download,
+  FileDown,
   FileSearch,
   FileText,
   Loader2,
@@ -363,6 +364,8 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [error, setError] = useState('');
   const [exportError, setExportError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState('');
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
   const canAnalyze = (cvText.trim().length >= 300 || Boolean(cvFile)) && !busy;
@@ -402,6 +405,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
     setBusy(true);
     setError('');
     setExportError('');
+    setBuildError('');
     setCopied(false);
     try {
       let response: Response;
@@ -465,6 +469,55 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
       setExportError('Could not export the report. Try again.');
     } finally {
       setExporting(null);
+    }
+  }
+
+  async function generateAtsCv() {
+    if (!result || building) return;
+    setBuilding(true);
+    setBuildError('');
+    try {
+      let response: Response;
+      if (cvFile) {
+        const formData = new FormData();
+        formData.append('key', adminKey);
+        formData.append('analysisMode', analyzerMode);
+        formData.append('cvFile', cvFile);
+        formData.append('targetRole', analyzerMode === 'advanced' ? targetRole : '');
+        formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
+        formData.append('goal', analyzerMode === 'advanced' ? goal : '');
+        formData.append('seniority', analyzerMode === 'advanced' ? seniority : '');
+        formData.append('analysis', JSON.stringify(result));
+        response = await fetch('/api/tools/cv-builder', { method: 'POST', body: formData });
+      } else {
+        response = await fetch('/api/tools/cv-builder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            key: adminKey,
+            analysisMode: analyzerMode,
+            cvText,
+            targetRole: analyzerMode === 'advanced' ? targetRole : '',
+            contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
+            goal: analyzerMode === 'advanced' ? goal : '',
+            seniority: analyzerMode === 'advanced' ? seniority : '',
+            analysis: result,
+          }),
+        });
+      }
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(data?.error || 'Could not generate the CV.');
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      downloadBlob(blob, match?.[1] || `coach-kagiso-ats-cv-${getLocalDateStamp()}.docx`);
+    } catch (caught) {
+      console.error('CV build error:', caught);
+      setBuildError(caught instanceof Error ? caught.message : 'Could not generate the CV.');
+    } finally {
+      setBuilding(false);
     }
   }
 
@@ -770,6 +823,29 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#142334]/62">Recommended coaching move</p>
               <h3 className="mt-2 font-serif text-[27px] leading-tight">{result.recommendedCoachMove.label}</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/72">{result.recommendedCoachMove.reason}</p>
+            </div>
+
+            <div className="rounded-[8px] border border-white/12 bg-white/[0.08] p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">ATS CV builder</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-white/64">
+                Generate a finished, ATS-optimized Word CV for a Revamp or bundle client. It rebuilds the source CV
+                using only facts already in it, strips sensitive personal data, and marks any missing numbers with
+                [brackets] for you to confirm with the client.
+              </p>
+              {buildError && (
+                <div className="mt-3 rounded-[8px] border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
+                  {buildError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void generateAtsCv()}
+                disabled={building}
+                className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#C9AD98] px-5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#142334] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {building ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                {building ? 'Building ATS CV...' : 'Generate ATS-optimized CV (.docx)'}
+              </button>
             </div>
           </div>
         )}

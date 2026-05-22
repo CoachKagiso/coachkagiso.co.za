@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { extractTextFromCvFile } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
-
-const pdfWorkerUrl = pathToFileURL(path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
 
 const cvGoals = [
   'new_role',
@@ -28,7 +25,6 @@ const coachMoveLabels = [
 ] as const;
 const MAX_CV_CHARS = 60000;
 const MAX_CONTEXT_CHARS = 16000;
-const MAX_CV_FILE_BYTES = 8 * 1024 * 1024;
 
 type CvGoal = (typeof cvGoals)[number];
 type Seniority = (typeof seniorityLevels)[number];
@@ -42,62 +38,6 @@ function includesValue<T extends readonly string[]>(values: T, value: string): v
 
 function compactString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function getFileExtension(name: string) {
-  const index = name.lastIndexOf('.');
-  return index === -1 ? '' : name.slice(index).toLowerCase();
-}
-
-function normalizeText(value: string) {
-  return value.replace(/\u0000/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
-}
-
-function isSupportedCvFile(file: File) {
-  const extension = getFileExtension(file.name);
-  return extension === '.pdf' || extension === '.docx' || extension === '.txt';
-}
-
-async function extractTextFromCvFile(file: File) {
-  const extension = getFileExtension(file.name);
-
-  if (file.size <= 0) {
-    throw new Error('Upload a CV file with content.');
-  }
-
-  if (file.size > MAX_CV_FILE_BYTES) {
-    throw new Error('CV file must be 8MB or smaller.');
-  }
-
-  if (extension === '.doc') {
-    throw new Error('Old .doc files are not supported yet. Save the CV as .docx or PDF first.');
-  }
-
-  if (!isSupportedCvFile(file)) {
-    throw new Error('Upload a PDF, Word .docx, or plain text CV.');
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  if (extension === '.txt') {
-    return normalizeText(buffer.toString('utf8'));
-  }
-
-  if (extension === '.docx') {
-    const mammoth = await import('mammoth');
-    const extracted = await mammoth.extractRawText({ buffer });
-    return normalizeText(extracted.value || '');
-  }
-
-  const { PDFParse } = await import('pdf-parse');
-  PDFParse.setWorker(pdfWorkerUrl);
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const extracted = await parser.getText();
-    return normalizeText(extracted.text || '');
-  } finally {
-    await parser.destroy();
-  }
 }
 
 function parseScore(value: unknown) {
