@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ClipboardList,
   Coins,
+  FileSearch,
   Layers3,
   LayoutDashboard,
   MessageSquare,
@@ -25,6 +26,7 @@ const primaryDashboardNavItems = [
   { label: 'Pipeline', tab: 'pipeline', icon: BarChart3 },
   { label: 'Clients', tab: 'clients', icon: ClipboardList },
   { label: 'Finance', tab: 'finance', icon: Coins },
+  { label: 'Career Tools', tab: 'career-tools', icon: FileSearch },
 ] as const;
 
 const studioNavItems = [

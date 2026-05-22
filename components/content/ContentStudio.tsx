@@ -133,9 +133,19 @@ type AiMode =
   | 'alchemy_stage2'
   | 'alchemy_critique'
   | 'format_recommendation'
+  | 'image_prompts'
   | 'voice_note'
   | 'calendar_plan'
   | 'summarise_insights';
+type ImagePromptKind = 'editorial_photo' | 'conceptual_visual' | 'designed_graphic';
+type ImagePromptOption = {
+  kind: ImagePromptKind;
+  title: string;
+  bestUse: string;
+  prompt: string;
+  negativePrompt: string;
+  aspectRatio: string;
+};
 type StudioToolKind = 'hook' | 'cta' | 'caption' | 'reply';
 type StudioGeneratedToolKind = 'hook' | 'cta';
 type StudioToolPayload = {
@@ -477,6 +487,44 @@ const hookTypeLabels: Record<HookType, { label: string; detail: string; placehol
     label: 'Visual + spoken hook',
     detail: 'First frame plus the first line Kagiso says.',
     placeholder: 'Paste the video idea and any scene details so AI can suggest the visual opening and spoken opener...',
+  },
+};
+const imagePromptKinds: ImagePromptKind[] = ['editorial_photo', 'conceptual_visual', 'designed_graphic'];
+const imagePromptFallbacks: Record<ImagePromptKind, { title: string; bestUse: string; aspectRatio: string }> = {
+  editorial_photo: {
+    title: 'Editorial photo prompt',
+    bestUse: 'LinkedIn hero image or post media that needs to feel human and credible.',
+    aspectRatio: '4:5 portrait for LinkedIn or Instagram feed',
+  },
+  conceptual_visual: {
+    title: 'Conceptual visual prompt',
+    bestUse: 'A metaphor-led image for a post about identity, transition, or decision tension.',
+    aspectRatio: '4:5 portrait for feed, 16:9 if used as an article header',
+  },
+  designed_graphic: {
+    title: 'Designed graphic prompt',
+    bestUse: 'A branded LinkedIn or Instagram graphic with restrained text and strong composition.',
+    aspectRatio: '1:1 square or 4:5 portrait',
+  },
+};
+const imagePromptMeta: Record<ImagePromptKind, { label: string; icon: LucideIcon; className: string; badgeClassName: string }> = {
+  editorial_photo: {
+    label: 'Editorial photo',
+    icon: ImageIcon,
+    className: 'border-[#E4D8CB] bg-white',
+    badgeClassName: 'bg-[#F5F3EE] text-[#8C7466]',
+  },
+  conceptual_visual: {
+    label: 'Conceptual visual',
+    icon: Lightbulb,
+    className: 'border-[#D7DEE8] bg-[#F7FAFC]',
+    badgeClassName: 'bg-white text-[#445B72]',
+  },
+  designed_graphic: {
+    label: 'Designed graphic',
+    icon: LayoutDashboard,
+    className: 'border-[#142334] bg-[#142334] text-white',
+    badgeClassName: 'bg-white/10 text-white',
   },
 };
 const captionLoadingMessages = ['Reading your image...', 'Finding three angles...', "Writing in Kagiso's voice..."];
@@ -1891,6 +1939,36 @@ function buildStudioToolUserPrompt(kind: StudioToolKind, payload: StudioToolPayl
   ].filter(Boolean).join('\n');
 }
 
+function buildImagePromptUserPrompt({
+  post,
+  platformLabel,
+  contentTypeLabel,
+  pillarLabel,
+  registerLabel,
+  angleLabel,
+  topic,
+}: {
+  post: string;
+  platformLabel: string;
+  contentTypeLabel: string;
+  pillarLabel: string;
+  registerLabel: string;
+  angleLabel: string;
+  topic: string;
+}) {
+  return [
+    `PLATFORM: ${platformLabel || 'LinkedIn'}`,
+    `CONTENT FORMAT: ${contentTypeLabel || 'Post'}`,
+    `PILLAR: ${pillarLabel}`,
+    `REGISTER: ${registerLabel}`,
+    angleLabel ? `ANGLE: ${angleLabel}` : '',
+    topic ? `TOPIC: ${topic}` : '',
+    '',
+    'FINISHED POST:',
+    post.trim(),
+  ].filter((line) => line !== '').join('\n');
+}
+
 function getPillarFocusLabel(pillar: CreatePillarFocus) {
   return pillar === 'auto' ? 'Auto-routed' : pillarMeta[pillar].label;
 }
@@ -2063,6 +2141,79 @@ function parseJsonFromAiOutput(raw: string): unknown | null {
     }
   }
   return null;
+}
+
+function isImagePromptKind(value: string): value is ImagePromptKind {
+  return imagePromptKinds.includes(value as ImagePromptKind);
+}
+
+function getImagePromptText(record: Record<string, unknown>) {
+  return multilineString(
+    record.prompt ??
+    record.imagePrompt ??
+    record.image_prompt ??
+    record.highlyDetailedImagePrompt ??
+    record.highly_detailed_image_prompt ??
+    record.detailedPrompt ??
+    record.detailed_prompt,
+  );
+}
+
+function normalizeImagePromptOptions(rawOutput: string): ImagePromptOption[] {
+  const parsed = parseJsonFromAiOutput(rawOutput);
+  const record = asPlainObject(parsed);
+  const rawOptions = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(record?.visualDirections)
+      ? record.visualDirections
+      : Array.isArray(record?.visual_directions)
+        ? record.visual_directions
+        : Array.isArray(record?.imagePrompts)
+          ? record.imagePrompts
+          : Array.isArray(record?.prompts)
+            ? record.prompts
+            : [];
+
+  return rawOptions
+    .slice(0, 3)
+    .map((item, index) => {
+      const itemRecord = asPlainObject(item);
+      if (!itemRecord) return null;
+
+      const rawKind = compactString(itemRecord.kind ?? itemRecord.type ?? itemRecord.category)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      const kind = isImagePromptKind(rawKind) ? rawKind : imagePromptKinds[index] || 'editorial_photo';
+      const fallback = imagePromptFallbacks[kind];
+      const prompt = getImagePromptText(itemRecord);
+
+      if (!prompt) return null;
+
+      return {
+        kind,
+        title: compactString(itemRecord.title) || fallback.title,
+        bestUse: multilineString(itemRecord.bestUse ?? itemRecord.best_use ?? itemRecord.useCase ?? itemRecord.use_case) || fallback.bestUse,
+        prompt,
+        negativePrompt: multilineString(itemRecord.negativePrompt ?? itemRecord.negative_prompt) || 'Avoid generic stock-photo styling, plastic corporate smiles, distorted hands, fake text, over-polished AI skin, random logos, and visual cliches.',
+        aspectRatio: compactString(itemRecord.aspectRatio ?? itemRecord.aspect_ratio ?? itemRecord.ratio) || fallback.aspectRatio,
+      };
+    })
+    .filter((item): item is ImagePromptOption => Boolean(item));
+}
+
+function formatImagePromptForClipboard(option: ImagePromptOption) {
+  return [
+    `Title: ${option.title}`,
+    `Best use: ${option.bestUse}`,
+    `Aspect ratio recommendation: ${option.aspectRatio}`,
+    '',
+    'Highly detailed image prompt:',
+    option.prompt,
+    '',
+    'Negative prompt:',
+    option.negativePrompt,
+  ].join('\n');
 }
 
 function getRawCarouselDraft(value: unknown): Record<string, unknown> | null {
@@ -2756,6 +2907,10 @@ export default function ContentStudio({
   const [alchemyDirection, setAlchemyDirection] = useState('');
   const [alchemyRebuildMode, setAlchemyRebuildMode] = useState<'simple' | 'advanced'>('simple');
   const [createFormatOutput, setCreateFormatOutput] = useState('');
+  const [createBusyAction, setCreateBusyAction] = useState<'generate' | 'regenerate' | 'polish' | 'format' | null>(null);
+  const [imagePromptOptions, setImagePromptOptions] = useState<ImagePromptOption[]>([]);
+  const [imagePromptBusy, setImagePromptBusy] = useState(false);
+  const [imagePromptError, setImagePromptError] = useState<string | null>(null);
   const [calendarPlan, setCalendarPlan] = useState('');
   const [calendarFrequency, setCalendarFrequency] = useState<CalendarFrequency>('three_per_week');
   const [calendarCustomDays, setCalendarCustomDays] = useState<CalendarDayIndex[]>([2, 3, 4]);
@@ -3856,7 +4011,9 @@ export default function ContentStudio({
     const topicToUse = topicOverride ?? topic;
     const pillarToUse = pillarOverride || createPillarFocus;
     if (!isCreateSelectionReady(selectionToUse)) return;
+    const busyAction = generatedPost.trim() && !selectionOverride ? 'regenerate' : 'generate';
     setCreateBusy(true);
+    setCreateBusyAction(busyAction);
     setCreateError(null);
     try {
       const result = await callAi(
@@ -3873,10 +4030,13 @@ export default function ContentStudio({
         setGeneratedPost(cleanDraftContent(result));
       }
       setCreateFormatOutput('');
+      setImagePromptOptions([]);
+      setImagePromptError(null);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not generate the content.');
     } finally {
       setCreateBusy(false);
+      setCreateBusyAction(null);
     }
   }
 
@@ -3884,15 +4044,19 @@ export default function ContentStudio({
     const cleanPost = cleanDraftContent(generatedPost);
     if (!cleanPost.trim()) return;
     setCreateBusy(true);
+    setCreateBusyAction('polish');
     setCreateError(null);
     try {
       const result = await callAi('polish', cleanPost);
       setGeneratedCarouselDraft(null);
       setGeneratedPost(cleanDraftContent(result));
+      setImagePromptOptions([]);
+      setImagePromptError(null);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not polish the content.');
     } finally {
       setCreateBusy(false);
+      setCreateBusyAction(null);
     }
   }
 
@@ -3915,6 +4079,7 @@ export default function ContentStudio({
     const source = cleanDraftContent(generatedPost).trim() || topic.trim();
     if (!source) return;
     setCreateBusy(true);
+    setCreateBusyAction('format');
     setCreateError(null);
     try {
       const result = await callAi('format_recommendation', source);
@@ -3923,6 +4088,44 @@ export default function ContentStudio({
       setCreateError(error instanceof Error ? error.message : 'Could not recommend a format.');
     } finally {
       setCreateBusy(false);
+      setCreateBusyAction(null);
+    }
+  }
+
+  async function generateImagePrompts() {
+    const source = cleanDraftContent(generatedPost).trim();
+    if (!source) return;
+
+    const selectedSubType = selectedCreateType?.subTypes.find((item) => item.id === createSelection.subType) || null;
+    const contentTypeLabel = selectedCreateType
+      ? `${selectedCreateType.label}${selectedSubType ? ` / ${selectedSubType.label}` : ''}`
+      : 'Post';
+
+    setImagePromptBusy(true);
+    setImagePromptError(null);
+    try {
+      const result = await callAi(
+        'image_prompts',
+        buildImagePromptUserPrompt({
+          post: source,
+          platformLabel: selectedCreatePlatformLabel || 'LinkedIn',
+          contentTypeLabel,
+          pillarLabel: getPillarFocusLabel(createPillarFocus),
+          registerLabel: selectedAngle ? getRegisterLabel(selectedAngle.register) : 'AI selected',
+          angleLabel: selectedAngle?.label || '',
+          topic: topic.trim(),
+        }),
+        createSelection,
+      );
+      const options = normalizeImagePromptOptions(result);
+      if (options.length !== 3) {
+        throw new Error('The AI did not return three usable image prompts. Try again.');
+      }
+      setImagePromptOptions(options);
+    } catch (error) {
+      setImagePromptError(error instanceof Error ? error.message : 'Could not generate image prompts.');
+    } finally {
+      setImagePromptBusy(false);
     }
   }
 
@@ -4518,9 +4721,13 @@ export default function ContentStudio({
                 topicPlaceholder={createPlaceholder}
                 generatedPost={generatedPost}
                 formatOutput={createFormatOutput}
+                imagePromptOptions={imagePromptOptions}
+                imagePromptBusy={imagePromptBusy}
+                imagePromptError={imagePromptError}
                 signalBriefOptions={signalBriefOptions}
                 canGenerate={canGenerateCreate}
                 busy={createBusy}
+                isRegenerating={createBusyAction === 'regenerate'}
                 topicInputRef={topicInputRef}
                 prepopulateNotice={smartPrepopulateNotice}
                 pulseKey={smartPulseKey}
@@ -4548,9 +4755,12 @@ export default function ContentStudio({
                 onGeneratedPostChange={(value) => {
                   setGeneratedPost(value);
                   setGeneratedCarouselDraft(null);
+                  setImagePromptOptions([]);
+                  setImagePromptError(null);
                 }}
                 onPolish={polishGeneratedPost}
                 onFormatCheck={checkGeneratedFormat}
+                onGenerateImagePrompts={() => void generateImagePrompts()}
                 carouselDraft={generatedCarouselDraft}
                 onSave={() => {
                   void saveCurrentCreateDraft();
@@ -6075,6 +6285,8 @@ function TransformFlow({
               onSave={onSave}
               onCalendar={onCalendar}
               outputNote={transformationNote}
+              actionsDisabled={busy}
+              isRegenerating={stage === 'rebuilding'}
               extraAction={
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -6164,9 +6376,13 @@ function CreateFlow({
   generatedPost,
   carouselDraft,
   formatOutput,
+  imagePromptOptions,
+  imagePromptBusy,
+  imagePromptError,
   signalBriefOptions,
   canGenerate,
   busy,
+  isRegenerating,
   topicInputRef,
   prepopulateNotice,
   pulseKey,
@@ -6185,6 +6401,7 @@ function CreateFlow({
   onGeneratedPostChange,
   onPolish,
   onFormatCheck,
+  onGenerateImagePrompts,
   onSave,
   saveLabel,
   onCalendar,
@@ -6203,9 +6420,13 @@ function CreateFlow({
   generatedPost: string;
   carouselDraft: CarouselDraftPayload | null;
   formatOutput: string;
+  imagePromptOptions: ImagePromptOption[];
+  imagePromptBusy: boolean;
+  imagePromptError: string | null;
   signalBriefOptions: Array<{ id: string; title: string; text: string }>;
   canGenerate: boolean;
   busy: boolean;
+  isRegenerating: boolean;
   topicInputRef: Ref<HTMLTextAreaElement>;
   prepopulateNotice: string | null;
   pulseKey: SmartPulseKey | null;
@@ -6224,6 +6445,7 @@ function CreateFlow({
   onGeneratedPostChange: (value: string) => void;
   onPolish: () => void;
   onFormatCheck: () => void;
+  onGenerateImagePrompts: () => void;
   onSave: () => void;
   saveLabel?: string;
   onCalendar: () => void;
@@ -6594,18 +6816,18 @@ function CreateFlow({
             saveLabel={carouselDraft ? 'Save to Carousel Studio' : saveLabel}
             onCalendar={onCalendar}
             outputNote={outputNote}
+            actionsDisabled={busy}
+            isRegenerating={isRegenerating}
             extraAction={
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  onClick={onFormatCheck}
-                  disabled={busy}
-                  className="studio-ghost-button w-fit"
-                >
-                  Format check <ClipboardCheck className="h-4 w-4" />
-                </button>
-                {formatOutput && <OutputPanel value={formatOutput} className="min-h-[180px] bg-white" />}
-              </div>
+              <ContentPreviewHelpers
+                busy={busy}
+                formatOutput={formatOutput}
+                imagePromptOptions={imagePromptOptions}
+                imagePromptBusy={imagePromptBusy}
+                imagePromptError={imagePromptError}
+                onFormatCheck={onFormatCheck}
+                onGenerateImagePrompts={onGenerateImagePrompts}
+              />
             }
           />
         ) : (
@@ -6621,6 +6843,126 @@ function CreateFlow({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function ContentPreviewHelpers({
+  busy,
+  formatOutput,
+  imagePromptOptions,
+  imagePromptBusy,
+  imagePromptError,
+  onFormatCheck,
+  onGenerateImagePrompts,
+}: {
+  busy: boolean;
+  formatOutput: string;
+  imagePromptOptions: ImagePromptOption[];
+  imagePromptBusy: boolean;
+  imagePromptError: string | null;
+  onFormatCheck: () => void;
+  onGenerateImagePrompts: () => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onFormatCheck}
+          disabled={busy}
+          className="studio-ghost-button w-fit"
+        >
+          Format check <ClipboardCheck className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onGenerateImagePrompts}
+          disabled={busy || imagePromptBusy}
+          className="studio-secondary-button w-fit"
+        >
+          {imagePromptBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+          {imagePromptBusy ? 'Generating...' : 'Image prompt'}
+        </button>
+      </div>
+
+      {formatOutput && <OutputPanel value={formatOutput} className="min-h-[180px] bg-white" />}
+
+      {imagePromptError && <Notice tone="error">{imagePromptError}</Notice>}
+      {imagePromptOptions.length > 0 && <ImagePromptCards options={imagePromptOptions} />}
+    </div>
+  );
+}
+
+function ImagePromptCards({ options }: { options: ImagePromptOption[] }) {
+  const [copiedKind, setCopiedKind] = useState<ImagePromptKind | null>(null);
+
+  async function copyPrompt(option: ImagePromptOption) {
+    await navigator.clipboard.writeText(formatImagePromptForClipboard(option));
+    setCopiedKind(option.kind);
+    window.setTimeout(() => setCopiedKind(null), 1600);
+  }
+
+  return (
+    <div className="grid gap-3">
+      {options.map((option) => {
+        const meta = imagePromptMeta[option.kind];
+        const Icon = meta.icon;
+        const isDark = option.kind === 'designed_graphic';
+        return (
+          <article key={option.kind} className={`rounded-[10px] border p-4 ${meta.className}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${isDark ? 'bg-white/10 text-white' : 'bg-[#F5F3EE] text-[#8C7466]'}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-[0.16em] ${isDark ? 'text-white/58' : 'text-[#8C7466]'}`}>
+                    {meta.label}
+                  </p>
+                  <h4 className={`mt-1 font-serif text-[23px] leading-tight ${isDark ? 'text-white' : 'text-[#142334]'}`}>
+                    {option.title}
+                  </h4>
+                </div>
+              </div>
+              <Badge className={meta.badgeClassName}>{option.aspectRatio}</Badge>
+            </div>
+
+            <div className={`mt-4 rounded-[8px] p-3 ${isDark ? 'bg-white/[0.08]' : 'bg-[#F8F6F4]'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.14em] ${isDark ? 'text-white/55' : 'text-[#8C7466]'}`}>Best use</p>
+              <p className={`mt-1 text-[13px] leading-relaxed ${isDark ? 'text-white/72' : 'text-[#142334]/68'}`}>{option.bestUse}</p>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.14em] ${isDark ? 'text-white/55' : 'text-[#8C7466]'}`}>
+                  Highly detailed image prompt
+                </p>
+                <p className={`mt-2 max-h-[260px] overflow-y-auto whitespace-pre-wrap rounded-[8px] border p-3 text-[13px] leading-[1.65] ${isDark ? 'border-white/10 bg-white text-[#142334]' : 'border-[#E4D8CB] bg-white text-[#142334]/78'}`} onWheel={trapWheel}>
+                  {option.prompt}
+                </p>
+              </div>
+              <div>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.14em] ${isDark ? 'text-white/55' : 'text-[#8C7466]'}`}>
+                  Negative prompt
+                </p>
+                <p className={`mt-2 rounded-[8px] border p-3 text-[12px] leading-relaxed ${isDark ? 'border-white/10 bg-white/[0.08] text-white/72' : 'border-[#E4D8CB] bg-white text-[#142334]/64'}`}>
+                  {option.negativePrompt}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void copyPrompt(option)}
+              className={`mt-4 ${isDark ? 'studio-secondary-button' : 'studio-primary-button'}`}
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              {copiedKind === option.kind ? 'Copied' : 'Copy prompt'}
+            </button>
+          </article>
+        );
+      })}
     </div>
   );
 }

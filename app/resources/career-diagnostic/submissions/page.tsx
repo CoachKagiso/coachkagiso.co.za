@@ -30,6 +30,7 @@ import {
 import BatchDeleteControls from '@/components/BatchDeleteControls';
 import SettingsPageComponent from '@/components/settings/SettingsPageComponent';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
+import CvAnalyzerDashboard from '@/components/career-tools/CvAnalyzerDashboard';
 import ClientsDashboard from '@/components/clients/ClientsDashboard';
 import ContentStudio from '@/components/content/ContentStudio';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
@@ -136,7 +137,7 @@ const archetypeColors = {
   D: '#79A580',
   E: '#C98672',
 } as const;
-const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'content', 'calendar', 'messages', 'tasks', 'settings'] as const;
+const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'career-tools', 'content', 'calendar', 'messages', 'tasks', 'settings'] as const;
 type DashboardTab = (typeof dashboardTabValues)[number];
 const studioWorkspaceValues = ['content', 'carousel', 'tools'] as const;
 type StudioWorkspace = (typeof studioWorkspaceValues)[number];
@@ -146,6 +147,7 @@ const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
   { tab: 'pipeline', label: 'Pipeline' },
   { tab: 'clients', label: 'Clients' },
   { tab: 'finance', label: 'Finance' },
+  { tab: 'career-tools', label: 'Career Tools' },
   { tab: 'content', label: 'Studio' },
   { tab: 'calendar', label: 'Calendar' },
   { tab: 'messages', label: 'Messages' },
@@ -950,6 +952,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
               activeTab === 'pipeline' ||
               activeTab === 'clients' ||
               activeTab === 'finance' ||
+              activeTab === 'career-tools' ||
               activeTab === 'messages' ||
               activeTab === 'tasks' ||
               activeTab === 'settings'
@@ -964,7 +967,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 query={q}
                 updatedTimeLabel={dashboardTimeLabel}
                 notificationCount={followUpNotificationCount}
-                showSearch={activeTab !== 'leads' && activeTab !== 'pipeline'}
+                showSearch={activeTab !== 'leads' && activeTab !== 'pipeline' && activeTab !== 'career-tools'}
                 profilePhotoUrl={profilePhotoUrl}
               />
             )}
@@ -1513,6 +1516,10 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
         {activeTab === 'clients' && (
           <ClientsDashboard adminKey={key || ''} clients={clientRecords} />
+        )}
+
+        {activeTab === 'career-tools' && (
+          <CvAnalyzerDashboard adminKey={key || ''} />
         )}
 
         {activeTab === 'pipeline' && (

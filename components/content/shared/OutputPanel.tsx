@@ -9,7 +9,9 @@ import {
   Italic,
   List,
   ListOrdered,
+  Loader2,
   Plus,
+  RefreshCcw,
   TextCursorInput,
 } from 'lucide-react';
 
@@ -134,6 +136,8 @@ export function OutputWithActions({
   saveLabel = 'Save to Vault',
   extraAction,
   outputNote,
+  actionsDisabled = false,
+  isRegenerating = false,
 }: {
   title: string;
   value: string;
@@ -151,6 +155,8 @@ export function OutputWithActions({
   saveLabel?: string;
   extraAction?: ReactNode;
   outputNote?: ReactNode;
+  actionsDisabled?: boolean;
+  isRegenerating?: boolean;
 }) {
   const [mode, setMode] = useState<DraftMode>('edit');
   const [insertOpen, setInsertOpen] = useState(false);
@@ -351,10 +357,17 @@ export function OutputWithActions({
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? 'Copied' : 'Copy draft'}
           </button>
-          <button type="button" onClick={onRegenerate} className="studio-ghost-button">
-            Regenerate
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={actionsDisabled}
+            aria-busy={isRegenerating}
+            className="studio-ghost-button min-w-[142px]"
+          >
+            {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            {isRegenerating ? 'Regenerating...' : 'Regenerate'}
           </button>
-          <button type="button" onClick={onPolish} className="studio-ghost-button">
+          <button type="button" onClick={onPolish} disabled={actionsDisabled} className="studio-ghost-button">
             Polish this
           </button>
           <button type="button" onClick={onSave} className="studio-secondary-button">
