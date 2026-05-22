@@ -119,6 +119,13 @@ const notificationRows = [
   ['sent_email_log', 'Sent email log', 'Record added to sent_emails'],
 ] as const;
 
+const openRouterModelOptions = [
+  { value: 'google/gemini-pro-3.1', label: 'google/gemini-pro-3.1' },
+  { value: 'google/gemini-flash-3.1', label: 'google/gemini-flash-3.1' },
+  { value: 'google/gemini-3.5-flash', label: 'google/gemini-3.5-flash' },
+  { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro' },
+];
+
 function coerceArray<T>(value: unknown, fallback: T[]): T[] {
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
@@ -200,7 +207,7 @@ function SettingsPanel({
           </div>
         </div>
       </div>
-      <div className="max-h-none overflow-y-visible p-5 md:max-h-[calc(100vh-270px)] md:overflow-y-auto md:p-6">
+      <div className="p-5 md:p-6">
         {children}
       </div>
     </section>
@@ -726,10 +733,19 @@ export default function SettingsPageComponent({
                   </button>
                 </div>
               </div>
-              <details open={productionOpen} onToggle={(event) => setProductionOpen(event.currentTarget.open)} className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
-                <summary className="cursor-pointer list-none font-serif text-[20px] text-[#142334] [&::-webkit-details-marker]:hidden">Switch to production models</summary>
-                <div className="mt-4 grid gap-4">
-                  <p className="text-[13px] leading-relaxed text-[#6B6B6B]">When testing is complete, switch to Google Vertex via OpenRouter for better instruction-following and POPIA compliance.</p>
+              <details
+                open={productionOpen}
+                onToggle={(event) => setProductionOpen(event.currentTarget.open)}
+                className="relative z-10 overflow-visible rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] shadow-[0_1px_2px_rgba(20,35,52,0.04)]"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 border-b border-[#E4D8CB] bg-white px-4 py-3 transition hover:bg-[#F8F6F4] [&::-webkit-details-marker]:hidden">
+                  <span className="font-serif text-[20px] text-[#142334]">Switch to production models</span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] text-[#8C7466]">
+                    <ChevronDown className={`h-4 w-4 transition-transform ${productionOpen ? 'rotate-180' : ''}`} />
+                  </span>
+                </summary>
+                <div className="grid gap-4 p-4">
+                  <p className="text-[13px] leading-relaxed text-[#6B6B6B]">When testing is complete, switch to production models via OpenRouter for better instruction-following and POPIA compliance.</p>
                   <label className="grid gap-2">
                     <span className="studio-label">OpenRouter API key</span>
                     <span className="relative">
@@ -747,9 +763,7 @@ export default function SettingsPageComponent({
                         value={aiConfig.primary_model || 'google/gemini-pro-3.1'}
                         onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value })}
                         ariaLabel="Choose primary AI model"
-                        options={[
-                          { value: 'google/gemini-pro-3.1', label: 'google/gemini-pro-3.1' },
-                        ]}
+                        options={openRouterModelOptions}
                       />
                       <span className="text-[12px] text-[#6B6B6B]">Used for content generation, brand voice, and Transform mode guardrail.</span>
                     </div>
@@ -760,9 +774,7 @@ export default function SettingsPageComponent({
                         value={aiConfig.secondary_model || 'google/gemini-flash-3.1'}
                         onChange={(value) => setAiConfig({ ...aiConfig, secondary_model: value })}
                         ariaLabel="Choose secondary AI model"
-                        options={[
-                          { value: 'google/gemini-flash-3.1', label: 'google/gemini-flash-3.1' },
-                        ]}
+                        options={openRouterModelOptions}
                       />
                       <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. Faster and cheaper.</span>
                     </div>

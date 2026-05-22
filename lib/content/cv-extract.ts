@@ -27,6 +27,14 @@ export function isSupportedCvFile(file: File) {
   return extension === '.pdf' || extension === '.docx' || extension === '.txt';
 }
 
+async function ensurePdfServerDomApis() {
+  const runtime = globalThis as typeof globalThis & { DOMMatrix?: typeof DOMMatrix };
+  if (typeof runtime.DOMMatrix !== 'undefined') return;
+
+  const { default: DOMMatrixShim } = (await import('@thednp/dommatrix')) as unknown as { default: typeof DOMMatrix };
+  runtime.DOMMatrix = DOMMatrixShim;
+}
+
 export async function extractTextFromCvFile(file: File) {
   const extension = getCvFileExtension(file.name);
 
@@ -58,6 +66,7 @@ export async function extractTextFromCvFile(file: File) {
     return normalizeCvText(extracted.value || '');
   }
 
+  await ensurePdfServerDomApis();
   const { PDFParse } = await import('pdf-parse');
   PDFParse.setWorker(pdfWorkerUrl);
   const parser = new PDFParse({ data: buffer });

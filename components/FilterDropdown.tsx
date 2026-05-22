@@ -68,7 +68,7 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="dashboard-filter-dropdown-menu absolute left-0 top-full z-[100] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#D8C8BB] bg-white shadow-xl shadow-[#142334]/12"
+            className="dashboard-filter-dropdown-menu absolute left-0 top-full z-[300] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#D8C8BB] bg-white shadow-xl shadow-[#142334]/12"
           >
             {options.map((option) => {
               const isSelected = option.value === selectedValue;
