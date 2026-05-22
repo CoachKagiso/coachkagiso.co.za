@@ -45,6 +45,7 @@ export type ContentBacklogItem = {
   platform: ContentPlatform | null;
   status: ContentBacklogStatus;
   source: ContentBacklogSource;
+  isFavorite: boolean;
   content: string | null;
   notes: string | null;
   createdAt: string;
@@ -93,9 +94,12 @@ export type ContentBacklogInput = {
   platform?: ContentPlatform | null;
   status?: ContentBacklogStatus;
   source?: ContentBacklogSource;
+  isFavorite?: boolean;
   content?: string | null;
   notes?: string | null;
 };
+
+const contentBacklogFavoriteMarker = '[vault:favorite]';
 
 const contentSignalByArchetype = {
   A: 'career plateau frustration',
@@ -142,7 +146,50 @@ function normalizeCalendarRow(row: ContentCalendarRow): ContentCalendarItem {
   };
 }
 
+function parseObjectNotes(notes: string) {
+  try {
+    const parsed = JSON.parse(notes) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasBacklogFavoriteFlag(notes?: string | null) {
+  const trimmed = notes?.trim();
+  if (!trimmed) return false;
+  const parsed = trimmed.startsWith('{') ? parseObjectNotes(trimmed) : null;
+  if (parsed) return parsed.isFavorite === true || parsed.favorite === true;
+  return trimmed.includes(contentBacklogFavoriteMarker);
+}
+
+function stripBacklogFavoriteFlag(notes?: string | null) {
+  if (!notes) return null;
+  const trimmed = notes.trim();
+  const parsed = trimmed.startsWith('{') ? parseObjectNotes(trimmed) : null;
+
+  if (parsed && ('isFavorite' in parsed || 'favorite' in parsed)) {
+    const { isFavorite: _isFavorite, favorite: _favorite, ...rest } = parsed;
+    return Object.keys(rest).length ? JSON.stringify(rest, null, 2) : null;
+  }
+
+  const cleaned = notes.replaceAll(contentBacklogFavoriteMarker, '').trim();
+  return cleaned || null;
+}
+
+function applyBacklogFavoriteFlag(notes: string | null | undefined, isFavorite?: boolean) {
+  const cleaned = stripBacklogFavoriteFlag(notes);
+  if (!isFavorite) return cleaned;
+
+  const trimmed = cleaned?.trim() || '';
+  const parsed = trimmed.startsWith('{') ? parseObjectNotes(trimmed) : null;
+  if (parsed) return JSON.stringify({ ...parsed, isFavorite: true }, null, 2);
+
+  return [contentBacklogFavoriteMarker, cleaned].filter(Boolean).join('\n');
+}
+
 function normalizeBacklogRow(row: ContentBacklogRow): ContentBacklogItem {
+  const notes = stripBacklogFavoriteFlag(row.notes);
   return {
     id: row.id,
     title: row.title,
@@ -150,8 +197,9 @@ function normalizeBacklogRow(row: ContentBacklogRow): ContentBacklogItem {
     platform: row.platform,
     status: row.status,
     source: row.source,
+    isFavorite: hasBacklogFavoriteFlag(row.notes),
     content: row.content,
-    notes: row.notes,
+    notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -180,6 +228,8 @@ function toCalendarPayload(input: ContentCalendarInput) {
 }
 
 function toBacklogPayload(input: ContentBacklogInput) {
+  const notes =
+    input.isFavorite !== undefined ? applyBacklogFavoriteFlag(input.notes, input.isFavorite) : input.notes || null;
   return {
     title: input.title.trim(),
     pillar: input.pillar || null,
@@ -187,7 +237,7 @@ function toBacklogPayload(input: ContentBacklogInput) {
     status: input.status || 'idea',
     source: input.source || 'manual',
     content: input.content || null,
-    notes: input.notes || null,
+    notes,
   };
 }
 
@@ -412,7 +462,10 @@ export async function updateContentBacklogItem(id: string, input: Partial<Conten
   if (input.status !== undefined) payload.status = input.status;
   if (input.source !== undefined) payload.source = input.source;
   if (input.content !== undefined) payload.content = input.content || null;
-  if (input.notes !== undefined) payload.notes = input.notes || null;
+  if (input.notes !== undefined) {
+    payload.notes =
+      input.isFavorite !== undefined ? applyBacklogFavoriteFlag(input.notes, input.isFavorite) : input.notes || null;
+  }
 
   const { data, error } = await supabase
     .from('content_backlog')

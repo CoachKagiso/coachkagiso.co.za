@@ -39,6 +39,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import FollowUpNotificationBell, { type NotificationPanelSection } from '@/components/dashboard/FollowUpNotificationBell';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
+import DashboardDatePicker from '@/components/DashboardDatePicker';
 import FilterDropdown from '@/components/FilterDropdown';
 import { OutputPanel, OutputWithActions } from '@/components/content/shared/OutputPanel';
 import { EditorialCalendarTab } from '@/components/content/tabs/EditorialCalendarTab';
@@ -163,6 +164,7 @@ type CaptionTone =
 type CaptionInputMode = 'text' | 'image';
 type CaptionResult = {
   captions: Array<{ caption: string; angle: string }>;
+  analysis?: string;
 };
 type ReplyPlatform = Exclude<ContentPlatform, 'email'> | 'email_dm';
 type ReplyInputMode = 'text' | 'image';
@@ -183,6 +185,7 @@ type ReplyResult = {
   reply: string;
   shortReply: string;
   chosenGoal?: string;
+  analysis?: string;
 };
 type HookType = 'text_post' | 'spoken_video' | 'visual' | 'visual_spoken';
 type TransformInputType = 'text' | 'image';
@@ -284,7 +287,7 @@ type ContentTypeOption = {
   label: string;
   description: string;
   icon: LucideIcon;
-  subTypes: Array<{ id: string; label: string }>;
+  subTypes: Array<{ id: string; label: string; description?: string }>;
 };
 
 type ContentTypeGroup = {
@@ -335,6 +338,37 @@ type ContentSearchResult = {
   title: string;
   detail: string;
   tag: string;
+};
+
+type CalendarFrequency = 'daily' | 'weekdays' | 'three_per_week' | 'custom';
+type CalendarTone =
+  | 'auto'
+  | 'tactical_teacher'
+  | 'reflective_leader'
+  | 'reflection_friday'
+  | 'conviction_reframe'
+  | 'celebration_gratitude'
+  | 'the_challenger';
+type CalendarPlanLength = 7 | 14 | 30;
+type CalendarDayIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+type CalendarDayOption = {
+  value: CalendarDayIndex;
+  label: string;
+  longLabel: string;
+};
+
+type CalendarFrequencyOption = {
+  value: CalendarFrequency;
+  label: string;
+  description: string;
+  dayIndexes?: CalendarDayIndex[];
+};
+
+type CalendarToneOption = {
+  value: CalendarTone;
+  label: string;
+  description: string;
 };
 
 const pillarMeta: Record<ContentPillar, { label: string; className: string }> = {
@@ -553,6 +587,54 @@ const sourceLabels: Record<ContentBacklogSource, string> = {
   manual: 'Manual',
   insights: 'Insights Article',
 };
+
+const calendarDayOptions: CalendarDayOption[] = [
+  { value: 1, label: 'Mon', longLabel: 'Monday' },
+  { value: 2, label: 'Tue', longLabel: 'Tuesday' },
+  { value: 3, label: 'Wed', longLabel: 'Wednesday' },
+  { value: 4, label: 'Thu', longLabel: 'Thursday' },
+  { value: 5, label: 'Fri', longLabel: 'Friday' },
+  { value: 6, label: 'Sat', longLabel: 'Saturday' },
+  { value: 0, label: 'Sun', longLabel: 'Sunday' },
+];
+
+const calendarFrequencyOptions: CalendarFrequencyOption[] = [
+  {
+    value: 'daily',
+    label: 'Every day',
+    description: 'Post across the full week when growth mode needs maximum consistency.',
+    dayIndexes: [1, 2, 3, 4, 5, 6, 0],
+  },
+  {
+    value: 'weekdays',
+    label: 'Weekdays only',
+    description: 'Post Monday to Friday and leave weekends open.',
+    dayIndexes: [1, 2, 3, 4, 5],
+  },
+  {
+    value: 'three_per_week',
+    label: '3x per week',
+    description: 'Balanced visibility using Tuesday, Wednesday, and Thursday.',
+    dayIndexes: [2, 3, 4],
+  },
+  {
+    value: 'custom',
+    label: 'Custom',
+    description: 'Choose the exact days that match the user schedule.',
+  },
+];
+
+const calendarToneOptions: CalendarToneOption[] = [
+  { value: 'auto', label: 'Auto (AI decides)', description: 'Choose the strongest register for each planned post.' },
+  { value: 'tactical_teacher', label: 'Tactical Teacher', description: 'Clear frameworks, direct steps, practical teaching.' },
+  { value: 'reflective_leader', label: 'Reflective Leader', description: 'Thought leadership, bigger truth, strategic context.' },
+  { value: 'reflection_friday', label: 'Reflection Friday', description: 'Warm, pastoral, intimate, one-to-one reflection.' },
+  { value: 'conviction_reframe', label: 'Conviction Reframe', description: 'Sharp reframe that names the hidden cost.' },
+  { value: 'celebration_gratitude', label: 'Celebration & Gratitude', description: 'Warm, specific, communal milestone energy.' },
+  { value: 'the_challenger', label: 'The Challenger', description: 'Punchy, direct, calls out the unspoken truth.' },
+];
+
+const calendarPlanLengthOptions: CalendarPlanLength[] = [7, 14, 30];
 
 const smartSourceLabels: Record<SmartSuggestSource, string> = {
   pillar_gap: 'Pillar gap',
@@ -796,6 +878,26 @@ const contentTypeGuidance: Record<string, StudioGuidance> = {
     ],
     callout: 'Use this when the hook gets attention and the caption earns connection.',
   },
+  caption_reel_normal_text_post: {
+    eyebrow: 'Format path',
+    title: 'Normal Text Post',
+    bullets: [
+      'Use this for an Instagram caption, Facebook feed post, or Reel caption.',
+      'The output stays as one complete post, not a comment thread.',
+      'Best when the post should stand alone in the feed.',
+    ],
+    callout: 'Choose this when the idea belongs on Instagram or when Facebook does not need a threaded comment sequence.',
+  },
+  caption_reel_facebook_thread: {
+    eyebrow: 'Format path',
+    title: 'Facebook Thread',
+    bullets: [
+      'Creates one opening post plus a planned sequence of first comments.',
+      'Best for step-by-step lessons, story breakdowns, and community discussion prompts.',
+      'Keeps the value in Facebook comments instead of turning the idea into an Instagram caption.',
+    ],
+    callout: 'Choose this when the Facebook version needs depth, conversation, and multiple comment entries.',
+  },
   story_prompt: {
     eyebrow: 'Format logic',
     title: 'Story Prompt',
@@ -908,6 +1010,53 @@ const contentTypeGuidance: Record<string, StudioGuidance> = {
   },
 };
 
+const NORMAL_CAPTION_REEL_SUBTYPE = 'normal_text_post';
+const FACEBOOK_THREAD_SUBTYPE_PREFIX = 'facebook_thread';
+
+const captionReelSubTypes: ContentTypeOption['subTypes'] = [
+  {
+    id: NORMAL_CAPTION_REEL_SUBTYPE,
+    label: 'Normal text post',
+    description: 'Instagram caption, Facebook post, or Reel caption',
+  },
+  {
+    id: 'facebook_thread_auto',
+    label: 'Thread: auto',
+    description: 'Facebook thread, AI chooses the length',
+  },
+  {
+    id: 'facebook_thread_3',
+    label: 'Thread: 3 comments',
+    description: 'Facebook opening post plus 3 comments',
+  },
+  {
+    id: 'facebook_thread_5',
+    label: 'Thread: 5 comments',
+    description: 'Facebook opening post plus 5 comments',
+  },
+  {
+    id: 'facebook_thread_7',
+    label: 'Thread: 7 comments',
+    description: 'Facebook opening post plus 7 comments',
+  },
+  {
+    id: 'facebook_thread_10',
+    label: 'Thread: 10 comments',
+    description: 'Facebook opening post plus 10 comments',
+  },
+];
+
+function isFacebookThreadSubType(subType?: string | null) {
+  return Boolean(subType?.startsWith(FACEBOOK_THREAD_SUBTYPE_PREFIX));
+}
+
+function getFacebookThreadDepthLabel(subType?: string | null) {
+  if (!isFacebookThreadSubType(subType)) return '';
+  if (subType === 'facebook_thread_auto') return 'AI decides between 3, 5, 7, or 10 comment entries based on the idea.';
+  const count = subType?.replace('facebook_thread_', '');
+  return count ? `Write exactly ${count} Facebook comment entries after the opening post.` : '';
+}
+
 const contentTypesByPlatform: Record<CreatePlatform, ContentTypeGroup[]> = {
   linkedin: [
     {
@@ -934,7 +1083,7 @@ const contentTypesByPlatform: Record<CreatePlatform, ContentTypeGroup[]> = {
     {
       label: null,
       types: [
-        { id: 'caption_reel', label: 'Caption + Reel Hook', description: 'For Reels and feed posts', icon: Sparkles, subTypes: [] },
+        { id: 'caption_reel', label: 'Caption + Reel Hook', description: 'Normal post or FB thread', icon: Sparkles, subTypes: captionReelSubTypes },
         { id: 'carousel', label: 'Carousel', description: 'Multi-slide saves', icon: ClipboardCheck, subTypes: [] },
         { id: 'story_prompt', label: 'Story Prompt', description: 'Polls, questions, behind-the-scenes', icon: MessageSquare, subTypes: [] },
         { id: 'content_series', label: 'Content Series', description: '3-7 connected posts', icon: CalendarDays, subTypes: [] },
@@ -1147,6 +1296,23 @@ const angleGroupsByKey: Record<string, AngleGroup[]> = {
       ],
     },
   ],
+  caption_reel_facebook_thread: [
+    {
+      label: 'Build the thread',
+      angles: [
+        { id: 'step_by_step_thread', label: 'Step-by-Step Thread', register: 'tactical_teacher' },
+        { id: 'story_thread', label: 'Story Thread', register: 'reflection_friday' },
+        { id: 'myth_busting_thread', label: 'Myth-Busting Thread', register: 'conviction_reframe' },
+      ],
+    },
+    {
+      label: 'Start a conversation',
+      angles: [
+        { id: 'community_discussion_thread', label: 'Community Discussion', register: 'reflection_friday' },
+        { id: 'case_breakdown_thread', label: 'Case Breakdown', register: 'reflective_leader' },
+      ],
+    },
+  ],
   story_prompt: [
     {
       label: 'Story type',
@@ -1278,11 +1444,65 @@ const angleDetails: Record<string, { whatItIs: string; whyItWorks: string; examp
     exampleOpener: "Everyone tells you to work harder to get promoted. That's not why people get promoted.",
     bestPlatform: 'LinkedIn',
   },
+  hot_observation: {
+    whatItIs: 'A sharp, timely observation about something happening in the professional world right now.',
+    whyItWorks: 'Speed and specificity. The reader recognises the moment and wants to know your take before the moment passes.',
+    exampleOpener: 'Every company just added "AI skills required" to their job posts. Nobody defined what that means.',
+    bestPlatform: 'LinkedIn',
+  },
+  thought_provoking_question: {
+    whatItIs: 'Build toward one question that sits with the reader long after they scroll past.',
+    whyItWorks: 'Questions that have no easy answer create more reflection and more comments than answers ever do.',
+    exampleOpener: 'If your job title disappeared tomorrow, what would you actually be qualified to do?',
+    bestPlatform: 'LinkedIn / Facebook',
+  },
   quick_lesson: {
     whatItIs: 'One actionable insight, explained clearly.',
     whyItWorks: 'Mid-career professionals want practical tools they can use this week, not theory.',
     exampleOpener: 'Nobody told you your LinkedIn headline was the problem. But it is.',
     bestPlatform: 'LinkedIn / TikTok',
+  },
+  lessons_learned: {
+    whatItIs: 'A specific moment that taught something unexpected about career, leadership, or growth.',
+    whyItWorks: 'Grounded lessons from real moments feel earned, not performed. Specificity builds trust.',
+    exampleOpener: 'Three months into my first management role, I made a decision that cost me my best team member.',
+    bestPlatform: 'LinkedIn / Instagram',
+  },
+  behind_the_scenes: {
+    whatItIs: 'Share what being there actually taught you — something the reader could not learn without you.',
+    whyItWorks: 'People follow people, not brands. Behind-the-scenes content builds the kind of trust that leads to DMs and bookings.',
+    exampleOpener: 'What no one tells you about running a coaching practice: most weeks, I am the one being coached.',
+    bestPlatform: 'Instagram / LinkedIn',
+  },
+  client_win: {
+    whatItIs: 'Share a client transformation with care and specificity.',
+    whyItWorks: 'Proof without boasting. A real client story does more selling than any testimonial line.',
+    exampleOpener: 'She had been applying for six months with the same CV. Three weeks after we reworked it, she had an interview.',
+    bestPlatform: 'LinkedIn / Facebook',
+  },
+  personal_milestone: {
+    whatItIs: 'Share a real achievement or moment of growth.',
+    whyItWorks: 'It shows the human behind the coach. Community celebrates with her and trusts her more.',
+    exampleOpener: "Growth is no longer accidental for me. It's intentional.",
+    bestPlatform: 'LinkedIn / Instagram',
+  },
+  career_framework: {
+    whatItIs: 'Share a practical mental model or decision-making framework for a specific career challenge.',
+    whyItWorks: 'Frameworks are saveable and shareable. They position Kagiso as a thinker, not just a motivator.',
+    exampleOpener: 'Here is the three-question test I use before accepting any new opportunity.',
+    bestPlatform: 'LinkedIn',
+  },
+  industry_insight: {
+    whatItIs: 'Observe a trend, shift, or pattern in the SA or global professional landscape and give your original take.',
+    whyItWorks: 'Readers want someone who can connect the dots, not just share the headline. Insight builds authority.',
+    exampleOpener: 'The biggest hiring shift in Corporate SA right now has nothing to do with AI.',
+    bestPlatform: 'LinkedIn',
+  },
+  resource_worth_sharing: {
+    whatItIs: 'Introduce a useful resource and explain why it matters and how to apply it.',
+    whyItWorks: 'The value is in the application, not the link. Curating well is a form of thought leadership.',
+    exampleOpener: 'I read something this week that changed how I think about salary negotiations.',
+    bestPlatform: 'LinkedIn / Facebook',
   },
   reflection_friday: {
     whatItIs: 'One honest question with no explanation needed.',
@@ -1290,11 +1510,23 @@ const angleDetails: Record<string, { whatItIs: string; whyItWorks: string; examp
     exampleOpener: 'Are you running away from something, or running towards something?',
     bestPlatform: 'LinkedIn',
   },
-  pov_scenario: {
-    whatItIs: 'Put the viewer inside a specific, relatable career situation.',
-    whyItWorks: 'Immediate recognition. The viewer thinks, this is exactly me.',
-    exampleOpener: 'POV: you have been passed over for promotion twice and your manager just called it timing.',
-    bestPlatform: 'TikTok',
+  community_call: {
+    whatItIs: 'Directly address the community and ask for input, experiences, or perspectives.',
+    whyItWorks: 'People engage when they feel their voice matters. This builds belonging and conversation.',
+    exampleOpener: 'I want to hear from you: what is one career rule you had to unlearn the hard way?',
+    bestPlatform: 'LinkedIn / Facebook',
+  },
+  relatable_observation: {
+    whatItIs: 'Name something every professional has experienced but rarely puts into words.',
+    whyItWorks: 'The recognition itself is the hook. When someone feels seen, they engage, save, and share.',
+    exampleOpener: 'The hardest part of a new job is not the work. It is figuring out who you can trust.',
+    bestPlatform: 'LinkedIn / TikTok',
+  },
+  career_hot_take: {
+    whatItIs: 'Take the strongest possible position on a career or workplace topic. No hedging.',
+    whyItWorks: 'Bold positions cut through the noise. People respect clarity even when they disagree.',
+    exampleOpener: 'Networking events are a waste of time for most professionals. Here is what works instead.',
+    bestPlatform: 'LinkedIn / TikTok',
   },
   the_challenger: {
     whatItIs: 'React to bad career advice with visible disagreement.',
@@ -1308,33 +1540,77 @@ const angleDetails: Record<string, { whatItIs: string; whyItWorks: string; examp
     exampleOpener: "Hey, it's Kagiso. I just wanted to check in, not as a coach, just as someone who cares.",
     bestPlatform: 'Email & Voice Note',
   },
-  personal_milestone: {
-    whatItIs: 'Share a real achievement or moment of growth.',
-    whyItWorks: 'It shows the human behind the coach. Community celebrates with her and trusts her more.',
-    exampleOpener: "Growth is no longer accidental for me. It's intentional.",
-    bestPlatform: 'LinkedIn / Instagram',
-  },
   conviction_reframe: {
     whatItIs: 'Take what sounds safe and name the hidden cost.',
     whyItWorks: 'It disrupts comfortable assumptions without being aggressive. It makes people pause.',
     exampleOpener: 'Comfortable is the most dangerous place to be.',
     bestPlatform: 'LinkedIn / TikTok',
   },
+  pov_scenario: {
+    whatItIs: 'Put the viewer inside a specific, relatable career situation.',
+    whyItWorks: 'Immediate recognition. The viewer thinks, this is exactly me.',
+    exampleOpener: 'POV: you have been passed over for promotion twice and your manager just called it timing.',
+    bestPlatform: 'TikTok',
+  },
+  step_by_step_thread: {
+    whatItIs: 'Break a useful process into an opening post plus clear comment-by-comment steps.',
+    whyItWorks: 'Facebook rewards conversation and dwell time, and a step sequence gives people a reason to follow the comments.',
+    exampleOpener: 'Stop saying "just checking in" in salary emails. Do this instead.',
+    bestPlatform: 'Facebook',
+  },
+  story_thread: {
+    whatItIs: 'Tell a story in layers, with each comment revealing the next beat.',
+    whyItWorks: 'It turns a longer lesson into a native Facebook conversation instead of a wall of text.',
+    exampleOpener: 'A client nearly talked herself out of asking for the raise she had earned.',
+    bestPlatform: 'Facebook',
+  },
+  myth_busting_thread: {
+    whatItIs: 'Use the opening post to name the myth, then unpack the correction across comments.',
+    whyItWorks: 'The format keeps disagreement useful and gives readers several points to respond to.',
+    exampleOpener: 'The "be grateful you have a job" advice has cost too many women money.',
+    bestPlatform: 'Facebook',
+  },
+  community_discussion_thread: {
+    whatItIs: 'Open a real question, then use comments to guide the conversation with prompts and context.',
+    whyItWorks: 'It makes the thread feel participatory rather than broadcast-only.',
+    exampleOpener: 'What is one career rule you had to unlearn the hard way?',
+    bestPlatform: 'Facebook',
+  },
+  case_breakdown_thread: {
+    whatItIs: 'Break down a client-adjacent or anonymised scenario into situation, decision, and lesson comments.',
+    whyItWorks: 'It gives proof of thinking without inventing outcomes or overexposing private client details.',
+    exampleOpener: 'Here is how I would approach a promotion conversation after being overlooked twice.',
+    bestPlatform: 'Facebook',
+  },
 };
 
 const anglePlaceholders: Record<string, string> = {
   contrarian_take: "What's the conventional wisdom you disagree with?",
+  hot_observation: 'What just happened in your industry that nobody is talking about clearly?',
+  thought_provoking_question: 'What question do you want the reader to sit with?',
   quick_lesson: 'What is the one thing you wish someone told you earlier?',
+  lessons_learned: 'What specific moment taught you something unexpected?',
+  behind_the_scenes: 'What did being there teach you that your reader could not learn without you?',
+  client_win: 'Describe a client situation or transformation.',
+  personal_milestone: 'What moment or achievement do you want to share?',
+  career_framework: 'What mental model or decision-making tool do you want to share?',
+  industry_insight: 'What trend, shift, or pattern are you noticing in the professional landscape?',
+  resource_worth_sharing: 'What resource do you want to share and why does it matter?',
   reflection_friday: 'What are you sitting with this week?',
-  pov_scenario: 'Describe the situation, for example being passed over for promotion again.',
+  community_call: 'Who do you want to invite into a conversation?',
+  relatable_observation: 'What universal professional experience do you want to name?',
+  career_hot_take: "What's the strongest position you can take on a career topic?",
   the_challenger: 'What bad career advice are you reacting to?',
   warm_checkin: "What do you want to say to someone who's been quiet?",
-  personal_milestone: 'What moment or achievement do you want to share?',
   conviction_reframe: "What safe choice has a hidden cost?",
-  community_call: 'Who do you want to invite into a conversation?',
-  client_win: 'Describe a client situation or transformation.',
+  pov_scenario: 'Describe the situation, for example being passed over for promotion again.',
   case_study: 'Describe the situation, the challenge, and what changed.',
   personal_essay: 'What experience shaped how you think about work?',
+  step_by_step_thread: 'What process, guide, or sequence should the Facebook thread explain?',
+  story_thread: 'What story should unfold across the opening post and comments?',
+  myth_busting_thread: 'What myth should the opening post challenge?',
+  community_discussion_thread: 'What conversation do you want people to join?',
+  case_breakdown_thread: 'What scenario should Kagiso break down for the audience?',
   default: 'What do you want to write about?',
 };
 
@@ -1345,6 +1621,45 @@ function getDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function sortCalendarDayIndexes(days: CalendarDayIndex[]) {
+  return calendarDayOptions.map((option) => option.value).filter((day) => days.includes(day));
+}
+
+function getCalendarFrequencyOption(value: CalendarFrequency) {
+  return calendarFrequencyOptions.find((option) => option.value === value) || calendarFrequencyOptions[2];
+}
+
+function getCalendarToneOption(value: CalendarTone) {
+  return calendarToneOptions.find((option) => option.value === value) || calendarToneOptions[0];
+}
+
+function getCalendarPostingDayIndexes(frequency: CalendarFrequency, customDays: CalendarDayIndex[]) {
+  const option = getCalendarFrequencyOption(frequency);
+  return option.dayIndexes ? option.dayIndexes : sortCalendarDayIndexes(customDays);
+}
+
+function getCalendarDayLabel(dayIndex: CalendarDayIndex, long = false) {
+  const option = calendarDayOptions.find((day) => day.value === dayIndex);
+  return long ? option?.longLabel || String(dayIndex) : option?.label || String(dayIndex);
+}
+
+function formatCalendarPostingDays(days: CalendarDayIndex[], long = false) {
+  if (days.length === 0) return 'No days selected';
+  return days.map((day) => getCalendarDayLabel(day, long)).join(', ');
+}
+
+function buildCalendarSlotDates(planLength: CalendarPlanLength, postingDays: CalendarDayIndex[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Array.from({ length: planLength }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return date;
+  })
+    .filter((date) => postingDays.includes(date.getDay() as CalendarDayIndex))
+    .map(getDateKey);
 }
 
 function formatDisplayDate(value: string) {
@@ -1374,6 +1689,8 @@ function getDateOffsetKey(days: number) {
 
 function getAngleKey(contentType: string | null, subType: string | null) {
   if (!contentType) return '';
+  if (contentType === 'caption_reel' && subType === NORMAL_CAPTION_REEL_SUBTYPE) return 'caption_reel';
+  if (contentType === 'caption_reel' && isFacebookThreadSubType(subType)) return 'caption_reel_facebook_thread';
   if (subType) return `${contentType}_${subType}`;
   return contentType;
 }
@@ -1414,9 +1731,126 @@ function chunkItems<T>(items: T[], size: number) {
 
 function getContentTypeGuidanceKey(selection: CreateSelection, type?: ContentTypeOption | null) {
   if (!type) return '';
+  if (type.id === 'caption_reel' && selection.subType === NORMAL_CAPTION_REEL_SUBTYPE) return 'caption_reel_normal_text_post';
+  if (type.id === 'caption_reel' && isFacebookThreadSubType(selection.subType)) return 'caption_reel_facebook_thread';
   const subtypeKey = getAngleKey(type.id, selection.subType);
   if (contentTypeGuidance[subtypeKey]) return subtypeKey;
   return type.id;
+}
+
+function parseBacklogNotes(item: ContentBacklogItem) {
+  if (!item.notes?.trim().startsWith('{')) return null;
+  try {
+    return asPlainObject(JSON.parse(item.notes));
+  } catch {
+    return null;
+  }
+}
+
+function getDefaultCreateSelectionForBacklogItem(item: ContentBacklogItem): CreateSelection {
+  const platform = createPlatformFromContentPlatform(item.platform);
+  const sourceText = `${item.title} ${item.content || ''} ${item.notes || ''}`.toLowerCase();
+
+  if (platform === 'instagram_facebook') {
+    const isThreadDraft =
+      item.platform === 'facebook' ||
+      sourceText.includes('facebook thread') ||
+      (sourceText.includes('opening post') && sourceText.includes('comment 1'));
+
+    return {
+      platform,
+      contentType: 'caption_reel',
+      subType: isThreadDraft ? 'facebook_thread_auto' : NORMAL_CAPTION_REEL_SUBTYPE,
+      angle: isThreadDraft ? 'step_by_step_thread' : 'lead_with_feeling',
+      angleRegister: isThreadDraft ? 'tactical_teacher' : 'reflection_friday',
+      carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+    };
+  }
+
+  if (platform === 'tiktok') {
+    return {
+      platform,
+      contentType: 'short_script',
+      subType: null,
+      angle: '3_step_tip',
+      angleRegister: 'tactical_teacher',
+      carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+    };
+  }
+
+  if (platform === 'email_voice') {
+    const isVoiceNote = sourceText.includes('voice note') || sourceText.includes('[voice note script]');
+    return {
+      platform,
+      contentType: isVoiceNote ? 'voice_note' : 'value_drop',
+      subType: null,
+      angle: isVoiceNote ? 'warm_checkin' : 'quick_lesson',
+      angleRegister: isVoiceNote ? 'reflection_friday' : 'tactical_teacher',
+      carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+    };
+  }
+
+  return {
+    platform,
+    contentType: 'linkedin_post',
+    subType: 'text_post',
+    angle: 'quick_lesson',
+    angleRegister: 'tactical_teacher',
+    carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+    carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+    carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+    carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+  };
+}
+
+function getCreateSelectionFromBacklogItem(item: ContentBacklogItem): CreateSelection {
+  const fallback = getDefaultCreateSelectionForBacklogItem(item);
+  const notes = parseBacklogNotes(item);
+  if (notes?.kind !== 'smart_suggest') return fallback;
+
+  const platformValue = typeof notes.platform === 'string' ? notes.platform : null;
+  const fallbackPlatform: CreatePlatform = fallback.platform || 'linkedin';
+  const platform: CreatePlatform = isCreatePlatform(platformValue) ? platformValue : fallbackPlatform;
+  const contentType = compactString(notes.contentType);
+  const type = contentTypesByPlatform[platform]
+    .flatMap((group) => group.types)
+    .find((candidate) => candidate.id === contentType);
+
+  if (!type) return { ...fallback, platform };
+
+  const requestedSubType = compactString(notes.subType);
+  const subType = type.subTypes.length
+    ? type.subTypes.find((candidate) => candidate.id === requestedSubType)?.id || type.subTypes[0].id
+    : null;
+  const requestedAngle = compactString(notes.angle);
+  const angle = (angleGroupsByKey[getAngleKey(type.id, subType)] || [])
+    .flatMap((group) => group.angles)
+    .find((candidate) => candidate.id === requestedAngle);
+
+  return {
+    platform,
+    contentType: type.id,
+    subType,
+    angle: angle?.id || fallback.angle,
+    angleRegister: angle?.register || (typeof notes.angleRegister === 'string' ? notes.angleRegister : fallback.angleRegister),
+    carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+    carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+    carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+    carouselLayoutRecipe: DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+  };
+}
+
+function getBacklogDraftBody(item: ContentBacklogItem) {
+  return cleanDraftContent(extractPostBody(item.content || '') || item.content || '').trim();
 }
 
 function getRegisterLabel(register?: string | null) {
@@ -1480,6 +1914,41 @@ function isCreateSelectionReady(selection: CreateSelection) {
   return Boolean(selection.platform && selection.contentType && selection.angle);
 }
 
+function buildCaptionReelPromptBlock(selection: CreateSelection) {
+  if (selection.contentType !== 'caption_reel') return '';
+
+  if (isFacebookThreadSubType(selection.subType)) {
+    return [
+      'FACEBOOK THREAD PATH:',
+      'The user selected Instagram & Facebook, then Caption + Reel Hook, then a Facebook thread option.',
+      'Do not write a normal Instagram caption. Do not write a carousel. Create a Facebook-native thread made from one opening post plus planned first comments.',
+      getFacebookThreadDepthLabel(selection.subType),
+      'Output exactly these labelled sections:',
+      'OPENING POST:',
+      'VISUAL / POST MEDIA IDEA:',
+      'THREAD CUE:',
+      'COMMENT 1 / N:',
+      '[Repeat comments until the selected depth is complete.]',
+      'CONVERSATION GAP:',
+      'FINAL COMMENT / CTA:',
+      'POSTING NOTES:',
+      'Keep the opening post short enough to invite comments. Each thread comment should make one point only, with white space for mobile reading. Avoid external links in the opening post.',
+    ].join('\n');
+  }
+
+  if (selection.subType === NORMAL_CAPTION_REEL_SUBTYPE) {
+    return [
+      'NORMAL INSTAGRAM / FACEBOOK POST PATH:',
+      'The user chose the normal post path inside Caption + Reel Hook.',
+      'Write one complete feed-ready caption or text post. Do not turn it into a Facebook comment thread.',
+      'If the topic sounds like a video or Reel, include a short REEL HOOK line before the caption. If it is clearly a static/text post, use a strong FIRST LINE instead.',
+      'Output labelled sections: FIRST LINE / REEL HOOK, CAPTION, CTA / COMMENT PROMPT, HASHTAGS.',
+    ].join('\n');
+  }
+
+  return '';
+}
+
 function buildCreateUserPrompt(selection: CreateSelection, topicValue: string, pillarFocus: CreatePillarFocus = 'auto') {
   const platformLabel = selection.platform ? createPlatformLabels[selection.platform] : '';
   const contentType = findContentTypeOption(selection);
@@ -1506,6 +1975,7 @@ function buildCreateUserPrompt(selection: CreateSelection, topicValue: string, p
     `Register: ${getRegisterLabel(selection.angleRegister)}`,
     `Pillar: ${getPillarFocusPrompt(pillarFocus)}`,
     carouselStructuredOutput,
+    buildCaptionReelPromptBlock(selection),
     `Topic: ${topicValue.trim() || 'Suggest the strongest topic from the dashboard signal and selected angle.'}`,
   ]
     .filter((item) => item && !item.endsWith(': '))
@@ -2091,10 +2561,10 @@ function cleanDraftContent(aiOutput: string) {
   return extractPostBody(aiOutput) || aiOutput.trim();
 }
 
-function buildPlanDays() {
+function buildPlanDays(dayCount: CalendarPlanLength = 30) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const days = Array.from({ length: 30 }, (_, index) => {
+  const days = Array.from({ length: dayCount }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() + index);
     return getDateKey(date);
@@ -2236,6 +2706,7 @@ export default function ContentStudio({
   const [archetypeTarget, setArchetypeTarget] = useState(archetypeOptions[0]);
   const [calendarRecords, setCalendarRecords] = useState(calendarItems);
   const [backlogRecords, setBacklogRecords] = useState(backlogItems);
+  const [activeVaultDraftId, setActiveVaultDraftId] = useState<string | null>(null);
   const [researchRecords, setResearchRecords] = useState<ResearchEntry[]>(researchItems);
   const [calendarModal, setCalendarModal] = useState<CalendarModalState | null>(null);
   const [backlogModal, setBacklogModal] = useState<BacklogModalState | null>(null);
@@ -2286,6 +2757,12 @@ export default function ContentStudio({
   const [alchemyRebuildMode, setAlchemyRebuildMode] = useState<'simple' | 'advanced'>('simple');
   const [createFormatOutput, setCreateFormatOutput] = useState('');
   const [calendarPlan, setCalendarPlan] = useState('');
+  const [calendarFrequency, setCalendarFrequency] = useState<CalendarFrequency>('three_per_week');
+  const [calendarCustomDays, setCalendarCustomDays] = useState<CalendarDayIndex[]>([2, 3, 4]);
+  const [calendarTone, setCalendarTone] = useState<CalendarTone>('auto');
+  const [calendarPlanLength, setCalendarPlanLength] = useState<CalendarPlanLength>(30);
+  const [calendarPillarFocus, setCalendarPillarFocus] = useState<ContentPillar | 'auto'>('auto');
+  const [calendarVoiceSample, setCalendarVoiceSample] = useState('');
   const [contentSearch, setContentSearch] = useState('');
   const [backlogSearch, setBacklogSearch] = useState('');
   const [activeVaultSection, setActiveVaultSection] = useState<VaultSection>('ideas');
@@ -2459,6 +2936,18 @@ export default function ContentStudio({
     () => calendarRecords.filter((item) => item.publishDate >= todayKey && item.publishDate <= weekEndKey).length,
     [calendarRecords, todayKey, weekEndKey],
   );
+  const calendarFrequencyOption = getCalendarFrequencyOption(calendarFrequency);
+  const calendarToneOption = getCalendarToneOption(calendarTone);
+  const calendarPostingDays = useMemo(
+    () => getCalendarPostingDayIndexes(calendarFrequency, calendarCustomDays),
+    [calendarCustomDays, calendarFrequency],
+  );
+  const calendarSlotDates = useMemo(
+    () => buildCalendarSlotDates(calendarPlanLength, calendarPostingDays),
+    [calendarPlanLength, calendarPostingDays],
+  );
+  const calendarSlotDateSet = useMemo(() => new Set(calendarSlotDates), [calendarSlotDates]);
+  const selectedCalendarPillarLabel = calendarPillarFocus === 'auto' ? 'Auto-balanced pillars' : pillarMeta[calendarPillarFocus].label;
   const latestContentUpdate = useMemo(() => {
     const dates = [...calendarRecords, ...backlogRecords]
       .map((item) => new Date(item.updatedAt))
@@ -2634,8 +3123,17 @@ export default function ContentStudio({
     setSmartPulseKey(null);
   }
 
+  function activateWorkspace(workspace: StudioWorkspace) {
+    setActiveWorkspace(workspace);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'content');
+    url.searchParams.set('studio', workspace);
+    window.history.replaceState(window.history.state, '', `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+  }
+
   function navigateContent(section: ContentSection, options?: { topic?: string }) {
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     if (section !== 'studio' || activeSection !== 'studio') {
       resetSmartSuggestSession();
     }
@@ -2658,6 +3156,7 @@ export default function ContentStudio({
 
   function selectCreatePlatform(nextPlatform: CreatePlatform) {
     setSmartPrepopulateNotice(null);
+    setActiveVaultDraftId(null);
     setCreatePillarFocus('auto');
     setCreateSelection((current) =>
       current.platform === nextPlatform
@@ -2817,9 +3316,36 @@ export default function ContentStudio({
   }
 
   function openVaultSection(section: VaultSection) {
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveVaultSection(section);
     setActiveSection('vault');
+  }
+
+  function openBacklogDraftInStudio(item: ContentBacklogItem) {
+    const selection = getCreateSelectionFromBacklogItem(item);
+    const draftBody = getBacklogDraftBody(item);
+    const isSavedSmartSuggestion = isSmartSuggestItem(item);
+    const title = extractCleanTitle(item.title, item.content ?? '');
+
+    resetSmartSuggestSession();
+    setActiveVaultDraftId(item.id);
+    setCreateSelection(selection);
+    setCreatePillarFocus(item.pillar || 'auto');
+    setTopic(title);
+    setTopicSource(isSavedSmartSuggestion ? 'signal' : 'manual');
+    setGeneratedPost(isSavedSmartSuggestion ? '' : draftBody);
+    setGeneratedCarouselDraft(null);
+    setCreateFormatOutput('');
+    setCreateError(null);
+    setSmartPrepopulateNotice(
+      isSavedSmartSuggestion
+        ? 'Loaded saved Smart Suggest from Vault. Review the topic, then generate when ready.'
+        : 'Loaded saved Vault draft. Edit, copy, polish, update, or schedule it here.',
+    );
+    setSmartPulseKey(null);
+    setStudioMode('create');
+    activateWorkspace('content');
+    setActiveSection('studio');
   }
 
   function openVaultItem(item: ContentBacklogItem) {
@@ -2833,17 +3359,17 @@ export default function ContentStudio({
     if (carouselDraft) {
       setSelectedCarouselDraftId(item.id);
       setCarouselStudioError(null);
-      setActiveWorkspace('carousel');
+      activateWorkspace('carousel');
       return;
     }
 
     const section = getVaultSectionForItem(item);
     setActiveVaultSection(section);
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveSection('vault');
 
     if (section !== 'messy') {
-      setBacklogModal({ mode: 'edit', item });
+      openBacklogDraftInStudio(item);
     }
   }
 
@@ -2866,7 +3392,7 @@ export default function ContentStudio({
     event.preventDefault();
     const query = contentSearch.trim();
     if (!query) return;
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setBacklogSearch(query);
     setBacklogPillarFilter('all');
     setBacklogStatusFilter('all');
@@ -2875,7 +3401,7 @@ export default function ContentStudio({
   }
 
   function openContentSearchResult(result: ContentSearchResult) {
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     if (result.section === 'vault') {
       setBacklogSearch(contentSearch.trim());
       setBacklogPillarFilter('all');
@@ -2907,7 +3433,7 @@ export default function ContentStudio({
       content: text,
     });
     setBacklogRecords((current) => [data.item, ...current]);
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -2933,8 +3459,74 @@ export default function ContentStudio({
       content: cleanContent,
     });
     setBacklogRecords((current) => [data.item, ...current]);
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveSection('vault');
+  }
+
+  async function updateActiveVaultDraft(
+    content: string,
+    titleFallback: string,
+    platformOverride: ContentPlatform = defaultOutputPlatform,
+    titleOverride?: string,
+    pillarOverride?: ContentPillar | null,
+  ) {
+    if (!activeVaultDraftId || !content.trim()) return false;
+    const existing = backlogRecords.find((item) => item.id === activeVaultDraftId);
+    if (!existing) {
+      setActiveVaultDraftId(null);
+      return false;
+    }
+
+    const outputMetadata = extractOutputMetadata(content);
+    const cleanContent = outputMetadata.body || content.trim();
+    const resolvedPillar = pillarOverride || normalizeGeneratedPillar(outputMetadata.pillar) || existing.pillar || 'career_growth';
+    setCreateBusy(true);
+    setCreateError(null);
+    try {
+      const data = await requestJson<{ item: ContentBacklogItem }>(`/api/content/backlog/${existing.id}`, 'PATCH', {
+        key: adminKey,
+        title: titleOverride?.trim() || titleFromText(cleanContent, titleFallback),
+        pillar: resolvedPillar,
+        platform: platformOverride,
+        source: existing.source,
+        status: existing.status === 'idea' ? 'draft' : existing.status,
+        content: cleanContent,
+        notes: existing.notes,
+      });
+      setBacklogRecords((current) => [data.item, ...current.filter((item) => item.id !== data.item.id)]);
+      setActiveVaultDraftId(data.item.id);
+      setSmartPrepopulateNotice('Updated the saved Vault draft.');
+      return true;
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not update the saved Vault draft.');
+      return true;
+    } finally {
+      setCreateBusy(false);
+    }
+  }
+
+  async function saveCurrentCreateDraft() {
+    if (generatedCarouselDraft) {
+      await saveCarouselDraftToBacklog(generatedCarouselDraft);
+      return;
+    }
+
+    const updatedExisting = await updateActiveVaultDraft(
+      generatedPost,
+      topic,
+      selectedOutputPlatform,
+      topic,
+      createPillarFocus === 'auto' ? null : createPillarFocus,
+    );
+    if (updatedExisting) return;
+
+    await saveOutputToBacklog(
+      generatedPost,
+      topic,
+      selectedOutputPlatform,
+      topic,
+      createPillarFocus === 'auto' ? null : createPillarFocus,
+    );
   }
 
   async function saveCarouselDraftToBacklog(draft: CarouselDraftPayload) {
@@ -2960,7 +3552,7 @@ export default function ContentStudio({
     });
     setBacklogRecords((current) => [data.item, ...current]);
     setSelectedCarouselDraftId(data.item.id);
-    setActiveWorkspace('carousel');
+    activateWorkspace('carousel');
   }
 
   async function updateCarouselDraftSettings(
@@ -3085,7 +3677,7 @@ export default function ContentStudio({
     setBacklogRecords((current) => [data.item, ...current]);
     setMessyModalOpen(false);
     setActiveVaultSection('messy');
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -3120,7 +3712,7 @@ export default function ContentStudio({
     setInsightsSuccess('Article added to Vault. Smart Suggest will now include it in recommendations.');
     setInsightsModalOpen(false);
     setActiveVaultSection('insights');
-    setActiveWorkspace('content');
+    activateWorkspace('content');
     setActiveSection('vault');
   }
 
@@ -3147,7 +3739,8 @@ export default function ContentStudio({
 
   function startFromBrief(text: string) {
     if (activeSection !== 'studio') resetSmartSuggestSession();
-    setActiveWorkspace('content');
+    setActiveVaultDraftId(null);
+    activateWorkspace('content');
     setTopic(text);
     setTopicSource('brief');
     setStudioMode('create');
@@ -3190,6 +3783,7 @@ export default function ContentStudio({
 
   async function applySmartSuggestion(suggestion: SmartSuggestion, options?: { generateAfter?: boolean }) {
     const normalized = normalizeSmartSuggestion(suggestion);
+    setActiveVaultDraftId(null);
     const nextSelection: CreateSelection = {
       platform: normalized.platform,
       contentType: normalized.contentType,
@@ -3276,7 +3870,7 @@ export default function ContentStudio({
         setGeneratedPost(formatCarouselDraftForOutput(carouselDraft));
       } else {
         setGeneratedCarouselDraft(null);
-        setGeneratedPost(result);
+        setGeneratedPost(cleanDraftContent(result));
       }
       setCreateFormatOutput('');
     } catch (error) {
@@ -3294,7 +3888,7 @@ export default function ContentStudio({
     try {
       const result = await callAi('polish', cleanPost);
       setGeneratedCarouselDraft(null);
-      setGeneratedPost(result);
+      setGeneratedPost(cleanDraftContent(result));
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not polish the content.');
     } finally {
@@ -3578,19 +4172,52 @@ export default function ContentStudio({
     }
   }
 
+  function toggleCalendarCustomDay(day: CalendarDayIndex) {
+    setCalendarFrequency('custom');
+    setCalendarCustomDays((current) => {
+      if (current.includes(day)) {
+        if (current.length === 1) return current;
+        return sortCalendarDayIndexes(current.filter((item) => item !== day));
+      }
+      return sortCalendarDayIndexes([...current, day]);
+    });
+  }
+
   async function suggestCalendarPlan() {
     setCreateError(null);
+    if (calendarSlotDates.length === 0) {
+      setCreateError('Choose at least one posting day before generating a plan.');
+      return;
+    }
     setCreateBusy(true);
     try {
+      const existingPosts = calendarRecords
+        .map((item) => `${item.publishDate}: ${item.title}`)
+        .join('; ') || 'none';
+      const slotList = calendarSlotDates
+        .map((date) => `${formatDayLabel(date)} (${date})`)
+        .join('; ');
+      const prompt = [
+        `Create a ${calendarPlanLength}-day editorial calendar plan using only these publishing slots: ${slotList}.`,
+        `Posting cadence: ${calendarFrequencyOption.label}. Posting days: ${formatCalendarPostingDays(calendarPostingDays, true)}. Total posts to plan: ${calendarSlotDates.length}.`,
+        calendarTone === 'auto'
+          ? `Writing register: Auto. Choose the strongest register per post from Kagiso's six registers. ${calendarToneOption.description}`
+          : `Writing register: ${calendarToneOption.label} (${calendarToneOption.description}). Use this register for the whole plan unless a specific slot clearly needs a stronger fit.`,
+        `Pillar focus: ${selectedCalendarPillarLabel}. If auto-balanced, rotate the four pillars based on dashboard signal strength.`,
+        calendarVoiceSample.trim()
+          ? `Voice sample to match: ${calendarVoiceSample.trim()}`
+          : "Voice sample: none provided, so use Kagiso's established voice rules.",
+        `Existing planned posts to avoid repeating: ${existingPosts}.`,
+        'Return one editable entry per publishing slot. Each entry must include the exact date, platform, pillar, title, angle, why now, and first draft note.',
+        'Do not create posts for empty days. Do not schedule or publish anything.',
+      ].join('\n');
       const result = await callAi(
         'calendar_plan',
-        `Create a 30-day plan from these signals. Existing planned posts: ${calendarRecords
-          .map((item) => `${item.publishDate}: ${item.title}`)
-          .join('; ') || 'none'}.`,
+        prompt,
       );
       setCalendarPlan(result);
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Could not suggest a 30-day plan.');
+      setCreateError(error instanceof Error ? error.message : 'Could not generate the calendar plan.');
     } finally {
       setCreateBusy(false);
     }
@@ -3771,14 +4398,19 @@ export default function ContentStudio({
                     {briefBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
                     Generate new brief
                   </button>
-                  <label className="grid gap-2">
+                  <div className="grid gap-2">
                     <span className="studio-label">Generate for archetype</span>
-                    <select value={archetypeTarget} onChange={(event) => setArchetypeTarget(event.target.value)} className="studio-input h-11">
-                      {archetypeOptions.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                  </label>
+                    <FilterDropdown
+                      name="signalBriefArchetype"
+                      value={archetypeTarget}
+                      onChange={setArchetypeTarget}
+                      ariaLabel="Choose Signal Brief archetype"
+                      options={archetypeOptions.map((option) => ({
+                        value: option,
+                        label: option,
+                      }))}
+                    />
+                  </div>
                   <button type="button" onClick={() => generateSignalBrief(archetypeTarget)} disabled={briefBusy} className="studio-secondary-button">
                     Generate for {archetypeTarget}
                   </button>
@@ -3829,27 +4461,27 @@ export default function ContentStudio({
                 type="button"
                 onClick={() => setStudioMode('create')}
                 data-active={studioMode === 'create'}
-                className={`studio-mode-card rounded-[12px] border p-5 text-left transition ${
+                className={`studio-mode-card rounded-[12px] border p-5 text-center transition ${
                   studioMode === 'create'
                     ? 'border-[#142334] bg-[#142334] text-white'
                     : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#142334]'
                 }`}
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Create</span>
-                <span className="mt-2 block font-serif text-[26px] leading-tight">Build from scratch</span>
+                <span className="block font-serif text-[30px] leading-tight">Create</span>
+                <span className="mt-2 block text-[12px] font-semibold uppercase tracking-[0.16em] opacity-70">Build from scratch</span>
               </button>
               <button
                 type="button"
                 onClick={() => setStudioMode('transform')}
                 data-active={studioMode === 'transform'}
-                className={`studio-mode-card studio-transform-mode-card rounded-[12px] border p-5 text-left transition ${
+                className={`studio-mode-card studio-transform-mode-card rounded-[12px] border p-5 text-center transition ${
                   studioMode === 'transform'
                     ? 'border-[#C9AD98] bg-[#142334] text-white'
                     : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#142334]'
                 }`}
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Transform</span>
-                <span className="mt-2 block font-serif text-[26px] leading-tight">Turn anything into a post</span>
+                <span className="block font-serif text-[30px] leading-tight">Transform</span>
+                <span className="mt-2 block text-[12px] font-semibold uppercase tracking-[0.16em] opacity-70">Turn anything into a post</span>
               </button>
             </div>
 
@@ -3921,18 +4553,9 @@ export default function ContentStudio({
                 onFormatCheck={checkGeneratedFormat}
                 carouselDraft={generatedCarouselDraft}
                 onSave={() => {
-                  if (generatedCarouselDraft) {
-                    void saveCarouselDraftToBacklog(generatedCarouselDraft);
-                    return;
-                  }
-                  void saveOutputToBacklog(
-                    generatedPost,
-                    topic,
-                    selectedOutputPlatform,
-                    topic,
-                    createPillarFocus === 'auto' ? null : createPillarFocus,
-                  );
+                  void saveCurrentCreateDraft();
                 }}
+                saveLabel={activeVaultDraftId && !generatedCarouselDraft ? 'Update Vault Draft' : undefined}
                 onCalendar={() =>
                   setCalendarModal({
                     mode: 'create',
@@ -4069,20 +4692,177 @@ export default function ContentStudio({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Editorial Calendar</p>
                 <h2 className="mt-2 font-serif text-[32px] leading-tight text-[#142334]">Plan the rhythm before the post</h2>
                 <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/62">
-                  Four weeks visible. Empty days are intentional space, not failure.
+                  Choose how often Kagiso can realistically show up, then generate a plan around those exact slots.
                 </p>
                 <p className="mt-2 max-w-2xl text-[12px] italic leading-relaxed text-[#6B6B6B]">
                   This is your editorial calendar for content planning. For sessions and appointments, go to Calendar in the main nav.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={suggestCalendarPlan} disabled={createBusy} className="studio-secondary-button">
+                <button type="button" onClick={suggestCalendarPlan} disabled={createBusy || calendarSlotDates.length === 0} className="studio-primary-button">
                   {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Suggest 30-day plan
+                  Generate plan
                 </button>
-                <button type="button" onClick={() => setCalendarModal({ mode: 'create' })} className="studio-primary-button">
+                <button type="button" onClick={() => setCalendarModal({ mode: 'create' })} className="studio-secondary-button">
                   <Plus className="h-4 w-4" /> Add post
                 </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
+              <div className="rounded-[8px] border border-[#E4D8CB] bg-[#FBFAF8] p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">How often can you post?</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-[#142334]/62">{calendarFrequencyOption.description}</p>
+                  </div>
+                  <div className="flex rounded-[8px] bg-white p-1 ring-1 ring-[#E4D8CB]">
+                    {calendarPlanLengthOptions.map((length) => (
+                      <button
+                        key={length}
+                        type="button"
+                        onClick={() => setCalendarPlanLength(length)}
+                        aria-pressed={calendarPlanLength === length}
+                        className={`h-9 rounded-[6px] px-3 text-[12px] font-bold transition ${
+                          calendarPlanLength === length
+                            ? 'bg-[#142334] text-white'
+                            : 'text-[#142334]/60 hover:bg-[#F5F3EE] hover:text-[#142334]'
+                        }`}
+                      >
+                        {length}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 md:grid-cols-2">
+                  {calendarFrequencyOptions.map((option) => {
+                    const isSelected = calendarFrequency === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setCalendarFrequency(option.value)}
+                        aria-pressed={isSelected}
+                        className={`min-h-[54px] rounded-[8px] border px-4 py-3 text-left text-[14px] font-bold transition ${
+                          isSelected
+                            ? 'border-[#142334] bg-[#142334] text-white shadow-[0_8px_20px_rgba(20,35,52,0.12)]'
+                            : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98] hover:bg-[#F5F3EE]'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {calendarFrequency === 'custom' && (
+                  <div className="mt-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Pick your days</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {calendarDayOptions.map((day) => {
+                        const isSelected = calendarCustomDays.includes(day.value);
+                        return (
+                          <button
+                            key={day.value}
+                            type="button"
+                            onClick={() => toggleCalendarCustomDay(day.value)}
+                            aria-pressed={isSelected}
+                            className={`h-11 min-w-12 rounded-[8px] border px-3 text-[12px] font-bold transition ${
+                              isSelected
+                                ? 'border-[#142334] bg-[#142334] text-white'
+                                : 'border-[#E4D8CB] bg-white text-[#142334]/70 hover:border-[#C9AD98] hover:text-[#142334]'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-[13px] leading-relaxed text-[#142334]/72">
+                    <span className="font-semibold text-[#142334]">Posting</span>
+                    {calendarPostingDays.length ? (
+                      calendarPostingDays.map((day) => (
+                        <span
+                          key={day}
+                          className="rounded-full border border-[#D7C2B2] bg-[#F8F6F4] px-3 py-1 text-[11px] font-bold tracking-[0.08em] text-[#8C7466] shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_10px_rgba(20,35,52,0.04)]"
+                        >
+                          {getCalendarDayLabel(day)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="rounded-full border border-[#D7C2B2] bg-[#F8F6F4] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">
+                        No days selected
+                      </span>
+                    )}
+                    <span className="text-[#142334]/52">-</span>
+                    <span>
+                      {calendarSlotDates.length} post{calendarSlotDates.length === 1 ? '' : 's'} over {calendarPlanLength} days
+                    </span>
+                    <span className="text-[#142334]/52">-</span>
+                    <span>
+                      Register: <span className="font-semibold text-[#142334]">{calendarToneOption.label}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Voice and pillars</p>
+                <div className="mt-3 grid gap-2">
+                  {calendarToneOptions.map((option) => {
+                    const isSelected = calendarTone === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setCalendarTone(option.value)}
+                        aria-pressed={isSelected}
+                        className={`rounded-[8px] border px-3 py-2.5 text-left transition ${
+                          isSelected
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                        }`}
+                      >
+                        <span className="block text-[13px] font-bold">{option.label}</span>
+                        <span className={`mt-1 block text-[11px] ${isSelected ? 'text-white/62' : 'text-[#142334]/52'}`}>
+                          {option.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <span className="studio-label">Pillar focus</span>
+                  <FilterDropdown
+                    name="calendarPillarFocus"
+                    value={calendarPillarFocus}
+                    onChange={(value) => setCalendarPillarFocus(value as ContentPillar | 'auto')}
+                    ariaLabel="Choose editorial calendar pillar focus"
+                    options={[
+                      { value: 'auto', label: 'Auto-balance from signals' },
+                      ...Object.entries(pillarMeta).map(([value, meta]) => ({
+                        value,
+                        label: meta.label,
+                      })),
+                    ]}
+                  />
+                </div>
+                <label className="mt-3 grid gap-2">
+                  <span className="studio-label">Voice sample</span>
+                  <textarea
+                    value={calendarVoiceSample}
+                    onChange={(event) => setCalendarVoiceSample(event.target.value)}
+                    onWheel={trapWheel}
+                    rows={3}
+                    placeholder="Paste a short sample if this plan should match a specific writing style."
+                    className="studio-input resize-y px-4 py-3 text-[13px] leading-relaxed"
+                  />
+                </label>
               </div>
             </div>
 
@@ -4090,9 +4870,9 @@ export default function ContentStudio({
               <div className="mt-5 rounded-[8px] bg-[#F5F3EE] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">AI suggested rhythm</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">AI suggested plan</p>
                     <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/62">
-                      Review, edit, then add only what Kagiso approves.
+                      Built from the selected cadence. Review it, then add only what Kagiso approves.
                     </p>
                   </div>
                   <button type="button" onClick={() => setCalendarPlan('')} className="grid h-9 w-9 place-items-center rounded-full bg-white text-[#142334]">
@@ -4103,28 +4883,56 @@ export default function ContentStudio({
               </div>
             )}
 
-            <div className="mt-6 grid gap-3 lg:grid-cols-7">
-              {buildPlanDays().map((week, weekIndex) =>
+            <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Calendar workspace</p>
+                <p className="mt-1 text-[13px] text-[#142334]/62">
+                  Slot days are highlighted. Empty days stay open unless you add something manually.
+                </p>
+              </div>
+              <div className="rounded-full bg-[#F5F3EE] px-4 py-2 text-[12px] font-bold text-[#142334]/72">
+                {calendarSlotDates.length} planned slot{calendarSlotDates.length === 1 ? '' : 's'} in view
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-7">
+              {buildPlanDays(calendarPlanLength).map((week, weekIndex) =>
                 week.map((day) => {
                   const dayItems = itemsByDate[day] || [];
+                  const isSlotDay = calendarSlotDateSet.has(day);
                   return (
                     <div
                       key={day}
-                      className={`min-h-[180px] rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3 ${weekIndex === 0 ? 'lg:min-h-[210px]' : ''}`}
+                      className={`min-h-[168px] rounded-[8px] border p-3 ${
+                        isSlotDay
+                          ? 'border-[#C9AD98] bg-[#FBFAF8] shadow-[0_8px_22px_rgba(20,35,52,0.06)]'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4]'
+                      } ${weekIndex === 0 ? 'lg:min-h-[196px]' : ''}`}
                     >
-                      <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
-                        {formatDayLabel(day)}
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                          {formatDayLabel(day)}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                          isSlotDay ? 'bg-[#142334] text-white' : 'bg-white text-[#142334]/38'
+                        }`}>
+                          {isSlotDay ? 'Slot' : 'Open'}
+                        </span>
                       </span>
                       <span className="mt-3 grid gap-2">
                         {dayItems.length === 0 ? (
                           <button
                             type="button"
                             onClick={() => setCalendarModal({ mode: 'create', defaults: { publishDate: day } })}
-                            className="grid h-24 place-items-center rounded-[8px] border border-dashed border-[#D8C8BB] text-[12px] text-[#142334]/45 transition hover:border-[#142334] hover:bg-[#F2ECE7] hover:text-[#142334]/70"
+                            className={`grid h-24 place-items-center rounded-[8px] border border-dashed text-[12px] transition ${
+                              isSlotDay
+                                ? 'border-[#C9AD98] bg-white text-[#142334]/70 hover:border-[#142334] hover:bg-[#F2ECE7]'
+                                : 'border-[#D8C8BB] text-[#142334]/38 hover:border-[#142334]/45 hover:bg-white hover:text-[#142334]/62'
+                            }`}
                           >
                             <span className="flex flex-col items-center gap-1">
                               <Plus className="h-4 w-4" />
-                              Add post
+                              {isSlotDay ? 'Plan post' : 'Add anyway'}
                             </span>
                           </button>
                         ) : (
@@ -4264,30 +5072,45 @@ export default function ContentStudio({
 
               {vaultFiltersOpen && (
                 <div className="mt-3 grid gap-3 rounded-[10px] bg-white p-3 md:grid-cols-4">
-                  <select value={backlogPillarFilter} onChange={(event) => setBacklogPillarFilter(event.target.value as 'all' | ContentPillar)} className="studio-input h-11">
-                    <option value="all">All pillars</option>
-                    {Object.entries(pillarMeta).map(([value, meta]) => (
-                      <option key={value} value={value}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={backlogStatusFilter} onChange={(event) => setBacklogStatusFilter(event.target.value as 'all' | ContentBacklogStatus)} className="studio-input h-11">
-                    <option value="all">All statuses</option>
-                    {Object.entries(backlogStatusMeta).map(([value, meta]) => (
-                      <option key={value} value={value}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={backlogPlatformFilter} onChange={(event) => setBacklogPlatformFilter(event.target.value as 'all' | ContentPlatform)} className="studio-input h-11">
-                    <option value="all">All platforms</option>
-                    {Object.entries(platformLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                  <FilterDropdown
+                    name="vaultPillarFilter"
+                    value={backlogPillarFilter}
+                    onChange={(value) => setBacklogPillarFilter(value as 'all' | ContentPillar)}
+                    ariaLabel="Filter Vault by pillar"
+                    options={[
+                      { value: 'all', label: 'All pillars' },
+                      ...Object.entries(pillarMeta).map(([value, meta]) => ({
+                        value,
+                        label: meta.label,
+                      })),
+                    ]}
+                  />
+                  <FilterDropdown
+                    name="vaultStatusFilter"
+                    value={backlogStatusFilter}
+                    onChange={(value) => setBacklogStatusFilter(value as 'all' | ContentBacklogStatus)}
+                    ariaLabel="Filter Vault by status"
+                    options={[
+                      { value: 'all', label: 'All statuses' },
+                      ...Object.entries(backlogStatusMeta).map(([value, meta]) => ({
+                        value,
+                        label: meta.label,
+                      })),
+                    ]}
+                  />
+                  <FilterDropdown
+                    name="vaultPlatformFilter"
+                    value={backlogPlatformFilter}
+                    onChange={(value) => setBacklogPlatformFilter(value as 'all' | ContentPlatform)}
+                    ariaLabel="Filter Vault by platform"
+                    options={[
+                      { value: 'all', label: 'All platforms' },
+                      ...Object.entries(platformLabels).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ]}
+                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -4396,6 +5219,11 @@ export default function ContentStudio({
                           <Badge className={activeVaultSection === 'messy' ? 'bg-[#F3E8FF] text-[#7C3AED]' : 'bg-[#F5F3EE] text-[#6B6B6B]'}>
                             {activeVaultSection === 'messy' ? 'Rough Thought' : getBacklogSourceLabel(item)}
                           </Badge>
+                          {item.isFavorite && (
+                            <Badge className="gap-1 border border-[#F2C6B8] bg-[#FFF4EF] text-[#A24E37]">
+                              <span aria-hidden="true">❤️</span> Favourite
+                            </Badge>
+                          )}
                           {item.pillar && <Badge className={pillarMeta[item.pillar].className}>{pillarMeta[item.pillar].label}</Badge>}
                           <Badge className={backlogStatusMeta[item.status].className}>{backlogStatusMeta[item.status].label}</Badge>
                           {item.platform && <Badge className="bg-[#F5F3EE] text-[#6B6B6B]">{platformLabels[item.platform]}</Badge>}
@@ -4415,7 +5243,12 @@ export default function ContentStudio({
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           {activeVaultSection !== 'messy' && (
                             <button type="button" onClick={() => openVaultItem(item)} className="studio-card-action-button">
-                              {carouselDraft ? 'Open Carousel Studio' : 'Edit Draft'}
+                              {carouselDraft ? 'Open Carousel Studio' : isSmartSuggestItem(item) ? 'Open in Create' : 'Open Draft'}
+                            </button>
+                          )}
+                          {activeVaultSection !== 'messy' && (
+                            <button type="button" onClick={() => setBacklogModal({ mode: 'edit', item })} className="studio-card-action-button">
+                              Edit Details
                             </button>
                           )}
                           {activeVaultSection === 'messy' ? (
@@ -4509,6 +5342,7 @@ export default function ContentStudio({
           key={`${calendarModal.mode}-${calendarModal.item?.id || calendarModal.defaults?.publishDate || 'new'}`}
           state={calendarModal}
           adminKey={adminKey}
+          vaultItems={backlogRecords}
           onClose={() => setCalendarModal(null)}
           onSaved={(item) => {
             setCalendarRecords((current) =>
@@ -4517,7 +5351,7 @@ export default function ContentStudio({
                 : [...current, item].sort((a, b) => a.publishDate.localeCompare(b.publishDate)),
             );
             setCalendarModal(null);
-            setActiveWorkspace('content');
+            activateWorkspace('content');
             setActiveSection('editorial');
           }}
           onDelete={
@@ -4546,7 +5380,7 @@ export default function ContentStudio({
             );
             setBacklogModal(null);
             setActiveVaultSection(isSmartSuggestItem(item) ? 'smart' : isInsightsBacklogItem(item) ? 'insights' : isMessyMiddleItem(item) ? 'messy' : 'ideas');
-            setActiveWorkspace('content');
+            activateWorkspace('content');
             setActiveSection('vault');
           }}
         />
@@ -5352,6 +6186,7 @@ function CreateFlow({
   onPolish,
   onFormatCheck,
   onSave,
+  saveLabel,
   onCalendar,
   profilePhotoUrl,
 }: {
@@ -5390,13 +6225,15 @@ function CreateFlow({
   onPolish: () => void;
   onFormatCheck: () => void;
   onSave: () => void;
+  saveLabel?: string;
   onCalendar: () => void;
   profilePhotoUrl?: string | null;
 }) {
   const contentTypeGroups = selection.platform ? contentTypesByPlatform[selection.platform] : [];
   const contentTypes = contentTypeGroups.flatMap((group) => group.types);
-  const contentRows = chunkItems(contentTypes, 3);
+  const contentRows = chunkItems(contentTypes, 4);
   const selectedSubType = selectedType?.subTypes.find((item) => item.id === selection.subType) || null;
+  const isCaptionReelType = selectedType?.id === 'caption_reel';
   const angleReady = Boolean(selectedType && (selectedType.subTypes.length === 0 || selection.subType));
   const needsCarouselSlideCount = selection.contentType === 'carousel' && Boolean(selection.angle);
   const outputTitle = selection.contentType === 'voice_note'
@@ -5510,7 +6347,7 @@ function CreateFlow({
                   className={`min-h-[104px] rounded-[8px] border p-4 text-left transition ${
                     isSelected
                       ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
-                      : 'border-[#E4D8CB] bg-white text-[#142334] hover:bg-[#F5F3EE]'
+                      : 'border-[#D7C2B2] bg-[#FBFAF8] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
                   } ${isSelected && pulseKey === 'platform' ? 'animate-pulse' : ''}`}
                 >
                   <span className={`grid h-10 w-10 place-items-center rounded-full ${isSelected ? 'bg-white/12 text-white' : 'bg-[#F5F3EE] text-[#C9AD98]'}`}>
@@ -5540,7 +6377,7 @@ function CreateFlow({
                 const rowHasSelected = row.some((type) => type.id === selection.contentType);
                 return (
                   <div key={`content-row-${rowIndex}`} className="grid gap-3">
-                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                    <div className="grid gap-3 md:grid-cols-2">
                       {row.map((type) => {
                         const TypeIcon = type.icon;
                         const isSelected = selection.contentType === type.id;
@@ -5569,22 +6406,45 @@ function CreateFlow({
                     </div>
 
                     {rowHasSelected && selectedType && selectedType.subTypes.length > 0 && (
-                      <div className="grid gap-2 rounded-[8px] bg-[#F5F3EE] p-2 md:grid-cols-3">
-                        {selectedType.subTypes.map((subType) => (
-                          <button
-                            key={subType.id}
-                            type="button"
-                            onClick={() => onSubTypeSelect(subType.id)}
-                            style={selection.subType === subType.id ? { outline: '2px solid #C9AD98' } : undefined}
-                            className={`min-h-10 rounded-full border px-3 py-2 text-[12px] font-semibold transition ${
-                              selection.subType === subType.id
-                                ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
-                                : 'border-white bg-white text-[#142334]/68 hover:border-[#C9AD98] hover:text-[#142334]'
-                            }`}
-                          >
-                            {subType.label}
-                          </button>
-                        ))}
+                      <div className="rounded-[8px] bg-[#F5F3EE] p-3">
+                        {isCaptionReelType && (
+                          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Format path</p>
+                              <p className="mt-1 text-[13px] leading-relaxed text-[#142334]/68">
+                                Choose a normal Instagram/Facebook post or shape the Facebook version as a comment thread.
+                              </p>
+                            </div>
+                            {selectedSubType && <Badge className="bg-white text-[#8C7466]">{selectedSubType.label}</Badge>}
+                          </div>
+                        )}
+                        <div className={`grid gap-2 ${isCaptionReelType ? 'sm:grid-cols-2 2xl:grid-cols-3' : 'md:grid-cols-3'}`}>
+                          {selectedType.subTypes.map((subType) => {
+                            const isSelected = selection.subType === subType.id;
+                            return (
+                              <button
+                                key={subType.id}
+                                type="button"
+                                onClick={() => onSubTypeSelect(subType.id)}
+                                style={isSelected ? { outline: '2px solid #C9AD98' } : undefined}
+                                className={`min-h-10 border px-3 py-2 text-[12px] font-semibold transition ${
+                                  isCaptionReelType ? 'rounded-[8px] text-left' : 'rounded-full text-center'
+                                } ${
+                                  isSelected
+                                    ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                                    : 'border-white bg-white text-[#142334]/68 hover:border-[#C9AD98] hover:text-[#142334]'
+                                }`}
+                              >
+                                <span className="block">{subType.label}</span>
+                                {isCaptionReelType && subType.description && (
+                                  <span className={`mt-1 block text-[11px] leading-snug ${isSelected ? 'text-white/62' : 'text-[#142334]/50'}`}>
+                                    {subType.description}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 
@@ -5720,7 +6580,7 @@ function CreateFlow({
         {generatedPost ? (
           <OutputWithActions
             title={outputTitle}
-            value={generatedPost}
+            value={generatedPostBody}
             wordCount={getWordCount(generatedPostBody)}
             platformLabel={selectedPlatformLabel || 'LinkedIn'}
             contentTypeLabel={selectedType ? `${selectedType.label}${selectedSubType ? ` / ${selectedSubType.label}` : ''}` : outputTitle}
@@ -5731,7 +6591,7 @@ function CreateFlow({
             onRegenerate={onGenerate}
             onPolish={onPolish}
             onSave={onSave}
-            saveLabel={carouselDraft ? 'Save to Carousel Studio' : undefined}
+            saveLabel={carouselDraft ? 'Save to Carousel Studio' : saveLabel}
             onCalendar={onCalendar}
             outputNote={outputNote}
             extraAction={
@@ -5815,7 +6675,9 @@ function CreateGuidancePanel({
     : !selection.contentType
       ? `Choose what to create for ${selectedPlatformLabel}.`
       : selectedType?.subTypes.length && !selection.subType
-        ? 'Choose the post subtype.'
+        ? selectedType?.id === 'caption_reel'
+          ? 'Choose normal post or Facebook thread.'
+          : 'Choose the post subtype.'
         : !selection.angle
           ? 'Choose the angle.'
           : 'Ready to generate.';
@@ -6658,6 +7520,7 @@ function CarouselSlideFrame({
 }) {
   const isBold = template.value === 'bold_diagnostic';
   const isWarm = template.value === 'warm_coaching';
+  const isEditorial = template.value === 'editorial_authority';
   const palette = template.palette;
   const role = slide.role || getDefaultCarouselSlideRole((layoutRecipe || template.layoutRecipe).value, index, total);
   const roleLabel = carouselSlideRoleLabels[role];
@@ -6669,6 +7532,8 @@ function CarouselSlideFrame({
   const isCover = role === 'cover';
   const isCta = role === 'cta';
   const headlineSize = getCarouselHeadlineSize(composition, textStats);
+  const coverHeadlineSize = Math.min(headlineSize + 6, 52);
+  const resolvedHeadlineSize = isCover ? coverHeadlineSize : headlineSize;
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
   const exportFrameStyles = exportDimensions
@@ -6679,9 +7544,605 @@ function CarouselSlideFrame({
         maxWidth: `${exportDimensions.width}px`,
         minHeight: `${exportDimensions.height}px`,
         maxHeight: `${exportDimensions.height}px`,
-        padding: exportSize(20),
+        padding: isCover ? `${exportSize(28)} ${exportSize(24)}` : exportSize(20),
       }
     : {};
+
+  const contentArea = (
+    <>
+      {isCover ? (
+        <>
+          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
+            <div>
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.58)' : isWarm ? palette.accent : palette.muted,
+                  fontSize: exportDimensions ? exportSize(10) : undefined,
+                }}
+              >
+                Coach Kagiso
+              </p>
+            </div>
+            <span
+              className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+              style={{
+                backgroundColor: palette.chipBackground,
+                color: palette.chipText,
+                fontSize: exportDimensions ? exportSize(10) : undefined,
+                padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
+              }}
+            >
+              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+            </span>
+          </div>
+
+          <div
+            className="my-auto w-full"
+            style={{
+              marginBottom: 'auto',
+              marginTop: 'auto',
+              padding: exportDimensions ? `0 ${exportSize(12)}` : '0 12px',
+            }}
+          >
+            {slide.body && (
+              <p
+                className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.55)' : isWarm ? palette.accent : palette.accent,
+                  fontSize: exportDimensions ? exportSize(11) : undefined,
+                  letterSpacing: exportDimensions ? exportSize(3.2) : undefined,
+                  marginBottom: exportDimensions ? exportSize(8) : undefined,
+                }}
+              >
+                {roleLabel}
+              </p>
+            )}
+            <h3
+              className="font-serif leading-[1.0] tracking-[-0.01em]"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
+                lineHeight: 1.0,
+              }}
+            >
+              {slide.headline}
+            </h3>
+            <div
+              className="mt-4 h-[3px] w-16 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(3) : undefined,
+                marginTop: exportDimensions ? exportSize(16) : undefined,
+                width: exportDimensions ? exportSize(64) : undefined,
+              }}
+            />
+            {slide.body && (
+              <p
+                className="mt-4 max-w-[42ch] text-[13px] font-medium leading-relaxed"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(13) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                }}
+              >
+                {slide.body}
+              </p>
+            )}
+            {slide.cta && (
+              <p
+                className="mt-4 max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{
+                  color: palette.accent,
+                  fontSize: exportDimensions ? exportSize(11) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                }}
+              >
+                {slide.cta}
+              </p>
+            )}
+          </div>
+
+          <div
+            className="flex items-center gap-2"
+            style={{ gap: exportDimensions ? exportSize(8) : undefined }}
+          >
+            <span
+              className="h-1.5 w-10 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(6) : undefined,
+                width: exportDimensions ? exportSize(40) : undefined,
+              }}
+            />
+            <span
+              className="text-[9px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.35)' : isWarm ? palette.accent : palette.muted,
+                fontSize: exportDimensions ? exportSize(9) : undefined,
+                opacity: isEditorial ? 0.5 : 1,
+              }}
+            >
+              coachkagiso.com
+            </span>
+          </div>
+        </>
+      ) : isCta ? (
+        <>
+          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
+            <div>
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.58)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(10) : undefined,
+                }}
+              >
+                Coach Kagiso
+              </p>
+              <div
+                className="mt-2 h-[2px] w-10 rounded-full"
+                style={{
+                  backgroundColor: palette.accent,
+                  height: exportDimensions ? exportSize(2) : undefined,
+                  marginTop: exportDimensions ? exportSize(8) : undefined,
+                  width: exportDimensions ? exportSize(40) : undefined,
+                }}
+              />
+            </div>
+            <span
+              className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+              style={{
+                backgroundColor: palette.chipBackground,
+                color: palette.chipText,
+                fontSize: exportDimensions ? exportSize(10) : undefined,
+                padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
+              }}
+            >
+              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+            </span>
+          </div>
+
+          <div
+            className="my-auto w-full"
+            style={{
+              marginBottom: 'auto',
+              marginTop: 'auto',
+              padding: exportDimensions ? `0 ${exportSize(8)}` : '0 8px',
+            }}
+          >
+            {composition === 'save_share_close' && (
+              <div
+                className="mb-3 flex gap-2"
+                style={{ gap: exportDimensions ? exportSize(8) : undefined, marginBottom: exportDimensions ? exportSize(12) : undefined }}
+              >
+                {['Save', 'Share', 'Apply'].map((actionLabel) => (
+                  <span
+                    key={actionLabel}
+                    className="rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em]"
+                    style={{
+                      borderColor: palette.border,
+                      color: isBold ? 'rgba(255,255,255,0.65)' : palette.muted,
+                      fontSize: exportDimensions ? exportSize(9) : undefined,
+                      padding: exportDimensions ? `${exportSize(3)} ${exportSize(10)}` : undefined,
+                    }}
+                  >
+                    {actionLabel}
+                  </span>
+                ))}
+              </div>
+            )}
+            <h3
+              className="font-serif leading-[1.0] tracking-[-0.01em]"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
+                lineHeight: 1.0,
+              }}
+            >
+              {slide.headline}
+            </h3>
+            <div
+              className="mt-3 h-[2px] w-12 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(2) : undefined,
+                marginTop: exportDimensions ? exportSize(12) : undefined,
+                width: exportDimensions ? exportSize(48) : undefined,
+              }}
+            />
+            {slide.body && (
+              <div
+                className="mt-5 max-w-[40ch] rounded-[8px] border p-4 text-[14px] font-medium leading-relaxed"
+                style={{
+                  backgroundColor: composition === 'direct_action'
+                    ? palette.accent
+                    : isBold
+                      ? 'rgba(255,255,255,0.08)'
+                      : isWarm
+                        ? 'rgba(185,133,103,0.12)'
+                        : palette.panel,
+                  borderColor: composition === 'direct_action' ? palette.accent : palette.border,
+                  color: composition === 'direct_action'
+                    ? '#142334'
+                    : isBold
+                      ? 'rgba(255,255,255,0.82)'
+                      : palette.muted,
+                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                  marginTop: exportDimensions ? exportSize(20) : undefined,
+                  maxWidth: exportDimensions ? `${40 * 14 * exportScale}px` : undefined,
+                  padding: exportDimensions ? exportSize(16) : undefined,
+                }}
+              >
+                {slide.body}
+              </div>
+            )}
+            {slide.cta && (
+              <p
+                className="mt-4 max-w-[30ch] text-[12px] font-bold uppercase tracking-[0.14em]"
+                style={{
+                  color: palette.accent,
+                  fontSize: exportDimensions ? exportSize(12) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                }}
+              >
+                {slide.cta}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : undefined }}>
+            <span className="h-1.5 w-10 rounded-full" style={{ backgroundColor: palette.accent, height: exportDimensions ? exportSize(6) : undefined, width: exportDimensions ? exportSize(40) : undefined }} />
+            <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: isBold ? 'rgba(255,255,255,0.35)' : palette.muted, fontSize: exportDimensions ? exportSize(9) : undefined, opacity: isEditorial ? 0.5 : 1 }}>
+              coachkagiso.com
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
+            <div className="flex items-center gap-3" style={{ gap: exportDimensions ? exportSize(12) : undefined }}>
+              <span
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                style={{
+                  backgroundColor: palette.accent,
+                  color: isBold ? '#142334' : palette.panel,
+                  fontSize: exportDimensions ? exportSize(10) : undefined,
+                  height: exportDimensions ? exportSize(28) : undefined,
+                  width: exportDimensions ? exportSize(28) : undefined,
+                }}
+              >
+                {index + 1}
+              </span>
+              <div>
+                <p
+                  className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={{
+                    color: isBold ? 'rgba(255,255,255,0.58)' : palette.muted,
+                    fontSize: exportDimensions ? exportSize(10) : undefined,
+                  }}
+                >
+                  Coach Kagiso
+                </p>
+                <p
+                  className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]"
+                  style={{
+                    color: isBold ? 'rgba(255,255,255,0.38)' : isWarm ? palette.accent : palette.muted,
+                    fontSize: exportDimensions ? exportSize(9) : undefined,
+                    opacity: isEditorial ? 0.55 : 1,
+                    marginTop: exportDimensions ? exportSize(2) : undefined,
+                  }}
+                >
+                  {roleLabel}
+                  {slide.composition === 'auto' ? ` / ${compositionOption.label}` : ''}
+                </p>
+              </div>
+            </div>
+            <span
+              className="text-[10px] font-bold tabular-nums"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.3)' : isWarm ? palette.accent : palette.muted,
+                fontSize: exportDimensions ? exportSize(10) : undefined,
+                opacity: isEditorial ? 0.45 : 1,
+              }}
+            >
+              {String(index + 1).padStart(2, '0')}/{String(total).padStart(2, '0')}
+            </span>
+          </div>
+
+          <div
+            className="w-full"
+            style={{
+              padding: exportDimensions ? `0 ${exportSize(4)}` : '0 4px',
+            }}
+          >
+            <h3
+              className="font-serif leading-[1.02] tracking-[-0.008em]"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
+              }}
+            >
+              {slide.headline}
+            </h3>
+            {composition === 'card_grid' && bodyPoints.length > 1 ? (
+              <div
+                className="mt-4 grid max-w-[44ch] grid-cols-2 gap-2"
+                style={{
+                  gap: exportDimensions ? exportSize(8) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
+                }}
+              >
+                {bodyPoints.map((point, pointIndex) => (
+                  <div
+                    key={`${slide.id}-card-${pointIndex}`}
+                    className="rounded-[8px] border p-3 text-[11px] font-semibold leading-snug md:text-[12px]"
+                    style={{
+                      backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : palette.panel,
+                      borderColor: isBold ? 'rgba(255,255,255,0.12)' : palette.border,
+                      color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                      fontSize: exportDimensions ? exportSize(12) : undefined,
+                      padding: exportDimensions ? exportSize(12) : undefined,
+                      boxShadow: isBold ? 'none' : '0 1px 3px rgba(20,35,52,0.06)',
+                    }}
+                  >
+                    <span
+                      className="mb-2 flex h-7 w-7 items-center justify-center rounded-full font-serif text-[14px] leading-none"
+                      style={{
+                        color: isBold ? palette.accent : palette.foreground,
+                        backgroundColor: isBold ? 'rgba(201,173,152,0.18)' : isWarm ? 'rgba(185,133,103,0.15)' : `${palette.accent}18`,
+                        fontFamily: 'var(--font-serif)',
+                        fontSize: exportDimensions ? exportSize(14) : undefined,
+                        height: exportDimensions ? exportSize(28) : undefined,
+                        width: exportDimensions ? exportSize(28) : undefined,
+                        marginBottom: exportDimensions ? exportSize(8) : undefined,
+                      }}
+                    >
+                      {String(pointIndex + 1).padStart(2, '0')}
+                    </span>
+                    {point}
+                  </div>
+                ))}
+              </div>
+            ) : composition === 'numbered_stack' && bodyPoints.length > 1 ? (
+              <ol
+                className="mt-4 grid max-w-[42ch] gap-2 text-[12px] font-semibold leading-relaxed md:text-[13px]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(13) : undefined,
+                  gap: exportDimensions ? exportSize(6) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                }}
+              >
+                {bodyPoints.map((point, pointIndex) => (
+                  <li key={`${slide.id}-point-${pointIndex}`} className="flex items-start gap-3 rounded-[6px] p-2" style={{
+                    backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(185,133,103,0.06)' : 'transparent',
+                    gap: exportDimensions ? exportSize(12) : undefined,
+                    padding: exportDimensions ? exportSize(8) : undefined,
+                  }}>
+                    <span
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                      style={{
+                        backgroundColor: palette.accent,
+                        color: isBold ? '#142334' : palette.panel,
+                        fontSize: exportDimensions ? exportSize(10) : undefined,
+                        height: exportDimensions ? exportSize(24) : undefined,
+                        width: exportDimensions ? exportSize(24) : undefined,
+                      }}
+                    >
+                      {pointIndex + 1}
+                    </span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : composition === 'side_rail' && slide.body ? (
+              <div
+                className="mt-4 flex max-w-[44ch] gap-4 rounded-[8px] p-3"
+                style={{
+                  gap: exportDimensions ? exportSize(16) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${44 * 14 * exportScale}px` : undefined,
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(185,133,103,0.06)' : 'transparent',
+                  padding: exportDimensions ? exportSize(12) : undefined,
+                }}
+              >
+                <span
+                  className="w-1.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: palette.accent,
+                    width: exportDimensions ? exportSize(6) : undefined,
+                  }}
+                />
+                <p
+                  className="text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                  style={{
+                    color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                    fontSize: exportDimensions ? exportSize(14) : undefined,
+                  }}
+                >
+                  {slide.body}
+                </p>
+              </div>
+            ) : composition === 'contrast_block' && slide.body ? (
+              <div
+                className="mt-4 grid max-w-[44ch] gap-2 sm:grid-cols-2"
+                style={{
+                  gap: exportDimensions ? exportSize(8) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
+                }}
+              >
+                {['Old frame', 'Sharper frame'].map((label, pointIndex) => (
+                  <div
+                    key={`${slide.id}-contrast-${label}`}
+                    className="rounded-[8px] border p-3"
+                    style={{
+                      backgroundColor: pointIndex === 0
+                        ? 'transparent'
+                        : isBold
+                          ? 'rgba(201,173,152,0.15)'
+                          : isWarm
+                            ? 'rgba(185,133,103,0.12)'
+                            : `${palette.accent}14`,
+                      borderColor: pointIndex === 0 ? palette.border : palette.accent,
+                      padding: exportDimensions ? exportSize(12) : undefined,
+                    }}
+                  >
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-[0.14em]"
+                      style={{
+                        color: pointIndex === 0
+                          ? isBold ? 'rgba(255,255,255,0.4)' : palette.muted
+                          : palette.accent,
+                        fontSize: exportDimensions ? exportSize(9) : undefined,
+                      }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      className="mt-2 text-[12px] font-semibold leading-snug"
+                      style={{
+                        color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                        fontSize: exportDimensions ? exportSize(12) : undefined,
+                        marginTop: exportDimensions ? exportSize(8) : undefined,
+                      }}
+                    >
+                      {contrastPoints[pointIndex] || slide.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : composition === 'quote_panel' && slide.body ? (
+              <div
+                className="mt-4 relative max-w-[40ch] rounded-[8px] px-5 py-4 text-[14px] font-medium leading-relaxed md:text-[15px]"
+                style={{
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(185,133,103,0.08)' : palette.panel,
+                  color: isBold ? 'rgba(255,255,255,0.82)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(15) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${40 * 15 * exportScale}px` : undefined,
+                  padding: exportDimensions ? `${exportSize(16)} ${exportSize(20)}` : undefined,
+                }}
+              >
+                <span
+                  className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full"
+                  style={{
+                    backgroundColor: palette.accent,
+                    width: exportDimensions ? exportSize(3) : undefined,
+                  }}
+                />
+                <span
+                  className="font-serif text-[28px] leading-none"
+                  style={{
+                    color: palette.accent,
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: exportDimensions ? exportSize(28) : undefined,
+                    opacity: 0.4,
+                    display: 'block',
+                    marginBottom: exportDimensions ? exportSize(4) : '4px',
+                  }}
+                >
+                  &ldquo;
+                </span>
+                {slide.body}
+              </div>
+            ) : (composition === 'evidence_card' || composition === 'example_note' || composition === 'credibility_cue') && slide.body ? (
+              <div
+                className="mt-4 max-w-[42ch] rounded-[8px] border p-4"
+                style={{
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(185,133,103,0.06)' : palette.panel,
+                  borderColor: composition === 'credibility_cue' ? palette.accent : isBold ? 'rgba(255,255,255,0.12)' : palette.border,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                  maxWidth: exportDimensions ? `${42 * 14 * exportScale}px` : undefined,
+                  padding: exportDimensions ? exportSize(16) : undefined,
+                  boxShadow: isBold ? 'none' : '0 1px 3px rgba(20,35,52,0.05)',
+                }}
+              >
+                <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : undefined }}>
+                  <span
+                    className="h-1.5 w-6 rounded-full"
+                    style={{
+                      backgroundColor: palette.accent,
+                      height: exportDimensions ? exportSize(6) : undefined,
+                      width: exportDimensions ? exportSize(24) : undefined,
+                    }}
+                  />
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                    style={{
+                      color: palette.accent,
+                      fontSize: exportDimensions ? exportSize(10) : undefined,
+                    }}
+                  >
+                    {composition === 'example_note' ? 'Example' : 'Proof cue'}
+                  </p>
+                </div>
+                <p
+                  className="mt-3 text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                  style={{
+                    color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                    fontSize: exportDimensions ? exportSize(14) : undefined,
+                    marginTop: exportDimensions ? exportSize(12) : undefined,
+                  }}
+                >
+                  {slide.body}
+                </p>
+              </div>
+            ) : slide.body ? (
+              <p
+                className="mt-3 max-w-[40ch] text-[13px] font-medium leading-relaxed md:text-[14px]"
+                style={{
+                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                  marginTop: exportDimensions ? exportSize(12) : undefined,
+                  maxWidth: exportDimensions ? `${40 * 14 * exportScale}px` : undefined,
+                }}
+              >
+                {slide.body}
+              </p>
+            ) : null}
+            {slide.cta && (
+              <p
+                className="mt-4 max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{
+                  color: palette.accent,
+                  fontSize: exportDimensions ? exportSize(11) : undefined,
+                  marginTop: exportDimensions ? exportSize(16) : undefined,
+                }}
+              >
+                {slide.cta}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : undefined }}>
+            <span
+              className="h-1.5 w-10 rounded-full"
+              style={{
+                backgroundColor: palette.accent,
+                height: exportDimensions ? exportSize(6) : undefined,
+                width: exportDimensions ? exportSize(40) : undefined,
+              }}
+            />
+            <span
+              className="text-[9px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: isBold ? 'rgba(255,255,255,0.35)' : isWarm ? palette.accent : palette.muted,
+                fontSize: exportDimensions ? exportSize(9) : undefined,
+                opacity: isEditorial ? 0.5 : 1,
+              }}
+            >
+              coachkagiso.com
+            </span>
+          </div>
+        </>
+      )}
+    </>
+  );
 
   return (
     <article
@@ -6699,24 +8160,31 @@ function CarouselSlideFrame({
         aspectRatio: aspectOption.cssRatio,
         background: palette.background,
         color: palette.foreground,
-        borderColor: palette.border,
+        borderColor: isCover ? 'transparent' : palette.border,
         fontFamily: 'var(--font-sans)',
         ...exportFrameStyles,
       }}
     >
-      {isBold && (
+      {isBold && !isCover && (
         <div
           aria-hidden="true"
           className="absolute inset-y-0 right-0 w-1/3"
           style={{ background: 'linear-gradient(180deg, rgba(201,173,152,0.34), rgba(201,173,152,0))' }}
         />
       )}
-      {isWarm && (
+      {isBold && isCover && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(135deg, rgba(201,173,152,0.2) 0%, transparent 50%, rgba(201,173,152,0.08) 100%)' }}
+        />
+      )}
+      {isWarm && !isCover && (
         <div
           aria-hidden="true"
           className={`absolute rounded-full ${exportDimensions ? '' : '-right-10 -top-10 h-32 w-32'}`}
           style={{
-            backgroundColor: 'rgba(185,133,103,0.18)',
+            backgroundColor: 'rgba(185,133,103,0.15)',
             height: exportDimensions ? exportSize(128) : undefined,
             right: exportDimensions ? `-${exportSize(40)}` : undefined,
             top: exportDimensions ? `-${exportSize(40)}` : undefined,
@@ -6724,282 +8192,61 @@ function CarouselSlideFrame({
           }}
         />
       )}
-
-      <div className="relative z-10 flex w-full flex-col justify-between" style={{ gap: exportDimensions ? exportSize(20) : undefined }}>
-        <div className="flex items-start justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
-          <div>
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.18em]"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
-                fontSize: exportDimensions ? exportSize(10) : undefined,
-              }}
-            >
-              Coach Kagiso
-            </p>
-            <div
-              className="mt-3 h-1 w-14 rounded-full"
-              style={{
-                backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(4) : undefined,
-                marginTop: exportDimensions ? exportSize(12) : undefined,
-                width: exportDimensions ? exportSize(56) : undefined,
-              }}
-            />
-          </div>
-          <span
-            className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+      {isWarm && isCover && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute rounded-full"
             style={{
-              backgroundColor: palette.chipBackground,
-              color: palette.chipText,
-              fontSize: exportDimensions ? exportSize(10) : undefined,
-              padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
-            }}
-          >
-            {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-          </span>
-        </div>
-
-        <div
-          className={isCover || isCta ? 'my-auto' : ''}
-          style={{
-            marginBottom: isCover || isCta ? 'auto' : undefined,
-            marginTop: isCover || isCta ? 'auto' : undefined,
-          }}
-        >
-          <span
-            className="mb-4 inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]"
-            style={{
-              backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-              borderColor: palette.border,
-              color: isBold ? 'rgba(255,255,255,0.72)' : palette.muted,
-              fontSize: exportDimensions ? exportSize(10) : undefined,
-              marginBottom: exportDimensions ? exportSize(16) : undefined,
-              padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
-            }}
-          >
-            {roleLabel}
-            {slide.composition === 'auto' ? ` / ${compositionOption.label}` : ''}
-          </span>
-          <h3
-            className="font-serif text-[28px] leading-[1.02] tracking-normal md:text-[34px]"
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: exportDimensions ? exportSize(headlineSize) : `${Math.min(headlineSize, 42)}px`,
-            }}
-          >
-            {slide.headline}
-          </h3>
-          {composition === 'card_grid' && bodyPoints.length > 1 ? (
-            <div
-              className="mt-4 grid max-w-[44ch] grid-cols-2 gap-2"
-              style={{
-                gap: exportDimensions ? exportSize(8) : undefined,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
-              }}
-            >
-              {bodyPoints.map((point, pointIndex) => (
-                <div
-                  key={`${slide.id}-card-${pointIndex}`}
-                  className="rounded-[8px] border p-3 text-[11px] font-semibold leading-snug md:text-[12px]"
-                  style={{
-                    backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-                    borderColor: palette.border,
-                    color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                    fontSize: exportDimensions ? exportSize(12) : undefined,
-                    padding: exportDimensions ? exportSize(12) : undefined,
-                  }}
-                >
-                  <span className="mb-2 block font-serif text-[18px] leading-none" style={{ color: palette.accent, fontFamily: 'var(--font-serif)', fontSize: exportDimensions ? exportSize(18) : undefined }}>
-                    {String(pointIndex + 1).padStart(2, '0')}
-                  </span>
-                  {point}
-                </div>
-              ))}
-            </div>
-          ) : composition === 'numbered_stack' && bodyPoints.length > 1 ? (
-            <ol
-              className="mt-4 grid max-w-[42ch] gap-2 text-[12px] font-semibold leading-relaxed md:text-[13px]"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                fontSize: exportDimensions ? exportSize(13) : undefined,
-                gap: exportDimensions ? exportSize(8) : undefined,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
-              }}
-            >
-              {bodyPoints.map((point, pointIndex) => (
-                <li key={`${slide.id}-point-${pointIndex}`} className="flex gap-2">
-                  <span
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
-                    style={{
-                      backgroundColor: palette.accent,
-                      color: template.value === 'bold_diagnostic' ? '#142334' : palette.panel,
-                      fontSize: exportDimensions ? exportSize(10) : undefined,
-                      height: exportDimensions ? exportSize(24) : undefined,
-                      width: exportDimensions ? exportSize(24) : undefined,
-                    }}
-                  >
-                    {pointIndex + 1}
-                  </span>
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ol>
-          ) : composition === 'side_rail' && slide.body ? (
-            <div className="mt-4 flex max-w-[44ch] gap-4" style={{ gap: exportDimensions ? exportSize(16) : undefined, marginTop: exportDimensions ? exportSize(16) : undefined, maxWidth: exportDimensions ? `${44 * 14 * exportScale}px` : undefined }}>
-              <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: palette.accent, width: exportDimensions ? exportSize(4) : undefined }} />
-              <p
-                className="text-[13px] font-semibold leading-relaxed md:text-[14px]"
-                style={{
-                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(14) : undefined,
-                }}
-              >
-                {slide.body}
-              </p>
-            </div>
-          ) : composition === 'contrast_block' && slide.body ? (
-            <div
-              className="mt-4 grid max-w-[44ch] gap-2 sm:grid-cols-2"
-              style={{
-                gap: exportDimensions ? exportSize(8) : undefined,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
-              }}
-            >
-              {['Old frame', 'Sharper frame'].map((label, pointIndex) => (
-                <div
-                  key={`${slide.id}-contrast-${label}`}
-                  className="rounded-[8px] border p-3"
-                  style={{
-                    backgroundColor: pointIndex === 0 ? 'transparent' : isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-                    borderColor: pointIndex === 0 ? palette.border : palette.accent,
-                    padding: exportDimensions ? exportSize(12) : undefined,
-                  }}
-                >
-                  <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: palette.accent, fontSize: exportDimensions ? exportSize(9) : undefined }}>{label}</p>
-                  <p
-                    className="mt-2 text-[12px] font-semibold leading-snug"
-                    style={{
-                      color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                      fontSize: exportDimensions ? exportSize(12) : undefined,
-                      marginTop: exportDimensions ? exportSize(8) : undefined,
-                    }}
-                  >
-                    {contrastPoints[pointIndex] || slide.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : composition === 'quote_panel' && slide.body ? (
-            <div
-              className="mt-4 max-w-[40ch] rounded-[8px] border-l-4 px-4 py-3 text-[14px] font-medium leading-relaxed md:text-[15px]"
-              style={{
-                backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-                borderColor: palette.accent,
-                color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                fontSize: exportDimensions ? exportSize(15) : undefined,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${40 * 15 * exportScale}px` : undefined,
-                padding: exportDimensions ? `${exportSize(12)} ${exportSize(16)}` : undefined,
-              }}
-            >
-              {slide.body}
-            </div>
-          ) : (composition === 'evidence_card' || composition === 'example_note' || composition === 'credibility_cue') && slide.body ? (
-            <div
-              className="mt-4 max-w-[42ch] rounded-[8px] border p-4"
-              style={{
-                backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-                borderColor: composition === 'credibility_cue' ? palette.accent : palette.border,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${42 * 14 * exportScale}px` : undefined,
-                padding: exportDimensions ? exportSize(16) : undefined,
-              }}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: palette.accent, fontSize: exportDimensions ? exportSize(10) : undefined }}>
-                {composition === 'example_note' ? 'Example' : 'Proof cue'}
-              </p>
-              <p
-                className="mt-2 text-[13px] font-semibold leading-relaxed md:text-[14px]"
-                style={{
-                  color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(14) : undefined,
-                  marginTop: exportDimensions ? exportSize(8) : undefined,
-                }}
-              >
-                {slide.body}
-              </p>
-            </div>
-          ) : slide.body && isCta ? (
-            <div
-              className="mt-5 max-w-[38ch] rounded-[8px] border p-4 text-[13px] font-semibold leading-relaxed md:text-[14px]"
-              style={{
-                backgroundColor: composition === 'direct_action' ? palette.accent : isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-                borderColor: composition === 'direct_action' ? palette.accent : palette.border,
-                color: composition === 'direct_action' ? '#142334' : isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                fontSize: exportDimensions ? exportSize(14) : undefined,
-                marginTop: exportDimensions ? exportSize(20) : undefined,
-                maxWidth: exportDimensions ? `${38 * 14 * exportScale}px` : undefined,
-                padding: exportDimensions ? exportSize(16) : undefined,
-              }}
-            >
-              {slide.body}
-            </div>
-          ) : slide.body ? (
-            <p
-              className="mt-4 max-w-[38ch] text-[13px] font-medium leading-relaxed md:text-[14px]"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                fontSize: exportDimensions ? exportSize(14) : undefined,
-                marginTop: exportDimensions ? exportSize(16) : undefined,
-                maxWidth: exportDimensions ? `${38 * 14 * exportScale}px` : undefined,
-              }}
-            >
-              {slide.body}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
-          {slide.cta ? (
-            <p
-              className="max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
-              style={{
-                color: palette.accent,
-                fontSize: exportDimensions ? exportSize(11) : undefined,
-                maxWidth: exportDimensions ? `${30 * 11 * exportScale}px` : undefined,
-              }}
-            >
-              {slide.cta}
-            </p>
-          ) : (
-            <span
-              className="h-2 w-20 rounded-full"
-              style={{
-                backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(8) : undefined,
-                width: exportDimensions ? exportSize(80) : undefined,
-              }}
-            />
-          )}
-          <span
-            className="h-10 w-10 shrink-0 rounded-full border"
-            style={{
-              borderColor: palette.accent,
-              backgroundColor: isBold ? 'rgba(255,255,255,0.08)' : palette.panel,
-              height: exportDimensions ? exportSize(40) : undefined,
-              width: exportDimensions ? exportSize(40) : undefined,
+              backgroundColor: 'rgba(185,133,103,0.18)',
+              height: exportDimensions ? exportSize(200) : '200px',
+              right: exportDimensions ? `-${exportSize(60)}` : '-60px',
+              top: exportDimensions ? `-${exportSize(60)}` : '-60px',
+              width: exportDimensions ? exportSize(200) : '200px',
             }}
           />
-        </div>
+          <div
+            aria-hidden="true"
+            className="absolute bottom-0 left-0 right-0 h-1/4"
+            style={{ background: 'linear-gradient(180deg, transparent, rgba(185,133,103,0.08))' }}
+          />
+        </>
+      )}
+      {isEditorial && isCover && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute right-0 top-0 h-full w-px"
+            style={{
+              backgroundColor: palette.accent,
+              opacity: 0.2,
+              width: exportDimensions ? exportSize(1) : undefined,
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute right-0 top-0 h-px w-full"
+            style={{
+              backgroundColor: palette.accent,
+              opacity: 0.2,
+              height: exportDimensions ? exportSize(1) : undefined,
+            }}
+          />
+        </>
+      )}
+
+      <div
+        className="relative z-10 flex w-full flex-col justify-between"
+        style={{
+          gap: exportDimensions ? exportSize(20) : undefined,
+          padding: exportDimensions ? undefined : isCover ? '24px 20px' : undefined,
+        }}
+      >
+        {contentArea}
       </div>
     </article>
   );
 }
-
 const carouselMinSlides = 4;
 const carouselMaxSlides = 10;
 
@@ -8336,7 +9583,7 @@ function StudioToolsPanel({
       });
       const data = await response.json().catch(() => null) as CaptionResult & { error?: string } | null;
       if (!response.ok) throw new Error(data?.error || 'Something went wrong. Try again or simplify your inputs.');
-      setCaptionResult({ captions: data?.captions || [] });
+      setCaptionResult({ captions: data?.captions || [], analysis: data?.analysis });
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : 'Something went wrong. Try again or simplify your inputs.');
     } finally {
@@ -8379,6 +9626,7 @@ function StudioToolsPanel({
         reply: data?.reply || '',
         shortReply: data?.shortReply || '',
         chosenGoal: data?.chosenGoal,
+        analysis: data?.analysis,
       });
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : 'Something went wrong. Try again or simplify your inputs.');
@@ -8801,6 +10049,12 @@ function StudioToolsPanel({
           </>
         ) : hasCaptionOutput ? (
           <>
+            {captionResult?.analysis && (
+              <div className="mt-5 rounded-[8px] border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">AI Reasoning</p>
+                <p className="mt-1 text-[11px] italic leading-relaxed text-[#8C7466]/80">{captionResult.analysis}</p>
+              </div>
+            )}
             <div className="mt-5 grid gap-3">
               {captionResult?.captions.map((item, index) => (
                 <div key={`${item.angle}-${index}`} className="rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
@@ -8840,6 +10094,9 @@ function StudioToolsPanel({
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Suggested reply</p>
                     <p className="mt-1 text-[12px] font-semibold text-[#142334]/58">{replyGoal === 'auto' && replyResult?.chosenGoal ? `Auto → ${replyGoalLabels[replyResult.chosenGoal as ReplyGoal]?.label ?? replyResult.chosenGoal}` : replyGoalLabels[resolvedReplyGoal].label}</p>
+                    {replyGoal === 'auto' && replyResult?.analysis && (
+                      <p className="mt-1 text-[11px] italic leading-relaxed text-[#8C7466]/80">{replyResult.analysis}</p>
+                    )}
                   </div>
                   <Badge className="bg-[#F5F3EE] text-[#8C7466]">{replyPlatformLabels[replyPlatform]}</Badge>
                 </div>
@@ -9145,16 +10402,19 @@ function InsightsArticleModal({
           placeholder="Paste the full Insights article here. Smart Suggest will use the summary for repurposing ideas."
         />
         <TextInput label="Published URL" value={publishedUrl} onChange={setPublishedUrl} placeholder="Optional public URL" />
-        <label className="grid gap-2">
+        <div className="grid gap-2">
           <span className="studio-label">Pillar</span>
-          <select value={pillar} onChange={(event) => setPillar(event.target.value as ContentPillar)} className="studio-input h-11">
-            {Object.entries(pillarMeta).map(([value, meta]) => (
-              <option key={value} value={value}>
-                {meta.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <FilterDropdown
+            name="insightsArticlePillar"
+            value={pillar}
+            onChange={(value) => setPillar(value as ContentPillar)}
+            ariaLabel="Choose Insights article pillar"
+            options={Object.entries(pillarMeta).map(([value, meta]) => ({
+              value,
+              label: meta.label,
+            }))}
+          />
+        </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="studio-ghost-button">
             Cancel
@@ -9172,12 +10432,14 @@ function InsightsArticleModal({
 function CalendarEntryModal({
   state,
   adminKey,
+  vaultItems,
   onClose,
   onSaved,
   onDelete,
 }: {
   state: CalendarModalState;
   adminKey: string;
+  vaultItems: ContentBacklogItem[];
   onClose: () => void;
   onSaved: (item: ContentCalendarItem) => void;
   onDelete?: () => void;
@@ -9193,9 +10455,55 @@ function CalendarEntryModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sourceMode, setSourceMode] = useState<'blank' | 'vault'>('blank');
+  const [vaultSearch, setVaultSearch] = useState('');
+  const [selectedVaultItemId, setSelectedVaultItemId] = useState<string | null>(null);
+  const usableVaultItems = useMemo(() => {
+    const query = vaultSearch.trim().toLowerCase();
+    return vaultItems
+      .filter((item) => item.status !== 'used' && !isMessyMiddleItem(item))
+      .filter((item) => {
+        if (!query) return true;
+        const haystack = [
+          extractCleanTitle(item.title, item.content || ''),
+          item.content || '',
+          item.notes || '',
+          item.pillar ? pillarMeta[item.pillar].label : '',
+          item.platform ? platformLabels[item.platform] : '',
+          getBacklogSourceLabel(item),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(query);
+      })
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 8);
+  }, [vaultItems, vaultSearch]);
+
+  function applyVaultItem(item: ContentBacklogItem) {
+    const body = getBacklogDraftBody(item);
+    const cleanTitle = extractCleanTitle(item.title, item.content || body);
+    const sourceNote = `Pulled from Vault: ${cleanTitle}`;
+
+    setSelectedVaultItemId(item.id);
+    setTitle(cleanTitle);
+    setPillar(item.pillar || pillar);
+    setPlatform(item.platform || platform);
+    setStatus(item.status === 'idea' ? 'idea' : 'draft');
+    setDraftContent(body || extractPreview(item.content || item.notes || cleanTitle, 800));
+    setNotes((current) => {
+      if (!current.trim()) return sourceNote;
+      if (current.includes(sourceNote)) return current;
+      return `${current.trim()}\n\n${sourceNote}`;
+    });
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!publishDate) {
+      setError('Choose a publish date before saving this planned post.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -9216,31 +10524,155 @@ function CalendarEntryModal({
     <ModalShell title={state.mode === 'edit' ? 'Edit planned post' : 'Add planned post'} onClose={onClose}>
       <form onSubmit={submit} className="grid gap-4">
         {error && <Notice tone="error">{error}</Notice>}
+        <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Start point</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-[#142334]/62">
+                Fill this manually, or pull a saved idea or draft from the Vault.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-[8px] bg-white p-1">
+              {[
+                { value: 'blank' as const, label: 'Start blank' },
+                { value: 'vault' as const, label: 'Pull from Vault' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSourceMode(option.value)}
+                  className={`min-h-9 rounded-[8px] px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                    sourceMode === option.value
+                      ? 'bg-[#142334] text-white'
+                      : 'text-[#142334]/58 hover:bg-[#F5F3EE] hover:text-[#142334]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {sourceMode === 'vault' && (
+            <div className="mt-3 grid gap-3">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C7466]" />
+                <input
+                  value={vaultSearch}
+                  onChange={(event) => setVaultSearch(event.target.value)}
+                  placeholder="Search saved drafts, ideas, Smart Suggests..."
+                  className="studio-input h-11 w-full pl-10"
+                />
+              </label>
+              <div className="grid max-h-[280px] gap-2 overflow-y-auto pr-1" onWheel={trapWheel}>
+                {usableVaultItems.length === 0 ? (
+                  <div className="rounded-[8px] border border-dashed border-[#D7C2B2] bg-white px-4 py-5 text-center">
+                    <p className="font-serif text-[20px] leading-tight text-[#142334]">No matching Vault items.</p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                      Try a different search, or start this calendar post blank.
+                    </p>
+                  </div>
+                ) : (
+                  usableVaultItems.map((item) => {
+                    const cleanTitle = extractCleanTitle(item.title, item.content || '');
+                    const preview = isInsightsBacklogItem(item)
+                      ? getInsightsSummary(item)
+                      : extractPreview(getBacklogDraftBody(item) || item.content || item.notes || cleanTitle, 150);
+                    const isSelected = selectedVaultItemId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => applyVaultItem(item)}
+                        className={`rounded-[8px] border p-3 text-left transition ${
+                          isSelected
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98] hover:bg-[#FBFAF8]'
+                        }`}
+                      >
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                            isSelected ? 'bg-white/12 text-white' : 'bg-[#F5F3EE] text-[#8C7466]'
+                          }`}>
+                            {getBacklogSourceLabel(item)}
+                          </span>
+                          <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                            isSelected ? 'bg-white/12 text-white' : backlogStatusMeta[item.status].className
+                          }`}>
+                            {backlogStatusMeta[item.status].label}
+                          </span>
+                          {item.platform && (
+                            <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                              isSelected ? 'bg-white/12 text-white' : 'bg-[#F5F3EE] text-[#6B6B6B]'
+                            }`}>
+                              {platformLabels[item.platform]}
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-2 block text-[14px] font-bold">{cleanTitle}</span>
+                        <span className={`mt-1 block line-clamp-2 text-[12px] leading-relaxed ${isSelected ? 'text-white/62' : 'text-[#142334]/58'}`}>
+                          {preview || 'Saved Vault item ready to place on the calendar.'}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <TextInput label="Title/topic" value={title} onChange={setTitle} required />
         <div className="grid gap-3 md:grid-cols-3">
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <span className="studio-label">Pillar</span>
-            <select value={pillar} onChange={(event) => setPillar(event.target.value as ContentPillar)} className="studio-input h-11">
-              {Object.entries(pillarMeta).map(([value, meta]) => (
-                <option key={value} value={value}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <PlatformSelect value={platform} onChange={setPlatform} />
-          <label className="grid gap-2">
+            <FilterDropdown
+              name="calendarPostPillar"
+              value={pillar}
+              onChange={(value) => setPillar(value as ContentPillar)}
+              ariaLabel="Choose planned post pillar"
+              options={Object.entries(pillarMeta).map(([value, meta]) => ({
+                value,
+                label: meta.label,
+              }))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <span className="studio-label">Platform</span>
+            <FilterDropdown
+              name="calendarPostPlatform"
+              value={platform}
+              onChange={(value) => setPlatform(value as ContentPlatform)}
+              ariaLabel="Choose planned post platform"
+              options={Object.entries(platformLabels).map(([value, label]) => ({
+                value,
+                label,
+              }))}
+            />
+          </div>
+          <div className="grid gap-2">
             <span className="studio-label">Status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as ContentCalendarStatus)} className="studio-input h-11">
-              {Object.entries(calendarStatusMeta).map(([value, meta]) => (
-                <option key={value} value={value}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <FilterDropdown
+              name="calendarPostStatus"
+              value={status}
+              onChange={(value) => setStatus(value as ContentCalendarStatus)}
+              ariaLabel="Choose planned post status"
+              options={Object.entries(calendarStatusMeta).map(([value, meta]) => ({
+                value,
+                label: meta.label,
+              }))}
+            />
+          </div>
         </div>
-        <TextInput label="Publish date" value={publishDate} onChange={setPublishDate} type="date" required />
+        <div className="grid gap-2">
+          <span className="studio-label">Publish date</span>
+          <DashboardDatePicker
+            name="publishDate"
+            value={publishDate}
+            onChange={setPublishDate}
+            ariaLabel="Choose planned post publish date"
+            placeholder="Publish date"
+          />
+        </div>
         <TextareaField label="Linked draft" value={draftContent} onChange={setDraftContent} rows={6} />
         <TextareaField label="Notes" value={notes} onChange={setNotes} rows={4} />
         <div className="flex justify-end gap-2">
@@ -9296,6 +10728,7 @@ function BacklogEntryModal({
   const [platform, setPlatform] = useState<ContentPlatform | ''>(state.item?.platform || state.defaults?.platform || '');
   const [status, setStatus] = useState<ContentBacklogStatus>(state.item?.status || state.defaults?.status || 'idea');
   const [source, setSource] = useState<ContentBacklogSource>(state.item?.source || state.defaults?.source || 'manual');
+  const [isFavorite, setIsFavorite] = useState(Boolean(state.item?.isFavorite || state.defaults?.isFavorite));
   const [content, setContent] = useState(state.item ? extractPostBody(state.item.content || '') : state.defaults?.content || '');
   const [notes, setNotes] = useState(state.item?.notes || state.defaults?.notes || '');
   const [error, setError] = useState<string | null>(null);
@@ -9307,7 +10740,7 @@ function BacklogEntryModal({
     setBusy(true);
     setError(null);
     try {
-      const payload = { key: adminKey, title, pillar, platform, status, source, content, notes };
+      const payload = { key: adminKey, title, pillar, platform, status, source, isFavorite, content, notes };
       const data =
         state.mode === 'edit' && state.item
           ? await requestJson<{ item: ContentBacklogItem }>(`/api/content/backlog/${state.item.id}`, 'PATCH', payload)
@@ -9324,52 +10757,87 @@ function BacklogEntryModal({
     <ModalShell title={state.mode === 'edit' ? 'Edit idea' : 'Add idea'} onClose={onClose}>
       <form onSubmit={submit} className="grid gap-4">
         {error && <Notice tone="error">{error}</Notice>}
+        <div className="flex flex-col gap-3 rounded-[12px] border border-[#E4D8CB] bg-[#F8F6F4] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Favourite</p>
+            <p className="mt-1 text-[12px] text-[#142334]/62">Keep this idea easy to spot.</p>
+          </div>
+          <button
+            type="button"
+            aria-pressed={isFavorite}
+            onClick={() => setIsFavorite((current) => !current)}
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-[12px] font-bold uppercase tracking-[0.12em] transition ${
+              isFavorite
+                ? 'border-[#A24E37] bg-[#FFF4EF] text-[#A24E37]'
+                : 'border-[#D8C8BB] bg-white text-[#142334] hover:border-[#C9AD98] hover:bg-[#F5F3EE]'
+            }`}
+          >
+            <span aria-hidden="true">❤️</span>
+            {isFavorite ? 'Favourited' : 'Mark favourite'}
+          </button>
+        </div>
         <TextInput label="Title/topic" value={title} onChange={setTitle} required />
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <span className="studio-label">Pillar</span>
-            <select value={pillar} onChange={(event) => setPillar(event.target.value as ContentPillar | '')} className="studio-input h-11">
-              <option value="">No pillar yet</option>
-              {Object.entries(pillarMeta).map(([value, meta]) => (
-                <option key={value} value={value}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-2">
+            <FilterDropdown
+              name="backlogPillar"
+              value={pillar}
+              onChange={(value) => setPillar(value as ContentPillar | '')}
+              ariaLabel="Choose idea pillar"
+              options={[
+                { value: '', label: 'No pillar yet' },
+                ...Object.entries(pillarMeta).map(([value, meta]) => ({
+                  value,
+                  label: meta.label,
+                })),
+              ]}
+            />
+          </div>
+          <div className="grid gap-2">
             <span className="studio-label">Platform</span>
-            <select value={platform} onChange={(event) => setPlatform(event.target.value as ContentPlatform | '')} className="studio-input h-11">
-              <option value="">No platform yet</option>
-              {Object.entries(platformLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <FilterDropdown
+              name="backlogPlatform"
+              value={platform}
+              onChange={(value) => setPlatform(value as ContentPlatform | '')}
+              ariaLabel="Choose idea platform"
+              options={[
+                { value: '', label: 'No platform yet' },
+                ...Object.entries(platformLabels).map(([value, label]) => ({
+                  value,
+                  label,
+                })),
+              ]}
+            />
+          </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <span className="studio-label">Status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as ContentBacklogStatus)} className="studio-input h-11">
-              {Object.entries(backlogStatusMeta).map(([value, meta]) => (
-                <option key={value} value={value}>
-                  {meta.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-2">
+            <FilterDropdown
+              name="backlogStatus"
+              value={status}
+              onChange={(value) => setStatus(value as ContentBacklogStatus)}
+              ariaLabel="Choose idea status"
+              options={Object.entries(backlogStatusMeta).map(([value, meta]) => ({
+                value,
+                label: meta.label,
+              }))}
+            />
+          </div>
+          <div className="grid gap-2">
             <span className="studio-label">Source</span>
-            <select value={source} onChange={(event) => setSource(event.target.value as ContentBacklogSource)} className="studio-input h-11">
-              {Object.entries(sourceLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <FilterDropdown
+              name="backlogSource"
+              value={source}
+              onChange={(value) => setSource(value as ContentBacklogSource)}
+              ariaLabel="Choose idea source"
+              options={Object.entries(sourceLabels).map(([value, label]) => ({
+                value,
+                label,
+              }))}
+            />
+          </div>
         </div>
         <TextareaField label="Content / draft" value={content} onChange={setContent} rows={6} />
         <TextareaField label="Notes" value={notes} onChange={setNotes} rows={4} />

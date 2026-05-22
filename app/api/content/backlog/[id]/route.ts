@@ -69,12 +69,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (body?.content !== undefined) values.content = body.content ? String(body.content) : null;
   if (body?.notes !== undefined) values.notes = body.notes ? String(body.notes) : null;
+  if (body?.isFavorite !== undefined) values.isFavorite = Boolean(body.isFavorite);
 
   const { activeItems: currentItems, deletedIds } = await pruneExpiredVaultItems();
   if (deletedIds.length > 0) revalidatePath('/resources/career-diagnostic/submissions');
 
   const currentItem = currentItems.find((item) => item.id === id);
   if (!currentItem) return NextResponse.json({ error: 'Idea not found.' }, { status: 404 });
+  if (values.isFavorite !== undefined && values.notes === undefined) values.notes = currentItem.notes;
 
   const currentSection = getVaultSectionForItem(currentItem);
   const nextSection = getVaultSectionForItem({

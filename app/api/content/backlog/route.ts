@@ -42,6 +42,7 @@ export async function POST(request: Request) {
   const status = String(body?.status || 'idea');
   const source = String(body?.source || 'manual');
   const notes = body?.notes ? String(body.notes) : null;
+  const isFavorite = Boolean(body?.isFavorite);
 
   if (!title) return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
   let normalizedPillar: ContentPillar | null = null;
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
     platform: normalizedPlatform,
     status,
     source,
+    isFavorite,
     content: body?.content ? String(body.content) : null,
     notes,
   });

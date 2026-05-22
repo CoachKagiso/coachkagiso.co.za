@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import { AuditBreakLeadMagnet } from '@/components/ArticleLeadMagnets';
 import ArticleShareActions from '@/components/ArticleShareActions';
 import { ArticleFaqJsonLd, ArticleJsonLd, BreadcrumbJsonLd } from '@/app/JsonLd';
+import BackToTopButton from '@/components/BackToTopButton';
 import { getInsightBySlug, getRelatedInsights, insights, type Insight, type InsightBodyBlock } from '@/lib/insights';
 
 type ArticlePageProps = {
@@ -23,7 +24,7 @@ const articleAuthor = {
   aboutHref: '/about',
   linkedin: 'https://linkedin.com/in/coach-kagiso',
   tiktok: 'https://www.tiktok.com/@coach_kagiso',
-  facebook: 'https://facebook.com/coachkagiso',
+  facebook: 'https://www.facebook.com/coachkagisoSA',
   instagram: 'https://www.instagram.com/coach.kagiso',
 };
 
@@ -943,6 +944,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           </div>
         </section>
       </main>
+      <BackToTopButton />
       <Footer />
     </>
   );
