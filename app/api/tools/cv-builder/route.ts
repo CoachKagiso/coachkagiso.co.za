@@ -207,6 +207,10 @@ ATS-OPTIMIZED WRITING
 - Core skills must be real skills evidenced by the CV, written as short keyword phrases for ATS keyword matching.
 - The professional summary is 3-4 sentences: who they are, their strongest evidence, and the direction implied by the career goal.
 
+TAILORING TO A TARGET ROLE
+- If the build context includes a target role or job description, optimise this CV for that specific role: mirror its key terminology, surface the most relevant experience and skills first, and align the professional summary and headline to it.
+- Tailoring means re-emphasising and re-wording real content. It NEVER means adding a skill, tool, or claim the CV does not support just because the job asks for it.
+
 SOUTH AFRICAN CONTEXT
 - Keep South African professional framing (Corporate SA, NQF levels, Matric, SETA credentials) where the source CV supports it.
 - STRIP all sensitive data from the output entirely: RSA ID number, date of birth, age, home/residential address, marital status, dependants, next of kin, race/ethnicity/B-BBEE status, photo references, salary history, and "References available on request". Keep only city/province in the location field.
@@ -770,6 +774,14 @@ export async function POST(request: Request) {
   }
 
   const deliverable: Deliverable = includesValue(deliverables, rawDeliverable) ? rawDeliverable : 'cv';
+
+  if (deliverable === 'cover_letter' && !targetRole) {
+    return NextResponse.json(
+      { error: 'Paste the job description before generating a cover letter.' },
+      { status: 400 },
+    );
+  }
+
   const analysisMode = includesValue(analyzerModes, rawAnalysisMode) ? rawAnalysisMode : 'simple';
   const goalLabel = analysisMode === 'advanced' && includesValue(cvGoals, rawGoal) ? rawGoal : 'Auto-infer from CV';
   const seniorityLabel = analysisMode === 'advanced' && includesValue(seniorityLevels, rawSeniority)

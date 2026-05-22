@@ -367,6 +367,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [copied, setCopied] = useState(false);
   const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
   const canAnalyze = (cvText.trim().length >= 300 || Boolean(cvFile)) && !busy;
@@ -475,9 +476,14 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
 
   async function generateDeliverable(kind: DeliverableKind) {
     if (!result || building) return;
+    if (kind === 'cover_letter' && !jobDescription.trim()) {
+      setBuildError('Paste the job description before generating a cover letter.');
+      return;
+    }
     setBuilding(kind);
     setBuildError('');
     try {
+      const deliverableTargetRole = jobDescription.trim() || (analyzerMode === 'advanced' ? targetRole : '');
       let response: Response;
       if (cvFile) {
         const formData = new FormData();
@@ -485,7 +491,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         formData.append('analysisMode', analyzerMode);
         formData.append('deliverable', kind);
         formData.append('cvFile', cvFile);
-        formData.append('targetRole', analyzerMode === 'advanced' ? targetRole : '');
+        formData.append('targetRole', deliverableTargetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
         formData.append('seniority', analyzerMode === 'advanced' ? seniority : '');
@@ -500,7 +506,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             analysisMode: analyzerMode,
             deliverable: kind,
             cvText,
-            targetRole: analyzerMode === 'advanced' ? targetRole : '',
+            targetRole: deliverableTargetRole,
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
@@ -835,6 +841,23 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 the source CV using only facts already in it, strips sensitive personal data, and marks missing
                 details with [brackets] for you to confirm with the client.
               </p>
+
+              <label className="mt-3 grid gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">
+                  Job description <span className="font-medium normal-case tracking-normal text-white/40">— required for a cover letter, optional for the CV</span>
+                </span>
+                <textarea
+                  value={jobDescription}
+                  onChange={(event) => {
+                    setJobDescription(event.target.value);
+                    setBuildError('');
+                  }}
+                  rows={4}
+                  placeholder="Paste the job posting here to target the cover letter and tailor the CV to that specific role..."
+                  className="rounded-[8px] border border-white/15 bg-white/[0.06] px-4 py-3 text-[13px] leading-relaxed text-white outline-none transition placeholder:text-white/35 focus:border-white/35"
+                />
+              </label>
+
               {buildError && (
                 <div className="mt-3 rounded-[8px] border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
                   {buildError}
@@ -845,25 +868,34 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   ['cv', 'Generate ATS-optimized CV', true],
                   ['cover_letter', 'Generate cover letter', false],
                   ['linkedin', 'Generate LinkedIn profile copy', false],
-                ] as const).map(([kind, label, primary]) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => void generateDeliverable(kind)}
-                    disabled={Boolean(building)}
-                    className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] px-5 text-[12px] font-bold uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                      primary
-                        ? 'bg-[#C9AD98] text-[#142334] hover:bg-white'
-                        : 'border border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.12]'
-                    }`}
-                  >
-                    {building === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                    {building === kind ? 'Building...' : label}
-                  </button>
-                ))}
+                ] as const).map(([kind, label, primary]) => {
+                  const needsJd = kind === 'cover_letter' && !jobDescription.trim();
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => void generateDeliverable(kind)}
+                      disabled={Boolean(building) || needsJd}
+                      title={needsJd ? 'Paste a job description above to generate a cover letter.' : undefined}
+                      className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] px-5 text-[12px] font-bold uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        primary
+                          ? 'bg-[#C9AD98] text-[#142334] hover:bg-white'
+                          : 'border border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.12]'
+                      }`}
+                    >
+                      {building === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                      {building === kind
+                        ? 'Building...'
+                        : needsJd
+                          ? 'Cover letter — add job description above'
+                          : label}
+                    </button>
+                  );
+                })}
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-                Cover letters tailor best when a target role or job description is added in Advanced mode.
+                With a job description, the CV is optimised for that specific role and the cover letter is fully
+                tailored. The CV and LinkedIn copy also work without one.
               </p>
             </div>
           </div>
