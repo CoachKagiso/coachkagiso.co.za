@@ -29,6 +29,7 @@ type CvGoal =
 
 type Seniority = 'early' | 'mid' | 'senior' | 'executive';
 type AnalyzerMode = 'simple' | 'advanced';
+type DeliverableKind = 'cv' | 'cover_letter' | 'linkedin';
 
 type CvAnalyzerResult = {
   snapshot: string;
@@ -364,7 +365,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [error, setError] = useState('');
   const [exportError, setExportError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [building, setBuilding] = useState(false);
+  const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
@@ -472,9 +473,9 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
     }
   }
 
-  async function generateAtsCv() {
+  async function generateDeliverable(kind: DeliverableKind) {
     if (!result || building) return;
-    setBuilding(true);
+    setBuilding(kind);
     setBuildError('');
     try {
       let response: Response;
@@ -482,6 +483,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         const formData = new FormData();
         formData.append('key', adminKey);
         formData.append('analysisMode', analyzerMode);
+        formData.append('deliverable', kind);
         formData.append('cvFile', cvFile);
         formData.append('targetRole', analyzerMode === 'advanced' ? targetRole : '');
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
@@ -496,6 +498,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
           body: JSON.stringify({
             key: adminKey,
             analysisMode: analyzerMode,
+            deliverable: kind,
             cvText,
             targetRole: analyzerMode === 'advanced' ? targetRole : '',
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
@@ -507,17 +510,17 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
       }
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null;
-        throw new Error(data?.error || 'Could not generate the CV.');
+        throw new Error(data?.error || 'Could not generate the document.');
       }
       const blob = await response.blob();
       const disposition = response.headers.get('content-disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      downloadBlob(blob, match?.[1] || `coach-kagiso-ats-cv-${getLocalDateStamp()}.docx`);
+      downloadBlob(blob, match?.[1] || `coach-kagiso-${kind}-${getLocalDateStamp()}.docx`);
     } catch (caught) {
-      console.error('CV build error:', caught);
-      setBuildError(caught instanceof Error ? caught.message : 'Could not generate the CV.');
+      console.error('CV deliverable build error:', caught);
+      setBuildError(caught instanceof Error ? caught.message : 'Could not generate the document.');
     } finally {
-      setBuilding(false);
+      setBuilding(null);
     }
   }
 
@@ -826,26 +829,42 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             </div>
 
             <div className="rounded-[8px] border border-white/12 bg-white/[0.08] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">ATS CV builder</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">Client deliverables</p>
               <p className="mt-2 text-[13px] leading-relaxed text-white/64">
-                Generate a finished, ATS-optimized Word CV for a Revamp or bundle client. It rebuilds the source CV
-                using only facts already in it, strips sensitive personal data, and marks any missing numbers with
-                [brackets] for you to confirm with the client.
+                Generate finished Word documents for a Revamp, Cover Letter, or bundle client. Each one rebuilds from
+                the source CV using only facts already in it, strips sensitive personal data, and marks missing
+                details with [brackets] for you to confirm with the client.
               </p>
               {buildError && (
                 <div className="mt-3 rounded-[8px] border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
                   {buildError}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => void generateAtsCv()}
-                disabled={building}
-                className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#C9AD98] px-5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#142334] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {building ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                {building ? 'Building ATS CV...' : 'Generate ATS-optimized CV (.docx)'}
-              </button>
+              <div className="mt-3 grid gap-2">
+                {([
+                  ['cv', 'Generate ATS-optimized CV', true],
+                  ['cover_letter', 'Generate cover letter', false],
+                  ['linkedin', 'Generate LinkedIn profile copy', false],
+                ] as const).map(([kind, label, primary]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => void generateDeliverable(kind)}
+                    disabled={Boolean(building)}
+                    className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] px-5 text-[12px] font-bold uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      primary
+                        ? 'bg-[#C9AD98] text-[#142334] hover:bg-white'
+                        : 'border border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.12]'
+                    }`}
+                  >
+                    {building === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                    {building === kind ? 'Building...' : label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-white/45">
+                Cover letters tailor best when a target role or job description is added in Advanced mode.
+              </p>
             </div>
           </div>
         )}
