@@ -6,7 +6,9 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   FileSearch,
+  FileText,
   Loader2,
   LockKeyhole,
   RefreshCcw,
@@ -52,6 +54,11 @@ type CvAnalyzerResult = {
     reason: string;
   };
 };
+type ExportFormat = 'pdf' | 'docx';
+type CvReportSection = {
+  heading: string;
+  lines: string[];
+};
 
 const cvGoalOptions: Array<{ value: CvGoal; label: string; detail: string }> = [
   { value: 'new_role', label: 'New role', detail: 'CV needs to compete for a specific next move.' },
@@ -83,34 +90,181 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function getCvReportSections(result: CvAnalyzerResult): CvReportSection[] {
+  return [
+    {
+      heading: 'Snapshot',
+      lines: [result.snapshot],
+    },
+    {
+      heading: 'Scores',
+      lines: [
+        `Positioning: ${result.scores.positioning}/100`,
+        `Clarity: ${result.scores.clarity}/100`,
+        `Role fit: ${result.scores.roleFit}/100`,
+        `ATS/readability: ${result.scores.atsReadability}/100`,
+      ],
+    },
+    {
+      heading: 'Recruiter read',
+      lines: [
+        result.recruiterRead.headline,
+        result.recruiterRead.firstImpression,
+        `Concern: ${result.recruiterRead.possibleConcern}`,
+      ],
+    },
+    {
+      heading: 'Strongest signals',
+      lines: result.strongestSignals.map((item, index) => `${index + 1}. ${item}`),
+    },
+    {
+      heading: 'Priority fixes',
+      lines: result.priorityFixes.map((item, index) => (
+        `${index + 1}. ${item.title}: ${item.fix}${item.whyItMatters ? ` Why it matters: ${item.whyItMatters}` : ''}`
+      )),
+    },
+    {
+      heading: 'Evidence gaps',
+      lines: result.evidenceGaps.map((item, index) => `${index + 1}. ${item.title}: ${item.fix || item.detail}`),
+    },
+    {
+      heading: 'Rewrite samples',
+      lines: result.rewriteSamples.map((item, index) => {
+        const before = item.before ? `Before: ${item.before} ` : '';
+        return `${index + 1}. ${before}After: ${item.after}${item.why ? ` Why: ${item.why}` : ''}`;
+      }),
+    },
+    {
+      heading: 'ATS notes',
+      lines: result.atsNotes.map((item, index) => `${index + 1}. ${item}`),
+    },
+    {
+      heading: 'Interview angles',
+      lines: result.interviewAngles.map((item, index) => `${index + 1}. ${item}`),
+    },
+    {
+      heading: 'Next actions',
+      lines: result.nextActions.map((item, index) => `${index + 1}. ${item.title}: ${item.detail}`),
+    },
+    {
+      heading: 'Recommended coaching move',
+      lines: [`${result.recommendedCoachMove.label}: ${result.recommendedCoachMove.reason}`],
+    },
+  ].filter((section) => section.lines.some(Boolean));
+}
+
 function formatCvReport(result: CvAnalyzerResult) {
   return [
     'CV Positioning Analysis',
     '',
-    `Snapshot: ${result.snapshot}`,
-    '',
-    'Scores',
-    `Positioning: ${result.scores.positioning}/100`,
-    `Clarity: ${result.scores.clarity}/100`,
-    `Role fit: ${result.scores.roleFit}/100`,
-    `ATS/readability: ${result.scores.atsReadability}/100`,
-    '',
-    'Recruiter read',
-    result.recruiterRead.headline,
-    result.recruiterRead.firstImpression,
-    `Concern: ${result.recruiterRead.possibleConcern}`,
-    '',
-    'Priority fixes',
-    ...result.priorityFixes.map((item, index) => `${index + 1}. ${item.title}: ${item.fix}`),
-    '',
-    'Evidence gaps',
-    ...result.evidenceGaps.map((item, index) => `${index + 1}. ${item.title}: ${item.fix}`),
-    '',
-    'Next actions',
-    ...result.nextActions.map((item, index) => `${index + 1}. ${item.title}: ${item.detail}`),
-    '',
-    `Recommended coaching move: ${result.recommendedCoachMove.label} - ${result.recommendedCoachMove.reason}`,
-  ].join('\n');
+    ...getCvReportSections(result).flatMap((section) => [section.heading, ...section.lines, '']),
+  ].join('\n').trim();
+}
+
+function getLocalDateStamp() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getReportFileName(format: ExportFormat) {
+  return `coach-kagiso-cv-analysis-${getLocalDateStamp()}.${format}`;
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function createPdfReportBlob(result: CvAnalyzerResult) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const margin = 46;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const textWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const ensureSpace = (height: number) => {
+    if (y + height <= pageHeight - margin) return;
+    doc.addPage();
+    y = margin;
+  };
+
+  const addLine = (text: string, options: { size?: number; bold?: boolean; gap?: number } = {}) => {
+    const size = options.size ?? 10;
+    const gap = options.gap ?? 8;
+    doc.setFont('helvetica', options.bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    const wrapped = doc.splitTextToSize(text || '-', textWidth) as string[];
+    const lineHeight = size * 1.35;
+    ensureSpace(wrapped.length * lineHeight + gap);
+    doc.text(wrapped, margin, y);
+    y += wrapped.length * lineHeight + gap;
+  };
+
+  doc.setTextColor(20, 35, 52);
+  addLine('CV Positioning Analysis', { size: 22, bold: true, gap: 10 });
+  doc.setTextColor(140, 116, 102);
+  addLine(`Coach Kagiso | Generated ${getLocalDateStamp()}`, { size: 9, gap: 18 });
+
+  for (const section of getCvReportSections(result)) {
+    doc.setTextColor(20, 35, 52);
+    addLine(section.heading, { size: 13, bold: true, gap: 8 });
+    doc.setTextColor(52, 65, 79);
+    section.lines.forEach((line) => addLine(line, { size: 10, gap: 6 }));
+    y += 8;
+  }
+
+  return doc.output('blob');
+}
+
+async function createDocxReportBlob(result: CvAnalyzerResult) {
+  const { Document, Packer, Paragraph, TextRun } = await import('docx');
+  const children = [
+    new Paragraph({
+      children: [new TextRun({ text: 'CV Positioning Analysis', bold: true, size: 36, color: '142334' })],
+      spacing: { after: 120 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: `Coach Kagiso | Generated ${getLocalDateStamp()}`, size: 20, color: '8C7466' })],
+      spacing: { after: 260 },
+    }),
+  ];
+
+  for (const section of getCvReportSections(result)) {
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: section.heading, bold: true, size: 26, color: '142334' })],
+        spacing: { before: 220, after: 100 },
+      }),
+    );
+
+    section.lines.forEach((line) => {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: line || '-', size: 21, color: '34414F' })],
+          spacing: { after: 90 },
+        }),
+      );
+    });
+  }
+
+  const doc = new Document({
+    creator: 'Coach Kagiso',
+    title: 'CV Positioning Analysis',
+    sections: [{ children }],
+  });
+
+  return Packer.toBlob(doc);
 }
 
 function ScoreCard({ label, value }: { label: string; value: number }) {
@@ -205,7 +359,9 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [seniority, setSeniority] = useState<Seniority>('mid');
   const [result, setResult] = useState<CvAnalyzerResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [error, setError] = useState('');
+  const [exportError, setExportError] = useState('');
   const [copied, setCopied] = useState(false);
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
@@ -245,6 +401,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
 
     setBusy(true);
     setError('');
+    setExportError('');
     setCopied(false);
     try {
       let response: Response;
@@ -292,6 +449,23 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
     await navigator.clipboard.writeText(formatCvReport(result));
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  async function exportReport(format: ExportFormat) {
+    if (!result || exporting) return;
+    setExporting(format);
+    setExportError('');
+    try {
+      const blob = format === 'pdf'
+        ? await createPdfReportBlob(result)
+        : await createDocxReportBlob(result);
+      downloadBlob(blob, getReportFileName(format));
+    } catch (caught) {
+      console.error('CV report export error:', caught);
+      setExportError('Could not export the report. Try again.');
+    } finally {
+      setExporting(null);
+    }
   }
 
   return (
@@ -447,12 +621,38 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             <h2 className="mt-2 font-serif text-[32px] leading-tight">Positioning report</h2>
           </div>
           {result && (
-            <button type="button" onClick={() => void copyReport()} className="studio-secondary-button">
-              <ClipboardCheck className="h-4 w-4" />
-              {copied ? 'Copied' : 'Copy report'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void copyReport()} className="studio-secondary-button">
+                <ClipboardCheck className="h-4 w-4" />
+                {copied ? 'Copied' : 'Copy report'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void exportReport('pdf')}
+                disabled={Boolean(exporting)}
+                className="studio-secondary-button disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {exporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Export PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => void exportReport('docx')}
+                disabled={Boolean(exporting)}
+                className="studio-secondary-button disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {exporting === 'docx' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                Export DOCX
+              </button>
+            </div>
           )}
         </div>
+
+        {exportError && (
+          <div className="mt-3 rounded-[8px] border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
+            {exportError}
+          </div>
+        )}
 
         {!result ? (
           <div className="mt-5 grid min-h-[640px] place-items-center rounded-[8px] border border-white/10 bg-white/5 p-6 text-center">
