@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import type { WheelEvent } from 'react';
 import {
   Bell,
   BriefcaseBusiness,
@@ -38,6 +39,22 @@ type SettingsPageComponentProps = {
 };
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+function containScrollableWheel<T extends HTMLElement>(event: WheelEvent<T>) {
+  const target = event.currentTarget;
+  if (target.scrollHeight <= target.clientHeight) return;
+
+  const deltaY =
+    event.deltaMode === 1
+      ? event.deltaY * 16
+      : event.deltaMode === 2
+        ? event.deltaY * target.clientHeight
+        : event.deltaY;
+
+  event.preventDefault();
+  event.stopPropagation();
+  target.scrollTop += deltaY;
+}
 
 const settingsNavItems = [
   {
@@ -843,7 +860,11 @@ export default function SettingsPageComponent({
 
       {previewTemplate && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal="true">
-          <div className="max-h-[80vh] w-full max-w-[720px] overflow-y-auto rounded-[16px] bg-white p-6">
+          <div
+            data-lenis-prevent-wheel
+            onWheel={containScrollableWheel}
+            className="max-h-[80vh] w-full max-w-[720px] overflow-y-auto overscroll-contain rounded-[16px] bg-white p-6 [scrollbar-gutter:stable]"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Preview</p>
@@ -929,9 +950,11 @@ function TemplateEditor({
           </div>
           <textarea
             ref={textareaRef}
-            className="studio-input h-[200px] resize-y px-3 py-3 font-mono text-[13px] leading-relaxed"
+            data-lenis-prevent-wheel
+            className="studio-input h-[200px] resize-y overflow-y-auto overscroll-contain px-3 py-3 font-mono text-[13px] leading-relaxed [scrollbar-gutter:stable]"
             value={template.body}
             onChange={(event) => onChange({ body: event.target.value })}
+            onWheel={containScrollableWheel}
           />
         </label>
         <div className="flex justify-end">

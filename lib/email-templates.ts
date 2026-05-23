@@ -50,7 +50,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     subject: 'I went through your diagnostic, {{firstName}}',
     body: `Hi {{firstName}},
 
-I just went through your responses and something jumped out.
+I just went through your responses, and something jumped out.
 
 You said you know something needs to change, but you're not sure what to fix first. That line stopped me because it's the most common thing I hear from people right before they actually make a move. Not "I'm lost," but "I know the direction, I just can't see the first step."
 
@@ -58,7 +58,7 @@ Can I ask you something?
 
 When you think about your career six months from now, what does "better" actually look like? Not the inspirational version. The real one.
 
-Is it a different role? A different company? Same job but people finally see what you're capable of? Something else entirely?
+Is it a different role? A different company? Same job, but people finally see what you're capable of? Something else entirely?
 
 Reply and let me know. I read everything.
 
@@ -104,7 +104,7 @@ hello@coachkagiso.co.za`,
     subject: 'Last one from me, {{firstName}}',
     body: `Hi {{firstName}},
 
-I've sent you a couple of emails now and you haven't replied, so I'm going to stop sending these personalized follow-ups after this one.
+I've sent you a couple of emails now, and you haven't replied, so I'm going to stop sending these personalized follow-ups after this one.
 
 But before I do, I want to tell you what I think is happening based on your diagnostic.
 
@@ -138,7 +138,7 @@ I said I'd stop sending you personalized follow-ups, and I meant it. This is the
 
 I'm adding you to my upcoming newsletter. When it launches, it'll be a regular email with something I'm thinking about related to careers, pivots, and personal branding.
 
-Usually it's a real example from someone I'm working with (anonymized), sometimes it's a pattern I'm seeing across multiple clients, sometimes it's just a useful reframe that helped someone get unstuck.
+Usually, it's a real example from someone I'm working with (anonymized), sometimes it's a pattern I'm seeing across multiple clients, sometimes it's just a useful reframe that helped someone get unstuck.
 
 No pitches every week. No "book my calendar" in every email. Just the thing I'm chewing on that might help you figure out your next move.
 
@@ -170,13 +170,16 @@ Your answers tell me you already know where you're going. You're clear on what y
 
 So here's my guess about what you actually need: other people who are moving at the same speed you are.
 
-The Saturday Masterclass series is less about teaching and more about the room. Every session is 2 hours on one topic (mentorship, visibility, salary negotiation, personal branding), and the people who show up are the kind who push you to think differently just by being there.
+The Saturday Masterclass series is less about teaching and more about the room. Across the series, we go deep on the things that actually move careers: how you build and use your network strategically, how you make yourself visible to the right people, how you position your personal brand so opportunities find you, and how to find mentors worth having. 
 
-Next session is here: [BOOKING LINK]
+Each session is 2 hours online, and the people who show up are the kind who push you to think differently just by being there.
 
-R450 early bird.
+We're still finalising the agenda, and we'll share it once official bookings open. But because you scored in the top tier of this diagnostic, you can bypass the waitlist and grab an early bird spot for R450 right now
+[BOOKING LINK]
 
-But I'm curious. What made you take the diagnostic in the first place? If you're already moving, what are you trying to figure out?
+If you'd rather wait for the final schedule, no stress. I'll email you when it's live.
+
+But I'm also curious. What made you take the diagnostic in the first place? If you're already moving, what are you trying to figure out?
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -224,7 +227,7 @@ You're already moving in the right direction. You don't need me to tell you what
 
 Details here if you want them: [BOOKING LINK]
 
-If not, keep going. I'm adding you to my upcoming newsletter with what I'm thinking about, but I'll stop sending these direct follow-ups.
+If not, no worries, keep going. I'm adding you to my upcoming newsletter with what I'm thinking about, but I'll stop sending these direct follow-ups.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -266,7 +269,7 @@ hello@coachkagiso.co.za`,
     subject: 'This one hit close, {{firstName}}',
     body: `Hi {{firstName}},
 
-I just read through your diagnostic and this one hit close for me because I know this feeling.
+I just read through your diagnostic, and this one hit close for me because I know this feeling.
 
 You're good at your job. You've been good at it for long enough that people trust you. But somewhere in the last year or two, it started feeling flat. Not bad. Just flat.
 
@@ -326,7 +329,7 @@ Staying where you are feels safe. But if you're someone who still has more to gi
 
 I run a workshop called From Stuck to Strategic. It's for people who are good at their jobs but can't figure out why the growth stopped. If you want in, it's here: [BOOKING LINK]
 
-If you're not ready, that's fine. You'll keep getting my weekly newsletter where I share what I'm seeing with other people in similar spots.
+If you're not ready, that's fine. You'll keep getting my weekly newsletter, where I share what I'm seeing with other people in similar spots.
 
 Don't wait for it to get so bad that you have to leave. There's usually a move available before that.
 
@@ -352,7 +355,7 @@ Most of it comes from real situations I'm seeing with clients. Pattern recogniti
 
 No hard sell every week. Just useful thinking.
 
-If you don't want it, unsubscribe link is at the bottom. If you ever want to continue this conversation, just reply to any email.
+If you don't want it, the unsubscribe link is at the bottom. If you ever want to continue this conversation, just reply to any email.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -372,7 +375,7 @@ hello@coachkagiso.co.za`,
     subject: 'I think I know what this is, {{firstName}}',
     body: `Hi {{firstName}},
 
-I read through your responses and I think I know what's happening.
+I read through your responses, and I think I know what's happening.
 
 You're not unhappy. You don't hate your job. But you can't remember the last time you felt genuinely excited about what you're building. And the worst part is you're starting to wonder if the problem is you.
 
@@ -380,7 +383,7 @@ It's probably not you.
 
 In most cases I see, this is a visibility problem. The work you're doing isn't being seen by the people who matter. Or the way you're showing up (CV, LinkedIn, conversations) is still describing the version of you from two years ago, not who you're becoming.
 
-Question: if someone looked at your LinkedIn right now, would they know what you actually want to do next?
+Question: If someone looked at your LinkedIn right now, would they know what you actually want to do next?
 
 Not what you've done. What you want.
 
@@ -400,7 +403,7 @@ hello@coachkagiso.co.za`,
     subject: 'I think I know why you didn\'t reply, {{firstName}}',
     body: `Hi {{firstName}},
 
-I asked you a question last week about your LinkedIn and you didn't reply.
+I asked you a question last week about your LinkedIn, and you didn't reply.
 
 I think I know why. It's not that you don't care. It's that looking at your own LinkedIn and being honest about what's missing feels like admitting you've been invisible.
 
@@ -428,11 +431,12 @@ hello@coachkagiso.co.za`,
     subject: 'Signing off, {{firstName}}',
     body: `Hi {{firstName}},
 
-I've reached out a few times now and I'm going to stop sending these personalized emails after this one.
+I've reached out a few times now, and I'm going to stop sending these personalized emails after this one.
 
 Before I do, I want to say: the internal work matters. The quiet figuring out, the private journaling, the thinking it through on your own. That's not wasted time.
 
 But at some point, the thinking has to turn into something visible. A different resume. A different LinkedIn. A different way of talking about what you do.
+
 If you want help with that, the CV + LinkedIn Bundle is here: [BOOKING LINK]
 
 If you're not there yet, I'm adding you to my upcoming newsletter. I write about visibility, positioning, and how to make your work seen by the people who matter.
@@ -481,7 +485,7 @@ hello@coachkagiso.co.za`,
     subject: 'How are you doing, {{firstName}}',
     body: `Hi {{firstName}},
 
-I just read your diagnostic responses and I'm not going to pitch you anything in this email.
+I just read your diagnostic responses, and I'm not going to pitch you anything in this email.
 
 I just want to ask: how are you doing right now?
 
@@ -565,7 +569,7 @@ I'm adding you to my upcoming newsletter. When it launches, it'll cover burnout,
 
 I don't have all the answers. But I work with a lot of people who are where you are, and I share what's actually helping them.
 
-No pressure to read every one. No pressure to respond. It's just there if you need it.
+No pressure to read everyone. No pressure to respond. It's just there if you need it.
 
 If you ever want to talk, reply to any email. I'll make time.
 
