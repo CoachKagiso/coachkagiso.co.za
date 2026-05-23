@@ -2,7 +2,12 @@ export type CarouselPlatform = 'linkedin' | 'instagram_facebook' | 'tiktok' | 'e
 export type CarouselSlideCount = 'auto' | 'quick' | 'full';
 export type CarouselAspectRatio = 'auto' | 'square_1_1' | 'portrait_4_5' | 'linkedin_document';
 export type CarouselLayoutRecipe = 'authority_framework' | 'guided_shift' | 'diagnostic_reframe';
-export type CarouselTemplate = 'editorial_authority' | 'warm_coaching' | 'bold_diagnostic';
+export type CarouselTemplate =
+  | 'editorial_authority'
+  | 'editorial_career_notes'
+  | 'warm_coaching'
+  | 'soft_diagnostic_cards'
+  | 'bold_diagnostic';
 export type CarouselSlideRole =
   | 'cover'
   | 'reframe'
@@ -372,6 +377,62 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     },
   },
   {
+    value: 'editorial_career_notes',
+    label: 'Editorial Career Notes',
+    bestFor: 'Premium career frameworks',
+    description: 'Print-inspired career-note slides with oversized serif type, fine rules, and hand-drawn movement cues.',
+    palette: {
+      background: '#F7F4EE',
+      foreground: '#142334',
+      muted: '#6F6A61',
+      accent: '#9F5F4B',
+      panel: '#FFFCF6',
+      border: '#D8C8BB',
+      chipBackground: '#142334',
+      chipText: '#F7F4EE',
+    },
+    designDirection: {
+      label: 'Editorial career notes',
+      mood: 'Premium, spacious, and print-like. It should feel like a branded mini-publication for career clarity.',
+      typography: 'Oversized serif headlines, compact sans metadata, and restrained body copy with wide margins.',
+      posture: [
+        'Use large quiet type as the primary design asset.',
+        'Add thin rules, corner frames, and subtle hand-drawn lines for movement.',
+        'Make the deck feel collectible, like a career note worth saving.',
+      ],
+      tokens: {
+        background: '#F7F4EE',
+        surface: '#FFFCF6',
+        ink: '#142334',
+        muted: '#6F6A61',
+        accent: '#9F5F4B',
+        border: '#D8C8BB',
+      },
+    },
+    layoutRecipe: authorityFramework,
+    promptBehavior: {
+      generation: [
+        'Build a polished editorial argument with one clear career insight per slide.',
+        'Favor frameworks, roadmaps, principles, and practical reframes over motivational copy.',
+        'Write copy that can hold large serif type without becoming crowded.',
+      ],
+      slideRules: [
+        'Keep cover headlines strong enough to stand alone as a poster.',
+        'Use numbered steps or short proof cues in the middle slides.',
+        'End with a save-worthy roadmap, reflection, or calm professional CTA.',
+      ],
+    },
+    preview: {
+      eyebrow: 'Career note',
+      headline: 'Before you pivot, build the signal.',
+      body: 'A print-led deck style for frameworks, roadmaps, and authority-building career insights.',
+    },
+    exportRules: {
+      pdf: 'Preserve wide page margins and one slide per LinkedIn PDF page.',
+      png: 'Keep thin rules and serif hierarchy sharp on 4:5 mobile frames.',
+    },
+  },
+  {
     value: 'warm_coaching',
     label: 'Warm Coaching',
     bestFor: 'Instagram relationship posts',
@@ -425,6 +486,62 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     exportRules: {
       pdf: 'Keep enough margin so soft surfaces still feel premium in PDF.',
       png: 'Favor 4:5 portrait frames for Instagram and Facebook readability.',
+    },
+  },
+  {
+    value: 'soft_diagnostic_cards',
+    label: 'Soft Diagnostic Cards',
+    bestFor: 'Emotional diagnostic posts',
+    description: 'Soft textured diagnostic frames with speech-card layering, sage accents, and human note-like emphasis.',
+    palette: {
+      background: '#6F866D',
+      foreground: '#FFF8ED',
+      muted: '#F5E9D8',
+      accent: '#C9AD98',
+      panel: '#FFF3E2',
+      border: 'rgba(255,248,237,0.72)',
+      chipBackground: '#FFF3E2',
+      chipText: '#577057',
+    },
+    designDirection: {
+      label: 'Soft diagnostic cards',
+      mood: 'Grounded, tactile, and intimate. It should feel like a calm observation written on textured cards.',
+      typography: 'Serif reflection lines, rounded sans card text, and small note-like labels.',
+      posture: [
+        'Use layered cards and speech-bubble shapes to make diagnostic copy feel conversational.',
+        'Let one emotional sentence breathe before offering the practical reframe.',
+        'Use sage, cream, and warm accent tones without turning the whole deck beige.',
+      ],
+      tokens: {
+        background: '#6F866D',
+        surface: '#FFF3E2',
+        ink: '#FFF8ED',
+        muted: '#F5E9D8',
+        accent: '#C9AD98',
+        border: 'rgba(255,248,237,0.72)',
+      },
+    },
+    layoutRecipe: guidedShift,
+    promptBehavior: {
+      generation: [
+        'Open with a felt diagnostic truth, not a generic lesson.',
+        'Use specific reader language around burnout, pivoting, confidence, visibility, or career fog.',
+        'Balance emotional recognition with one practical next step.',
+      ],
+      slideRules: [
+        'Keep card text short enough to feel like a note, not an essay.',
+        'Use one strong reframe or question per slide.',
+        'Close with a reflective prompt or low-pressure invitation.',
+      ],
+    },
+    preview: {
+      eyebrow: 'Diagnostic note',
+      headline: 'You do not need more pressure.',
+      body: 'A softer card-led deck for emotional pattern recognition and warm career coaching.',
+    },
+    exportRules: {
+      pdf: 'Keep card edges and texture visible while preserving text contrast.',
+      png: 'Favor portrait frames so layered cards have enough breathing room.',
     },
   },
   {
