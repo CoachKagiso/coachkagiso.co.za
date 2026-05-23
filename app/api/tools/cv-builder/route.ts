@@ -120,6 +120,22 @@ function educationList(value: unknown): BuiltEducation[] {
     .filter((item) => item.qualification || item.institution);
 }
 
+function changeReportList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, 14)
+    .map((item) => {
+      const record = asRecord(item);
+      return {
+        category: compactString(record.category),
+        summary: compactString(record.summary),
+        before: compactString(record.before),
+        after: compactString(record.after),
+      };
+    })
+    .filter((item) => item.summary || item.before || item.after);
+}
+
 function normalizeBuiltCv(value: unknown) {
   const record = asRecord(value);
   const contact = asRecord(record.contact);
@@ -139,6 +155,7 @@ function normalizeBuiltCv(value: unknown) {
     education: educationList(record.education),
     certifications: stringList(record.certifications, 15),
     additionalInfo: stringList(record.additionalInfo, 10),
+    changeReport: changeReportList(record.changeReport),
   };
 }
 
@@ -248,10 +265,26 @@ Respond only with valid JSON. No markdown. No code fences. Use this exact shape:
     }
   ],
   "certifications": ["Certifications, short courses, or learnerships present in the CV"],
-  "additionalInfo": ["Optional: languages, professional memberships, or other credible extras present in the CV"]
+  "additionalInfo": ["Optional: languages, professional memberships, or other credible extras present in the CV"],
+  "changeReport": [
+    {
+      "category": "One of: 'Sensitive data', 'Sections', 'Structure', 'Wording', 'Tailoring', 'Other'",
+      "summary": "Plain-language description of what changed, written for Kagiso to read back to the client",
+      "before": "Verbatim quote of the original snippet if applicable, else empty string",
+      "after": "Updated snippet if applicable, else empty string"
+    }
+  ]
 }
 
 Return experience in reverse-chronological order. Include every real role from the source CV. Leave arrays empty only when the CV genuinely has nothing for that section.
+
+CHANGE REPORT RULES
+- Populate changeReport with 6-12 entries summarising the most important edits you made.
+- Group similar small edits into one entry (e.g. "Reframed 'Duties included' phrases across roles as impact-first bullets").
+- Always include an entry under category "Sensitive data" for anything removed (ID number, DOB, address, salary, marital status, photo, "references on request").
+- If a target role or job description was provided, always include an entry under "Tailoring" describing how the CV was aligned to it.
+- Skip trivial formatting changes. Focus on edits a coach would defend to a client.
+- "before" is a verbatim quote from the source CV when the change is a single line; leave it empty when the change is structural.
 `.trim();
 }
 
@@ -720,7 +753,7 @@ function summarizeAnalysis(analysis: unknown) {
 function maxTokensFor(deliverable: Deliverable) {
   if (deliverable === 'cover_letter') return 2400;
   if (deliverable === 'linkedin') return 3000;
-  return 5200;
+  return 6000;
 }
 
 /* --------------------------------- route --------------------------------- */
@@ -876,6 +909,7 @@ export async function POST(request: Request) {
 
   let doc: Document;
   let fileName: string;
+  let cvChangeReport: BuiltCv['changeReport'] | null = null;
 
   if (deliverable === 'cover_letter') {
     const letter = normalizeCoverLetter(parsed);
@@ -901,10 +935,18 @@ export async function POST(request: Request) {
     }
     doc = buildCvDocument(cv);
     fileName = buildFileName(cv.fullName, 'ATS-CV');
+    cvChangeReport = cv.changeReport;
   }
 
   try {
     const buffer = await Packer.toBuffer(doc);
+    if (cvChangeReport !== null) {
+      return NextResponse.json({
+        filename: fileName,
+        docxBase64: Buffer.from(buffer).toString('base64'),
+        changeReport: cvChangeReport,
+      });
+    }
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
