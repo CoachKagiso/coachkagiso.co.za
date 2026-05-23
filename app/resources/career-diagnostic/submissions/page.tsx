@@ -28,6 +28,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 import BatchDeleteControls from '@/components/BatchDeleteControls';
+import { GrowthOSAssistant } from '@/components/assistant/GrowthOSAssistant';
 import SettingsPageComponent from '@/components/settings/SettingsPageComponent';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
 import CvAnalyzerDashboard from '@/components/career-tools/CvAnalyzerDashboard';
@@ -67,6 +68,7 @@ import {
 import { listManualTasks, listNotes } from '@/lib/dashboard-task-records';
 import { getDiagnosticAdminKey } from '@/lib/env';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
+import { buildAssistantDashboardContext } from '@/lib/growth-os-assistant';
 import { listSentEmails } from '@/lib/sent-emails';
 import { EMAIL_TEMPLATES } from '@/lib/email-templates';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -664,8 +666,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           hasFilters: false,
         }),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
-    activeTab === 'content' ? listContentCalendarItems() : Promise.resolve([]),
-    activeTab === 'content' ? listContentBacklogItems() : Promise.resolve([]),
+    listContentCalendarItems(),
+    listContentBacklogItems(),
     activeTab === 'content' ? listResearchEntries() : Promise.resolve([]),
     getFollowUpNotificationCount(),
     listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
@@ -929,6 +931,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     },
   ] as const;
   const contentDashboardContext = buildDashboardContext(submissions, operations);
+  const assistantContext = buildAssistantDashboardContext({
+    submissions,
+    operations,
+    backlogItems: contentBacklogItems,
+    calendarItems: contentCalendarItems,
+    now: dashboardNow,
+  });
 
   return (
     <main className="coach-dashboard-clean min-h-screen overflow-x-clip bg-[#EDEBE8] text-[#142334]">
@@ -1870,6 +1879,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           </div>
         </section>
       </div>
+      <GrowthOSAssistant adminKey={key || ''} initialContext={assistantContext} />
     </main>
   );
 }

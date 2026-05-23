@@ -634,6 +634,7 @@ const sourceLabels: Record<ContentBacklogSource, string> = {
   create: 'From Create',
   manual: 'Manual',
   insights: 'Insights Article',
+  assistant: 'Assistant Draft',
 };
 
 const calendarDayOptions: CalendarDayOption[] = [
@@ -7861,8 +7862,10 @@ function CarouselSlideFrame({
   frameRef?: Ref<HTMLElement>;
 }) {
   const isBold = template.value === 'bold_diagnostic';
-  const isWarm = template.value === 'warm_coaching';
-  const isEditorial = template.value === 'editorial_authority';
+  const isCareerNotes = template.value === 'editorial_career_notes';
+  const isSoftCards = template.value === 'soft_diagnostic_cards';
+  const isWarm = template.value === 'warm_coaching' || isSoftCards;
+  const isEditorial = template.value === 'editorial_authority' || isCareerNotes;
   const palette = template.palette;
   const role = slide.role || getDefaultCarouselSlideRole((layoutRecipe || template.layoutRecipe).value, index, total);
   const roleLabel = carouselSlideRoleLabels[role];
@@ -7874,8 +7877,12 @@ function CarouselSlideFrame({
   const isCover = role === 'cover';
   const isCta = role === 'cta';
   const headlineSize = getCarouselHeadlineSize(composition, textStats);
-  const coverHeadlineSize = Math.min(headlineSize + 6, 52);
-  const resolvedHeadlineSize = isCover ? coverHeadlineSize : headlineSize;
+  const coverHeadlineSize = Math.min(headlineSize + (isCareerNotes ? 14 : 6), isCareerNotes ? 64 : 52);
+  const resolvedHeadlineSize = isCover
+    ? coverHeadlineSize
+    : isCareerNotes
+      ? Math.min(headlineSize + 6, 42)
+      : headlineSize;
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
   const exportFrameStyles = exportDimensions
@@ -7945,7 +7952,9 @@ function CarouselSlideFrame({
               style={{
                 fontFamily: 'var(--font-serif)',
                 fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
-                lineHeight: 1.0,
+                fontStyle: isSoftCards ? 'italic' : undefined,
+                letterSpacing: 0,
+                lineHeight: isCareerNotes ? 0.92 : 1.0,
               }}
             >
               {slide.headline}
@@ -7960,23 +7969,40 @@ function CarouselSlideFrame({
               }}
             />
             {slide.body && (
-              <p
-                className="mt-4 max-w-[42ch] text-[13px] font-medium leading-relaxed"
-                style={{
-                  color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(13) : undefined,
-                  marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
-                }}
-              >
-                {slide.body}
-              </p>
+              isSoftCards ? (
+                <div
+                  className="mt-5 max-w-[42ch] rounded-[18px] px-5 py-4 text-center text-[13px] font-semibold leading-relaxed shadow-[0_12px_30px_rgba(20,35,52,0.12)]"
+                  style={{
+                    backgroundColor: palette.panel,
+                    color: palette.chipText,
+                    fontSize: exportDimensions ? exportSize(13) : undefined,
+                    marginTop: exportDimensions ? exportSize(20) : undefined,
+                    maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                    padding: exportDimensions ? `${exportSize(16)} ${exportSize(20)}` : undefined,
+                  }}
+                >
+                  {slide.body}
+                </div>
+              ) : (
+                <p
+                  className="mt-4 max-w-[42ch] text-[13px] font-medium leading-relaxed"
+                  style={{
+                    color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
+                    fontSize: exportDimensions ? exportSize(13) : undefined,
+                    marginTop: exportDimensions ? exportSize(16) : undefined,
+                    maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                  }}
+                >
+                  {slide.body}
+                </p>
+              )
             )}
             {slide.cta && (
               <p
                 className="mt-4 max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
                 style={{
-                  color: palette.accent,
+                  color: isSoftCards ? palette.muted : palette.accent,
+                  transform: isSoftCards ? 'rotate(-2deg)' : undefined,
                   fontSize: exportDimensions ? exportSize(11) : undefined,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
                 }}
@@ -8500,7 +8526,13 @@ function CarouselSlideFrame({
       }`}
       style={{
         aspectRatio: aspectOption.cssRatio,
-        background: palette.background,
+        backgroundColor: palette.background,
+        backgroundImage: isCareerNotes
+          ? 'linear-gradient(90deg, rgba(20,35,52,0.035) 1px, transparent 1px), linear-gradient(180deg, rgba(20,35,52,0.025) 1px, transparent 1px)'
+          : isSoftCards
+            ? 'repeating-linear-gradient(90deg, rgba(255,248,237,0.035) 0 1px, transparent 1px 8px), repeating-linear-gradient(180deg, rgba(20,35,52,0.03) 0 1px, transparent 1px 9px)'
+            : undefined,
+        backgroundSize: isCareerNotes ? '100% 100%, 24px 24px, 28px 28px' : undefined,
         color: palette.foreground,
         borderColor: isCover ? 'transparent' : palette.border,
         fontFamily: 'var(--font-sans)',
@@ -8572,6 +8604,82 @@ function CarouselSlideFrame({
               backgroundColor: palette.accent,
               opacity: 0.2,
               height: exportDimensions ? exportSize(1) : undefined,
+            }}
+          />
+        </>
+      )}
+      {isCareerNotes && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute font-serif leading-none"
+            style={{
+              bottom: exportDimensions ? `-${exportSize(36)}` : '-36px',
+              color: '#142334',
+              fontFamily: 'var(--font-serif)',
+              fontSize: exportDimensions ? exportSize(isCover ? 134 : 96) : isCover ? '134px' : '96px',
+              left: exportDimensions ? `-${exportSize(8)}` : '-8px',
+              letterSpacing: '-0.06em',
+              opacity: isCover ? 0.035 : 0.045,
+              pointerEvents: 'none',
+              textTransform: 'uppercase',
+            }}
+          >
+            NOTE
+          </div>
+          <div
+            aria-hidden="true"
+            className="absolute rounded-full"
+            style={{
+              borderTop: `${exportDimensions ? exportSize(2) : '2px'} solid ${palette.accent}`,
+              height: exportDimensions ? exportSize(42) : '42px',
+              opacity: 0.85,
+              right: exportDimensions ? `-${exportSize(18)}` : '-18px',
+              top: exportDimensions ? exportSize(isCover ? 96 : 132) : isCover ? '96px' : '132px',
+              transform: 'rotate(-12deg)',
+              width: exportDimensions ? exportSize(138) : '138px',
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute"
+            style={{
+              borderBottom: `${exportDimensions ? exportSize(1) : '1px'} solid ${palette.foreground}`,
+              borderLeft: `${exportDimensions ? exportSize(1) : '1px'} solid ${palette.foreground}`,
+              bottom: exportDimensions ? exportSize(42) : '42px',
+              height: exportDimensions ? exportSize(82) : '82px',
+              left: exportDimensions ? exportSize(38) : '38px',
+              opacity: 0.18,
+              width: exportDimensions ? exportSize(76) : '76px',
+            }}
+          />
+        </>
+      )}
+      {isSoftCards && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute"
+            style={{
+              backgroundColor: 'rgba(255,243,226,0.16)',
+              bottom: exportDimensions ? `-${exportSize(36)}` : '-36px',
+              height: exportDimensions ? exportSize(92) : '92px',
+              left: exportDimensions ? `-${exportSize(22)}` : '-22px',
+              transform: 'rotate(-5deg)',
+              width: exportDimensions ? exportSize(210) : '210px',
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute rounded-[22px]"
+            style={{
+              border: `${exportDimensions ? exportSize(2) : '2px'} solid rgba(255,248,237,0.42)`,
+              height: exportDimensions ? exportSize(92) : '92px',
+              opacity: 0.7,
+              right: exportDimensions ? `-${exportSize(26)}` : '-26px',
+              top: exportDimensions ? exportSize(118) : '118px',
+              transform: 'rotate(-7deg)',
+              width: exportDimensions ? exportSize(210) : '210px',
             }}
           />
         </>

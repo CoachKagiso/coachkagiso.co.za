@@ -6,7 +6,7 @@ export const contentPillars = ['career_growth', 'leadership', 'personal_brand', 
 export const contentPlatforms = ['linkedin', 'tiktok', 'instagram', 'facebook', 'email'] as const;
 export const contentCalendarStatuses = ['idea', 'draft', 'scheduled', 'published'] as const;
 export const contentBacklogStatuses = ['idea', 'draft', 'in_progress', 'used'] as const;
-export const contentBacklogSources = ['signal_brief', 'create', 'manual', 'insights'] as const;
+export const contentBacklogSources = ['signal_brief', 'create', 'manual', 'insights', 'assistant'] as const;
 
 export type ContentPillar = (typeof contentPillars)[number];
 export type ContentPlatform = (typeof contentPlatforms)[number];
