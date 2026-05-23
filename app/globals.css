@@ -222,6 +222,32 @@ body::-webkit-scrollbar-thumb:hover,
   background: var(--brand-ink);
 }
 
+textarea::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+textarea {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: var(--brand-scroll-track);
+  border-radius: 999px;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: var(--brand-warm);
+  border: 2px solid var(--brand-scroll-track);
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-ink);
+}
+
 @media (pointer: fine) {
   html.has-custom-cursor,
   html.has-custom-cursor * {
