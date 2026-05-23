@@ -30,6 +30,12 @@ type CvGoal =
 type Seniority = 'early' | 'mid' | 'senior' | 'executive';
 type AnalyzerMode = 'simple' | 'advanced';
 type DeliverableKind = 'cv' | 'cover_letter' | 'linkedin';
+type ChangeReportEntry = {
+  category: string;
+  summary: string;
+  before: string;
+  after: string;
+};
 
 type CvAnalyzerResult = {
   snapshot: string;
@@ -367,7 +373,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [copied, setCopied] = useState(false);
   const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
-  const [jobDescription, setJobDescription] = useState('');
+  const [cvChangeReport, setCvChangeReport] = useState<ChangeReportEntry[] | null>(null);
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
   const canAnalyze = (cvText.trim().length >= 300 || Boolean(cvFile)) && !busy;
@@ -408,6 +414,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
     setError('');
     setExportError('');
     setBuildError('');
+    setCvChangeReport(null);
     setCopied(false);
     try {
       let response: Response;
@@ -416,7 +423,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         formData.append('key', adminKey);
         formData.append('analysisMode', analyzerMode);
         formData.append('cvFile', cvFile);
-        formData.append('targetRole', analyzerMode === 'advanced' ? targetRole : '');
+        formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
         formData.append('seniority', analyzerMode === 'advanced' ? seniority : '');
@@ -432,7 +439,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             key: adminKey,
             analysisMode: analyzerMode,
             cvText,
-            targetRole: analyzerMode === 'advanced' ? targetRole : '',
+            targetRole,
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
@@ -476,14 +483,14 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
 
   async function generateDeliverable(kind: DeliverableKind) {
     if (!result || building) return;
-    if (kind === 'cover_letter' && !jobDescription.trim()) {
+    if (kind === 'cover_letter' && !targetRole.trim()) {
       setBuildError('Paste the job description before generating a cover letter.');
       return;
     }
     setBuilding(kind);
     setBuildError('');
+    if (kind === 'cv') setCvChangeReport(null);
     try {
-      const deliverableTargetRole = jobDescription.trim() || (analyzerMode === 'advanced' ? targetRole : '');
       let response: Response;
       if (cvFile) {
         const formData = new FormData();
@@ -491,7 +498,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         formData.append('analysisMode', analyzerMode);
         formData.append('deliverable', kind);
         formData.append('cvFile', cvFile);
-        formData.append('targetRole', deliverableTargetRole);
+        formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
         formData.append('seniority', analyzerMode === 'advanced' ? seniority : '');
@@ -506,7 +513,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             analysisMode: analyzerMode,
             deliverable: kind,
             cvText,
-            targetRole: deliverableTargetRole,
+            targetRole,
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
@@ -518,10 +525,27 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         const data = await response.json().catch(() => null) as { error?: string } | null;
         throw new Error(data?.error || 'Could not generate the document.');
       }
-      const blob = await response.blob();
-      const disposition = response.headers.get('content-disposition') || '';
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      downloadBlob(blob, match?.[1] || `coach-kagiso-${kind}-${getLocalDateStamp()}.docx`);
+      const contentType = response.headers.get('content-type') || '';
+      let blob: Blob;
+      let filename: string;
+      if (contentType.includes('application/json')) {
+        const data = await response.json() as {
+          filename?: string;
+          docxBase64?: string;
+          changeReport?: ChangeReportEntry[];
+        };
+        if (!data.docxBase64) throw new Error('No document returned.');
+        const bytes = Uint8Array.from(atob(data.docxBase64), (ch) => ch.charCodeAt(0));
+        blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        filename = data.filename || `coach-kagiso-${kind}-${getLocalDateStamp()}.docx`;
+        if (kind === 'cv') setCvChangeReport(data.changeReport ?? []);
+      } else {
+        blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        filename = match?.[1] || `coach-kagiso-${kind}-${getLocalDateStamp()}.docx`;
+      }
+      downloadBlob(blob, filename);
     } catch (caught) {
       console.error('CV deliverable build error:', caught);
       setBuildError(caught instanceof Error ? caught.message : 'Could not generate the document.');
@@ -592,6 +616,19 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             <span className="text-[11px] font-medium text-[#142334]/50">{wordCount} words</span>
           </label>
 
+          <label className="grid gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
+              Job description <span className="font-medium normal-case tracking-normal text-[#142334]/45">— optional for analysis &amp; CV, required for cover letter</span>
+            </span>
+            <textarea
+              value={targetRole}
+              onChange={(event) => setTargetRole(event.target.value)}
+              rows={4}
+              placeholder="Paste the job posting to tailor the analysis, ATS CV, and cover letter to this specific role..."
+              className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:bg-white focus:ring-2 focus:ring-[#BFA490]/25"
+            />
+          </label>
+
           <div className="grid grid-cols-2 gap-2 rounded-[8px] bg-[#F8F6F4] p-2">
             {([
               ['simple', 'Simple'],
@@ -633,17 +670,6 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   <PillGroup value={seniority} options={seniorityOptions} onChange={setSeniority} />
                 </div>
               </div>
-
-              <label className="grid gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Target role or job description</span>
-                <textarea
-                  value={targetRole}
-                  onChange={(event) => setTargetRole(event.target.value)}
-                  rows={5}
-                  placeholder="Optional: paste the role title, job description, or next move..."
-                  className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:bg-white focus:ring-2 focus:ring-[#BFA490]/25"
-                />
-              </label>
 
               <label className="grid gap-2">
                 <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Context notes</span>
@@ -842,22 +868,6 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 details with [brackets] for you to confirm with the client.
               </p>
 
-              <label className="mt-3 grid gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">
-                  Job description <span className="font-medium normal-case tracking-normal text-white/40">— required for a cover letter, optional for the CV</span>
-                </span>
-                <textarea
-                  value={jobDescription}
-                  onChange={(event) => {
-                    setJobDescription(event.target.value);
-                    setBuildError('');
-                  }}
-                  rows={4}
-                  placeholder="Paste the job posting here to target the cover letter and tailor the CV to that specific role..."
-                  className="rounded-[8px] border border-white/15 bg-white/[0.06] px-4 py-3 text-[13px] leading-relaxed text-white outline-none transition placeholder:text-white/35 focus:border-white/35"
-                />
-              </label>
-
               {buildError && (
                 <div className="mt-3 rounded-[8px] border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
                   {buildError}
@@ -869,14 +879,22 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   ['cover_letter', 'Generate cover letter', false],
                   ['linkedin', 'Generate LinkedIn profile copy', false],
                 ] as const).map(([kind, label, primary]) => {
-                  const needsJd = kind === 'cover_letter' && !jobDescription.trim();
+                  const hasJd = targetRole.trim().length > 0;
+                  const needsJd = kind === 'cover_letter' && !hasJd;
+                  const displayLabel = building === kind
+                    ? 'Building...'
+                    : needsJd
+                      ? 'Cover letter — add job description above'
+                      : kind === 'cv' && hasJd
+                        ? 'Generate ATS CV tailored to this job'
+                        : label;
                   return (
                     <button
                       key={kind}
                       type="button"
                       onClick={() => void generateDeliverable(kind)}
                       disabled={Boolean(building) || needsJd}
-                      title={needsJd ? 'Paste a job description above to generate a cover letter.' : undefined}
+                      title={needsJd ? 'Paste a job description in the input panel to generate a cover letter.' : undefined}
                       className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] px-5 text-[12px] font-bold uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
                         primary
                           ? 'bg-[#C9AD98] text-[#142334] hover:bg-white'
@@ -884,11 +902,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                       }`}
                     >
                       {building === kind ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                      {building === kind
-                        ? 'Building...'
-                        : needsJd
-                          ? 'Cover letter — add job description above'
-                          : label}
+                      {displayLabel}
                     </button>
                   );
                 })}
@@ -897,6 +911,39 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 With a job description, the CV is optimised for that specific role and the cover letter is fully
                 tailored. The CV and LinkedIn copy also work without one.
               </p>
+
+              {cvChangeReport && cvChangeReport.length > 0 && (
+                <div className="mt-4 rounded-[8px] bg-white p-4 text-[#142334]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">What changed in the CV</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/55">
+                    The rewrite uses only facts already in the original CV. Below is a summary of the edits — useful when explaining the new CV to the client.
+                  </p>
+                  <ul className="mt-3 grid gap-3">
+                    {cvChangeReport.map((entry, index) => (
+                      <li key={`${entry.summary}-${index}`} className="rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-3">
+                        {entry.category && (
+                          <span className="inline-block rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">
+                            {entry.category}
+                          </span>
+                        )}
+                        {entry.summary && (
+                          <p className="mt-2 text-[13px] font-semibold leading-relaxed text-[#142334]">{entry.summary}</p>
+                        )}
+                        {entry.before && (
+                          <p className="mt-2 rounded-[6px] bg-[#F8F6F4] px-2 py-1.5 text-[12px] leading-relaxed text-[#142334]/58">
+                            <span className="font-semibold text-[#8C7466]">Before: </span>{entry.before}
+                          </p>
+                        )}
+                        {entry.after && (
+                          <p className="mt-1 rounded-[6px] bg-white px-2 py-1.5 text-[12px] leading-relaxed text-[#142334]/82">
+                            <span className="font-semibold text-[#79A580]">After: </span>{entry.after}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
