@@ -232,6 +232,11 @@ export function EmailTab({
           className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
         />
       </label>
+      {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
+        <p className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#92400E]">
+          This is the manual trigger email. Only send when July bookings are confirmed live.
+        </p>
+      )}
 
       <label className="grid gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Body</span>
@@ -265,11 +270,6 @@ export function EmailTab({
         {selectedTemplate.sequenceIndex === 4 && (
           <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
             This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
-          </p>
-        )}
-        {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
-          <p className="rounded-[8px] bg-[#FEF3C7] px-3 py-2 text-[12px] leading-relaxed text-[#92400E]">
-            Masterclass bookings-open emails are manual only. Send this when the booking link and date are confirmed.
           </p>
         )}
       </div>

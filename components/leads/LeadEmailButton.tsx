@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Mail, Send } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import LeadEmailModal, { type LeadEmailModalLead } from './LeadEmailModal';
+import { getMailtoHref, shouldUseInternalEmailModal } from './email-modal-routing';
 
 type SentLeadUpdate = {
   id: string;
@@ -37,9 +38,18 @@ export default function LeadEmailButton({
   const [isOpen, setIsOpen] = useState(false);
   const Icon = icon === 'send' ? Send : Mail;
 
+  function handleClick() {
+    if (shouldUseInternalEmailModal(lead)) {
+      setIsOpen(true);
+      return;
+    }
+
+    window.open(getMailtoHref(lead.email), '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <>
-      <button type="button" onClick={() => setIsOpen(true)} className={className}>
+      <button type="button" onClick={handleClick} className={className}>
         {label} <Icon className="h-4 w-4" />
       </button>
       <LeadEmailModal

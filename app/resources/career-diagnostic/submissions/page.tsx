@@ -597,6 +597,31 @@ function getLeadActivityKey(email: string | null | undefined, source: Diagnostic
   return `${email.toLowerCase()}::${source}`;
 }
 
+function getFunnelActivityServiceInterest(source: DiagnosticLeadSource) {
+  if (source === 'masterclass_waitlist') return 'Saturday Masterclass';
+  if (source === 'linkedin_headline') return 'CV + LinkedIn Bundle';
+  if (source === 'first_90_days') return 'Career Clarity Session';
+  return '';
+}
+
+function buildFunnelActivityEmailLead(activity: DashboardEventNotification) {
+  const source = getFunnelActivityLeadSource(activity);
+  if (!source || !activity.contactEmail) return null;
+
+  return {
+    id: '',
+    firstName: activity.contactName || activity.contactEmail.split('@')[0] || getFunnelActivityContact(activity),
+    email: activity.contactEmail,
+    archetype: '',
+    serviceInterest: getFunnelActivityServiceInterest(source),
+    leadStatus: 'new',
+    followUpCount: 0,
+    lastContactedAt: null,
+    source,
+    downloadLink: typeof activity.metadata?.pdfUrl === 'string' ? activity.metadata.pdfUrl : null,
+  };
+}
+
 function isFollowUpDue(submission: DiagnosticSubmission, referenceDate: Date) {
   return Boolean(
     submission.next_follow_up_at &&
@@ -713,6 +738,7 @@ function FunnelActivityRows({
           const priority = getFunnelActivityPriority(activity);
           const recordHref = buildFunnelActivityRecordHref(activity.id, adminKey, returnHref);
           const contactLabel = getFunnelActivityContact(activity);
+          const emailLead = buildFunnelActivityEmailLead(activity);
 
           return (
             <div key={activity.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[1.25fr_0.78fr_0.72fr_0.5fr_0.72fr_auto] lg:items-center">
@@ -765,7 +791,14 @@ function FunnelActivityRows({
                 >
                   View <ArrowUpRight className="h-4 w-4" />
                 </Link>
-                {href ? (
+                {emailLead ? (
+                  <LeadEmailButton
+                    lead={emailLead}
+                    initialNotes={[]}
+                    label="Email"
+                    className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                  />
+                ) : href ? (
                   <a
                     href={href}
                     className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
@@ -827,6 +860,7 @@ function FunnelPipelinePanel({
             const priority = getFunnelActivityPriority(activity);
             const recordHref = buildFunnelActivityRecordHref(activity.id, adminKey, returnHref);
             const contactLabel = getFunnelActivityContact(activity);
+            const emailLead = buildFunnelActivityEmailLead(activity);
 
             return (
               <div key={activity.id} className="grid gap-5 px-6 py-5 lg:grid-cols-[1fr_0.46fr_auto] lg:items-center">
@@ -872,7 +906,14 @@ function FunnelPipelinePanel({
                   >
                     View
                   </Link>
-                  {href ? (
+                  {emailLead ? (
+                    <LeadEmailButton
+                      lead={emailLead}
+                      initialNotes={[]}
+                      label="Email"
+                      className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    />
+                  ) : href ? (
                     <a
                       href={href}
                       className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"

@@ -59,6 +59,13 @@ function getFirstName(lead: LeadEmailModalLead) {
   return lead.firstName.trim().split(/\s+/)[0] || 'there';
 }
 
+function getModalHeader(lead: LeadEmailModalLead) {
+  if (lead.source === 'first_90_days') return 'First 90 Days Checklist Lead';
+  if (lead.source === 'linkedin_headline') return 'LinkedIn Headline Builder Lead';
+  if (lead.source === 'masterclass_waitlist') return 'Masterclass Waitlist Lead';
+  return lead.archetype?.trim() || lead.serviceInterest?.trim() || 'Diagnostic Lead';
+}
+
 function getBookingUrlForLead(lead: LeadEmailModalLead, templateId: EmailTemplateId) {
   const service = lead.serviceInterest.toLowerCase();
   if (service.includes('glow')) return getBookingLink('Glow Up VIP Package');
@@ -425,9 +432,11 @@ export default function LeadEmailModal({
                 <X className="h-4 w-4" />
               </button>
               <h2 className="max-w-[calc(100%-44px)] truncate font-serif text-[20px] font-bold leading-tight text-[#142334]">
-                Email {getFirstName(modalLead)}
+                {getModalHeader(modalLead)}
               </h2>
-              <p className="mt-1 max-w-[calc(100%-44px)] truncate text-[13px] text-[#6B6B6B]">{modalLead.email}</p>
+              <p className="mt-1 max-w-[calc(100%-44px)] truncate text-[13px] text-[#6B6B6B]">
+                {getFirstName(modalLead)} - {modalLead.email}
+              </p>
               <p className="mt-2 max-w-[calc(100%-44px)] truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8C7466]">
                 Email {selectedTemplate.sequenceIndex} of {sequenceTotal} <span aria-hidden="true">{sequenceDots}</span> {selectedTemplate.stageLabel}
               </p>
@@ -484,6 +493,11 @@ export default function LeadEmailModal({
                       className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
                     />
                   </label>
+                  {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
+                    <p className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#92400E]">
+                      This is the manual trigger email. Only send when July bookings are confirmed live.
+                    </p>
+                  )}
 
                   <label className="grid gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Body</span>
@@ -520,11 +534,6 @@ export default function LeadEmailModal({
                     {selectedTemplate.sequenceIndex === 4 && (
                       <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
                         This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
-                      </p>
-                    )}
-                    {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
-                      <p className="rounded-[8px] bg-[#FEF3C7] px-3 py-2 text-[12px] leading-relaxed text-[#92400E]">
-                        Masterclass bookings-open emails are manual only. Send this when the date and booking link are ready.
                       </p>
                     )}
                   </div>
