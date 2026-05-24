@@ -6,6 +6,7 @@ import { FileText, Mail } from 'lucide-react';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import LeadEmailButton from './LeadEmailButton';
+import LeadSourceBadge from './LeadSourceBadge';
 
 const statusLabels: Record<DiagnosticLeadStatus, string> = {
   new: 'New',
@@ -86,6 +87,8 @@ export default function LeadListRow({
     leadStatus,
     followUpCount,
     lastContactedAt,
+    source: submission.source,
+    downloadLink: submission.download_link,
   };
 
   return (
@@ -127,6 +130,7 @@ export default function LeadListRow({
           >
             {archetypeLabels[submission.archetype_key] || submission.archetype_name}
           </span>
+          <LeadSourceBadge source={submission.source} />
         </div>
         <p className="mt-2 text-[15px] leading-relaxed text-[#142334]">
           {submission.archetype_payload?.service || 'Not set'}

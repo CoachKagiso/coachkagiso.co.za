@@ -52,7 +52,7 @@ export default function DashboardTopBar({
           <div className="hidden text-right lg:block">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A09086]">Synced {updatedTimeLabel}</p>
             <p className="mt-0.5 text-[12px] font-medium text-[#6B6B6B]">
-              {notificationCount} follow-up email{notificationCount === 1 ? '' : 's'} due
+              {notificationCount} dashboard notification{notificationCount === 1 ? '' : 's'}
             </p>
           </div>
 

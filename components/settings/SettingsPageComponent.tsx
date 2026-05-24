@@ -18,7 +18,8 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react';
-import { EMAIL_TEMPLATES, getBookingLink } from '@/lib/email-templates';
+import { EMAIL_TEMPLATES, getBookingLink, getDownloadLink } from '@/lib/email-templates';
+import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 import FilterDropdown from '@/components/FilterDropdown';
 import DashboardTimePicker from '@/components/DashboardTimePicker';
@@ -120,8 +121,11 @@ const sectionDefaults = {
   notifications: {
     new_lead: true,
     follow_up_due: true,
+    lead_magnet_download: true,
+    masterclass_reservation: true,
     overdue_delivery: true,
     payment_confirmed: true,
+    intake_submitted: true,
     cal_booking: true,
     sent_email_log: false,
   },
@@ -130,8 +134,11 @@ const sectionDefaults = {
 const notificationRows = [
   ['new_lead', 'New lead', 'New diagnostic submission arrives'],
   ['follow_up_due', 'Follow-up due', "Lead's follow-up date is today"],
+  ['lead_magnet_download', 'Lead magnet download', 'A visitor requests a downloadable resource'],
+  ['masterclass_reservation', 'Masterclass reservation', 'A visitor joins the masterclass reserve list'],
   ['overdue_delivery', 'Overdue delivery', "Client's delivery is past deadline"],
   ['payment_confirmed', 'Payment confirmed', 'PayFast confirms a payment'],
+  ['intake_submitted', 'Intake submitted', 'A paid client submits their intake brief'],
   ['cal_booking', 'Cal.com booking', 'New session booked via Cal.com'],
   ['sent_email_log', 'Sent email log', 'Record added to sent_emails'],
 ] as const;
@@ -277,12 +284,24 @@ export default function SettingsPageComponent({
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('business_profile');
   const [photoUploadState, setPhotoUploadState] = useState<SaveState>('idle');
 
-  const groupedTemplates = useMemo(() => {
-    return templates.reduce<Record<string, StoredEmailTemplate[]>>((acc, template) => {
-      acc[template.archetypeName] = acc[template.archetypeName] || [];
-      acc[template.archetypeName].push(template);
-      return acc;
-    }, {});
+  const templateSections = useMemo(() => {
+    function groupByArchetype(sectionTemplates: StoredEmailTemplate[]) {
+      return sectionTemplates.reduce<Record<string, StoredEmailTemplate[]>>((acc, template) => {
+        acc[template.archetypeName] = acc[template.archetypeName] || [];
+        acc[template.archetypeName].push(template);
+        return acc;
+      }, {});
+    }
+
+    const diagnostics = templates.filter((template) => normalizeLeadSource(template.source) === 'diagnostic');
+    const leadMagnets = templates.filter((template) => ['first_90_days', 'linkedin_headline'].includes(normalizeLeadSource(template.source)));
+    const waitlist = templates.filter((template) => normalizeLeadSource(template.source) === 'masterclass_waitlist');
+
+    return [
+      { title: 'DIAGNOSTICS', groups: groupByArchetype(diagnostics) },
+      { title: 'LEAD MAGNETS', groups: groupByArchetype(leadMagnets) },
+      { title: 'MASTERCLASS WAITLIST', groups: groupByArchetype(waitlist) },
+    ];
   }, [templates]);
 
   async function saveSetting(key: string, value: unknown) {
@@ -370,7 +389,9 @@ export default function SettingsPageComponent({
       .split('{{firstName}}')
       .join('Thabo')
       .split('[BOOKING LINK]')
-      .join(getBookingLink(template.bookingKey));
+      .join(getBookingLink(template.bookingKey))
+      .split('[DOWNLOAD LINK]')
+      .join(template.downloadKey ? getDownloadLink(template.downloadKey) : 'Download link');
   }
 
   async function uploadProfilePhoto(file: File) {
@@ -678,37 +699,45 @@ export default function SettingsPageComponent({
 
           {activeSection === 'email_templates' && (
           <SettingsPanel title="Email Templates" icon={Mail}>
-            <div className="grid gap-4">
-              {Object.entries(groupedTemplates).map(([archetypeName, group]) => {
-                const groupActive = group.every((template) => template.active);
-                return (
-                  <details key={archetypeName} className="rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-4">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
-                      <span>
-                        <span className="block font-serif text-[18px] leading-tight text-[#142334]">{archetypeName}</span>
-                        <span className="mt-1 block text-[12px] text-[#6B6B6B]">{group[0]?.recommendedService || 'Recommended service'}</span>
-                      </span>
-                      <span className="flex items-center gap-3">
-                        <Toggle checked={groupActive} label={`Toggle ${archetypeName}`} onChange={(active) => void setArchetypeActive(archetypeName, active)} />
-                        <ChevronDown className="h-4 w-4 text-[#8C7466]" />
-                      </span>
-                    </summary>
-                    <div className="mt-5 grid gap-5">
-                      {group.map((template) => (
-                        <TemplateEditor
-                          key={template.id}
-                          template={template}
-                          saveState={saveStates[template.id] || 'idle'}
-                          onChange={(updates) => updateTemplate(template.id, updates)}
-                          onSave={() => void saveTemplate(template)}
-                          onPreview={() => setPreviewTemplate(template)}
-                          onReset={() => void resetTemplate(template)}
-                        />
-                      ))}
-                    </div>
-                  </details>
-                );
-              })}
+            <div className="grid gap-6">
+              {templateSections.map((section) => (
+                <div key={section.title} className="grid gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">{section.title}</p>
+                  {Object.entries(section.groups).map(([archetypeName, group]) => {
+                    const groupActive = group.every((template) => template.active);
+                    const source = normalizeLeadSource(group[0]?.source);
+                    return (
+                      <details key={`${section.title}-${archetypeName}`} className="rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-4">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
+                          <span>
+                            <span className="block font-serif text-[18px] leading-tight text-[#142334]">{archetypeName}</span>
+                            <span className="mt-1 block text-[12px] text-[#6B6B6B]">
+                              {group[0]?.recommendedService || 'Recommended service'} - {leadSourceLabels[source]}
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-3">
+                            <Toggle checked={groupActive} label={`Toggle ${archetypeName}`} onChange={(active) => void setArchetypeActive(archetypeName, active)} />
+                            <ChevronDown className="h-4 w-4 text-[#8C7466]" />
+                          </span>
+                        </summary>
+                        <div className="mt-5 grid gap-5">
+                          {group.map((template) => (
+                            <TemplateEditor
+                              key={template.id}
+                              template={template}
+                              saveState={saveStates[template.id] || 'idle'}
+                              onChange={(updates) => updateTemplate(template.id, updates)}
+                              onSave={() => void saveTemplate(template)}
+                              onPreview={() => setPreviewTemplate(template)}
+                              onReset={() => void resetTemplate(template)}
+                            />
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </SettingsPanel>
           )}
@@ -924,9 +953,16 @@ function TemplateEditor({
 
   return (
     <div className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
-      <span className="inline-flex rounded-full bg-[#F7F1EC] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7B5D49]">
-        {template.stageLabel}
-      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex rounded-full bg-[#F7F1EC] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7B5D49]">
+          {template.stageLabel}
+        </span>
+        {template.manualOnly && (
+          <span className="inline-flex rounded-full bg-[#FEF3C7] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#92400E]">
+            Manual trigger
+          </span>
+        )}
+      </div>
       <div className="mt-4 grid gap-4">
         <label className="grid gap-2">
           <span className="studio-label">Subject</span>
@@ -941,6 +977,11 @@ function TemplateEditor({
             <button type="button" className="studio-ghost-button h-9" onClick={() => insertToken('[BOOKING LINK]')}>
               [BOOKING LINK]
             </button>
+            {template.downloadKey && (
+              <button type="button" className="studio-ghost-button h-9" onClick={() => insertToken('[DOWNLOAD LINK]')}>
+                [DOWNLOAD LINK]
+              </button>
+            )}
             <button type="button" className="studio-secondary-button h-9" onClick={onPreview}>
               Preview
             </button>

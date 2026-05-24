@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
+import { upsertSourceLead } from '@/lib/diagnostic-submissions';
 import { getContactEmail, getSiteUrl } from '@/lib/env';
 
 type ReservePayload = {
@@ -161,6 +163,32 @@ Coach Kagiso
           <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">For now, nothing else is needed from you.</p>
           <p style="margin:22px 0 0;"><a href="${escapeHtml(workUrl)}" style="display:inline-block;background:#142334;color:#ffffff;padding:12px 18px;text-decoration:none;font:700 12px Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;">Review the masterclass</a></p>`,
         ),
+      }),
+      upsertSourceLead({
+        source: 'masterclass_waitlist',
+        firstName: fullName,
+        email,
+        metadata: {
+          originalSource: source,
+          whatsapp: whatsapp || null,
+          focus,
+          plannedSession: 'Date to be confirmed',
+        },
+      }),
+      recordDashboardNotification({
+        eventType: 'masterclass_reservation',
+        source: 'masterclass-reserve-form',
+        title: `New masterclass reservation - ${fullName}`,
+        description: `${fullName} joined the Saturday Masterclass reserve list. ${whatsapp ? `WhatsApp: ${whatsapp}. ` : ''}Focus: ${focus}`,
+        contactName: fullName,
+        contactEmail: email,
+        href: `mailto:${email}?subject=${encodeURIComponent('Saturday Masterclass reserve list')}`,
+        metadata: {
+          source,
+          whatsapp: whatsapp || null,
+          focus,
+          plannedSession: 'Date to be confirmed',
+        },
       }),
     ]);
 

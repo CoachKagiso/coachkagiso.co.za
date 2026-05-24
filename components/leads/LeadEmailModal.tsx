@@ -9,12 +9,16 @@ import type { DashboardNote } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
   getEmailSequenceDots,
+  getEmailSequenceTotal,
   getEmailTemplateOptionLabel,
   getBookingLink,
+  getDownloadLink,
   getEmailTemplate,
   getTemplateIdForLeadStage,
+  isMasterclassBookingsOpenTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import { leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
@@ -26,6 +30,8 @@ export type LeadEmailModalLead = {
   leadStatus?: string;
   followUpCount?: number;
   lastContactedAt?: string | null;
+  source?: DiagnosticLeadSource | string | null;
+  downloadLink?: string | null;
 };
 
 type SentLeadUpdate = {
@@ -64,12 +70,20 @@ function getBookingUrlForLead(lead: LeadEmailModalLead, templateId: EmailTemplat
   return getBookingLink(getEmailTemplate(templateId).bookingKey);
 }
 
+function getDownloadUrlForLead(lead: LeadEmailModalLead, templateId: EmailTemplateId) {
+  if (lead.downloadLink) return lead.downloadLink;
+  const template = getEmailTemplate(templateId);
+  return template.downloadKey ? getDownloadLink(template.downloadKey) : '';
+}
+
 function injectTemplate(value: string, lead: LeadEmailModalLead, templateId: EmailTemplateId) {
   return value
     .split('{{firstName}}')
     .join(getFirstName(lead))
     .split('[BOOKING LINK]')
-    .join(getBookingUrlForLead(lead, templateId));
+    .join(getBookingUrlForLead(lead, templateId))
+    .split('[DOWNLOAD LINK]')
+    .join(getDownloadUrlForLead(lead, templateId));
 }
 
 function escapeHtml(value: string) {
@@ -149,10 +163,11 @@ export default function LeadEmailModal({
 }: LeadEmailModalProps) {
   const searchParams = useSearchParams();
   const adminKey = searchParams.get('key') || '';
-  const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt } = lead;
+  const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source, downloadLink } = lead;
+  const leadSource = normalizeLeadSource(source);
   const modalLead = useMemo(
-    () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt }),
-    [archetype, email, firstName, followUpCount, id, lastContactedAt, leadStatus, serviceInterest],
+    () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source: leadSource, downloadLink }),
+    [archetype, downloadLink, email, firstName, followUpCount, id, lastContactedAt, leadSource, leadStatus, serviceInterest],
   );
   const initialNotesRef = useRef(initialNotes);
   const defaultTemplateId = useMemo(
@@ -162,8 +177,9 @@ export default function LeadEmailModal({
         followUpCount,
         leadStatus,
         lastContactedAt,
+        source: leadSource,
       }),
-    [archetype, followUpCount, lastContactedAt, leadStatus]
+    [archetype, followUpCount, lastContactedAt, leadSource, leadStatus]
   );
   const [activeTab, setActiveTab] = useState<LeadEmailTab>('email');
   const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateId>(defaultTemplateId);
@@ -182,6 +198,7 @@ export default function LeadEmailModal({
   );
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
   const sequenceDots = getEmailSequenceDots(selectedTemplateId);
+  const sequenceTotal = getEmailSequenceTotal(selectedTemplate);
 
   useEffect(() => {
     initialNotesRef.current = initialNotes;
@@ -412,7 +429,7 @@ export default function LeadEmailModal({
               </h2>
               <p className="mt-1 max-w-[calc(100%-44px)] truncate text-[13px] text-[#6B6B6B]">{modalLead.email}</p>
               <p className="mt-2 max-w-[calc(100%-44px)] truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8C7466]">
-                Email {selectedTemplate.sequenceIndex} of 4 <span aria-hidden="true">{sequenceDots}</span> {selectedTemplate.stageLabel}
+                Email {selectedTemplate.sequenceIndex} of {sequenceTotal} <span aria-hidden="true">{sequenceDots}</span> {selectedTemplate.stageLabel}
               </p>
             </header>
 
@@ -437,6 +454,10 @@ export default function LeadEmailModal({
             <div className="min-h-0 flex-1 overflow-hidden">
               {activeTab === 'email' && (
                 <div className="grid gap-4 px-5 py-4 md:px-6">
+                  <div className="rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/70">
+                    Source: <span className="font-semibold text-[#142334]">{leadSourceLabels[leadSource]}</span>
+                    {modalLead.downloadLink ? ' - download link is available for this lead.' : ''}
+                  </div>
                   <label className="grid gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Template</span>
                     <select
@@ -499,6 +520,11 @@ export default function LeadEmailModal({
                     {selectedTemplate.sequenceIndex === 4 && (
                       <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
                         This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
+                      </p>
+                    )}
+                    {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
+                      <p className="rounded-[8px] bg-[#FEF3C7] px-3 py-2 text-[12px] leading-relaxed text-[#92400E]">
+                        Masterclass bookings-open emails are manual only. Send this when the date and booking link are ready.
                       </p>
                     )}
                   </div>

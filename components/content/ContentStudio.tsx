@@ -112,7 +112,7 @@ type ContentStudioProps = {
   calendarItems: ContentCalendarItem[];
   backlogItems: ContentBacklogItem[];
   researchItems: ResearchEntry[];
-  followUpNotificationCount: number;
+  dashboardNotificationCount: number;
   profilePhotoUrl?: string | null;
 };
 
@@ -2833,7 +2833,7 @@ export default function ContentStudio({
   calendarItems,
   backlogItems,
   researchItems,
-  followUpNotificationCount,
+  dashboardNotificationCount,
   profilePhotoUrl,
 }: ContentStudioProps) {
   const [activeWorkspace, setActiveWorkspace] = useState<StudioWorkspace>(initialWorkspace);
@@ -4533,7 +4533,7 @@ export default function ContentStudio({
           updatedTimeLabel={contentUpdatedTimeLabel}
           attentionCount={contentAttentionCount}
           attentionLabel={contentAttentionLabel}
-          notificationCount={followUpNotificationCount + contentAttentionCount}
+          notificationCount={dashboardNotificationCount + contentAttentionCount}
           extraNotificationSections={contentNotificationSections}
           onSearchChange={setContentSearch}
           onSearchSubmit={submitContentSearch}
@@ -5720,7 +5720,7 @@ function ContentTopBar({
             adminKey={adminKey}
             notificationCount={notificationCount}
             extraSections={extraNotificationSections}
-            panelSubtitle={`${attentionCount} content item${attentionCount === 1 ? '' : 's'} and lead follow-ups need attention.`}
+            panelSubtitle={`${attentionCount} content item${attentionCount === 1 ? '' : 's'} and dashboard notifications need attention.`}
           />
 
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">

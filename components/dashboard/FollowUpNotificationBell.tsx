@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Bell, Loader2, MailCheck, X } from 'lucide-react';
+import { ArrowUpRight, Bell, CheckCircle2, Loader2, MailCheck, X } from 'lucide-react';
 import LeadEmailModal, { type LeadEmailModalLead } from '@/components/leads/LeadEmailModal';
+import type { DashboardEventNotification, DashboardNotificationEventType } from '@/lib/dashboard-notifications';
 import type { FollowUpNotification } from '@/lib/follow-up-utils';
 
 type NotificationResponse = {
   notifications?: FollowUpNotification[];
+  eventNotifications?: DashboardEventNotification[];
   error?: string;
 };
 
@@ -49,6 +51,36 @@ const urgencyTextClass: Record<NotificationTone, string> = {
   neutral: 'text-[#6B6B6B]',
   warm: 'text-[#7B695F]',
 };
+
+const eventTypeLabels: Record<DashboardNotificationEventType, string> = {
+  lead_magnet_download: 'Lead magnet',
+  masterclass_reservation: 'Masterclass',
+  payment_confirmed: 'Payment',
+  intake_submitted: 'Intake',
+  cal_booking: 'Cal.com',
+};
+
+function getEventNotificationTone(eventType: DashboardNotificationEventType): NotificationTone {
+  if (eventType === 'payment_confirmed' || eventType === 'intake_submitted' || eventType === 'cal_booking') {
+    return 'today';
+  }
+  if (eventType === 'masterclass_reservation') return 'warm';
+  return 'neutral';
+}
+
+function formatEventTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    month: 'short',
+    timeZone: 'Africa/Johannesburg',
+  }).format(date);
+}
 
 function buildLeadsHref(adminKey: string) {
   const params = new URLSearchParams();
@@ -132,6 +164,69 @@ function renderExtraNotificationItem(item: NotificationPanelItem, closePanel: ()
   );
 }
 
+function renderEventNotificationItem(
+  notification: DashboardEventNotification,
+  closePanel: () => void,
+  onReview: (notification: DashboardEventNotification) => void,
+) {
+  const tone = getEventNotificationTone(notification.eventType);
+  const label = eventTypeLabels[notification.eventType];
+  const eventTime = formatEventTime(notification.createdAt);
+  const meta = [label, eventTime].filter(Boolean).join(' / ');
+  const actionLabel = notification.href ? 'Open contact' : 'Mark reviewed';
+  const content = (
+    <>
+      <span className={`mt-1.5 h-2.5 w-2.5 rounded-full ${urgencyDotClass[tone]}`} />
+      <span className="min-w-0">
+        <span className="flex items-start justify-between gap-3">
+          <span className="line-clamp-2 text-[14px] font-bold leading-snug text-[#142334]">{notification.title}</span>
+          <span className={`shrink-0 text-right text-[11px] font-semibold uppercase tracking-[0.1em] ${urgencyTextClass[tone]}`}>
+            {label}
+          </span>
+        </span>
+        {notification.description && <span className="mt-1 block text-[12px] leading-relaxed text-[#6B6B6B]">{notification.description}</span>}
+        <span className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#142334]">
+          {meta && <span>{meta}</span>}
+          <span className="inline-flex items-center gap-1">
+            {actionLabel}
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
+        </span>
+      </span>
+    </>
+  );
+
+  if (notification.href) {
+    return (
+      <a
+        key={notification.id}
+        href={notification.href}
+        onClick={() => {
+          onReview(notification);
+          closePanel();
+        }}
+        className="grid w-full grid-cols-[auto_1fr] gap-3 rounded-[8px] px-3 py-3 text-left transition hover:bg-[#F8F6F4]"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      key={notification.id}
+      type="button"
+      onClick={() => {
+        onReview(notification);
+        closePanel();
+      }}
+      className="grid w-full grid-cols-[auto_1fr] gap-3 rounded-[8px] px-3 py-3 text-left transition hover:bg-[#F8F6F4]"
+    >
+      {content}
+    </button>
+  );
+}
+
 export default function FollowUpNotificationBell({
   adminKey,
   notificationCount,
@@ -147,6 +242,7 @@ export default function FollowUpNotificationBell({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<FollowUpNotification[]>([]);
+  const [eventNotifications, setEventNotifications] = useState<DashboardEventNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,10 +251,10 @@ export default function FollowUpNotificationBell({
   const badgeCount = Math.max(0, notificationCount - locallyResolvedCount);
   const badgeLabel = badgeCount > 99 ? '99+' : String(badgeCount);
   const totalExtraCount = extraSections.reduce((total, section) => total + (section.count ?? section.items.length), 0);
-  const followUpSummaryCount = notifications.length || Math.max(0, badgeCount - totalExtraCount);
+  const followUpSummaryCount = hasLoaded ? notifications.length : Math.max(0, badgeCount - totalExtraCount);
   const summaryText =
     panelSubtitle ||
-    `${badgeCount} item${badgeCount === 1 ? '' : 's'} need attention across follow-ups, calendar, and content.`;
+    `${badgeCount} item${badgeCount === 1 ? '' : 's'} need attention across follow-ups, funnel activity, calendar, and content.`;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -182,6 +278,7 @@ export default function FollowUpNotificationBell({
       const data = (await response.json().catch(() => ({}))) as NotificationResponse;
       if (!response.ok) throw new Error(data.error || 'Could not load notifications.');
       setNotifications(data.notifications || []);
+      setEventNotifications(data.eventNotifications || []);
       setHasLoaded(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load notifications.');
@@ -200,6 +297,23 @@ export default function FollowUpNotificationBell({
       if (next && !hasLoaded && !isLoading) void loadNotifications();
       return next;
     });
+  }
+
+  function markEventNotificationReviewed(notification: DashboardEventNotification) {
+    setEventNotifications((current) => current.filter((item) => item.id !== notification.id));
+    setLocallyResolvedCount((current) => current + 1);
+    void fetch(`/api/notifications/${notification.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: adminKey }),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Could not mark notification as reviewed.');
+      })
+      .catch(() => {
+        setEventNotifications((current) => [notification, ...current]);
+        setLocallyResolvedCount((current) => Math.max(0, current - 1));
+      });
   }
 
   return (
@@ -323,6 +437,34 @@ export default function FollowUpNotificationBell({
                   View all in leads
                 </a>
               </section>
+
+              {(hasLoaded || eventNotifications.length > 0) && (
+                <section className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A09086]">Funnel activity</p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-[#6B6B6B]">Reservations, downloads, payments, and booking events.</p>
+                    </div>
+                    <span className="grid h-8 min-w-8 place-items-center rounded-full bg-[#F8F6F4] px-2 text-[12px] font-bold text-[#142334]">
+                      {eventNotifications.length}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-1">
+                    {eventNotifications.length > 0 ? (
+                      eventNotifications.map((notification) =>
+                        renderEventNotificationItem(notification, closePanel, markEventNotificationReviewed)
+                      )
+                    ) : (
+                      <div className="rounded-[8px] bg-[#F8F6F4] px-3 py-4 text-center">
+                        <CheckCircle2 className="mx-auto h-5 w-5 text-[#C9AD98]" />
+                        <p className="mt-2 text-[13px] font-semibold text-[#142334]">No unread funnel notifications.</p>
+                        <p className="mt-1 text-[12px] text-[#6B6B6B]">Downloads and reservations will appear here once they arrive.</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {extraSections.map((section) => (
                 <section key={section.id} className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">

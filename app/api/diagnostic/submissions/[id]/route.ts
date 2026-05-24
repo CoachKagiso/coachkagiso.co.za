@@ -9,6 +9,7 @@ import {
 import {
   isFollowUpOneTemplate,
   isFollowUpTwoTemplate,
+  isMasterclassBookingsOpenTemplate,
   isNewsletterBridgeTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
@@ -40,6 +41,13 @@ function getFollowUpScheduleAfterSend(
   now: Date,
   hasPriorContact = false
 ) {
+  if (isMasterclassBookingsOpenTemplate(templateId)) {
+    return {
+      follow_up_count: 1,
+      next_follow_up_at: null,
+    };
+  }
+
   if (isNewsletterBridgeTemplate(templateId)) {
     return {
       follow_up_count: 3,

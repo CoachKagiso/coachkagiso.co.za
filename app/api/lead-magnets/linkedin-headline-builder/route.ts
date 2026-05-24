@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
+import { upsertSourceLead } from '@/lib/diagnostic-submissions';
 import {
   LINKEDIN_HEADLINE_BUILDER_FILENAME,
   LINKEDIN_HEADLINE_BUILDER_PATH,
@@ -101,6 +103,30 @@ Email: ${email}
 Source: ${source}
 PDF: ${pdfUrl}
 `,
+      }),
+      upsertSourceLead({
+        source: 'linkedin_headline',
+        firstName,
+        email,
+        downloadLink: pdfUrl,
+        metadata: {
+          originalSource: source,
+          asset: LINKEDIN_HEADLINE_BUILDER_FILENAME,
+        },
+      }),
+      recordDashboardNotification({
+        eventType: 'lead_magnet_download',
+        source: 'linkedin-headline-builder',
+        title: `New lead magnet download - ${firstName}`,
+        description: `${firstName} requested ${LINKEDIN_HEADLINE_BUILDER_FILENAME}. Source: ${source}.`,
+        contactName: firstName,
+        contactEmail: email,
+        href: `mailto:${email}?subject=${encodeURIComponent('Your LinkedIn Headline Builder download')}`,
+        metadata: {
+          asset: LINKEDIN_HEADLINE_BUILDER_FILENAME,
+          source,
+          pdfUrl,
+        },
       }),
     ]);
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAsyncService } from '@/lib/buying-flow';
 import { addClientToBrevoList } from '@/lib/brevo';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import {
   notifyKagisoIntake,
   sendClientIntakeConfirmation,
@@ -174,6 +175,25 @@ export async function POST(request: Request) {
     sendClientIntakeConfirmation({ service, email, fullName, cvDeliveryMethod, paymentId }),
     notifyKagisoIntake({ service, name: fullName, email, whatsapp, formData: values, signedCvUrl, cvDeliveryMethod }),
     addClientToBrevoList(email, fullName),
+    recordDashboardNotification({
+      eventType: 'intake_submitted',
+      source: 'client-intake-form',
+      title: `New intake - ${service.title}`,
+      description:
+        cvDeliveryMethod === 'email_after_submit'
+          ? `${fullName} submitted the brief for ${service.title}, but the CV still needs to arrive by email.`
+          : `${fullName} submitted the brief for ${service.title}. ${cvDeliveryMethod === 'uploaded' ? 'CV uploaded.' : 'No CV required.'}`,
+      contactName: fullName,
+      contactEmail: email,
+      href: `mailto:${email}?subject=${encodeURIComponent(`Your ${service.title} intake`)}`,
+      metadata: {
+        paymentId,
+        serviceSlug: service.slug,
+        whatsapp: whatsapp || null,
+        cvDeliveryMethod,
+        hasSignedCvUrl: Boolean(signedCvUrl),
+      },
+    }),
   ]);
 
   const isWaitingForCv = cvDeliveryMethod === 'email_after_submit';

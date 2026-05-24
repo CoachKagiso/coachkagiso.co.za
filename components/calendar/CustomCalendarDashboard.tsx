@@ -31,7 +31,7 @@ import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 type CustomCalendarDashboardProps = {
   adminKey: string;
   leads: DiagnosticSubmission[];
-  followUpNotificationCount?: number;
+  dashboardNotificationCount?: number;
   profilePhotoUrl?: string | null;
 };
 
@@ -426,7 +426,7 @@ function isCoachingWindow(date: Date, time: string) {
   return false;
 }
 
-export default function CustomCalendarDashboard({ adminKey, leads, followUpNotificationCount = 0, profilePhotoUrl }: CustomCalendarDashboardProps) {
+export default function CustomCalendarDashboard({ adminKey, leads, dashboardNotificationCount = 0, profilePhotoUrl }: CustomCalendarDashboardProps) {
   const [view, setView] = useState<DashboardCalendarView>('week');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [events, setEvents] = useState<DashboardCalendarEvent[]>([]);
@@ -1431,7 +1431,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, followUpNotif
       items: selectedDayNotificationItems,
     },
   ];
-  const calendarNotificationCount = followUpNotificationCount + selectedDateAppointmentEvents.length + selectedDateExtraActionEvents.length;
+  const calendarNotificationCount = dashboardNotificationCount + selectedDateAppointmentEvents.length + selectedDateExtraActionEvents.length;
 
   const calendarTopBar = (
     <div className="rounded-[8px] bg-white px-4 py-3">
@@ -1496,7 +1496,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, followUpNotif
             adminKey={adminKey}
             notificationCount={calendarNotificationCount}
             extraSections={calendarNotificationSections}
-            panelSubtitle={`${attentionStatusLabel} on the selected day, plus lead follow-up emails.`}
+            panelSubtitle={`${attentionStatusLabel} on the selected day, plus dashboard notifications.`}
           />
           <div className="flex items-center gap-2 rounded-full bg-[#F8F6F4] p-1 pr-3">
             <DashboardProfileAvatar src={profilePhotoUrl} />

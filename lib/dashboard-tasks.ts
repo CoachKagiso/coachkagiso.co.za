@@ -1,6 +1,7 @@
 import { asyncServices } from '@/lib/buying-flow';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import { leadSourceShortLabels, normalizeLeadSource } from '@/lib/lead-sources';
 
 export const taskTypes = ['LEAD', 'DELIVERY', 'CONTENT', 'PERSONAL'] as const;
 export const taskStatuses = ['todo', 'waiting', 'in_progress', 'done'] as const;
@@ -140,7 +141,81 @@ export function getPaymentClientName(operation: ClientOperation) {
 }
 
 function getLeadSubtitle(submission: DiagnosticSubmission) {
-  return `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name}`;
+  const source = normalizeLeadSource(submission.source);
+  return `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name} - ${leadSourceShortLabels[source]}`;
+}
+
+function getLeadSourceTags(submission: DiagnosticSubmission) {
+  const source = normalizeLeadSource(submission.source);
+  return source === 'diagnostic' ? [submission.archetype_name] : [leadSourceShortLabels[source], submission.archetype_name];
+}
+
+function getFirstContactTitle(submission: DiagnosticSubmission, clientName: string) {
+  const source = normalizeLeadSource(submission.source);
+  if (source === 'first_90_days') return `${clientName} - Send First 90 Days checklist email`;
+  if (source === 'linkedin_headline') return `${clientName} - Send LinkedIn Builder email`;
+  if (source === 'masterclass_waitlist') return `${clientName} - Send waitlist confirmation`;
+  return `${clientName} - Send first result follow-up`;
+}
+
+function getFollowUpOneTask(submission: DiagnosticSubmission, clientName: string) {
+  const source = normalizeLeadSource(submission.source);
+  if (source === 'first_90_days') {
+    return {
+      id: `first-90-followup-${submission.id}`,
+      title: `${clientName} - Send First 90 Days follow-up`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - The part nobody warns you about`,
+      tags: ['FOLLOW-UP', 'FIRST 90 DAYS', 'DAY 4'],
+    };
+  }
+  if (source === 'linkedin_headline') {
+    return {
+      id: `linkedin-followup-${submission.id}`,
+      title: `${clientName} - Send LinkedIn headline follow-up`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Why the headline is costing them`,
+      tags: ['FOLLOW-UP', 'LINKEDIN', 'DAY 4'],
+    };
+  }
+  if (source === 'masterclass_waitlist') {
+    return {
+      id: `masterclass-bookings-open-${submission.id}`,
+      title: `${clientName} - Send bookings-open email`,
+      subtitle: 'Saturday Masterclass - manual trigger only when bookings are live',
+      tags: ['MANUAL TRIGGER', 'WAITLIST', 'BOOKINGS OPEN'],
+    };
+  }
+  return {
+    id: `followup1-${submission.id}`,
+    title: `${clientName} - Send Follow-up 1`,
+    subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name} - Day 4 check-in`,
+    tags: ['FOLLOW-UP', 'DAY 4'],
+  };
+}
+
+function getFollowUpTwoTask(submission: DiagnosticSubmission, clientName: string) {
+  const source = normalizeLeadSource(submission.source);
+  if (source === 'first_90_days') {
+    return {
+      id: `first-90-newsletter-${submission.id}`,
+      title: `${clientName} - Send First 90 Days newsletter bridge`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
+      tags: ['NEWSLETTER', 'FIRST 90 DAYS', 'DAY 10'],
+    };
+  }
+  if (source === 'linkedin_headline') {
+    return {
+      id: `linkedin-newsletter-${submission.id}`,
+      title: `${clientName} - Send LinkedIn newsletter bridge`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
+      tags: ['NEWSLETTER', 'LINKEDIN', 'DAY 10'],
+    };
+  }
+  return {
+    id: `followup2-${submission.id}`,
+    title: `${clientName} - Send Follow-up 2`,
+    subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name} - Soft close`,
+    tags: ['FOLLOW-UP', 'FINAL', 'DAY 10'],
+  };
 }
 
 function getDeliveryDueAt(operation: ClientOperation) {
@@ -170,7 +245,7 @@ export function generateTasks(
       tasks.push(
         buildTask({
           id: `lead-first-follow-up-${lead.id}`,
-          title: `${clientName} - Send first result follow-up`,
+          title: getFirstContactTitle(lead, clientName),
           subtitle,
           type: 'LEAD',
           status: 'todo',
@@ -178,7 +253,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at || lead.submitted_at,
           clientName,
           leadId: lead.id,
-          tags: ['First follow-up', lead.archetype_name],
+          tags: ['First follow-up', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -199,7 +274,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at,
           clientName,
           leadId: lead.id,
-          tags: ['Overdue follow-up', lead.archetype_name],
+          tags: ['Overdue follow-up', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -209,18 +284,19 @@ export function generateTasks(
     }
 
     if (lead.lead_status === 'contacted' && followUpCount === 0 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+      const followUpTask = getFollowUpOneTask(lead, clientName);
       tasks.push(
         buildTask({
-          id: `followup1-${lead.id}`,
-          title: `${clientName} - Send Follow-up 1`,
-          subtitle: `${lead.archetype_payload?.service || 'Recommended route'} - ${lead.archetype_name} - Day 4 check-in`,
+          id: followUpTask.id,
+          title: followUpTask.title,
+          subtitle: followUpTask.subtitle,
           type: 'LEAD',
           status: 'todo',
           priority: 85,
           dueDate: lead.next_follow_up_at,
           clientName,
           leadId: lead.id,
-          tags: ['FOLLOW-UP', 'DAY 4'],
+          tags: followUpTask.tags,
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -229,19 +305,26 @@ export function generateTasks(
       );
     }
 
-    if (lead.lead_status === 'contacted' && followUpCount === 1 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+    if (
+      lead.lead_status === 'contacted' &&
+      followUpCount === 1 &&
+      normalizeLeadSource(lead.source) !== 'masterclass_waitlist' &&
+      lead.next_follow_up_at &&
+      isTodayOrPast(lead.next_follow_up_at, now)
+    ) {
+      const followUpTask = getFollowUpTwoTask(lead, clientName);
       tasks.push(
         buildTask({
-          id: `followup2-${lead.id}`,
-          title: `${clientName} - Send Follow-up 2`,
-          subtitle: `${lead.archetype_payload?.service || 'Recommended route'} - ${lead.archetype_name} - Soft close`,
+          id: followUpTask.id,
+          title: followUpTask.title,
+          subtitle: followUpTask.subtitle,
           type: 'LEAD',
           status: 'todo',
           priority: 80,
           dueDate: lead.next_follow_up_at,
           clientName,
           leadId: lead.id,
-          tags: ['FOLLOW-UP', 'FINAL', 'DAY 10'],
+          tags: followUpTask.tags,
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -250,7 +333,13 @@ export function generateTasks(
       );
     }
 
-    if (lead.lead_status === 'contacted' && followUpCount === 2 && lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now)) {
+    if (
+      lead.lead_status === 'contacted' &&
+      followUpCount === 2 &&
+      normalizeLeadSource(lead.source) === 'diagnostic' &&
+      lead.next_follow_up_at &&
+      isTodayOrPast(lead.next_follow_up_at, now)
+    ) {
       tasks.push(
         buildTask({
           id: `newsletter-bridge-${lead.id}`,
@@ -262,7 +351,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at,
           clientName,
           leadId: lead.id,
-          tags: ['NEWSLETTER', 'BRIDGE', 'DAY 17'],
+          tags: ['NEWSLETTER', 'BRIDGE', 'DAY 17', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -284,7 +373,7 @@ export function generateTasks(
           dueDate: lead.last_contacted_at,
           clientName,
           leadId: lead.id,
-          tags: ['NURTURE', 'SEQUENCE COMPLETE'],
+          tags: ['NURTURE', 'SEQUENCE COMPLETE', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -305,7 +394,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at || lead.last_contacted_at || lead.updated_at || lead.submitted_at,
           clientName,
           leadId: lead.id,
-          tags: ['Awaiting response', lead.archetype_name],
+          tags: ['Awaiting response', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -326,7 +415,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at || lead.last_contacted_at || lead.updated_at || lead.submitted_at,
           clientName,
           leadId: lead.id,
-          tags: ['Response check', lead.archetype_name],
+          tags: ['Response check', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -347,7 +436,7 @@ export function generateTasks(
           dueDate: lead.next_follow_up_at || lead.updated_at || lead.submitted_at,
           clientName,
           leadId: lead.id,
-          tags: ['Discovery prep', lead.archetype_name],
+          tags: ['Discovery prep', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -368,7 +457,7 @@ export function generateTasks(
           dueDate: lead.updated_at || lead.submitted_at,
           clientName,
           leadId: lead.id,
-          tags: [lead.lead_status === 'paid' ? 'Paid client' : 'Closed lead', lead.archetype_name],
+          tags: [lead.lead_status === 'paid' ? 'Paid client' : 'Closed lead', ...getLeadSourceTags(lead)],
           isManual: false,
           notes: [],
           createdAt: lead.submitted_at,
@@ -565,7 +654,7 @@ export function mergeTasks(
       clientName,
       leadId: task.linkedLeadId,
       paymentId: task.linkedPaymentId,
-      tags: ['Manual', task.type, ...(linkedLead ? [linkedLead.archetype_name] : []), ...(linkedOperation ? [linkedOperation.serviceTitle] : [])],
+      tags: ['Manual', task.type, ...(linkedLead ? getLeadSourceTags(linkedLead) : []), ...(linkedOperation ? [linkedOperation.serviceTitle] : [])],
       isManual: true,
       notes: notesByTask.get(task.id) || [],
       createdAt: task.createdAt,
