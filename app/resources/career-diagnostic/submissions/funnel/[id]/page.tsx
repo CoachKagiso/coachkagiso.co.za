@@ -318,8 +318,8 @@ export default async function FunnelActivityRecordPage({
                           ['Source', activity.source],
                           ['Status', activity.status],
                           ...metadataEntries.map(([label, value]) => [formatMetadataLabel(label), formatMetadataValue(value)]),
-                        ].map(([label, value]) => (
-                          <div key={label} className="grid gap-2 px-5 py-4 md:grid-cols-[0.35fr_1fr]">
+                        ].map(([label, value], idx) => (
+                          <div key={`${label}-${idx}`} className="grid gap-2 px-5 py-4 md:grid-cols-[0.35fr_1fr]">
                             <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#A09086]">
                               {label}
                             </p>

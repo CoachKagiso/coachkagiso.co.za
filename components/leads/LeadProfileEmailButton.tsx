@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Send } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import LeadEmailModal, { type LeadEmailModalLead } from './LeadEmailModal';
+import { getMailtoHref, shouldUseInternalEmailModal } from './email-modal-routing';
 
 function formatProfileFollowUpDate(value: string) {
   return new Intl.DateTimeFormat('en-ZA', {
@@ -23,11 +24,20 @@ export default function LeadProfileEmailButton({
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState(initialNotes);
 
+  function handleClick() {
+    if (shouldUseInternalEmailModal(lead)) {
+      setIsOpen(true);
+      return;
+    }
+
+    window.open(getMailtoHref(lead.email), '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={handleClick}
         className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-5 text-[14px] font-semibold text-[#142334] transition hover:bg-[#142334] hover:text-white"
       >
         Send Email <Send className="h-4 w-4" />
