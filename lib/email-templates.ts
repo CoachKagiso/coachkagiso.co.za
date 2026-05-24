@@ -812,13 +812,15 @@ hello@coachkagiso.co.za`,
     subject: "You're on the list, {{firstName}}",
     body: `Hi {{firstName}},
 
-You are on the waitlist for the Saturday Masterclass.
+You're on the waitlist for the July Saturday Masterclass.
 
-This does not reserve a paid seat yet. It just means you will be one of the first people I email when bookings open.
+I read what you wrote about what you're hoping this will help you with. I'm glad you shared that — it tells me exactly what the room needs to cover.
 
-When the next session is confirmed, I will send the booking link, date, and payment details.
+Here's what to expect: bookings officially open on 1 June. You'll get an email with the booking link and payment details. Because you reserved early, you'll have access to the early bird rate of R450.
 
-For now, you do not need to do anything else.
+The session is capped at 12 people. You'll have seven days from 1 June to secure your spot at that price. After 7 June, the price moves to R500 and any unclaimed spots open to the public.
+
+I'll be in touch on 1 June with everything you need.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -833,20 +835,20 @@ hello@coachkagiso.co.za`,
     variant: 2,
     sequenceIndex: 2,
     stageLabel: 'Bookings open',
-    subject: 'Bookings are open, {{firstName}}',
+    subject: 'Your booking link is ready, {{firstName}}',
     body: `Hi {{firstName}},
 
-Bookings are now open for the next Saturday Masterclass.
+As promised, bookings for the July Saturday Masterclass are now open.
 
-You joined the waitlist, so I am sending this to you before I share it more widely.
+Because you reserved early, you're getting first access at R450 until 7 June. After that, it opens to the public at R500.
 
-You can book your seat here:
+Here's what the session covers: how you build and use your network strategically, how you make yourself visible to the right people, how you position your personal brand so opportunities find you, and how to find mentors worth having.
 
-[BOOKING LINK]
+One intensive 2-hour session, capped at 12 people.
 
-If the topic and timing work for you, book as soon as you can. Once the available spaces are gone, I will close the booking link.
+Book and pay here: [BOOKING LINK]
 
-If it is not the right time, no stress. I will keep you on the list for future sessions unless you unsubscribe.
+See you there.
 
 Kagiso
 hello@coachkagiso.co.za`,
