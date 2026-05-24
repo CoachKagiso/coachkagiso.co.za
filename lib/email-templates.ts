@@ -631,17 +631,15 @@ hello@coachkagiso.co.za`,
     subject: 'Your First 90 Days checklist, {{firstName}}',
     body: `Hi {{firstName}},
 
-Here is your First 90 Days checklist:
+Here's your First 90 Days Checklist for New Managers: [DOWNLOAD LINK]
 
-[DOWNLOAD LINK]
+I want to ask you something while you have it open.
 
-Do not try to do all of it at once. Use it as a working document. Start with the part that matches where you are right now.
+Where are you right now? Are you already in a new management role, about to step into one, or preparing for a conversation you're hoping will lead to one?
 
-If you are in week one, focus on listening, context, and expectations.
-If you are in month one, focus on patterns, quick wins, and trust.
-If you are already further in, use it to check what you may have skipped.
+I ask because the checklist is just a starting point. What you actually need depends on where you are in that journey.
 
-The first 90 days are not about proving everything immediately. They are about building enough clarity that people know how to trust your judgment.
+Reply and let me know. I read everything.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -659,21 +657,19 @@ hello@coachkagiso.co.za`,
     subject: 'The part nobody warns you about, {{firstName}}',
     body: `Hi {{firstName}},
 
-I sent you the First 90 Days checklist a few days ago.
+I sent you the First 90 Days checklist last week and wanted to follow up.
 
-The part nobody warns you about is that the work is not only technical. It is emotional too.
+Here's what I see most often with new managers in corporate SA: the technical skills that got you promoted are not the skills that will make you successful in the new role.
 
-You are learning the role, the team, the politics, the expectations, and the unspoken rules, while also trying to look capable.
+The thing nobody warns you about is the shift from doing to leading. You spent years being good at the work. Now your job is to get other people to be good at the work. That's a completely different skill, and most companies give you zero preparation for it.
 
-That pressure can make people overperform in the wrong places.
+The first 90 days either builds or breaks your credibility with your team. 
 
-So here is the question I want you to sit with:
+If you want to talk through what this transition looks like for your specific situation, I run a 75-minute Career Clarity Session. We’ll map out exactly where you are and design a plan for your first three months.
 
-What are you trying to prove right now, and who are you trying to prove it to?
+It's here if you want to set that up: [BOOKING LINK]
 
-If you want help thinking through your first 90 days with more clarity, you can book a Career Clarity Session here:
-
-[BOOKING LINK]
+If you're not ready for that, no stress. But I'd still love to know: how is the transition actually going?
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -691,15 +687,15 @@ hello@coachkagiso.co.za`,
     subject: 'Last one from me for now, {{firstName}}',
     body: `Hi {{firstName}},
 
-This is the last direct email I will send about the First 90 Days checklist for now.
+This is the last email in this sequence. I don't want to fill your inbox beyond what's useful.
 
-If you have used even one part of it, good. That is enough to start.
+I'm adding you to my upcoming newsletter. When it launches, it'll cover leadership, career growth, and what actually moves people forward in corporate SA. Real situations, real patterns, no generic advice.
 
-I am going to move you into my wider career newsletter, where I share reflections on visibility, career transitions, leadership, and personal branding.
+You're on the early-access list. If it's not your thing, you can easily opt out with the link at the bottom of the first email.
 
-It is not a weekly pitch. It is a place for useful thinking.
+And if you ever want to continue the conversation we started, just reply to any email. 
 
-If anything I send lands and you want to talk it through, you can always reply.
+Your career matters, {{firstName}}.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -721,21 +717,13 @@ hello@coachkagiso.co.za`,
     subject: 'Your SA LinkedIn Headline Builder, {{firstName}}',
     body: `Hi {{firstName}},
 
-Here is your SA LinkedIn Headline Builder:
+Here's your SA LinkedIn Headline Builder: [DOWNLOAD LINK]
 
-[DOWNLOAD LINK]
+Quick question while you have it in hand.
 
-Start with the formula before you look at the examples.
+When someone lands on your LinkedIn profile right now, someone who doesn't know you: do they immediately understand what you do and where you're going? Or do they see your current job title and have to work out the rest?
 
-A strong headline should make three things clear:
-
-Who you help.
-What you do.
-Why someone should keep reading.
-
-Most people only list their job title. That is why their profile feels flat.
-
-Your headline is not there to impress everyone. It is there to help the right person understand where to place you.
+Reply and let me know what yours currently says. I'm curious.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -753,19 +741,21 @@ hello@coachkagiso.co.za`,
     subject: 'Why your headline is costing you, {{firstName}}',
     body: `Hi {{firstName}},
 
-I sent you the LinkedIn Headline Builder a few days ago.
+I wanted to follow up on the LinkedIn Headline Builder I sent last week.
 
-Here is why the headline matters more than most people think:
+Here's the thing most people don't realise: your LinkedIn headline is the first thing recruiters see when they search for someone like you. Before your experience, before your skills, before anything else, your headline either matches their search or it doesn't.
 
-People decide what box to put you in before they read the rest of your profile.
+If your headline still says your job title from two years ago, you're invisible to the searches that matter.
 
-If your headline is vague, outdated, or too internal, the rest of the profile has to work harder.
+The headline is just one piece of it. Your summary, your experience section, the way your profile tells the story of where you're going, all of that works together or it doesn't work at all.
 
-That is where opportunities get missed.
+If you want someone to do that work with you properly, the CV + LinkedIn Bundle is how I help people close that gap. I rewrite both, built around where you actually want to go.
 
-If you want me to help you reposition the full profile, not just the headline, the CV + LinkedIn Bundle is here:
+R500. Seven working days.
 
-[BOOKING LINK]
+Details here: [BOOKING LINK]
+
+Or if you just have a question about the builder, reply and ask. I'm here.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -783,15 +773,13 @@ hello@coachkagiso.co.za`,
     subject: 'Moving you to the newsletter, {{firstName}}',
     body: `Hi {{firstName}},
 
-This is the last direct email I will send about the LinkedIn Headline Builder for now.
+Last email in this sequence.
 
-I am moving you into my wider newsletter, where I share notes on visibility, career positioning, CVs, LinkedIn, and making your work easier for the right people to understand.
+I'm adding you to my upcoming newsletter. When it launches, it'll cover career growth, leadership, and personal branding, specifically for professionals navigating corporate SA.
 
-If you downloaded the builder because you know your profile is not representing you properly yet, keep going.
+You'll be on the early list. Opt out anytime.
 
-Start with the headline. Then look at your About section. Then your experience bullets.
-
-Visibility is built in layers.
+If you ever want to talk through your LinkedIn or CV, just reply to any email. I'll make time.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -814,7 +802,7 @@ hello@coachkagiso.co.za`,
 
 You're on the waitlist for the July Saturday Masterclass.
 
-I read what you wrote about what you're hoping this will help you with. I'm glad you shared that — it tells me exactly what the room needs to cover.
+I read what you wrote about what you're hoping this will help you with. I'm glad you shared that, it tells me exactly what the room needs to cover.
 
 Here's what to expect: bookings officially open on 1 June. You'll get an email with the booking link and payment details. Because you reserved early, you'll have access to the early bird rate of R450.
 
