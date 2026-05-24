@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
+import { upsertSourceLead } from '@/lib/diagnostic-submissions';
 import {
   FIRST_90_DAYS_CHECKLIST_FILENAME,
   FIRST_90_DAYS_CHECKLIST_PATH,
@@ -105,6 +107,30 @@ Email: ${email}
 Source: ${source}
 PDF: ${pdfUrl}
 `,
+      }),
+      upsertSourceLead({
+        source: 'first_90_days',
+        firstName,
+        email,
+        downloadLink: pdfUrl,
+        metadata: {
+          originalSource: source,
+          asset: FIRST_90_DAYS_CHECKLIST_FILENAME,
+        },
+      }),
+      recordDashboardNotification({
+        eventType: 'lead_magnet_download',
+        source: 'first-90-days-checklist',
+        title: `New lead magnet download - ${firstName}`,
+        description: `${firstName} requested ${FIRST_90_DAYS_CHECKLIST_FILENAME}. Source: ${source}.`,
+        contactName: firstName,
+        contactEmail: email,
+        href: `mailto:${email}?subject=${encodeURIComponent('Your First 90 Days Checklist download')}`,
+        metadata: {
+          asset: FIRST_90_DAYS_CHECKLIST_FILENAME,
+          source,
+          pdfUrl,
+        },
       }),
     ]);
 

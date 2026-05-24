@@ -42,8 +42,11 @@ export type AiConfigSettings = {
 export type NotificationSettings = {
   new_lead: boolean;
   follow_up_due: boolean;
+  lead_magnet_download: boolean;
+  masterclass_reservation: boolean;
   overdue_delivery: boolean;
   payment_confirmed: boolean;
+  intake_submitted: boolean;
   cal_booking: boolean;
   sent_email_log: boolean;
 };
@@ -61,6 +64,8 @@ type EmailTemplateRow = {
   body: string;
   recommended_service: string;
   booking_key: string;
+  source?: string | null;
+  download_key?: string | null;
   variant: number;
   sequence_index: number;
   stage_label: string;
@@ -107,8 +112,11 @@ export const DEFAULT_SETTINGS = {
   notifications: {
     new_lead: true,
     follow_up_due: true,
+    lead_magnet_download: true,
+    masterclass_reservation: true,
     overdue_delivery: true,
     payment_confirmed: true,
+    intake_submitted: true,
     cal_booking: true,
     sent_email_log: false,
   } satisfies NotificationSettings,
@@ -127,6 +135,18 @@ function isMissingSettingsTableError(error: unknown) {
     message.includes("Could not find the table 'public.email_templates'") ||
     message.includes('relation "public.settings" does not exist') ||
     message.includes('relation "public.email_templates" does not exist')
+  );
+}
+
+function isMissingEmailTemplateExtensionError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String((error as { message?: unknown }).message || '') : '';
+  return (
+    message.includes('source') ||
+    message.includes('download_key') ||
+    message.includes("Could not find the 'source' column") ||
+    message.includes("Could not find the 'download_key' column") ||
+    message.includes('schema cache')
   );
 }
 
@@ -159,6 +179,8 @@ function toEmailTemplateRow(template: EmailTemplate) {
     body: template.body,
     recommended_service: template.recommendedService,
     booking_key: template.bookingKey,
+    source: template.source || 'diagnostic',
+    download_key: template.downloadKey || null,
     variant: template.variant,
     sequence_index: template.sequenceIndex,
     stage_label: template.stageLabel,
@@ -166,7 +188,13 @@ function toEmailTemplateRow(template: EmailTemplate) {
   };
 }
 
+function toLegacyEmailTemplateRow(template: EmailTemplate) {
+  const { source: _source, download_key: _downloadKey, ...row } = toEmailTemplateRow(template);
+  return row;
+}
+
 export function mapEmailTemplateRow(row: EmailTemplateRow): StoredEmailTemplate {
+  const fallback = EMAIL_TEMPLATES.find((template) => template.id === row.template_id);
   return {
     id: row.template_id as EmailTemplate['id'],
     archetypeName: row.archetype_name,
@@ -174,6 +202,9 @@ export function mapEmailTemplateRow(row: EmailTemplateRow): StoredEmailTemplate 
     body: row.body,
     recommendedService: row.recommended_service,
     bookingKey: row.booking_key,
+    source: fallback?.source || (row.source as EmailTemplate['source']) || 'diagnostic',
+    downloadKey: fallback?.downloadKey || row.download_key || undefined,
+    manualOnly: fallback?.manualOnly,
     variant: row.variant as EmailTemplate['variant'],
     sequenceIndex: row.sequence_index as EmailTemplate['sequenceIndex'],
     stageLabel: row.stage_label as EmailTemplate['stageLabel'],
@@ -221,6 +252,14 @@ export async function seedEmailTemplates(supabase: SupabaseClient) {
     .upsert(EMAIL_TEMPLATES.map(toEmailTemplateRow), { onConflict: 'template_id', ignoreDuplicates: true });
 
   if (isMissingSettingsTableError(error)) return;
+  if (isMissingEmailTemplateExtensionError(error)) {
+    const legacy = await supabase
+      .from('email_templates')
+      .upsert(EMAIL_TEMPLATES.map(toLegacyEmailTemplateRow), { onConflict: 'template_id', ignoreDuplicates: true });
+    if (isMissingSettingsTableError(legacy.error)) return;
+    if (legacy.error) throw new Error(legacy.error.message);
+    return;
+  }
   if (error) throw new Error(error.message);
 }
 
@@ -236,7 +275,10 @@ export async function listStoredEmailTemplates(supabase: SupabaseClient) {
   }
   if (error) throw new Error(error.message);
 
-  if (!data || data.length === 0) {
+  const hasMissingDefaults =
+    !data?.length || EMAIL_TEMPLATES.some((template) => !data.some((row) => row.template_id === template.id));
+
+  if (hasMissingDefaults) {
     await seedEmailTemplates(supabase);
     const seeded = await supabase
       .from('email_templates')

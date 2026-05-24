@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { asyncServices } from '@/lib/buying-flow';
+import { asyncServices, formatCurrency } from '@/lib/buying-flow';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { ensureClientDeliveryMilestones } from '@/lib/delivery-milestones';
 import { validatePayFastSignature } from '@/lib/payfast';
 import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
@@ -108,6 +109,23 @@ export async function POST(request: Request) {
       name: buyerName,
       email: buyerEmail,
       timestamp: new Date(now),
+    });
+
+    await recordDashboardNotification({
+      eventType: 'payment_confirmed',
+      source: 'payfast-itn',
+      title: `New payment - ${service.title}`,
+      description: `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. Watch for the intake form.`,
+      contactName: buyerName || null,
+      contactEmail: buyerEmail || null,
+      href: buyerEmail ? `mailto:${buyerEmail}?subject=${encodeURIComponent(`Next steps for ${service.title}`)}` : null,
+      metadata: {
+        paymentId,
+        serviceSlug: service.slug,
+        amount,
+        status,
+        upgradeToken: upgradeToken || null,
+      },
     });
   }
 

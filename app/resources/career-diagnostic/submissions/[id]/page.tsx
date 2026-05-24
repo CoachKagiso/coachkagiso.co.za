@@ -17,6 +17,7 @@ import DashboardSidebar from '@/components/DashboardSidebar';
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import LeadProfileEmailButton from '@/components/leads/LeadProfileEmailButton';
+import LeadSourceBadge from '@/components/leads/LeadSourceBadge';
 import PrintButton from '@/components/PrintButton';
 import Reveal from '@/components/Reveal';
 import {
@@ -28,6 +29,7 @@ import {
 } from '@/lib/diagnostic-submissions';
 import { questions } from '@/lib/career-diagnostic';
 import { listNotes } from '@/lib/dashboard-task-records';
+import { getDashboardEventNotificationCount } from '@/lib/dashboard-notifications';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { getFollowUpUrgency, getSastDateKey } from '@/lib/follow-up-utils';
 
@@ -171,11 +173,13 @@ export default async function DiagnosticSubmissionSummaryPage({
   const encodedKey = encodeURIComponent(key || '');
   const leadsHref = `/resources/career-diagnostic/submissions?key=${encodedKey}&tab=leads`;
   const profileHref = `/resources/career-diagnostic/submissions/${submission.id}?key=${encodedKey}`;
-  const [allNotes, followUpNotificationCount, sidebarFollowUps] = await Promise.all([
+  const [allNotes, followUpNotificationCount, dashboardEventNotificationCount, sidebarFollowUps] = await Promise.all([
     listNotes(),
     getFollowUpNotificationCount(),
+    getDashboardEventNotificationCount(),
     listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
   ]);
+  const dashboardNotificationCount = followUpNotificationCount + dashboardEventNotificationCount;
   const leadNotes = allNotes.filter((note) => note.linkedLeadId === submission.id);
   const followUpUrgency = submission.next_follow_up_at ? getFollowUpUrgency(submission.next_follow_up_at) : null;
   const dashboardTimeLabel = formatDashboardTime(new Date());
@@ -188,6 +192,8 @@ export default async function DiagnosticSubmissionSummaryPage({
     leadStatus: submission.lead_status,
     followUpCount: submission.follow_up_count,
     lastContactedAt: submission.last_contacted_at,
+    source: submission.source,
+    downloadLink: submission.download_link,
   };
 
   return (
@@ -207,7 +213,7 @@ export default async function DiagnosticSubmissionSummaryPage({
               adminKey={key || ''}
               query=""
               updatedTimeLabel={dashboardTimeLabel}
-              notificationCount={followUpNotificationCount}
+              notificationCount={dashboardNotificationCount}
               showSearch={false}
             />
 
@@ -281,6 +287,7 @@ export default async function DiagnosticSubmissionSummaryPage({
                     <span className={`rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] ${getStatusClass(submission.lead_status)}`}>
                       {getStatusLabel(submission.lead_status)}
                     </span>
+                    <LeadSourceBadge source={submission.source} className="px-4 py-2 text-[11px] tracking-[0.17em]" />
                     <span className="rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334]/68">
                       Submitted {formatDate(submission.submitted_at)}
                     </span>

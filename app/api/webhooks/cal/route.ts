@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
+import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -172,6 +173,19 @@ export async function POST(request: Request) {
       payload,
       error: 'Cal booking received for unmatched email; no diagnostic_submissions record found',
     });
+    await recordDashboardNotification({
+      eventType: 'cal_booking',
+      source: 'cal-webhook',
+      title: `New Cal.com booking - ${serviceLabel}`,
+      description: `A Cal.com booking came in for ${bookerEmail}, but no matching diagnostic lead was found.`,
+      contactEmail: bookerEmail,
+      href: `mailto:${bookerEmail}?subject=${encodeURIComponent(serviceLabel)}`,
+      metadata: {
+        bookingUid,
+        eventSlug,
+        matched: false,
+      },
+    });
     console.warn('Cal booking received for unmatched email', { bookingUid, eventSlug, email: bookerEmail });
     return NextResponse.json({ received: true });
   }
@@ -198,6 +212,21 @@ export async function POST(request: Request) {
       payload,
       error: `Status update failed: ${updateError.message}`,
     });
+    await recordDashboardNotification({
+      eventType: 'cal_booking',
+      source: 'cal-webhook',
+      title: `Cal.com booking needs review - ${serviceLabel}`,
+      description: `A booking came in for ${bookerEmail}, but the matched lead could not be updated automatically.`,
+      contactEmail: bookerEmail,
+      href: `mailto:${bookerEmail}?subject=${encodeURIComponent(serviceLabel)}`,
+      metadata: {
+        bookingUid,
+        eventSlug,
+        matched: true,
+        leadId: lead.id,
+        error: updateError.message,
+      },
+    });
     console.error('Cal webhook: failed to update matched lead', { bookingUid, eventSlug, leadId: lead.id });
     return NextResponse.json({ received: true });
   }
@@ -211,6 +240,21 @@ export async function POST(request: Request) {
     lead_id: lead.id,
     payload,
     error: null,
+  });
+
+  await recordDashboardNotification({
+    eventType: 'cal_booking',
+    source: 'cal-webhook',
+    title: `New Cal.com booking - ${serviceLabel}`,
+    description: `${bookerEmail} booked ${serviceLabel}. The matched diagnostic lead was moved to discovery booked.`,
+    contactEmail: bookerEmail,
+    href: `mailto:${bookerEmail}?subject=${encodeURIComponent(serviceLabel)}`,
+    metadata: {
+      bookingUid,
+      eventSlug,
+      matched: true,
+      leadId: lead.id,
+    },
   });
 
   console.log('Cal booking matched to diagnostic lead', {

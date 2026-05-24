@@ -40,8 +40,12 @@ import DashboardDatePicker from '@/components/DashboardDatePicker';
 import DashboardTopBar from '@/components/dashboard/DashboardTopBar';
 import FinanceTab from '@/components/finance/FinanceTab';
 import FilterDropdown from '@/components/FilterDropdown';
+import BrevoNotificationImportButton from '@/components/leads/BrevoNotificationImportButton';
+import FunnelActivityDeleteButton from '@/components/leads/FunnelActivityDeleteButton';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import LeadListRow from '@/components/leads/LeadListRow';
+import LeadSourceBadge from '@/components/leads/LeadSourceBadge';
+import MasterclassBookingsOpenButton from '@/components/leads/MasterclassBookingsOpenButton';
 import MoveToNurtureButton from '@/components/leads/MoveToNurtureButton';
 import MessagesLog from '@/components/messages/MessagesLog';
 import TasksNotesWorkspace from '@/components/TasksNotesWorkspace';
@@ -57,6 +61,12 @@ import {
   type DiagnosticLeadStatus,
   type DiagnosticSubmission,
 } from '@/lib/diagnostic-submissions';
+import {
+  isDiagnosticLeadSource,
+  leadSourceOptions,
+  normalizeLeadSource,
+  type DiagnosticLeadSource,
+} from '@/lib/lead-sources';
 import { listClientOperations, type ClientOperation } from '@/lib/client-operations';
 import { listClientRecords } from '@/lib/clients';
 import { buildDashboardContext, listContentBacklogItems, listContentCalendarItems, listResearchEntries } from '@/lib/content-studio';
@@ -66,6 +76,12 @@ import {
   mergeTasks,
 } from '@/lib/dashboard-tasks';
 import { listManualTasks, listNotes } from '@/lib/dashboard-task-records';
+import {
+  getDashboardEventNotificationCount,
+  listDashboardEventNotifications,
+  type DashboardEventNotification,
+  type DashboardNotificationEventType,
+} from '@/lib/dashboard-notifications';
 import { getDiagnosticAdminKey } from '@/lib/env';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { buildAssistantDashboardContext } from '@/lib/growth-os-assistant';
@@ -101,6 +117,7 @@ type DiagnosticSubmissionsPageProps = {
     archetype?: string;
     status?: string;
     service?: string;
+    source?: string;
     followUp?: string;
     q?: string;
     from?: string;
@@ -124,6 +141,13 @@ const archetypeLabels = {
 const revenueStatuses: DiagnosticLeadStatus[] = ['discovery_booked', 'paid'];
 const inactiveLeadStatuses: DiagnosticLeadStatus[] = ['paid', 'archived', 'not_a_fit', 'nurture', 'closed'];
 const dashboardTimeZone = 'Africa/Johannesburg';
+const funnelActivityLabels: Record<DashboardNotificationEventType, string> = {
+  lead_magnet_download: 'Lead magnet',
+  masterclass_reservation: 'Masterclass',
+  payment_confirmed: 'Payment',
+  intake_submitted: 'Intake',
+  cal_booking: 'Cal.com',
+};
 const contentSignalByArchetype = {
   A: 'career plateau frustration',
   B: 'quiet career pivoting',
@@ -301,6 +325,16 @@ function daysSince(value?: string | null, now = new Date()) {
 
 function getFollowUpSequenceLabel(submission: DiagnosticSubmission) {
   const followUpCount = submission.follow_up_count ?? 0;
+  const source = normalizeLeadSource(submission.source);
+  if (source === 'first_90_days') {
+    if (followUpCount <= 0) return 'First 90 Days follow-up (Day 4)';
+    return 'First 90 Days newsletter bridge (Day 10)';
+  }
+  if (source === 'linkedin_headline') {
+    if (followUpCount <= 0) return 'LinkedIn headline follow-up (Day 4)';
+    return 'LinkedIn newsletter bridge (Day 10)';
+  }
+  if (source === 'masterclass_waitlist') return 'Bookings-open email (manual)';
   if (followUpCount <= 0) return 'Follow-up 1 (Day 4)';
   if (followUpCount === 1) return 'Follow-up 2 (Day 10)';
   return 'Newsletter bridge (Day 17)';
@@ -414,18 +448,153 @@ function getPriorityScore(submission: DiagnosticSubmission) {
 }
 
 function getNextAction(submission: DiagnosticSubmission) {
+  const source = normalizeLeadSource(submission.source);
   if (submission.lead_status === 'paid') return 'Confirm delivery and intake';
   if (submission.lead_status === 'discovery_booked') return 'Prep for the discovery call';
   if (submission.next_follow_up_at && new Date(submission.next_follow_up_at).getTime() <= Date.now()) {
+    if (source === 'first_90_days') return (submission.follow_up_count ?? 0) >= 1 ? 'Send newsletter bridge' : 'Follow up on checklist';
+    if (source === 'linkedin_headline') return (submission.follow_up_count ?? 0) >= 1 ? 'Send newsletter bridge' : 'Follow up on headline';
+    if (source === 'masterclass_waitlist') return 'Send bookings-open email when ready';
     return (submission.follow_up_count ?? 0) >= 2 ? 'Send newsletter bridge' : 'Follow up today';
   }
-  if (submission.lead_status === 'new') return 'Send first result follow-up';
+  if (source === 'masterclass_waitlist' && submission.lead_status === 'contacted' && (submission.follow_up_count ?? 0) === 0) {
+    return 'Waiting for bookings to open';
+  }
+  if (submission.lead_status === 'new') {
+    if (source === 'first_90_days') return 'Send checklist email';
+    if (source === 'linkedin_headline') return 'Send headline builder email';
+    if (source === 'masterclass_waitlist') return 'Send waitlist confirmation';
+    return 'Send first result follow-up';
+  }
   if (submission.lead_status === 'contacted') return 'Waiting for their reply';
   if (submission.lead_status === 'follow_up_later') return 'Wait for scheduled follow-up';
   if (submission.lead_status === 'nurture') return 'Keep in nurture';
   if (submission.lead_status === 'closed') return 'Closed';
   if (submission.lead_status === 'not_a_fit') return 'Keep archived unless they re-engage';
   return 'Check whether they need another nudge';
+}
+
+function getFunnelActivityBadgeClass(eventType: DashboardNotificationEventType) {
+  if (eventType === 'payment_confirmed' || eventType === 'intake_submitted') {
+    return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
+  }
+  if (eventType === 'cal_booking') return 'border-[#8AA6C8] bg-[#EEF4FA] text-[#284B70]';
+  if (eventType === 'masterclass_reservation') return 'border-[#DDD6FE] bg-[#F3E8FF] text-[#7C3AED]';
+  return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
+}
+
+function getFunnelActivityAction(activity: DashboardEventNotification) {
+  if (activity.eventType === 'lead_magnet_download') return 'Start nurture';
+  if (activity.eventType === 'masterclass_reservation') return 'Send booking link';
+  if (activity.eventType === 'payment_confirmed') return 'Watch intake';
+  if (activity.eventType === 'intake_submitted') return 'Start delivery';
+  if (activity.eventType === 'cal_booking') return 'Prep booking';
+  return 'Review activity';
+}
+
+function getFunnelActivityPriority(activity: DashboardEventNotification) {
+  const baseScore: Record<DashboardNotificationEventType, number> = {
+    lead_magnet_download: 62,
+    masterclass_reservation: 82,
+    payment_confirmed: 92,
+    intake_submitted: 94,
+    cal_booking: 88,
+  };
+  const unreadBoost = activity.status === 'unread' ? 8 : 0;
+  const agePenalty = Math.min(20, daysSince(activity.createdAt) * 3);
+  return Math.max(30, Math.min(100, baseScore[activity.eventType] + unreadBoost - agePenalty));
+}
+
+function getFunnelActivityContact(activity: DashboardEventNotification) {
+  return activity.contactName || activity.contactEmail || activity.title;
+}
+
+function getFunnelActivityDetail(activity: DashboardEventNotification) {
+  const label = funnelActivityLabels[activity.eventType] || 'Funnel activity';
+  const description = activity.description || activity.title;
+  return `${label} - ${description}`;
+}
+
+function getFunnelActivityHref(activity: DashboardEventNotification) {
+  if (activity.href) return activity.href;
+  if (activity.contactEmail) return `mailto:${activity.contactEmail}?subject=${encodeURIComponent(activity.title)}`;
+  return '';
+}
+
+function buildFunnelActivityRecordHref(id: string, key: string, returnTo: string) {
+  const params = new URLSearchParams();
+  if (key) params.set('key', key);
+  if (returnTo) params.set('returnTo', returnTo);
+  return `/resources/career-diagnostic/submissions/funnel/${id}?${params.toString()}`;
+}
+
+function getDateBoundaryTimestamp(value: string | null | undefined, boundary: 'start' | 'end') {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+
+  const date = new Date(`${value}T00:00:00+02:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (boundary === 'end') date.setHours(23, 59, 59, 999);
+  return date.getTime();
+}
+
+function getRecentFunnelActivityCount(activities: DashboardEventNotification[]) {
+  const now = Date.now();
+  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+  return activities.filter((activity) => new Date(activity.createdAt).getTime() >= weekAgo).length;
+}
+
+function filterFunnelActivities(
+  activities: DashboardEventNotification[],
+  filters: { query?: string | null; from?: string | null; to?: string | null }
+) {
+  const queryText = filters.query?.trim().toLowerCase() || '';
+  const fromTimestamp = getDateBoundaryTimestamp(filters.from, 'start');
+  const toTimestamp = getDateBoundaryTimestamp(filters.to, 'end');
+
+  return activities
+    .filter((activity) => activity.status !== 'archived')
+    .filter((activity) => {
+      const createdAt = new Date(activity.createdAt).getTime();
+      if (fromTimestamp && createdAt < fromTimestamp) return false;
+      if (toTimestamp && createdAt > toTimestamp) return false;
+      if (!queryText) return true;
+
+      const searchable = [
+        activity.title,
+        activity.description,
+        activity.contactName,
+        activity.contactEmail,
+        activity.source,
+        funnelActivityLabels[activity.eventType],
+        JSON.stringify(activity.metadata || {}),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(queryText);
+    })
+    .sort(
+      (a, b) =>
+        Number(b.status === 'unread') - Number(a.status === 'unread') ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+}
+
+function getFunnelActivityLeadSource(activity: DashboardEventNotification): DiagnosticLeadSource | null {
+  if (activity.eventType === 'masterclass_reservation') return 'masterclass_waitlist';
+  if (activity.eventType !== 'lead_magnet_download') return null;
+
+  const searchable = [activity.source, activity.title, activity.description, JSON.stringify(activity.metadata || {})]
+    .join(' ')
+    .toLowerCase();
+  if (searchable.includes('linkedin')) return 'linkedin_headline';
+  if (searchable.includes('90') || searchable.includes('manager')) return 'first_90_days';
+  return null;
+}
+
+function getLeadActivityKey(email: string | null | undefined, source: DiagnosticLeadSource | null) {
+  if (!email || !source) return '';
+  return `${email.toLowerCase()}::${source}`;
 }
 
 function isFollowUpDue(submission: DiagnosticSubmission, referenceDate: Date) {
@@ -466,6 +635,7 @@ function buildFilterHref(
     archetype?: string;
     status?: string;
     service?: string;
+    source?: string;
     followUp?: string;
     q?: string;
     taskView?: string;
@@ -506,7 +676,229 @@ function buildLeadEmailModalLead(submission: DiagnosticSubmission) {
     leadStatus: submission.lead_status,
     followUpCount: submission.follow_up_count,
     lastContactedAt: submission.last_contacted_at,
+    source: submission.source,
+    downloadLink: submission.download_link,
   };
+}
+
+function FunnelActivityRows({
+  activities,
+  adminKey,
+  returnHref,
+}: {
+  activities: DashboardEventNotification[];
+  adminKey: string;
+  returnHref: string;
+}) {
+  if (activities.length === 0) {
+    return (
+      <div className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-6 text-[14px] leading-relaxed text-[#142334]/62">
+        No masterclass reservations, lead magnet downloads, payments, or bookings match this view yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA]">
+      <div className="hidden border-b border-[#D8C8BB] bg-[#F7F1EC] px-6 py-4 lg:grid lg:grid-cols-[1.25fr_0.78fr_0.72fr_0.5fr_0.72fr_auto] lg:gap-5">
+        {['Lead', 'Source', 'Status', 'Signal', 'Received', 'Actions'].map((label) => (
+          <p key={label} className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+            {label}
+          </p>
+        ))}
+      </div>
+      <div className="divide-y divide-[#D8C8BB]">
+        {activities.map((activity) => {
+          const href = getFunnelActivityHref(activity);
+          const priority = getFunnelActivityPriority(activity);
+          const recordHref = buildFunnelActivityRecordHref(activity.id, adminKey, returnHref);
+          const contactLabel = getFunnelActivityContact(activity);
+
+          return (
+            <div key={activity.id} className="grid gap-4 px-4 py-4 lg:grid-cols-[1.25fr_0.78fr_0.72fr_0.5fr_0.72fr_auto] lg:items-center">
+              <div className="min-w-0">
+                <p className="truncate font-serif text-[29px] leading-none text-[#142334]">
+                  {getFunnelActivityContact(activity)}
+                </p>
+                {activity.contactEmail && (
+                  <a
+                    href={`mailto:${activity.contactEmail}`}
+                    className="mt-2 flex min-w-0 items-center gap-2 text-[14px] leading-relaxed text-[#142334]/72 transition hover:text-[#C9AD98]"
+                  >
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{activity.contactEmail}</span>
+                  </a>
+                )}
+              </div>
+              <div>
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getFunnelActivityBadgeClass(activity.eventType)}`}>
+                  {funnelActivityLabels[activity.eventType]}
+                </span>
+                <p className="mt-2 text-[15px] leading-relaxed text-[#142334]">
+                  {activity.source.replace(/-/g, ' ')}
+                </p>
+              </div>
+              <div>
+                <span className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.17em] ${
+                  activity.status === 'unread'
+                    ? 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]'
+                    : 'border-[#D8C8BB] bg-white text-[#142334]/62'
+                }`}>
+                  {activity.status === 'unread' ? 'New' : 'Reviewed'}
+                </span>
+                <p className="mt-3 text-[12px] text-[#142334]/58">Captured {formatDate(activity.createdAt)}</p>
+              </div>
+              <div>
+                <p className="font-serif text-[30px] leading-none text-[#142334]">{priority}</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
+                  <div className="h-full bg-[#C9AD98]" style={{ width: `${priority}%` }} />
+                </div>
+              </div>
+              <div>
+                <p className="text-[14px] leading-relaxed text-[#142334]/72">{formatShortDate(activity.createdAt)}</p>
+                <p className="mt-1 line-clamp-2 text-[12px] text-[#142334]/58">{activity.description || activity.title}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={recordHref}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                >
+                  View <ArrowUpRight className="h-4 w-4" />
+                </Link>
+                {href ? (
+                  <a
+                    href={href}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                  >
+                    Email <Mail className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334]/50">
+                    No email
+                  </span>
+                )}
+                <FunnelActivityDeleteButton
+                  adminKey={adminKey}
+                  notificationId={activity.id}
+                  contactLabel={contactLabel}
+                  returnHref={returnHref}
+                  compact
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FunnelPipelinePanel({
+  activities,
+  adminKey,
+  returnHref,
+}: {
+  activities: DashboardEventNotification[];
+  adminKey: string;
+  returnHref: string;
+}) {
+  return (
+    <div className="mb-5 overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA]">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D8C8BB] px-6 py-5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+            Funnel activity
+          </p>
+          <h2 className="mt-2 font-serif text-[36px] leading-tight">New non-diagnostic leads</h2>
+          <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/62">
+            Masterclass reservations, lead magnet downloads, payments, intake briefs, and bookings sit here so they do not disappear from the pipeline.
+          </p>
+        </div>
+        <BrevoNotificationImportButton adminKey={adminKey} compact />
+      </div>
+      {activities.length === 0 ? (
+        <div className="p-6 text-[15px] leading-relaxed text-[#142334]/70">
+          No funnel activity matches this view yet.
+        </div>
+      ) : (
+        <div className="divide-y divide-[#D8C8BB]">
+          {activities.map((activity) => {
+            const href = getFunnelActivityHref(activity);
+            const priority = getFunnelActivityPriority(activity);
+            const recordHref = buildFunnelActivityRecordHref(activity.id, adminKey, returnHref);
+            const contactLabel = getFunnelActivityContact(activity);
+
+            return (
+              <div key={activity.id} className="grid gap-5 px-6 py-5 lg:grid-cols-[1fr_0.46fr_auto] lg:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="font-serif text-[29px] leading-none text-[#142334]">
+                      {getFunnelActivityContact(activity)}
+                    </p>
+                    <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.17em] ${getFunnelActivityBadgeClass(activity.eventType)}`}>
+                      {funnelActivityLabels[activity.eventType]}
+                    </span>
+                    {activity.status === 'unread' && (
+                      <span className="rounded-full bg-[#142334] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.17em] text-white">
+                        New
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-[14px] leading-relaxed text-[#142334]/68">
+                    {getFunnelActivityDetail(activity)}
+                  </p>
+                  <p className="mt-2 text-[13px] font-semibold uppercase tracking-[0.17em] text-[#C9AD98]">
+                    {getFunnelActivityAction(activity)}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A09086]">
+                      Signal
+                    </p>
+                    <p className="font-serif text-[26px] leading-none text-[#142334]">{priority}</p>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F1E7DF]">
+                    <div className="h-full bg-[#C9AD98]" style={{ width: `${priority}%` }} />
+                  </div>
+                  <p className="mt-3 text-[12px] text-[#142334]/58">
+                    Captured: {formatShortDate(activity.createdAt)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Link
+                    href={recordHref}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                  >
+                    View
+                  </Link>
+                  {href ? (
+                    <a
+                      href={href}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
+                    >
+                      Email
+                    </a>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334]/50">
+                      No email
+                    </span>
+                  )}
+                  <FunnelActivityDeleteButton
+                    adminKey={adminKey}
+                    notificationId={activity.id}
+                    contactLabel={contactLabel}
+                    returnHref={returnHref}
+                    compact
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 async function loadSettingsBundle(): Promise<{ settings: SettingsMap; emailTemplates: StoredEmailTemplate[] }> {
@@ -604,6 +996,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     archetype,
     status,
     service,
+    source,
     followUp,
     q,
     from,
@@ -620,6 +1013,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
   const selectedFilter = isDiagnosticArchetypeKey(archetype) ? archetype : 'all';
   const selectedStatus = isDiagnosticLeadStatus(status) ? status : 'all';
+  const selectedSource = isDiagnosticLeadSource(source) ? source : 'all';
   const selectedFollowUp = ['due', 'scheduled', 'none'].includes(followUp || '') ? followUp : 'all';
   const activeTab = isDashboardTab(tab) ? tab : 'dashboard';
   const activeStudioWorkspace = isStudioWorkspace(studio) ? studio : 'content';
@@ -640,6 +1034,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     contentBacklogItems,
     researchItems,
     followUpNotificationCount,
+    dashboardEventNotificationCount,
+    dashboardEventNotifications,
     sidebarFollowUps,
     settingsBundle,
     profilePhotoUrl,
@@ -648,6 +1044,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
       archetype,
       status,
       service,
+      source: selectedSource === 'all' ? null : selectedSource,
       followUp,
       query: q,
       from,
@@ -670,24 +1067,56 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     listContentBacklogItems(),
     activeTab === 'content' ? listResearchEntries() : Promise.resolve([]),
     getFollowUpNotificationCount(),
+    getDashboardEventNotificationCount(),
+    listDashboardEventNotifications({ limit: 120, status: 'all' }),
     listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
     activeTab === 'settings' ? loadSettingsBundle() : Promise.resolve(null),
     loadDashboardProfilePhoto(),
   ]);
-  const uniqueEmails = new Set(submissions.map((submission) => submission.email)).size;
+  const dashboardNotificationCount = followUpNotificationCount + dashboardEventNotificationCount;
   const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
     selectedFilter === 'all' ? '' : `&archetype=${selectedFilter}`
-  }`;
+  }${selectedSource === 'all' ? '' : `&source=${selectedSource}`}`;
   const currentFilters = {
     tab: activeTab,
     archetype: selectedFilter,
     status: selectedStatus,
     service,
+    source: selectedSource,
     followUp: selectedFollowUp,
     q,
     from,
     to,
   };
+  const sourceLeadActivityKeys = new Set(
+    submissions
+      .filter((submission) => normalizeLeadSource(submission.source) !== 'diagnostic')
+      .map((submission) => getLeadActivityKey(submission.email, normalizeLeadSource(submission.source)))
+      .filter(Boolean)
+  );
+  const funnelActivities = filterFunnelActivities(dashboardEventNotifications, { query: q, from, to }).filter((activity) => {
+    const activitySource = getFunnelActivityLeadSource(activity);
+    if (!activitySource) return true;
+    return !sourceLeadActivityKeys.has(getLeadActivityKey(activity.contactEmail, activitySource));
+  });
+  const funnelLeadActivities =
+    selectedSource === 'all'
+      ? funnelActivities
+      : funnelActivities.filter((activity) => getFunnelActivityLeadSource(activity) === selectedSource);
+  const funnelPipelineActivities = [...funnelLeadActivities]
+    .sort(
+      (a, b) =>
+        getFunnelActivityPriority(b) - getFunnelActivityPriority(a) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    .slice(0, 8);
+  const leadsReturnHref = buildFilterHref(key, currentFilters, { tab: 'leads' });
+  const pipelineReturnHref = buildFilterHref(key, currentFilters, { tab: 'pipeline' });
+  const totalLeadRecordCount = submissions.length + funnelLeadActivities.length;
+  const uniqueFunnelEmails = funnelLeadActivities
+    .map((activity) => activity.contactEmail)
+    .filter((email): email is string => Boolean(email));
+  const combinedUniqueEmails = new Set([...submissions.map((submission) => submission.email), ...uniqueFunnelEmails]).size;
   const sortedSubmissions = [...submissions].sort(
     (a, b) => getLeadStatusSortRank(a.lead_status) - getLeadStatusSortRank(b.lead_status) || getPriorityScore(b) - getPriorityScore(a)
   );
@@ -704,6 +1133,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     ...statusOption,
     count: submissions.filter((submission) => submission.lead_status === statusOption.value).length,
   }));
+  const masterclassWaitlistCount = submissions.filter((submission) => submission.source === 'masterclass_waitlist').length;
+  const masterclassBookingsOpenEligibleCount = submissions.filter(
+    (submission) =>
+      submission.source === 'masterclass_waitlist' &&
+      submission.lead_status === 'contacted' &&
+      (submission.follow_up_count ?? 0) === 0
+  ).length;
   const conversionReady = submissions.filter((submission) => revenueStatuses.includes(submission.lead_status)).length;
   const confirmedOperations = operations.filter((operation) => operation.payment.status === 'confirmed');
   const totalRevenue = confirmedOperations.reduce((total, operation) => total + operation.payment.amount, 0);
@@ -775,6 +1211,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
   const bookedLeadCount = submissions.filter((submission) => submission.lead_status === 'discovery_booked').length;
   const followUpLaterCount = submissions.filter((submission) => submission.lead_status === 'follow_up_later').length;
   const pipelineStageCards = [
+    ['Funnel', funnelLeadActivities.length, 'Downloads and reservations'],
     ['Lead magnet', newLeadCount, 'New diagnostic signups'],
     ['Contacted', contactedLeadCount, 'First reply sent'],
     ['Call booked', bookedLeadCount, 'Discovery scheduled'],
@@ -975,7 +1412,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 adminKey={key || ''}
                 query={q}
                 updatedTimeLabel={dashboardTimeLabel}
-                notificationCount={followUpNotificationCount}
+                notificationCount={dashboardNotificationCount}
                 showSearch={activeTab !== 'leads' && activeTab !== 'pipeline' && activeTab !== 'career-tools'}
                 profilePhotoUrl={profilePhotoUrl}
               />
@@ -1390,7 +1827,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
             {(activeTab === 'leads' || activeTab === 'pipeline') && (
             <section className="rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] p-3">
-              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[1.4fr_0.8fr_0.8fr_0.78fr_0.7fr_0.7fr_auto]">
+              <form action="/resources/career-diagnostic/submissions" method="get" className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr_0.78fr_0.7fr_0.7fr_auto]">
                 <input type="hidden" name="key" value={key || ''} />
                 <input type="hidden" name="tab" value={activeTab} />
                 <label className="relative block md:col-span-2 xl:col-span-2 2xl:col-span-1">
@@ -1398,7 +1835,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   <input
                     name="q"
                     defaultValue={q || ''}
-                    placeholder="Search name, email, service..."
+                    placeholder="Search name, email, service, download..."
                     className="h-11 w-full rounded-[8px] border border-[#D8C8BB] bg-white pl-11 pr-4 text-[14px] outline-none transition focus:border-[#142334]"
                   />
                 </label>
@@ -1412,6 +1849,15 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       value: option.value,
                       label: option.label,
                     })),
+                  ]}
+                />
+                <FilterDropdown
+                  name="source"
+                  value={selectedSource}
+                  ariaLabel="Filter by lead source"
+                  options={[
+                    { value: 'all', label: 'All sources' },
+                    ...leadSourceOptions,
                   ]}
                 />
                 <FilterDropdown
@@ -1453,6 +1899,14 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                   Apply
                 </button>
               </form>
+              {masterclassWaitlistCount > 0 && (
+                <div className="mt-3 border-t border-[#E4D8CB] pt-3">
+                  <MasterclassBookingsOpenButton
+                    adminKey={key || ''}
+                    eligibleCount={masterclassBookingsOpenEligibleCount}
+                  />
+                </div>
+              )}
             </section>
             )}
 
@@ -1482,11 +1936,11 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             <div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {[
-                  ['Total leads', String(submissions.length), UserRoundCheck],
-                  ['Unique emails', String(uniqueEmails), Mail],
-                  ['Last 7 days', String(getRecentCount(submissions)), CalendarClock],
+                  ['Total leads', String(totalLeadRecordCount), UserRoundCheck],
+                  ['Unique emails', String(combinedUniqueEmails), Mail],
+                  ['Last 7 days', String(getRecentCount(submissions) + getRecentFunnelActivityCount(funnelLeadActivities)), CalendarClock],
                   ['Due follow-ups', String(getDueFollowUps(submissions)), CheckCircle2],
-                  ['Top archetype', getTopArchetype(submissions), FileText],
+                  ['Funnel activity', String(funnelLeadActivities.length), FileText],
                 ].map(([label, value, Icon]) => {
                   const StatIcon = Icon as typeof UserRoundCheck;
                   return (
@@ -1505,6 +1959,30 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 })}
               </div>
             </div>
+          </div>
+        </section>
+        )}
+
+        {activeTab === 'leads' && (
+        <section id="funnel-leads">
+          <div className="w-full">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
+                  Funnel leads
+                </p>
+                <h2 className="mt-2 font-serif text-[32px] leading-tight text-[#142334]">
+                  Downloads, reservations, and bookings
+                </h2>
+              </div>
+              <div className="flex max-w-xl flex-col items-start gap-3 sm:items-end">
+                <p className="text-[13px] leading-relaxed text-[#142334]/62 sm:text-right">
+                  These are non-diagnostic contacts captured from the wider funnel. They are filtered by search and date alongside the diagnostic list.
+                </p>
+                <BrevoNotificationImportButton adminKey={key || ''} />
+              </div>
+            </div>
+            <FunnelActivityRows activities={funnelLeadActivities} adminKey={key || ''} returnHref={leadsReturnHref} />
           </div>
         </section>
         )}
@@ -1535,6 +2013,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         <section id="pipeline-status" className="pb-10">
           <div className="grid w-full gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.85fr)]">
             <div>
+              <FunnelPipelinePanel activities={funnelPipelineActivities} adminKey={key || ''} returnHref={pipelineReturnHref} />
               <div className="overflow-hidden rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA]">
                 <div className="border-b border-[#D8C8BB] px-6 py-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
@@ -1568,6 +2047,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                               <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.17em] ${getStatusClass(submission.lead_status)}`}>
                                 {getStatusLabel(submission.lead_status)}
                               </span>
+                              <LeadSourceBadge source={submission.source} />
                             </div>
                             <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/68">
                               {submission.archetype_name} to {submission.archetype_payload?.service || 'No service recommendation'}
@@ -1676,6 +2156,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                             <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${getStatusClass(submission.lead_status)}`}>
                               {getStatusLabel(submission.lead_status)}
                             </span>
+                            <LeadSourceBadge source={submission.source} className="shrink-0" />
                           </div>
                           <p className="text-[12px] text-[#142334]/58">
                             Next follow-up: {formatShortDate(submission.next_follow_up_at)}
@@ -1723,13 +2204,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             calendarItems={contentCalendarItems}
             backlogItems={contentBacklogItems}
             researchItems={researchItems}
-            followUpNotificationCount={followUpNotificationCount}
+            dashboardNotificationCount={dashboardNotificationCount}
             profilePhotoUrl={profilePhotoUrl}
           />
         )}
 
         {activeTab === 'calendar' && (
-          <CustomCalendarDashboard adminKey={key || ''} leads={submissions} followUpNotificationCount={followUpNotificationCount} profilePhotoUrl={profilePhotoUrl} />
+          <CustomCalendarDashboard adminKey={key || ''} leads={submissions} dashboardNotificationCount={dashboardNotificationCount} profilePhotoUrl={profilePhotoUrl} />
         )}
 
         {activeTab === 'messages' && (

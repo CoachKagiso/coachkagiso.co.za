@@ -7,6 +7,25 @@ type SendEmailInput = {
   html?: string;
 };
 
+export type BrevoTransactionalEmail = {
+  date?: string;
+  email?: string;
+  messageId?: string;
+  subject?: string;
+  uuid?: string;
+  templateId?: number;
+};
+
+export type BrevoTransactionalEmailContent = {
+  date?: string;
+  email?: string;
+  events?: { name?: string; time?: string }[];
+  subject?: string;
+  attachmentCount?: number;
+  body?: string;
+  templateId?: number;
+};
+
 async function brevoFetch(path: string, init: RequestInit) {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
@@ -44,6 +63,52 @@ export async function sendTransactionalEmail({ to, subject, text, html }: SendEm
       htmlContent: html,
     }),
   });
+}
+
+export async function listBrevoTransactionalEmails({
+  email,
+  startDate,
+  endDate,
+  limit = 500,
+  offset = 0,
+  sort = 'desc',
+}: {
+  email: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+  offset?: number;
+  sort?: 'asc' | 'desc';
+}) {
+  const params = new URLSearchParams({
+    email,
+    startDate,
+    endDate,
+    limit: String(limit),
+    offset: String(offset),
+    sort,
+  });
+
+  const response = await brevoFetch(`/smtp/emails?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  if (!response || !response.ok) return null;
+
+  return (await response.json()) as {
+    count?: number;
+    transactionalEmails?: BrevoTransactionalEmail[];
+  };
+}
+
+export async function getBrevoTransactionalEmailContent(uuid: string) {
+  const response = await brevoFetch(`/smtp/emails/${encodeURIComponent(uuid)}`, {
+    method: 'GET',
+  });
+
+  if (!response || !response.ok) return null;
+
+  return (await response.json()) as BrevoTransactionalEmailContent;
 }
 
 export async function addClientToBrevoList(email: string, fullName: string) {

@@ -11,14 +11,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get('key') || request.headers.get('x-diagnostic-admin-key');
   const archetype = searchParams.get('archetype');
+  const source = searchParams.get('source');
 
   if (!isDiagnosticAdminAuthorized(key)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const submissions = await listDiagnosticSubmissions(archetype);
+  const submissions = await listDiagnosticSubmissions({ archetype, source });
   const csv = buildDiagnosticCsv(submissions);
-  const suffix = archetype ? `-${archetype.toLowerCase()}` : '';
+  const suffix = `${archetype ? `-${archetype.toLowerCase()}` : ''}${source ? `-${source}` : ''}`;
 
   return new NextResponse(csv, {
     status: 200,

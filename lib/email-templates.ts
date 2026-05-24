@@ -1,3 +1,9 @@
+import {
+  isLeadMagnetSource,
+  isMasterclassWaitlistSource,
+  type DiagnosticLeadSource,
+} from '@/lib/lead-sources';
+
 const publicSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://coachkagiso.co.za').replace(/\/$/, '');
 
 export type BaseEmailTemplateId =
@@ -12,7 +18,31 @@ export type FollowUpEmailTemplateId =
   | `${BaseEmailTemplateId}_follow_up_2`
   | `${BaseEmailTemplateId}_newsletter_bridge`;
 
-export type EmailTemplateId = BaseEmailTemplateId | FollowUpEmailTemplateId;
+export type LeadMagnetEmailTemplateId =
+  | 'first_90_days_first_contact'
+  | 'first_90_days_follow_up_1'
+  | 'first_90_days_newsletter_bridge'
+  | 'linkedin_headline_first_contact'
+  | 'linkedin_headline_follow_up_1'
+  | 'linkedin_headline_newsletter_bridge';
+
+export type MasterclassWaitlistEmailTemplateId =
+  | 'masterclass_waitlist_confirmation'
+  | 'masterclass_waitlist_bookings_open';
+
+export type EmailTemplateId =
+  | BaseEmailTemplateId
+  | FollowUpEmailTemplateId
+  | LeadMagnetEmailTemplateId
+  | MasterclassWaitlistEmailTemplateId;
+
+export type EmailTemplateStageLabel =
+  | 'First contact'
+  | 'Follow-up 1'
+  | 'Follow-up 2'
+  | 'Newsletter bridge'
+  | 'Waitlist confirmation'
+  | 'Bookings open';
 
 export type EmailTemplate = {
   id: EmailTemplateId;
@@ -21,9 +51,12 @@ export type EmailTemplate = {
   body: string;
   recommendedService: string;
   bookingKey: string;
+  downloadKey?: string;
+  source?: DiagnosticLeadSource;
+  manualOnly?: boolean;
   variant: 1 | 2 | 3 | 4;
   sequenceIndex: 1 | 2 | 3 | 4;
-  stageLabel: 'First contact' | 'Follow-up 1' | 'Follow-up 2' | 'Newsletter bridge';
+  stageLabel: EmailTemplateStageLabel;
 };
 
 export const bookingLinks: Record<string, string> = {
@@ -33,6 +66,11 @@ export const bookingLinks: Record<string, string> = {
   'Career Clarity Session': process.env.NEXT_PUBLIC_CAL_CLARITY_URL ?? `${publicSiteUrl}/book/clarity`,
   'CV Revamp': `${publicSiteUrl}/buy/cv-revamp`,
   'LinkedIn Optimisation': `${publicSiteUrl}/buy/linkedin`,
+};
+
+export const downloadLinks: Record<string, string> = {
+  'First 90 Days Checklist': `${publicSiteUrl}/api/lead-magnets/first-90-days-checklist/pdf`,
+  'SA LinkedIn Headline Builder': `${publicSiteUrl}/api/lead-magnets/linkedin-headline-builder/pdf`,
 };
 
 export const EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -576,6 +614,243 @@ If you ever want to talk, reply to any email. I'll make time.
 Kagiso
 hello@coachkagiso.co.za`,
   },
+
+  // ============================================================================
+  // FIRST 90 DAYS CHECKLIST
+  // ============================================================================
+  {
+    id: 'first_90_days_first_contact',
+    archetypeName: 'First 90 Days Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'First 90 Days Checklist',
+    source: 'first_90_days',
+    variant: 1,
+    sequenceIndex: 1,
+    stageLabel: 'First contact',
+    subject: 'Your First 90 Days checklist, {{firstName}}',
+    body: `Hi {{firstName}},
+
+Here is your First 90 Days checklist:
+
+[DOWNLOAD LINK]
+
+Do not try to do all of it at once. Use it as a working document. Start with the part that matches where you are right now.
+
+If you are in week one, focus on listening, context, and expectations.
+If you are in month one, focus on patterns, quick wins, and trust.
+If you are already further in, use it to check what you may have skipped.
+
+The first 90 days are not about proving everything immediately. They are about building enough clarity that people know how to trust your judgment.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'first_90_days_follow_up_1',
+    archetypeName: 'First 90 Days Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'First 90 Days Checklist',
+    source: 'first_90_days',
+    variant: 2,
+    sequenceIndex: 2,
+    stageLabel: 'Follow-up 1',
+    subject: 'The part nobody warns you about, {{firstName}}',
+    body: `Hi {{firstName}},
+
+I sent you the First 90 Days checklist a few days ago.
+
+The part nobody warns you about is that the work is not only technical. It is emotional too.
+
+You are learning the role, the team, the politics, the expectations, and the unspoken rules, while also trying to look capable.
+
+That pressure can make people overperform in the wrong places.
+
+So here is the question I want you to sit with:
+
+What are you trying to prove right now, and who are you trying to prove it to?
+
+If you want help thinking through your first 90 days with more clarity, you can book a Career Clarity Session here:
+
+[BOOKING LINK]
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'first_90_days_newsletter_bridge',
+    archetypeName: 'First 90 Days Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'First 90 Days Checklist',
+    source: 'first_90_days',
+    variant: 3,
+    sequenceIndex: 3,
+    stageLabel: 'Newsletter bridge',
+    subject: 'Last one from me for now, {{firstName}}',
+    body: `Hi {{firstName}},
+
+This is the last direct email I will send about the First 90 Days checklist for now.
+
+If you have used even one part of it, good. That is enough to start.
+
+I am going to move you into my wider career newsletter, where I share reflections on visibility, career transitions, leadership, and personal branding.
+
+It is not a weekly pitch. It is a place for useful thinking.
+
+If anything I send lands and you want to talk it through, you can always reply.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+
+  // ============================================================================
+  // SA LINKEDIN HEADLINE BUILDER
+  // ============================================================================
+  {
+    id: 'linkedin_headline_first_contact',
+    archetypeName: 'SA LinkedIn Headline Builder',
+    recommendedService: 'CV + LinkedIn Bundle',
+    bookingKey: 'CV + LinkedIn Bundle',
+    downloadKey: 'SA LinkedIn Headline Builder',
+    source: 'linkedin_headline',
+    variant: 1,
+    sequenceIndex: 1,
+    stageLabel: 'First contact',
+    subject: 'Your SA LinkedIn Headline Builder, {{firstName}}',
+    body: `Hi {{firstName}},
+
+Here is your SA LinkedIn Headline Builder:
+
+[DOWNLOAD LINK]
+
+Start with the formula before you look at the examples.
+
+A strong headline should make three things clear:
+
+Who you help.
+What you do.
+Why someone should keep reading.
+
+Most people only list their job title. That is why their profile feels flat.
+
+Your headline is not there to impress everyone. It is there to help the right person understand where to place you.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'linkedin_headline_follow_up_1',
+    archetypeName: 'SA LinkedIn Headline Builder',
+    recommendedService: 'CV + LinkedIn Bundle',
+    bookingKey: 'CV + LinkedIn Bundle',
+    downloadKey: 'SA LinkedIn Headline Builder',
+    source: 'linkedin_headline',
+    variant: 2,
+    sequenceIndex: 2,
+    stageLabel: 'Follow-up 1',
+    subject: 'Why your headline is costing you, {{firstName}}',
+    body: `Hi {{firstName}},
+
+I sent you the LinkedIn Headline Builder a few days ago.
+
+Here is why the headline matters more than most people think:
+
+People decide what box to put you in before they read the rest of your profile.
+
+If your headline is vague, outdated, or too internal, the rest of the profile has to work harder.
+
+That is where opportunities get missed.
+
+If you want me to help you reposition the full profile, not just the headline, the CV + LinkedIn Bundle is here:
+
+[BOOKING LINK]
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'linkedin_headline_newsletter_bridge',
+    archetypeName: 'SA LinkedIn Headline Builder',
+    recommendedService: 'CV + LinkedIn Bundle',
+    bookingKey: 'CV + LinkedIn Bundle',
+    downloadKey: 'SA LinkedIn Headline Builder',
+    source: 'linkedin_headline',
+    variant: 3,
+    sequenceIndex: 3,
+    stageLabel: 'Newsletter bridge',
+    subject: 'Moving you to the newsletter, {{firstName}}',
+    body: `Hi {{firstName}},
+
+This is the last direct email I will send about the LinkedIn Headline Builder for now.
+
+I am moving you into my wider newsletter, where I share notes on visibility, career positioning, CVs, LinkedIn, and making your work easier for the right people to understand.
+
+If you downloaded the builder because you know your profile is not representing you properly yet, keep going.
+
+Start with the headline. Then look at your About section. Then your experience bullets.
+
+Visibility is built in layers.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+
+  // ============================================================================
+  // MASTERCLASS WAITLIST
+  // ============================================================================
+  {
+    id: 'masterclass_waitlist_confirmation',
+    archetypeName: 'Masterclass Waitlist',
+    recommendedService: 'Saturday Masterclass',
+    bookingKey: 'Saturday Masterclass',
+    source: 'masterclass_waitlist',
+    variant: 1,
+    sequenceIndex: 1,
+    stageLabel: 'Waitlist confirmation',
+    subject: "You're on the list, {{firstName}}",
+    body: `Hi {{firstName}},
+
+You are on the waitlist for the Saturday Masterclass.
+
+This does not reserve a paid seat yet. It just means you will be one of the first people I email when bookings open.
+
+When the next session is confirmed, I will send the booking link, date, and payment details.
+
+For now, you do not need to do anything else.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'masterclass_waitlist_bookings_open',
+    archetypeName: 'Masterclass Waitlist',
+    recommendedService: 'Saturday Masterclass',
+    bookingKey: 'Saturday Masterclass',
+    source: 'masterclass_waitlist',
+    manualOnly: true,
+    variant: 2,
+    sequenceIndex: 2,
+    stageLabel: 'Bookings open',
+    subject: 'Bookings are open, {{firstName}}',
+    body: `Hi {{firstName}},
+
+Bookings are now open for the next Saturday Masterclass.
+
+You joined the waitlist, so I am sending this to you before I share it more widely.
+
+You can book your seat here:
+
+[BOOKING LINK]
+
+If the topic and timing work for you, book as soon as you can. Once the available spaces are gone, I will close the booking link.
+
+If it is not the right time, no stress. I will keep you on the list for future sessions unless you unsubscribe.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
 ];
 
 export const EMAIL_TEMPLATE_MAP: Record<string, BaseEmailTemplateId> = {
@@ -617,13 +892,36 @@ export function getTemplateIdForLeadStage({
   followUpCount,
   leadStatus,
   lastContactedAt,
+  source,
 }: {
   archetypeName?: string | null;
   archetypeKey?: string | null;
   followUpCount?: number | null;
   leadStatus?: string | null;
   lastContactedAt?: string | null;
+  source?: DiagnosticLeadSource | string | null;
 }): EmailTemplateId {
+  if (source === 'first_90_days') {
+    const count = Math.max(0, followUpCount ?? 0);
+    if (leadStatus === 'new' || !lastContactedAt) return 'first_90_days_first_contact';
+    if (leadStatus !== 'contacted') return 'first_90_days_first_contact';
+    if (count === 0) return 'first_90_days_follow_up_1';
+    return 'first_90_days_newsletter_bridge';
+  }
+
+  if (source === 'linkedin_headline') {
+    const count = Math.max(0, followUpCount ?? 0);
+    if (leadStatus === 'new' || !lastContactedAt) return 'linkedin_headline_first_contact';
+    if (leadStatus !== 'contacted') return 'linkedin_headline_first_contact';
+    if (count === 0) return 'linkedin_headline_follow_up_1';
+    return 'linkedin_headline_newsletter_bridge';
+  }
+
+  if (source === 'masterclass_waitlist') {
+    if (leadStatus === 'new' || !lastContactedAt) return 'masterclass_waitlist_confirmation';
+    return 'masterclass_waitlist_bookings_open';
+  }
+
   const baseTemplateId = getTemplateIdForArchetype(archetypeName, archetypeKey);
   const count = Math.max(0, followUpCount ?? 0);
 
@@ -639,9 +937,17 @@ export function getEmailTemplate(id: EmailTemplateId) {
   return EMAIL_TEMPLATES.find((template) => template.id === id) || EMAIL_TEMPLATES[0];
 }
 
+export function getEmailSequenceTotal(templateOrId: EmailTemplateId | EmailTemplate) {
+  const template = typeof templateOrId === 'string' ? getEmailTemplate(templateOrId) : templateOrId;
+  if (isMasterclassWaitlistSource(template.source)) return 2;
+  if (isLeadMagnetSource(template.source)) return 3;
+  return 4;
+}
+
 export function getEmailSequenceDots(templateId: EmailTemplateId) {
-  const sequenceIndex = getEmailTemplate(templateId).sequenceIndex;
-  return Array.from({ length: 4 }, (_, index) => (index < sequenceIndex ? '●' : '○')).join('');
+  const template = getEmailTemplate(templateId);
+  const total = getEmailSequenceTotal(template);
+  return Array.from({ length: total }, (_, index) => (index < template.sequenceIndex ? '●' : '○')).join('');
 }
 
 export function getEmailTemplateOptionLabel(template: EmailTemplate) {
@@ -660,6 +966,14 @@ export function isNewsletterBridgeTemplate(templateId?: string | null) {
   return Boolean(templateId?.endsWith('_newsletter_bridge'));
 }
 
+export function isMasterclassBookingsOpenTemplate(templateId?: string | null) {
+  return templateId === 'masterclass_waitlist_bookings_open';
+}
+
 export function getBookingLink(bookingKey: string) {
   return bookingLinks[bookingKey] || publicSiteUrl;
+}
+
+export function getDownloadLink(downloadKey: string) {
+  return downloadLinks[downloadKey] || publicSiteUrl;
 }

@@ -7,12 +7,16 @@ import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
   getEmailSequenceDots,
+  getEmailSequenceTotal,
   getEmailTemplateOptionLabel,
   getBookingLink,
+  getDownloadLink,
   getEmailTemplate,
   getTemplateIdForLeadStage,
+  isMasterclassBookingsOpenTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 function getLeadFirstName(lead?: DiagnosticSubmission) {
@@ -34,12 +38,20 @@ function getBookingUrlForLead(lead: DiagnosticSubmission | undefined, templateId
   return getBookingLink(getEmailTemplate(templateId).bookingKey);
 }
 
+function getDownloadUrlForLead(lead: DiagnosticSubmission | undefined, templateId: EmailTemplateId) {
+  if (lead?.download_link) return lead.download_link;
+  const template = getEmailTemplate(templateId);
+  return template.downloadKey ? getDownloadLink(template.downloadKey) : '';
+}
+
 function injectEmailTemplate(value: string, lead: DiagnosticSubmission | undefined, templateId: EmailTemplateId) {
   return value
     .split('{{firstName}}')
     .join(getLeadFirstName(lead))
     .split('[BOOKING LINK]')
-    .join(getBookingUrlForLead(lead, templateId));
+    .join(getBookingUrlForLead(lead, templateId))
+    .split('[DOWNLOAD LINK]')
+    .join(getDownloadUrlForLead(lead, templateId));
 }
 
 function escapeHtml(value: string) {
@@ -96,6 +108,7 @@ export function EmailTab({
         followUpCount: lead?.follow_up_count,
         leadStatus: lead?.lead_status,
         lastContactedAt: lead?.last_contacted_at,
+        source: lead?.source,
       }),
     [lead]
   );
@@ -108,6 +121,7 @@ export function EmailTab({
     EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
   );
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
+  const leadSource = normalizeLeadSource(lead?.source);
 
   useEffect(() => {
     if (!adminKey) return;
@@ -183,7 +197,10 @@ export function EmailTab({
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</p>
           <p className="mt-1 truncate text-[13px] text-[#142334]">{lead?.email || 'No email available'}</p>
           <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8C7466]">
-            Email {selectedTemplate.sequenceIndex} of 4 <span aria-hidden="true">{getEmailSequenceDots(selectedTemplateId)}</span>
+            Email {selectedTemplate.sequenceIndex} of {getEmailSequenceTotal(selectedTemplate)} <span aria-hidden="true">{getEmailSequenceDots(selectedTemplateId)}</span>
+          </p>
+          <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
+            {leadSourceLabels[leadSource]}
           </p>
         </div>
         <MailCheck className="h-4 w-4 shrink-0 text-[#C9AD98]" />
@@ -248,6 +265,11 @@ export function EmailTab({
         {selectedTemplate.sequenceIndex === 4 && (
           <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
             This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
+          </p>
+        )}
+        {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
+          <p className="rounded-[8px] bg-[#FEF3C7] px-3 py-2 text-[12px] leading-relaxed text-[#92400E]">
+            Masterclass bookings-open emails are manual only. Send this when the booking link and date are confirmed.
           </p>
         )}
       </div>
