@@ -1145,7 +1145,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     selectedSource === 'all'
       ? funnelActivities
       : funnelActivities.filter((activity) => getFunnelActivityLeadSource(activity) === selectedSource);
-  const funnelPipelineActivities = [...funnelLeadActivities]
+  const funnelPipelineActivities = funnelLeadActivities
+    .filter((activity) => activity.status === 'unread')
     .sort(
       (a, b) =>
         getFunnelActivityPriority(b) - getFunnelActivityPriority(a) ||
