@@ -47,6 +47,7 @@ import LeadListRow from '@/components/leads/LeadListRow';
 import LeadSourceBadge from '@/components/leads/LeadSourceBadge';
 import MasterclassBookingsOpenButton from '@/components/leads/MasterclassBookingsOpenButton';
 import MoveToNurtureButton from '@/components/leads/MoveToNurtureButton';
+import MessagesInboundPanel from '@/components/messages/MessagesInboundPanel';
 import MessagesLog from '@/components/messages/MessagesLog';
 import TasksNotesWorkspace from '@/components/TasksNotesWorkspace';
 import Navbar from '@/components/Navbar';
@@ -85,6 +86,7 @@ import {
 import { getDiagnosticAdminKey } from '@/lib/env';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { buildAssistantDashboardContext } from '@/lib/growth-os-assistant';
+import { listInboundEmailReplies } from '@/lib/inbound-email-replies';
 import { listSentEmails } from '@/lib/sent-emails';
 import { EMAIL_TEMPLATES } from '@/lib/email-templates';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -1082,6 +1084,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     manualTasks,
     taskNotes,
     sentEmailLog,
+    inboundEmailReplies,
     clientRecords,
     contentCalendarItems,
     contentBacklogItems,
@@ -1119,6 +1122,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           stateOptions: [],
           hasFilters: false,
         }),
+    activeTab === 'messages' ? listInboundEmailReplies({ limit: 40 }) : Promise.resolve([]),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
     listContentCalendarItems(),
     listContentBacklogItems(),
@@ -2271,29 +2275,36 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
 
         {activeTab === 'messages' && (
-          <MessagesLog
-            adminKey={key || ''}
-            emails={sentEmailLog.emails}
-            totalCount={sentEmailLog.totalCount}
-            thisWeekCount={sentEmailLog.thisWeekCount}
-            uniqueLeadCount={sentEmailLog.uniqueLeadCount}
-            importedCount={sentEmailLog.importedCount}
-            engagedCount={sentEmailLog.engagedCount}
-            segmentOptions={sentEmailLog.segmentOptions}
-            stateOptions={sentEmailLog.stateOptions}
-            hasFilters={sentEmailLog.hasFilters}
-            filters={{
-              q: q || '',
-              archetype: archetype || '',
-              source: source || '',
-              status: status || '',
-              segment: segment || '',
-              state: state || '',
-              sort: sort || '',
-              from: from || '',
-              to: to || '',
-            }}
-          />
+          <>
+            <MessagesInboundPanel
+              key={inboundEmailReplies.map((reply) => `${reply.id}:${reply.status}:${reply.draftStatus}`).join('|')}
+              adminKey={key || ''}
+              replies={inboundEmailReplies}
+            />
+            <MessagesLog
+              adminKey={key || ''}
+              emails={sentEmailLog.emails}
+              totalCount={sentEmailLog.totalCount}
+              thisWeekCount={sentEmailLog.thisWeekCount}
+              uniqueLeadCount={sentEmailLog.uniqueLeadCount}
+              importedCount={sentEmailLog.importedCount}
+              engagedCount={sentEmailLog.engagedCount}
+              segmentOptions={sentEmailLog.segmentOptions}
+              stateOptions={sentEmailLog.stateOptions}
+              hasFilters={sentEmailLog.hasFilters}
+              filters={{
+                q: q || '',
+                archetype: archetype || '',
+                source: source || '',
+                status: status || '',
+                segment: segment || '',
+                state: state || '',
+                sort: sort || '',
+                from: from || '',
+                to: to || '',
+              }}
+            />
+          </>
         )}
 
         {activeTab === 'tasks' && (
