@@ -1363,7 +1363,6 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     now: dashboardNow,
   });
   const dashboardTasks = mergeTasks(generatedTasks, manualTasks, taskNotes, submissions, operations);
-  const standaloneNotes = taskNotes.filter((note) => !note.linkedTaskId);
   const briefingNumberClass =
     'inline-flex min-w-5 items-center justify-center rounded-[5px] bg-white px-1.5 py-0.5 text-[13px] font-semibold leading-none text-[#8C7466]';
   const dashboardMetricCards = [
@@ -2279,8 +2278,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             initialTasks={dashboardTasks}
             leads={submissions}
             clientOps={operations}
-            standaloneNotes={standaloneNotes}
+            initialNotes={taskNotes}
             strongestContentSignal={strongestContentSignal}
+            topArchetype={topArchetype}
             newLeadCount={newLeadCount}
             dueFollowUpCount={dueFollowUpCount}
             paidDeliveryPressureCount={paidDeliveryPressureCount}

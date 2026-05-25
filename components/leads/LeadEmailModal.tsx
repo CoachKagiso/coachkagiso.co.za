@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FormEvent, WheelEvent } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, MailCheck, Save, Send, X } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import {
@@ -19,6 +19,7 @@ import {
   type EmailTemplateId,
 } from '@/lib/email-templates';
 import { leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
+import { buildEmailHistoryNote } from '@/lib/email-history-note';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
@@ -169,6 +170,7 @@ export default function LeadEmailModal({
   onSent,
   onNoteCreated,
 }: LeadEmailModalProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const adminKey = searchParams.get('key') || '';
   const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source, downloadLink, notificationId } = lead;
@@ -386,7 +388,27 @@ export default function LeadEmailModal({
         };
       }
 
+      const noteLeadId = submission?.id || modalLead.id;
+      if (noteLeadId) {
+        try {
+          const data = await requestJson<{ note: DashboardNote }>('/api/dashboard/notes', 'POST', {
+            key: adminKey,
+            body: buildEmailHistoryNote({
+              subject,
+              templateLabel: getEmailTemplateOptionLabel(selectedTemplate),
+              recipientEmail: modalLead.email,
+            }),
+            linkedLeadId: noteLeadId,
+          });
+          setNotes((current) => [data.note, ...current]);
+          onNoteCreated?.(data.note);
+        } catch {
+          setNoteError('Email sent, but the history note did not save.');
+        }
+      }
+
       if (submission) onSent?.(submission);
+      router.refresh();
       setSendState('sent');
       setToast(`Email sent to ${getFirstName(modalLead)}.`);
       window.setTimeout(() => {
@@ -423,6 +445,7 @@ export default function LeadEmailModal({
       });
       setNotes((current) => current.map((note) => (note.id === optimisticNote.id ? data.note : note)));
       onNoteCreated?.(data.note);
+      router.refresh();
       setNoteBody('');
     } catch {
       setNotes((current) => current.filter((note) => note.id !== optimisticNote.id));

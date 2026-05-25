@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, MailCheck, Send } from 'lucide-react';
 import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
+import { buildEmailHistoryNote } from '@/lib/email-history-note';
 import {
   EMAIL_TEMPLATES,
   getEmailSequenceDots,
@@ -90,6 +91,7 @@ export function EmailTab({
   adminKey,
   lead,
   onLeadStatusChange,
+  onAddNote,
   onToast,
   onAfterSend,
 }: {
@@ -97,6 +99,7 @@ export function EmailTab({
   adminKey: string;
   lead?: DiagnosticSubmission;
   onLeadStatusChange: (task: Task, nextStatus: TaskStatus, options?: { templateId?: EmailTemplateId }) => Promise<void>;
+  onAddNote: (task: Task, body: string) => Promise<void>;
   onToast: (message: string) => void;
   onAfterSend: () => void;
 }) {
@@ -180,6 +183,18 @@ export function EmailTab({
       });
 
       await onLeadStatusChange(task, 'waiting', { templateId: selectedTemplateId });
+      try {
+        await onAddNote(
+          task,
+          buildEmailHistoryNote({
+            subject: emailSubject,
+            templateLabel: getEmailTemplateOptionLabel(selectedTemplate),
+            recipientEmail: lead.email,
+          }),
+        );
+      } catch {
+        onToast('Email sent, but the history note did not save.');
+      }
       setSendState('sent');
       onToast(`Email sent to ${getLeadFirstName(lead)}.`);
       window.setTimeout(onAfterSend, 650);
