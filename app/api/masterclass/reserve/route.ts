@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { upsertSourceLead } from '@/lib/diagnostic-submissions';
+import { recordSentEmail } from '@/lib/sent-emails';
 import { getContactEmail, getSiteUrl } from '@/lib/env';
 
 type ReservePayload = {
@@ -77,6 +78,24 @@ export async function POST(request: Request) {
     const firstName = fullName.split(/\s+/)[0] || 'there';
     const contactEmail = getContactEmail();
     const workUrl = `${getSiteUrl()}/work-with-me#masterclass`;
+    const confirmationSubject = 'You are on the Saturday Masterclass reserve list';
+    const confirmationText = `Hi ${firstName},
+
+You are on the reserve list for the next Saturday Masterclass. The date is still being confirmed.
+
+What happens next:
+1. Coach Kagiso will confirm the next session date.
+2. You will get the booking and payment link by email when the booking window opens.
+3. You can decide then whether you want to confirm your seat.
+
+For now, no payment is needed from you.
+
+If you want to review the service details again:
+${workUrl}
+
+Talk soon,
+Coach Kagiso
+`;
 
     if (!fullName || fullName.length > 80 || !/^[\p{L}' -]+$/u.test(fullName)) {
       return NextResponse.json({ error: 'Please provide a valid full name.' }, { status: 400 });
@@ -94,7 +113,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please share what you want the masterclass to help you with.' }, { status: 400 });
     }
 
-    await Promise.all([
+    const [, , confirmationResult, sourceLead] = await Promise.all([
       addClientToBrevoList(email, fullName),
       sendTransactionalEmail({
         to: [{ email: contactEmail, name: 'Coach Kagiso' }],
@@ -127,24 +146,8 @@ ${focus}
       }),
       sendTransactionalEmail({
         to: [{ email, name: fullName }],
-        subject: 'You are on the Saturday Masterclass reserve list',
-        text: `Hi ${firstName},
-
-You are on the reserve list for the next Saturday Masterclass. The date is still being confirmed.
-
-What happens next:
-1. Coach Kagiso will confirm the next session date.
-2. You will get the booking and payment link by email when the booking window opens.
-3. You can decide then whether you want to confirm your seat.
-
-For now, no payment is needed from you.
-
-If you want to review the service details again:
-${workUrl}
-
-Talk soon,
-Coach Kagiso
-`,
+        subject: confirmationSubject,
+        text: confirmationText,
         html: emailShell(
           `You are on the Saturday Masterclass reserve list.`,
           `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">You are on the reserve list, ${escapeHtml(firstName)}.</h1>
@@ -191,6 +194,25 @@ Coach Kagiso
         },
       }),
     ]);
+
+    try {
+      await recordSentEmail({
+        leadId: sourceLead?.id || null,
+        toEmail: email,
+        toName: fullName,
+        subject: confirmationSubject,
+        body: confirmationText,
+        templateId: 'masterclass_waitlist_confirmation',
+        archetype: 'Masterclass Waitlist',
+        serviceInterest: 'Saturday Masterclass',
+        origin: 'automated',
+        externalProvider: confirmationResult?.messageId ? 'brevo' : null,
+        externalMessageId: confirmationResult?.messageId || null,
+        deliveryStatus: 'sent',
+      });
+    } catch (logError) {
+      console.error('Sent email log write failed', logError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { upsertSourceLead } from '@/lib/diagnostic-submissions';
+import { recordSentEmail } from '@/lib/sent-emails';
 import {
   LINKEDIN_HEADLINE_BUILDER_FILENAME,
   LINKEDIN_HEADLINE_BUILDER_PATH,
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
     const pdfUrl = `${siteUrl}${LINKEDIN_HEADLINE_BUILDER_PATH}`;
     const workUrl = `${siteUrl}/work-with-me`;
 
-    await Promise.all([
+    const [, deliveryResult, , sourceLead] = await Promise.all([
       addClientToBrevoList(email, firstName),
       sendTransactionalEmail({
         to: [{ email, name: firstName }],
@@ -129,6 +130,25 @@ PDF: ${pdfUrl}
         },
       }),
     ]);
+
+    try {
+      await recordSentEmail({
+        leadId: sourceLead?.id || null,
+        toEmail: email,
+        toName: firstName,
+        subject: 'Your SA LinkedIn Headline Builder PDF',
+        body: plainEmail(firstName, pdfUrl),
+        templateId: 'automated_linkedin_headline_delivery',
+        archetype: 'SA LinkedIn Headline Builder',
+        serviceInterest: 'CV + LinkedIn Bundle',
+        origin: 'automated',
+        externalProvider: deliveryResult?.messageId ? 'brevo' : null,
+        externalMessageId: deliveryResult?.messageId || null,
+        deliveryStatus: 'sent',
+      });
+    } catch (logError) {
+      console.error('Sent email log write failed', logError);
+    }
 
     return NextResponse.json({ success: true, pdfUrl });
   } catch (error) {
