@@ -51,6 +51,10 @@ async function brevoFetch(path: string, init: RequestInit) {
   return response;
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function sendTransactionalEmail({ to, subject, text, html }: SendEmailInput) {
   const senderEmail = getContactEmail();
   const response = await brevoFetch('/smtp/email', {
@@ -93,9 +97,17 @@ export async function listBrevoTransactionalEmails({
   });
   if (email) params.set('email', email);
 
-  const response = await brevoFetch(`/smtp/emails?${params.toString()}`, {
+  let response = await brevoFetch(`/smtp/emails?${params.toString()}`, {
     method: 'GET',
   });
+
+  if (response?.status === 429) {
+    const retryAfter = Number(response.headers.get('retry-after') || 1);
+    await wait(Math.max(1000, Math.min(retryAfter * 1000, 5000)));
+    response = await brevoFetch(`/smtp/emails?${params.toString()}`, {
+      method: 'GET',
+    });
+  }
 
   if (response?.status === 404) {
     return { count: 0, transactionalEmails: [] };

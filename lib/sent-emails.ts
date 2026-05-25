@@ -1,7 +1,7 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { isDiagnosticLeadStatus, type DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
 import { EMAIL_TEMPLATES, getEmailTemplate, type EmailTemplateId } from '@/lib/email-templates';
-import { normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
+import { leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 
 const SENT_EMAIL_SELECT = '*, diagnostic_submissions(lead_status, source)';
 
@@ -55,8 +55,16 @@ export type SentEmailFilters = {
   archetype?: string | null;
   source?: string | null;
   status?: string | null;
+  segment?: string | null;
+  state?: string | null;
+  sort?: string | null;
   from?: string | null;
   to?: string | null;
+};
+
+export type SentEmailFilterOption = {
+  value: string;
+  label: string;
 };
 
 export type SentEmailResult = {
@@ -65,6 +73,9 @@ export type SentEmailResult = {
   thisWeekCount: number;
   uniqueLeadCount: number;
   importedCount: number;
+  engagedCount: number;
+  segmentOptions: SentEmailFilterOption[];
+  stateOptions: SentEmailFilterOption[];
   hasFilters: boolean;
 };
 
@@ -157,6 +168,8 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
   const archetype = filters.archetype?.trim();
   const source = filters.source?.trim();
   const status = filters.status?.trim();
+  const segment = filters.segment?.trim();
+  const state = filters.state?.trim();
 
   return emails.filter((email) => {
     if (query) {
@@ -166,9 +179,28 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
       if (!matchesQuery) return false;
     }
 
-    if (archetype && email.archetype !== archetype) return false;
-    if (source && source !== 'all' && email.leadSource !== source) return false;
-    if (status && status !== 'all' && email.leadStatus !== status) return false;
+    if (segment) {
+      if (segment.startsWith('source:') && email.leadSource !== segment.slice('source:'.length)) return false;
+      if (segment.startsWith('service:') && email.serviceInterest !== segment.slice('service:'.length)) return false;
+      if (segment.startsWith('archetype:') && email.archetype !== segment.slice('archetype:'.length)) return false;
+    } else {
+      if (archetype && email.archetype !== archetype) return false;
+      if (source && source !== 'all' && email.leadSource !== source) return false;
+    }
+
+    if (state) {
+      if (state.startsWith('lead:') && email.leadStatus !== state.slice('lead:'.length)) return false;
+      if (state === 'delivery:engaged' && !email.openedAt && !email.clickedAt) return false;
+      if (state === 'delivery:opened' && !email.openedAt) return false;
+      if (state === 'delivery:clicked' && !email.clickedAt) return false;
+      if (state === 'delivery:issue' && !['bounced', 'blocked', 'deferred'].includes(String(email.deliveryStatus || '').toLowerCase())) return false;
+      if (state === 'delivery:sent' && !['sent', 'logged', ''].includes(String(email.deliveryStatus || '').toLowerCase())) return false;
+      if (state.startsWith('delivery:') && !['delivery:engaged', 'delivery:opened', 'delivery:clicked', 'delivery:issue', 'delivery:sent'].includes(state)) {
+        if (String(email.deliveryStatus || '').toLowerCase() !== state.slice('delivery:'.length)) return false;
+      }
+    } else if (status && status !== 'all' && email.leadStatus !== status) {
+      return false;
+    }
 
     const sentTime = new Date(email.sentAt).getTime();
     if (fromTime && sentTime < fromTime) return false;
@@ -178,12 +210,57 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
   });
 }
 
+function getDeliverySortRank(email: SentEmail) {
+  const status = String(email.deliveryStatus || '').toLowerCase();
+  if (status === 'bounced' || status === 'blocked') return 1;
+  if (status === 'deferred') return 2;
+  if (status === 'sent' || status === '' || status === 'logged') return 3;
+  if (status === 'delivered') return 4;
+  if (email.openedAt || status === 'opened') return 5;
+  if (email.clickedAt || status === 'clicked') return 6;
+  return 7;
+}
+
+function sortSentEmails(emails: SentEmail[], sort?: string | null) {
+  const sortKey = sort || 'newest';
+  const sorted = [...emails];
+
+  if (sortKey === 'oldest') {
+    return sorted.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+  }
+
+  if (sortKey === 'engaged') {
+    return sorted.sort((a, b) => {
+      const aTime = new Date(a.clickedAt || a.openedAt || a.sentAt).getTime();
+      const bTime = new Date(b.clickedAt || b.openedAt || b.sentAt).getTime();
+      return bTime - aTime;
+    });
+  }
+
+  if (sortKey === 'delivery_attention') {
+    return sorted.sort(
+      (a, b) =>
+        getDeliverySortRank(a) - getDeliverySortRank(b) ||
+        new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    );
+  }
+
+  if (sortKey === 'name_asc') {
+    return sorted.sort((a, b) => (a.toName || a.toEmail).localeCompare(b.toName || b.toEmail));
+  }
+
+  return sorted.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+}
+
 export function hasSentEmailFilters(filters: SentEmailFilters) {
   return Boolean(
     filters.query?.trim() ||
       filters.archetype?.trim() ||
       (filters.source?.trim() && filters.source !== 'all') ||
       (filters.status?.trim() && filters.status !== 'all') ||
+      filters.segment?.trim() ||
+      filters.state?.trim() ||
+      (filters.sort?.trim() && filters.sort !== 'newest') ||
       filters.from ||
       filters.to
   );
@@ -293,6 +370,98 @@ export async function recordSentEmail(input: SentEmailInsert) {
   throw new Error(result.error.message);
 }
 
+export async function updateSentEmailDeliveryById(
+  id: string,
+  values: {
+    externalProvider?: string | null;
+    externalMessageId?: string | null;
+    deliveryStatus?: string | null;
+    openedAt?: string | Date | null;
+    clickedAt?: string | Date | null;
+  }
+) {
+  const payload: Record<string, string | null> = {};
+  if (values.externalProvider !== undefined) payload.external_provider = values.externalProvider || null;
+  if (values.externalMessageId !== undefined) payload.external_message_id = values.externalMessageId || null;
+  if (values.deliveryStatus !== undefined) payload.delivery_status = values.deliveryStatus || null;
+  if (values.openedAt !== undefined) payload.opened_at = cleanOptionalDate(values.openedAt);
+  if (values.clickedAt !== undefined) payload.clicked_at = cleanOptionalDate(values.clickedAt);
+
+  if (Object.keys(payload).length === 0) return null;
+
+  const supabase = createSupabaseServiceClient();
+  const result = await supabase
+    .from('sent_emails')
+    .update(payload)
+    .eq('id', id)
+    .select(SENT_EMAIL_SELECT)
+    .single();
+
+  if (result.error) {
+    if (isMissingSentEmailsTable(result.error.message) || isMissingSentEmailOptionalColumn(result.error.message)) return null;
+    throw new Error(result.error.message);
+  }
+
+  return normalizeSentEmail(result.data as SentEmailRow);
+}
+
+export async function updateSentEmailDeliveryByExternalId(
+  externalProvider: string,
+  externalMessageId: string,
+  values: {
+    deliveryStatus?: string | null;
+    openedAt?: string | Date | null;
+    clickedAt?: string | Date | null;
+  }
+) {
+  const existing = await getSentEmailByExternalId(externalProvider, externalMessageId);
+  if (!existing) return null;
+  return updateSentEmailDeliveryById(existing.id, values);
+}
+
+function addOption(options: Map<string, SentEmailFilterOption>, value: string, label: string) {
+  if (!value || options.has(value)) return;
+  options.set(value, { value, label });
+}
+
+function buildSegmentOptions(emails: SentEmail[]) {
+  const options = new Map<string, SentEmailFilterOption>();
+
+  for (const email of emails) {
+    addOption(options, `source:${email.leadSource}`, `Source: ${leadSourceLabels[email.leadSource]}`);
+    if (email.serviceInterest) addOption(options, `service:${email.serviceInterest}`, `Service: ${email.serviceInterest}`);
+    if (email.archetype) addOption(options, `archetype:${email.archetype}`, `Archetype: ${email.archetype}`);
+  }
+
+  return Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function buildStateOptions(emails: SentEmail[]) {
+  const options = new Map<string, SentEmailFilterOption>();
+  addOption(options, 'delivery:engaged', 'Email: Opened or clicked');
+  addOption(options, 'delivery:opened', 'Email: Opened');
+  addOption(options, 'delivery:clicked', 'Email: Clicked');
+  addOption(options, 'delivery:sent', 'Email: Sent or logged');
+  addOption(options, 'delivery:issue', 'Email: Needs delivery attention');
+
+  for (const email of emails) {
+    if (email.leadStatus) {
+      const label = email.leadStatus
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+      addOption(options, `lead:${email.leadStatus}`, `Lead: ${label}`);
+    }
+
+    const deliveryStatus = String(email.deliveryStatus || '').toLowerCase();
+    if (deliveryStatus && !['sent', 'opened', 'clicked', 'bounced', 'blocked', 'deferred', 'delivered'].includes(deliveryStatus)) {
+      addOption(options, `delivery:${deliveryStatus}`, `Email: ${deliveryStatus}`);
+    }
+  }
+
+  return Array.from(options.values());
+}
+
 export async function listSentEmails(filters: SentEmailFilters = {}): Promise<SentEmailResult> {
   const supabase = createSupabaseServiceClient();
   const result = await supabase
@@ -309,6 +478,9 @@ export async function listSentEmails(filters: SentEmailFilters = {}): Promise<Se
         thisWeekCount: 0,
         uniqueLeadCount: 0,
         importedCount: 0,
+        engagedCount: 0,
+        segmentOptions: [],
+        stateOptions: [],
         hasFilters: hasSentEmailFilters(filters),
       };
     }
@@ -321,13 +493,18 @@ export async function listSentEmails(filters: SentEmailFilters = {}): Promise<Se
   const thisWeekCount = allEmails.filter((email) => new Date(email.sentAt).getTime() >= weekAgo).length;
   const uniqueLeadCount = new Set(allEmails.map((email) => email.leadId || email.toEmail.toLowerCase()).filter(Boolean)).size;
   const importedCount = allEmails.filter((email) => email.origin === 'brevo_import').length;
+  const engagedCount = allEmails.filter((email) => email.openedAt || email.clickedAt).length;
+  const filteredEmails = filterSentEmails(allEmails, filters);
 
   return {
-    emails: filterSentEmails(allEmails, filters),
+    emails: sortSentEmails(filteredEmails, filters.sort),
     totalCount: allEmails.length,
     thisWeekCount,
     uniqueLeadCount,
     importedCount,
+    engagedCount,
+    segmentOptions: buildSegmentOptions(allEmails),
+    stateOptions: buildStateOptions(allEmails),
     hasFilters: hasSentEmailFilters(filters),
   };
 }

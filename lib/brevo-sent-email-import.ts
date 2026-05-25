@@ -8,7 +8,7 @@ import { EMAIL_TEMPLATES, type EmailTemplate } from '@/lib/email-templates';
 import { normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { listStoredEmailTemplates } from '@/lib/settings';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
-import { recordSentEmail } from '@/lib/sent-emails';
+import { recordSentEmail, updateSentEmailDeliveryByExternalId, updateSentEmailDeliveryById } from '@/lib/sent-emails';
 
 type ImportCandidate = {
   leadId: string | null;
@@ -86,6 +86,10 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getBrevoWindows(days: number) {
@@ -329,8 +333,10 @@ function isMissingOptionalExternalColumn(message?: string) {
   return normalized.includes('external_provider') || normalized.includes('external_message_id');
 }
 
-async function hasExistingExternalEmail(externalMessageId: string) {
+async function hasExistingExternalEmail(externalMessageId: string, delivery: DeliveryUpdate) {
   if (!externalMessageId) return false;
+  const updated = await updateSentEmailDeliveryByExternalId('brevo', externalMessageId, delivery);
+  if (updated) return true;
 
   const supabase = createSupabaseServiceClient();
   const { data, error } = await supabase
@@ -349,9 +355,9 @@ async function hasExistingExternalEmail(externalMessageId: string) {
   return Boolean(data?.id);
 }
 
-async function hasExistingSentEmailFingerprint(input: { toEmail: string; subject: string; sentAt: string }) {
+async function findExistingSentEmailFingerprint(input: { toEmail: string; subject: string; sentAt: string }) {
   const timestamp = new Date(input.sentAt).getTime();
-  if (Number.isNaN(timestamp)) return false;
+  if (Number.isNaN(timestamp)) return null;
 
   const windowStart = new Date(timestamp - 15 * 60 * 1000).toISOString();
   const windowEnd = new Date(timestamp + 15 * 60 * 1000).toISOString();
@@ -366,9 +372,15 @@ async function hasExistingSentEmailFingerprint(input: { toEmail: string; subject
     .limit(1)
     .maybeSingle();
 
-  if (error) return false;
-  return Boolean(data?.id);
+  if (error) return null;
+  return data?.id || null;
 }
+
+type DeliveryUpdate = {
+  deliveryStatus: string | null;
+  openedAt: string | null;
+  clickedAt: string | null;
+};
 
 async function importBrevoEmail({
   email,
@@ -383,10 +395,17 @@ async function importBrevoEmail({
   const externalMessageId = cleanText(email.uuid || email.messageId);
   if (!contentId) return 'skipped' as const;
   if (!externalMessageId) return 'skipped' as const;
-  if (await hasExistingExternalEmail(externalMessageId)) return 'duplicate' as const;
 
   const content = await getBrevoTransactionalEmailContent(contentId);
   if (!content) return 'skipped' as const;
+
+  const deliveryUpdate = {
+    deliveryStatus: getDeliveryStatus(content),
+    openedAt: getEventTime(content, /open/),
+    clickedAt: getEventTime(content, /click/),
+  };
+
+  if (await hasExistingExternalEmail(externalMessageId, deliveryUpdate)) return 'duplicate' as const;
 
   const subject = cleanText(content.subject || email.subject);
   if (!subject || isIgnoredInboundSubject(subject)) return 'ignored' as const;
@@ -396,7 +415,13 @@ async function importBrevoEmail({
   if (!templateMatch && !looksLikeCoachOutbound(subject, text)) return 'ignored' as const;
 
   const sentAt = getIsoDate(email, content);
-  if (await hasExistingSentEmailFingerprint({ toEmail: candidate.email, subject, sentAt })) {
+  const existingFingerprintId = await findExistingSentEmailFingerprint({ toEmail: candidate.email, subject, sentAt });
+  if (existingFingerprintId) {
+    await updateSentEmailDeliveryById(existingFingerprintId, {
+      externalProvider: 'brevo',
+      externalMessageId,
+      ...deliveryUpdate,
+    });
     return 'duplicate' as const;
   }
 
@@ -413,9 +438,7 @@ async function importBrevoEmail({
     origin: 'brevo_import',
     externalProvider: 'brevo',
     externalMessageId,
-    deliveryStatus: getDeliveryStatus(content),
-    openedAt: getEventTime(content, /open/),
-    clickedAt: getEventTime(content, /click/),
+    ...deliveryUpdate,
   });
 
   return sentEmail ? ('imported' as const) : ('skipped' as const);
@@ -479,7 +502,10 @@ export async function importBrevoSentEmails({
 
         if (emails.length === 0) break;
         offset += emails.length;
+        await wait(150);
       }
+
+      await wait(250);
     }
   }
 

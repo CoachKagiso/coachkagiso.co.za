@@ -118,6 +118,9 @@ type DiagnosticSubmissionsPageProps = {
     status?: string;
     service?: string;
     source?: string;
+    segment?: string;
+    state?: string;
+    sort?: string;
     followUp?: string;
     q?: string;
     from?: string;
@@ -1039,6 +1042,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     status,
     service,
     source,
+    segment,
+    state,
+    sort,
     followUp,
     q,
     from,
@@ -1064,6 +1070,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     archetype: activeTab === 'messages' ? archetype : null,
     source: activeTab === 'messages' ? source : null,
     status: activeTab === 'messages' ? status : null,
+    segment: activeTab === 'messages' ? segment : null,
+    state: activeTab === 'messages' ? state : null,
+    sort: activeTab === 'messages' ? sort : null,
     from: activeTab === 'messages' ? from : null,
     to: activeTab === 'messages' ? to : null,
   };
@@ -1105,6 +1114,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           thisWeekCount: 0,
           uniqueLeadCount: 0,
           importedCount: 0,
+          engagedCount: 0,
+          segmentOptions: [],
+          stateOptions: [],
           hasFilters: false,
         }),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
@@ -2266,12 +2278,18 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             thisWeekCount={sentEmailLog.thisWeekCount}
             uniqueLeadCount={sentEmailLog.uniqueLeadCount}
             importedCount={sentEmailLog.importedCount}
+            engagedCount={sentEmailLog.engagedCount}
+            segmentOptions={sentEmailLog.segmentOptions}
+            stateOptions={sentEmailLog.stateOptions}
             hasFilters={sentEmailLog.hasFilters}
             filters={{
               q: q || '',
               archetype: archetype || '',
               source: source || '',
               status: status || '',
+              segment: segment || '',
+              state: state || '',
+              sort: sort || '',
               from: from || '',
               to: to || '',
             }}
