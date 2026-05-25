@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent, InputHTMLAttributes, ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowUpRight,
   CalendarClock,
@@ -26,6 +27,7 @@ import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { EmailTemplateId } from '@/lib/email-templates';
 import {
+  generateTasks,
   getPaymentClientName,
   mergeTasks,
   sortTasks,
@@ -44,8 +46,9 @@ type TasksNotesWorkspaceProps = {
   initialTasks: Task[];
   leads: DiagnosticSubmission[];
   clientOps: ClientOperation[];
-  standaloneNotes: DashboardNote[];
+  initialNotes: DashboardNote[];
   strongestContentSignal: string;
+  topArchetype?: string;
   newLeadCount: number;
   dueFollowUpCount: number;
   paidDeliveryPressureCount: number;
@@ -179,6 +182,31 @@ function statusLabel(status: TaskStatus) {
   return statusOptions.find((option) => option.value === status)?.label || status;
 }
 
+function getInitialManualTasks(tasks: Task[]) {
+  return tasks
+    .filter((task) => task.isManual)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      type: task.type,
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      dueTime: task.dueTime,
+      linkedLeadId: task.leadId,
+      linkedPaymentId: task.paymentId,
+      createdAt: task.createdAt || new Date().toISOString(),
+      updatedAt: task.updatedAt || task.createdAt || new Date().toISOString(),
+    }) satisfies ManualTaskRecord);
+}
+
+function getLikelyLeadTaskId(leadId: string, nextStatus: TaskStatus) {
+  if (nextStatus === 'waiting') return `lead-awaiting-response-${leadId}`;
+  if (nextStatus === 'in_progress') return `lead-discovery-prep-${leadId}`;
+  if (nextStatus === 'done') return `lead-closed-${leadId}`;
+  return `lead-first-follow-up-${leadId}`;
+}
+
 function getRelativeTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Just now';
@@ -227,15 +255,17 @@ export default function TasksNotesWorkspace({
   initialTasks,
   leads,
   clientOps,
-  standaloneNotes,
+  initialNotes,
   strongestContentSignal,
+  topArchetype,
   newLeadCount,
   dueFollowUpCount,
   paidDeliveryPressureCount,
 }: TasksNotesWorkspaceProps) {
-  const [tasks, setTasks] = useState(initialTasks);
+  const router = useRouter();
+  const [manualTasks, setManualTasks] = useState<ManualTaskRecord[]>(() => getInitialManualTasks(initialTasks));
   const [leadRecords, setLeadRecords] = useState(leads);
-  const [notes, setNotes] = useState(standaloneNotes);
+  const [notes, setNotes] = useState(initialNotes);
   const [view, setView] = useState<TaskView>('kanban');
   const [typeFilter, setTypeFilter] = useState<TaskTypeFilter>('all');
   const [sortBy, setSortBy] = useState<TaskSort>('priority');
@@ -244,6 +274,15 @@ export default function TasksNotesWorkspace({
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const tasks = useMemo(() => {
+    const generated = generateTasks(leadRecords, clientOps, {
+      contentSignal: strongestContentSignal,
+      topArchetype,
+      now: new Date(),
+    });
+    return mergeTasks(generated, manualTasks, notes, leadRecords, clientOps);
+  }, [clientOps, leadRecords, manualTasks, notes, strongestContentSignal, topArchetype]);
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
   const activeLeadCount = leadRecords.filter((lead) => !['archived', 'not_a_fit', 'closed'].includes(lead.lead_status)).length;
@@ -272,7 +311,8 @@ export default function TasksNotesWorkspace({
     return [...groups, { label, tasks: [task] }];
   }, []);
 
-  const visibleNotes = notes.filter((note) => {
+  const standaloneNotes = notes.filter((note) => !note.linkedTaskId);
+  const visibleNotes = standaloneNotes.filter((note) => {
     const linkedLead = note.linkedLeadId ? leadRecords.find((lead) => lead.id === note.linkedLeadId) : null;
     const linkedOperation = note.linkedPaymentId
       ? clientOps.find((operation) => operation.payment.payment_id === note.linkedPaymentId)
@@ -288,14 +328,6 @@ export default function TasksNotesWorkspace({
     { label: 'Open tasks', value: String(openTaskCount), description: 'Manual and generated queue items', Icon: ListChecks },
     { label: 'Completed', value: `${completionRate}%`, description: 'Closed lead or task movement', Icon: CheckCircle2 },
   ];
-
-  function hydrateManualTask(task: ManualTaskRecord, taskNotes: DashboardNote[] = []) {
-    return mergeTasks([], [task], taskNotes, leadRecords, clientOps)[0];
-  }
-
-  function replaceTask(nextTask: Task) {
-    setTasks((current) => sortTasks(current.map((task) => (task.id === nextTask.id ? nextTask : task)), 'priority'));
-  }
 
   async function createTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -313,10 +345,10 @@ export default function TasksNotesWorkspace({
         linkedLeadId: form.get('linkedLeadId'),
         linkedPaymentId: form.get('linkedPaymentId'),
       });
-      const hydrated = hydrateManualTask(data.task);
-      setTasks((current) => sortTasks([hydrated, ...current], 'priority'));
+      setManualTasks((current) => [data.task, ...current]);
       setShowTaskModal(false);
-      setSelectedTaskId(hydrated.id);
+      setSelectedTaskId(data.task.id);
+      router.refresh();
     } catch (taskError) {
       setError(taskError instanceof Error ? taskError.message : 'Could not create the task.');
     }
@@ -325,17 +357,20 @@ export default function TasksNotesWorkspace({
   async function updateTask(task: Task, values: Partial<ManualTaskRecord>) {
     if (!task.isManual) return;
     setError(null);
-    const optimistic = { ...task, ...values } as Task;
-    replaceTask(optimistic);
+    const previous = manualTasks;
+    setManualTasks((current) =>
+      current.map((item) => (item.id === task.id ? { ...item, ...values, updatedAt: new Date().toISOString() } : item))
+    );
 
     try {
       const data = await requestJson<{ task: ManualTaskRecord }>(`/api/dashboard/tasks/${task.id}`, 'PATCH', {
         key: adminKey,
         ...values,
       });
-      replaceTask(hydrateManualTask(data.task, optimistic.notes));
+      setManualTasks((current) => current.map((item) => (item.id === data.task.id ? data.task : item)));
+      router.refresh();
     } catch (taskError) {
-      replaceTask(task);
+      setManualTasks(previous);
       setError(taskError instanceof Error ? taskError.message : 'Could not update the task.');
     }
   }
@@ -343,14 +378,15 @@ export default function TasksNotesWorkspace({
   async function deleteTask(task: Task) {
     if (!task.isManual) return;
     setError(null);
-    const previous = tasks;
-    setTasks((current) => current.filter((item) => item.id !== task.id));
+    const previous = manualTasks;
+    setManualTasks((current) => current.filter((item) => item.id !== task.id));
     setSelectedTaskId(null);
 
     try {
       await requestJson<{ ok: true }>(`/api/dashboard/tasks/${task.id}`, 'DELETE', { key: adminKey });
+      router.refresh();
     } catch (taskError) {
-      setTasks(previous);
+      setManualTasks(previous);
       setError(taskError instanceof Error ? taskError.message : 'Could not delete the task.');
     }
   }
@@ -359,14 +395,10 @@ export default function TasksNotesWorkspace({
     if (!task.leadId) return;
 
     setError(null);
-    const previousTasks = tasks;
     const previousLeads = leadRecords;
     const nextLeadStatus = leadStatusByTaskStatus[nextStatus];
     const contactedAt = nextLeadStatus === 'contacted' ? new Date().toISOString() : undefined;
 
-    setTasks((current) =>
-      sortTasks(current.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item)), sortBy)
-    );
     setLeadRecords((current) =>
       current.map((lead) =>
         lead.id === task.leadId
@@ -379,6 +411,7 @@ export default function TasksNotesWorkspace({
           : lead
       )
     );
+    if (nextStatus !== task.status) setSelectedTaskId(getLikelyLeadTaskId(task.leadId, nextStatus));
 
     try {
       const data = await requestJson<{ submission: DiagnosticSubmission | null }>(
@@ -397,9 +430,10 @@ export default function TasksNotesWorkspace({
           current.map((lead) => (lead.id === data.submission?.id ? data.submission : lead))
         );
       }
+      router.refresh();
     } catch (taskError) {
-      setTasks(previousTasks);
       setLeadRecords(previousLeads);
+      setSelectedTaskId(task.id);
       const message = taskError instanceof Error ? taskError.message : 'Could not sync the lead status.';
       setError(message);
       throw new Error(message);
@@ -419,9 +453,7 @@ export default function TasksNotesWorkspace({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setTasks((current) =>
-      current.map((item) => (item.id === task.id ? { ...item, notes: [optimisticNote, ...item.notes] } : item))
-    );
+    setNotes((current) => [optimisticNote, ...current]);
 
     try {
       const data = await requestJson<{ note: DashboardNote }>('/api/dashboard/notes', 'POST', {
@@ -431,21 +463,12 @@ export default function TasksNotesWorkspace({
         linkedLeadId: task.isManual ? null : task.leadId || null,
         linkedPaymentId: task.isManual ? null : task.paymentId || null,
       });
-      setTasks((current) =>
-        current.map((item) =>
-          item.id === task.id
-            ? { ...item, notes: item.notes.map((note) => (note.id === optimisticNote.id ? data.note : note)) }
-            : item
-        )
-      );
-      if (!data.note.linkedTaskId) setNotes((current) => [data.note, ...current]);
+      setNotes((current) => current.map((note) => (note.id === optimisticNote.id ? data.note : note)));
+      router.refresh();
     } catch (noteError) {
-      setTasks((current) =>
-        current.map((item) =>
-          item.id === task.id ? { ...item, notes: item.notes.filter((note) => note.id !== optimisticNote.id) } : item
-        )
-      );
+      setNotes((current) => current.filter((note) => note.id !== optimisticNote.id));
       setError(noteError instanceof Error ? noteError.message : 'Could not save the note.');
+      throw noteError;
     }
   }
 
@@ -780,7 +803,7 @@ export default function TasksNotesWorkspace({
               <h2 className="mt-2 font-serif text-[34px] leading-tight">Standalone notes</h2>
             </div>
             <span className="inline-flex w-fit rounded-full bg-[#F8F6F4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7B695F]">
-              {notes.length} saved
+              {standaloneNotes.length} saved
             </span>
           </summary>
 

@@ -7,6 +7,7 @@ import {
   getSuggestedQuestions,
   type AssistantDashboardContext,
 } from '@/lib/growth-os-assistant';
+import { buildEmailHistoryNote } from '@/lib/email-history-note';
 
 type AssistantRecommendationItem = {
   label: string;
@@ -339,8 +340,23 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
       });
       if (!patchResponse.ok) throw new Error('Lead update failed.');
 
+      await fetch('/api/dashboard/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: adminKey,
+          body: buildEmailHistoryNote({
+            subject: edit.subject,
+            templateLabel: draft.templateId,
+            recipientEmail: draft.to,
+          }),
+          linkedLeadId: draft.leadId,
+        }),
+      }).catch(() => null);
+
       setRemovedActionCards((current) => ({ ...current, [messageId]: true }));
       appendAssistantAnswer(`Email sent to ${draft.toName || draft.to}. Follow-up date updated automatically.`);
+      router.refresh();
     } catch {
       appendAssistantAnswer('Something went wrong. Try using the email modal directly.');
     } finally {

@@ -131,6 +131,7 @@ export function TaskModal({
               adminKey={adminKey}
               lead={lead}
               onLeadStatusChange={onLeadStatusChange}
+              onAddNote={onAddNote}
               onToast={setToast}
               onAfterSend={() => setActiveTab('detail')}
             />
