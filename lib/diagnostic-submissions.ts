@@ -413,7 +413,7 @@ export async function updateDiagnosticSubmissionCrm(
   }
 }
 
-type SourceLeadInput = {
+export type SourceLeadInput = {
   source: Exclude<DiagnosticLeadSource, 'diagnostic'>;
   firstName: string;
   email: string;

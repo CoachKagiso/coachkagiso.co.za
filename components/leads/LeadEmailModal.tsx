@@ -32,6 +32,7 @@ export type LeadEmailModalLead = {
   lastContactedAt?: string | null;
   source?: DiagnosticLeadSource | string | null;
   downloadLink?: string | null;
+  notificationId?: string | null;
 };
 
 type SentLeadUpdate = {
@@ -170,11 +171,11 @@ export default function LeadEmailModal({
 }: LeadEmailModalProps) {
   const searchParams = useSearchParams();
   const adminKey = searchParams.get('key') || '';
-  const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source, downloadLink } = lead;
+  const { id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source, downloadLink, notificationId } = lead;
   const leadSource = normalizeLeadSource(source);
   const modalLead = useMemo(
-    () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source: leadSource, downloadLink }),
-    [archetype, downloadLink, email, firstName, followUpCount, id, lastContactedAt, leadSource, leadStatus, serviceInterest],
+    () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source: leadSource, downloadLink, notificationId }),
+    [archetype, downloadLink, email, firstName, followUpCount, id, lastContactedAt, leadSource, leadStatus, notificationId, serviceInterest],
   );
   const initialNotesRef = useRef(initialNotes);
   const defaultTemplateId = useMemo(
@@ -339,6 +340,8 @@ export default function LeadEmailModal({
         serviceInterest: modalLead.serviceInterest,
       });
 
+      let submission: SentLeadUpdate | null = null;
+
       if (modalLead.id) {
         const data = await requestJson<{ submission: SentLeadUpdate | null }>(
           `/api/diagnostic/submissions/${modalLead.id}`,
@@ -351,14 +354,39 @@ export default function LeadEmailModal({
           },
         );
 
-        const submission = data.submission || {
+        submission = data.submission || {
           id: modalLead.id,
           lead_status: 'contacted',
           last_contacted_at: new Date().toISOString(),
         };
 
-        onSent?.(submission);
+        if (modalLead.notificationId) {
+          await requestJson(`/api/notifications/${modalLead.notificationId}`, 'PATCH', { key: adminKey });
+        }
+      } else if (modalLead.notificationId && leadSource !== 'diagnostic') {
+        const data = await requestJson<{ submission: SentLeadUpdate | null }>(
+          '/api/leads/source-contact',
+          'POST',
+          {
+            key: adminKey,
+            notificationId: modalLead.notificationId,
+            source: leadSource,
+            firstName: modalLead.firstName,
+            email: modalLead.email,
+            downloadLink: modalLead.downloadLink,
+            templateId: selectedTemplateId,
+            sentAt: new Date().toISOString(),
+          },
+        );
+
+        submission = data.submission || {
+          id: '',
+          lead_status: 'contacted',
+          last_contacted_at: new Date().toISOString(),
+        };
       }
+
+      if (submission) onSent?.(submission);
       setSendState('sent');
       setToast(`Email sent to ${getFirstName(modalLead)}.`);
       window.setTimeout(() => {
