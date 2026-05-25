@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/messages/import-inbound",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
