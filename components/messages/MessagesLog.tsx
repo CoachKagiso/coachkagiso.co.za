@@ -8,16 +8,8 @@ import DashboardDatePicker from '@/components/DashboardDatePicker';
 import FilterDropdown from '@/components/FilterDropdown';
 import MessagesBrevoImportButton from '@/components/messages/MessagesBrevoImportButton';
 import type { DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
-import { leadSourceLabels, leadSourceOptions } from '@/lib/lead-sources';
-import type { SentEmail } from '@/lib/sent-emails';
-
-const archetypeOptions = [
-  'Lost Pivoter',
-  'Engaged Strategist',
-  'Plateaued Performer',
-  'Quiet Pivoter',
-  'Burnt-Out Builder',
-] as const;
+import { leadSourceLabels } from '@/lib/lead-sources';
+import type { SentEmail, SentEmailFilterOption } from '@/lib/sent-emails';
 
 const archetypeBadgeClasses: Record<string, string> = {
   'Lost Pivoter': 'bg-[#F5C07A] text-[#7A4A00]',
@@ -39,17 +31,12 @@ const statusLabels: Record<DiagnosticLeadStatus, string> = {
   archived: 'Archived',
 };
 
-const statusOptions = [
-  { value: '', label: 'All statuses' },
-  { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'discovery_booked', label: 'Booked' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'follow_up_later', label: 'Follow up' },
-  { value: 'nurture', label: 'Nurture' },
-  { value: 'not_a_fit', label: 'Not a fit' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'archived', label: 'Archived' },
+const sortOptions = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'engaged', label: 'Recently opened/clicked' },
+  { value: 'delivery_attention', label: 'Delivery attention first' },
+  { value: 'name_asc', label: 'Name A-Z' },
 ];
 
 function getStatusClass(status?: DiagnosticLeadStatus | null) {
@@ -158,6 +145,9 @@ export default function MessagesLog({
   thisWeekCount,
   uniqueLeadCount,
   importedCount,
+  engagedCount,
+  segmentOptions,
+  stateOptions,
   filters,
   hasFilters,
 }: {
@@ -167,11 +157,17 @@ export default function MessagesLog({
   thisWeekCount: number;
   uniqueLeadCount: number;
   importedCount: number;
+  engagedCount: number;
+  segmentOptions: SentEmailFilterOption[];
+  stateOptions: SentEmailFilterOption[];
   filters: {
     q?: string;
     archetype?: string;
     source?: string;
     status?: string;
+    segment?: string;
+    state?: string;
+    sort?: string;
     from?: string;
     to?: string;
   };
@@ -179,7 +175,7 @@ export default function MessagesLog({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(emails[0]?.id || null);
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
   const [deletedEmailIds, setDeletedEmailIds] = useState<string[]>([]);
   const [deletingEmailId, setDeletingEmailId] = useState<string | null>(null);
   const visibleEmails = emails.filter((email) => !deletedEmailIds.includes(email.id));
@@ -233,7 +229,7 @@ export default function MessagesLog({
           ['Total sent', String(totalCount), 'Emails sent'],
           ['This week', String(thisWeekCount), 'Last 7 days'],
           ['Unique leads', String(uniqueLeadCount), 'Leads contacted'],
-          ['Brevo synced', String(importedCount), 'Imported history'],
+          ['Opened/clicked', String(engagedCount), importedCount > 0 ? `${importedCount} synced from Brevo` : 'Known engagement'],
         ].map(([title, value, label]) => (
           <div key={title} className="rounded-[8px] bg-white p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{title}</p>
@@ -243,7 +239,7 @@ export default function MessagesLog({
         ))}
       </div>
 
-      <form action="/resources/career-diagnostic/submissions" method="get" className="mt-5 grid gap-3 xl:grid-cols-[minmax(220px,1fr)_190px_180px_170px_150px_150px_auto_auto] xl:items-center">
+      <form action="/resources/career-diagnostic/submissions" method="get" className="mt-5 grid gap-3 xl:grid-cols-[minmax(220px,1fr)_220px_210px_190px_150px_150px_auto_auto] xl:items-center">
         <input type="hidden" name="key" value={adminKey} />
         <input type="hidden" name="tab" value="messages" />
         <label className="relative block">
@@ -256,31 +252,28 @@ export default function MessagesLog({
           />
         </label>
         <FilterDropdown
-          name="source"
-          value={filters.source || ''}
-          ariaLabel="Filter messages by source"
+          name="segment"
+          value={filters.segment || ''}
+          ariaLabel="Filter messages by segment"
           options={[
-            { value: '', label: 'All sources' },
-            ...leadSourceOptions,
+            { value: '', label: 'All segments' },
+            ...segmentOptions,
           ]}
         />
         <FilterDropdown
-          name="archetype"
-          value={filters.archetype || ''}
-          ariaLabel="Filter messages by archetype"
+          name="state"
+          value={filters.state || ''}
+          ariaLabel="Filter messages by state"
           options={[
-            { value: '', label: 'All archetypes' },
-            ...archetypeOptions.map((archetype) => ({
-              value: archetype,
-              label: archetype,
-            })),
+            { value: '', label: 'All states' },
+            ...stateOptions,
           ]}
         />
         <FilterDropdown
-          name="status"
-          value={filters.status || ''}
-          ariaLabel="Filter messages by lead status"
-          options={statusOptions}
+          name="sort"
+          value={filters.sort || 'newest'}
+          ariaLabel="Sort messages"
+          options={sortOptions}
         />
         <DashboardDatePicker
           name="from"
