@@ -6,14 +6,9 @@ import {
   isDiagnosticLeadStatus,
   updateDiagnosticSubmissionCrm,
 } from '@/lib/diagnostic-submissions';
-import {
-  isFollowUpOneTemplate,
-  isFollowUpTwoTemplate,
-  isMasterclassBookingsOpenTemplate,
-  isNewsletterBridgeTemplate,
-  type EmailTemplateId,
-} from '@/lib/email-templates';
-import { addSastDaysAsDateKey, isPastDateKey, shouldClearNextFollowUp } from '@/lib/follow-up-utils';
+import type { EmailTemplateId } from '@/lib/email-templates';
+import { getFollowUpScheduleAfterSend, getLeadStatusAfterSend } from '@/lib/lead-contact-schedule';
+import { isPastDateKey, shouldClearNextFollowUp } from '@/lib/follow-up-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,58 +24,6 @@ function redirectWithStatus(
   const url = new URL(redirectTo || '/resources/career-diagnostic/submissions', requestUrl);
   url.searchParams.set(status === 'updated' || status === 'deleted' ? 'updated' : 'error', status);
   return NextResponse.redirect(url, { status: 303 });
-}
-
-function addDaysAsDateString(value: Date, days: number) {
-  return addSastDaysAsDateKey(value, days);
-}
-
-function getFollowUpScheduleAfterSend(
-  currentFollowUpCount: number,
-  templateId: string | null,
-  now: Date,
-  hasPriorContact = false
-) {
-  if (isMasterclassBookingsOpenTemplate(templateId)) {
-    return {
-      follow_up_count: 1,
-      next_follow_up_at: null,
-    };
-  }
-
-  if (isNewsletterBridgeTemplate(templateId)) {
-    return {
-      follow_up_count: 3,
-      next_follow_up_at: null,
-    };
-  }
-
-  if (isFollowUpTwoTemplate(templateId)) {
-    return {
-      follow_up_count: 2,
-      next_follow_up_at: addDaysAsDateString(now, 7),
-    };
-  }
-
-  if (isFollowUpOneTemplate(templateId)) {
-    return {
-      follow_up_count: 1,
-      next_follow_up_at: addDaysAsDateString(now, 6),
-    };
-  }
-
-  if (!templateId && hasPriorContact) {
-    const nextFollowUpCount = currentFollowUpCount <= 0 ? 1 : currentFollowUpCount === 1 ? 2 : 3;
-    return {
-      follow_up_count: nextFollowUpCount,
-      next_follow_up_at: nextFollowUpCount >= 3 ? null : addDaysAsDateString(now, nextFollowUpCount === 1 ? 6 : 7),
-    };
-  }
-
-  return {
-    follow_up_count: currentFollowUpCount,
-    next_follow_up_at: addDaysAsDateString(now, 4),
-  };
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -181,7 +124,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       )
     : null;
   const shouldClear = clearNextFollowUp || shouldClearNextFollowUp(leadStatus);
-  const nextLeadStatus = markContacted && isNewsletterBridgeTemplate(templateId) ? 'nurture' : leadStatus;
+  const nextLeadStatus = markContacted ? getLeadStatusAfterSend(leadStatus, templateId) : leadStatus;
 
   await updateDiagnosticSubmissionCrm(id, {
     lead_status: nextLeadStatus,

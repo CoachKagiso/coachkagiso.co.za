@@ -619,6 +619,7 @@ function buildFunnelActivityEmailLead(activity: DashboardEventNotification) {
     lastContactedAt: null,
     source,
     downloadLink: typeof activity.metadata?.pdfUrl === 'string' ? activity.metadata.pdfUrl : null,
+    notificationId: activity.id,
   };
 }
 
