@@ -6,6 +6,9 @@ import {
   getEmailTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import { createNote } from '@/lib/dashboard-task-records';
+import { buildEmailHistoryNote } from '@/lib/email-history-note';
+import { recordSentEmail } from '@/lib/sent-emails';
 import { listStoredEmailTemplates } from '@/lib/settings';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
     const subject = injectTemplate(template.subject, firstName);
     const text = injectTemplate(template.body, firstName);
 
-    await sendTransactionalEmail({
+    const brevoResult = await sendTransactionalEmail({
       to: [{ email: lead.email, name: lead.first_name || lead.email }],
       subject,
       text,
@@ -109,22 +112,39 @@ export async function POST(request: Request) {
     if (update.error) throw new Error(update.error.message);
 
     try {
-      await supabase.from('sent_emails').insert({
-        lead_id: lead.id,
-        to_email: lead.email,
-        to_name: lead.first_name || lead.email,
+      await recordSentEmail({
+        leadId: lead.id,
+        toEmail: lead.email,
+        toName: lead.first_name || lead.email,
         subject,
         body: text,
-        template_id: templateId,
+        templateId,
         archetype: lead.archetype_name || 'Masterclass Waitlist',
-        service_interest:
+        serviceInterest:
           typeof lead.archetype_payload === 'object' && lead.archetype_payload && 'service' in lead.archetype_payload
             ? String(lead.archetype_payload.service || '')
             : 'Saturday Masterclass',
-        sent_at: sentAt,
+        sentAt,
+        origin: 'dashboard',
+        externalProvider: brevoResult?.messageId ? 'brevo' : null,
+        externalMessageId: brevoResult?.messageId || null,
+        deliveryStatus: 'sent',
       });
     } catch (logError) {
       console.error('Sent email log write failed', logError);
+    }
+
+    try {
+      await createNote({
+        linkedLeadId: lead.id,
+        body: buildEmailHistoryNote({
+          subject,
+          templateLabel: `${template.stageLabel} - ${template.archetypeName}`,
+          recipientEmail: lead.email,
+        }),
+      });
+    } catch (noteError) {
+      console.error('Email history note write failed', noteError);
     }
 
     sentIds.push(lead.id);

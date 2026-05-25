@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { recordSentEmail } from '@/lib/sent-emails';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,23 +61,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Email failed to send. Try again.' }, { status: 500 });
   }
 
+  const brevoResult = (await response.json().catch(() => ({}))) as { messageId?: string };
+
   try {
-    const supabase = createSupabaseServiceClient();
-    const { error } = await supabase.from('sent_emails').insert({
-      lead_id: leadId || null,
-      to_email: to,
-      to_name: toName || to,
+    await recordSentEmail({
+      leadId: leadId || null,
+      toEmail: to,
+      toName: toName || to,
       subject,
       body: plainTextBody || htmlContent,
-      template_id: templateId || null,
+      templateId: templateId || null,
       archetype: archetype || null,
-      service_interest: serviceInterest || null,
-      sent_at: new Date().toISOString(),
+      serviceInterest: serviceInterest || null,
+      sentAt: new Date().toISOString(),
+      origin: 'dashboard',
+      externalProvider: brevoResult.messageId ? 'brevo' : null,
+      externalMessageId: brevoResult.messageId || null,
+      deliveryStatus: 'sent',
     });
-
-    if (error) {
-      console.error('Sent email log write failed', error.message);
-    }
   } catch (error) {
     console.error('Sent email log write failed', error);
   }

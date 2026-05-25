@@ -1062,6 +1062,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
   const sentEmailFilters = {
     query: activeTab === 'messages' ? q : null,
     archetype: activeTab === 'messages' ? archetype : null,
+    source: activeTab === 'messages' ? source : null,
+    status: activeTab === 'messages' ? status : null,
     from: activeTab === 'messages' ? from : null,
     to: activeTab === 'messages' ? to : null,
   };
@@ -1102,6 +1104,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           totalCount: 0,
           thisWeekCount: 0,
           uniqueLeadCount: 0,
+          importedCount: 0,
           hasFilters: false,
         }),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
@@ -2262,10 +2265,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             totalCount={sentEmailLog.totalCount}
             thisWeekCount={sentEmailLog.thisWeekCount}
             uniqueLeadCount={sentEmailLog.uniqueLeadCount}
+            importedCount={sentEmailLog.importedCount}
             hasFilters={sentEmailLog.hasFilters}
             filters={{
               q: q || '',
               archetype: archetype || '',
+              source: source || '',
+              status: status || '',
               from: from || '',
               to: to || '',
             }}

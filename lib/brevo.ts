@@ -53,7 +53,7 @@ async function brevoFetch(path: string, init: RequestInit) {
 
 export async function sendTransactionalEmail({ to, subject, text, html }: SendEmailInput) {
   const senderEmail = getContactEmail();
-  await brevoFetch('/smtp/email', {
+  const response = await brevoFetch('/smtp/email', {
     method: 'POST',
     body: JSON.stringify({
       sender: { email: senderEmail, name: 'Coach Kagiso' },
@@ -63,6 +63,10 @@ export async function sendTransactionalEmail({ to, subject, text, html }: SendEm
       htmlContent: html,
     }),
   });
+
+  if (!response || !response.ok) return null;
+
+  return (await response.json().catch(() => ({}))) as { messageId?: string };
 }
 
 export async function listBrevoTransactionalEmails({
@@ -73,7 +77,7 @@ export async function listBrevoTransactionalEmails({
   offset = 0,
   sort = 'desc',
 }: {
-  email: string;
+  email?: string;
   startDate: string;
   endDate: string;
   limit?: number;
@@ -81,17 +85,21 @@ export async function listBrevoTransactionalEmails({
   sort?: 'asc' | 'desc';
 }) {
   const params = new URLSearchParams({
-    email,
     startDate,
     endDate,
     limit: String(limit),
     offset: String(offset),
     sort,
   });
+  if (email) params.set('email', email);
 
   const response = await brevoFetch(`/smtp/emails?${params.toString()}`, {
     method: 'GET',
   });
+
+  if (response?.status === 404) {
+    return { count: 0, transactionalEmails: [] };
+  }
 
   if (!response || !response.ok) return null;
 
