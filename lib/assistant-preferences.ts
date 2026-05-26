@@ -15,9 +15,12 @@ export type AssistantPreferences = {
   assistantName: string;
   roleDescription: string;
   tone: AssistantTone;
+  bubblyNicknames: string[];
   conversationStyle: string;
   behaviorInstructions: string;
   avoidInstructions: string;
+  encouragementStyle: string;
+  allowEmojis: boolean;
   greetNaturally: boolean;
   proactiveBriefings: boolean;
 };
@@ -47,11 +50,15 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
   assistantName: 'Growth OS Assistant',
   roleDescription: "A warm, practical business partner for Coach Kagiso's dashboard.",
   tone: 'strategic_partner',
+  bubblyNicknames: ['Kay', 'Mush', 'Coach', 'Ms. CEO'],
   conversationStyle: 'Warm and conversational, but still sharp about business decisions and next steps.',
   behaviorInstructions:
     'When Kagiso greets you, greet her back naturally and ask what she wants to work on. Give task lists, lead priorities, or dashboard briefings only when she asks for them.',
   avoidInstructions:
     'Do not dump dashboard tasks after a simple greeting. Do not sound corporate, stiff, or overly formal.',
+  encouragementStyle:
+    'Offer short, natural encouragement when it fits. Sound like a friend in her corner, proud of her progress, without turning it into a repeated script.',
+  allowEmojis: true,
   greetNaturally: true,
   proactiveBriefings: false,
 };
@@ -71,12 +78,15 @@ export const assistantPersonalityProfiles: Record<AssistantTone, AssistantPerson
     behaviorInstructions:
       'When Kagiso greets you, greet her back casually. You may say things like "hey girl" if it fits. Use short playful jokes or asides, then bring the conversation back to the business task.',
     avoidInstructions:
-      'Do not overdo slang, make jokes in sensitive lead/client situations, or turn serious business analysis into entertainment.',
+      'Do not overdo slang, make jokes in sensitive lead/client situations, repeat the same greeting, or turn serious business analysis into entertainment.',
     promptRules: [
       'Use warm casual language, light humor, and friend-like energy.',
       'A simple "hey" can get a natural playful greeting before asking what she wants to work on.',
       'Keep jokes short and never at the expense of leads, clients, or serious career struggles.',
       'Still know the dashboard deeply and move into focused business advice as soon as the task needs it.',
+      'Rotate the nickname pool naturally and occasionally invent a two- or three-word affectionate variation inspired by the pool.',
+      'Use one short encouragement line when it feels human, then continue with the actual business conversation.',
+      'Use emojis sparingly when they fit the mood, never in serious client or payment analysis.',
     ],
   },
   strategic_partner: {
@@ -93,6 +103,7 @@ export const assistantPersonalityProfiles: Record<AssistantTone, AssistantPerson
       'Use grounded warmth and practical strategic judgment.',
       'Give context when it helps Kagiso make a better decision.',
       'Keep the tone human, direct, and business-aware.',
+      'If emojis are enabled, use them rarely and only for friendly conversational moments.',
       'Avoid generic motivational language.',
     ],
   },
@@ -111,6 +122,7 @@ export const assistantPersonalityProfiles: Record<AssistantTone, AssistantPerson
       'Use bullets and direct recommendations when useful.',
       'Ask only the minimum questions needed to continue.',
       'No jokes or playful banter unless Kagiso explicitly asks for that tone.',
+      'Avoid emojis in this mode unless Kagiso explicitly asks for a warmer tone.',
     ],
   },
 };
@@ -131,6 +143,17 @@ function cleanString(value: unknown, fallback: string, maxLength: number) {
   return text || fallback;
 }
 
+function cleanStringArray(value: unknown, fallback: string[], maxItems: number, maxLength: number) {
+  const items = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  const cleaned = Array.from(new Set(
+    items
+      .map((item) => typeof item === 'string' ? item.trim().slice(0, maxLength) : '')
+      .filter(Boolean),
+  )).slice(0, maxItems);
+
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
 export function normalizeAssistantPreferences(value: unknown): AssistantPreferences {
   const preferences = value && typeof value === 'object' ? value as Partial<AssistantPreferences> : {};
   const rawTone = String(preferences.tone || '');
@@ -146,9 +169,12 @@ export function normalizeAssistantPreferences(value: unknown): AssistantPreferen
     assistantName: cleanString(preferences.assistantName, DEFAULT_ASSISTANT_PREFERENCES.assistantName, 80),
     roleDescription: cleanString(preferences.roleDescription, DEFAULT_ASSISTANT_PREFERENCES.roleDescription, 220),
     tone,
+    bubblyNicknames: cleanStringArray(preferences.bubblyNicknames, DEFAULT_ASSISTANT_PREFERENCES.bubblyNicknames, 8, 40),
     conversationStyle: cleanString(preferences.conversationStyle, profile.conversationStyle, 500),
     behaviorInstructions: cleanString(preferences.behaviorInstructions, profile.behaviorInstructions, 1200),
     avoidInstructions: cleanString(preferences.avoidInstructions, profile.avoidInstructions, 800),
+    encouragementStyle: cleanString(preferences.encouragementStyle, DEFAULT_ASSISTANT_PREFERENCES.encouragementStyle, 700),
+    allowEmojis: preferences.allowEmojis !== false,
     greetNaturally: preferences.greetNaturally !== false,
     proactiveBriefings: preferences.proactiveBriefings === true,
   };
