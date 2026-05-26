@@ -542,14 +542,12 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
 }
 
 function getAssistantLocalTimeContext(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-ZA', {
-    dateStyle: 'full',
+  const hourText = new Intl.DateTimeFormat('en-ZA', {
     hour: '2-digit',
     hourCycle: 'h23',
-    minute: '2-digit',
     timeZone: assistantTimeZone,
-  }).formatToParts(now);
-  const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+  }).format(now);
+  const hour = Number(hourText || 0);
   const formatted = new Intl.DateTimeFormat('en-ZA', {
     dateStyle: 'full',
     timeStyle: 'short',
