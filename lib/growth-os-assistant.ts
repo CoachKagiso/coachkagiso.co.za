@@ -3,6 +3,12 @@ import type { ContentBacklogItem, ContentCalendarItem } from '@/lib/content-stud
 import { isDiagnosticLeadStatus, type DiagnosticLeadStatus, type DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { InboundEmailReply } from '@/lib/inbound-email-replies';
 import type { SentEmail } from '@/lib/sent-emails';
+import {
+  DEFAULT_ASSISTANT_PREFERENCES,
+  assistantToneLabels,
+  normalizeAssistantPreferences,
+  type AssistantPreferences,
+} from '@/lib/assistant-preferences';
 
 export type AssistantDashboardContext = {
   totalLeads: number;
@@ -535,11 +541,36 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
   };
 }
 
-export function buildAssistantSystemPrompt(context: AssistantDashboardContext): string {
+function buildAssistantPreferencePrompt(value?: AssistantPreferences) {
+  const preferences = normalizeAssistantPreferences(value || DEFAULT_ASSISTANT_PREFERENCES);
+  const greetingRule = preferences.greetNaturally
+    ? `If ${preferences.userName} only greets you or makes small talk, greet her back naturally and ask what she wants to work on. Do not give a dashboard task list unless she asks for one.`
+    : `You may answer simple greetings with a short dashboard-oriented prompt.`;
+  const briefingRule = preferences.proactiveBriefings
+    ? 'You may proactively surface dashboard priorities when it is useful.'
+    : 'Do not proactively surface dashboard priorities, overdue work, or task lists unless the user asks for a briefing, focus list, priorities, or next actions.';
+
+  return `
+ASSISTANT PERSONALITY SETTINGS:
+- User name: ${preferences.userName}
+- Assistant name: ${preferences.assistantName}
+- Role: ${preferences.roleDescription}
+- Tone: ${assistantToneLabels[preferences.tone]}
+- Conversation style: ${preferences.conversationStyle}
+- Behavior notes: ${preferences.behaviorInstructions}
+- Avoid: ${preferences.avoidInstructions}
+- Greeting rule: ${greetingRule}
+- Briefing rule: ${briefingRule}
+`;
+}
+
+export function buildAssistantSystemPrompt(context: AssistantDashboardContext, preferences?: AssistantPreferences): string {
   return `
 You are the Growth OS Assistant for Kagiso Shabangu's career coaching business dashboard. You are her private business intelligence layer.
 
 You speak to Kagiso as a trusted business partner. Direct, warm, never generic. Never say "Great question," "Certainly," "Of course," or "Absolutely."
+
+${buildAssistantPreferencePrompt(preferences)}
 
 DASHBOARD SNAPSHOT (data at session start - tell Kagiso to refresh if she needs updated numbers):
 - Total leads: ${context.totalLeads}
