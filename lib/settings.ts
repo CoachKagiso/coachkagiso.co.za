@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { EMAIL_TEMPLATES, type EmailTemplate } from '@/lib/email-templates';
+import {
+  DEFAULT_ASSISTANT_CONVERSATIONS,
+  DEFAULT_ASSISTANT_PREFERENCES,
+  type AssistantConversationStore,
+  type AssistantPreferences,
+} from '@/lib/assistant-preferences';
 
 export type SettingsMap = Record<string, unknown>;
 
@@ -49,6 +55,11 @@ export type NotificationSettings = {
   intake_submitted: boolean;
   cal_booking: boolean;
   sent_email_log: boolean;
+};
+
+export type {
+  AssistantConversationStore,
+  AssistantPreferences,
 };
 
 export type StoredEmailTemplate = EmailTemplate & {
@@ -120,6 +131,8 @@ export const DEFAULT_SETTINGS = {
     cal_booking: true,
     sent_email_log: false,
   } satisfies NotificationSettings,
+  assistant_preferences: DEFAULT_ASSISTANT_PREFERENCES satisfies AssistantPreferences,
+  assistant_conversations: DEFAULT_ASSISTANT_CONVERSATIONS satisfies AssistantConversationStore,
 } as const;
 
 export const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);

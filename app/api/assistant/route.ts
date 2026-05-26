@@ -5,8 +5,10 @@ import {
   type AssistantDashboardContext,
 } from '@/lib/growth-os-assistant';
 import { buildAssistantAccessContext } from '@/lib/assistant-access';
+import { DEFAULT_ASSISTANT_PREFERENCES, normalizeAssistantPreferences } from '@/lib/assistant-preferences';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +62,7 @@ const HISTORY_MESSAGE_LIMIT = 4000;
 const ANSWER_MESSAGE_LIMIT = 8000;
 const DRAFT_BODY_LIMIT = 10000;
 const CONTENT_DRAFT_LIMIT = 12000;
+const UPLOADED_CONTEXT_LIMIT = 16000;
 
 function getRequestKey(request: Request) {
   const url = new URL(request.url);
@@ -68,6 +71,41 @@ function getRequestKey(request: Request) {
 
 function cleanString(value: unknown, maxLength = 4000) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+async function loadAssistantPreferences() {
+  try {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase.from('settings').select('value').eq('key', 'assistant_preferences').single();
+    if (error || !data?.value) return DEFAULT_ASSISTANT_PREFERENCES;
+    return normalizeAssistantPreferences(data.value);
+  } catch {
+    return DEFAULT_ASSISTANT_PREFERENCES;
+  }
+}
+
+function buildUploadedContext(value: unknown) {
+  if (!Array.isArray(value)) return '';
+
+  const blocks = value.slice(0, 6).map((item, index) => {
+    const name = cleanString(item?.name, 160) || `Upload ${index + 1}`;
+    const type = cleanString(item?.type, 80);
+    const kind = cleanString(item?.kind, 40);
+    const content = cleanString(item?.content, UPLOADED_CONTEXT_LIMIT);
+
+    if (kind === 'text' && content) {
+      return `UPLOAD ${index + 1}: ${name}${type ? ` (${type})` : ''}\n${content}`;
+    }
+
+    if (kind === 'image') {
+      return `UPLOAD ${index + 1}: ${name}${type ? ` (${type})` : ''}\nImage attachment metadata is available, but the current assistant route receives text context only unless a multimodal model is enabled. Ask Kagiso for the visible text or description if needed.`;
+    }
+
+    return '';
+  }).filter(Boolean);
+
+  if (blocks.length === 0) return '';
+  return `UPLOADED CONTEXT FROM KAGISO\nUse this as user-provided context for the current request. Do not treat uploads as live mailbox or database access.\n\n${blocks.join('\n\n')}`;
 }
 
 function sanitizeConversationHistory(value: unknown): ConversationMessage[] {
@@ -192,10 +230,14 @@ export async function POST(request: Request) {
 
   const conversationHistory = sanitizeConversationHistory(body?.conversationHistory);
   const dashboardContext: AssistantDashboardContext = normalizeAssistantDashboardContext(body?.dashboardContext);
+  const uploadedContext = buildUploadedContext(body?.uploadedContext);
   const isDraftRequest = /draft|write|create|generate|compose/i.test(message);
   const isAnalysisRequest = /analy[sz]e|summari[sz]e|theme|pain point|curriculum|structure|masterclass|inbound|outbound|email/i.test(message);
   const shouldContinueTruncated = isContinuationRequest(message) && conversationHistory.some((item) => item.role === 'assistant' && item.mayBeTruncated);
-  const runtime = await resolveAiRuntimeConfig();
+  const [runtime, assistantPreferences] = await Promise.all([
+    resolveAiRuntimeConfig(),
+    loadAssistantPreferences(),
+  ]);
 
   if (!runtime) {
     return NextResponse.json(
@@ -216,15 +258,16 @@ export async function POST(request: Request) {
       body: JSON.stringify(buildAiRequestBody(runtime, {
         model: runtime.model,
         messages: [
-          { role: 'system', content: buildAssistantSystemPrompt(dashboardContext) },
+          { role: 'system', content: buildAssistantSystemPrompt(dashboardContext, assistantPreferences) },
           accessContext ? { role: 'system', content: accessContext } : null,
+          uploadedContext ? { role: 'system', content: uploadedContext } : null,
           shouldContinueTruncated
             ? { role: 'system', content: 'Kagiso asked you to continue after a truncated answer. Continue from the last visible point. Do not say you already finished unless the visible conversation genuinely contains the ending.' }
             : null,
           ...buildConversationMessages(conversationHistory),
           { role: 'user', content: message },
         ].filter(Boolean),
-        max_tokens: isAnalysisRequest || accessContext ? 4000 : 2500,
+        max_tokens: isAnalysisRequest || accessContext || uploadedContext ? 4000 : 2500,
         temperature: isDraftRequest ? 0.7 : 0.3,
         response_format: { type: 'json_object' },
       })),

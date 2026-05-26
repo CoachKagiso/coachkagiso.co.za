@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { WheelEvent } from 'react';
 import {
   Bell,
+  Bot,
   BriefcaseBusiness,
   Check,
   ChevronDown,
@@ -18,6 +19,11 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react';
+import {
+  DEFAULT_ASSISTANT_PREFERENCES,
+  assistantToneLabels,
+  normalizeAssistantPreferences,
+} from '@/lib/assistant-preferences';
 import { EMAIL_TEMPLATES, getBookingLink, getDownloadLink } from '@/lib/email-templates';
 import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
@@ -25,6 +31,7 @@ import FilterDropdown from '@/components/FilterDropdown';
 import DashboardTimePicker from '@/components/DashboardTimePicker';
 import type {
   AiConfigSettings,
+  AssistantPreferences,
   BusinessHoursSettings,
   BusinessProfileSettings,
   NotificationSettings,
@@ -89,6 +96,12 @@ const settingsNavItems = [
     icon: Sparkles,
   },
   {
+    id: 'assistant_preferences',
+    title: 'AI Assistant',
+    description: 'Personality, memory, behavior',
+    icon: Bot,
+  },
+  {
     id: 'notifications',
     title: 'Notifications',
     description: 'Dashboard event alerts',
@@ -129,6 +142,7 @@ const sectionDefaults = {
     cal_booking: true,
     sent_email_log: false,
   },
+  assistant_preferences: DEFAULT_ASSISTANT_PREFERENCES,
 } as const;
 
 const notificationRows = [
@@ -270,6 +284,9 @@ export default function SettingsPageComponent({
   );
   const [aiConfig, setAiConfig] = useState<AiConfigSettings>(
     getSetting(settings, 'ai_config', sectionDefaults.ai_config),
+  );
+  const [assistantPreferences, setAssistantPreferences] = useState<AssistantPreferences>(
+    normalizeAssistantPreferences(getSetting(settings, 'assistant_preferences', sectionDefaults.assistant_preferences)),
   );
   const [notifications, setNotifications] = useState<NotificationSettings>(
     getSetting(settings, 'notifications', sectionDefaults.notifications),
@@ -856,6 +873,124 @@ export default function SettingsPageComponent({
               </details>
               {testStatus && <p className={`text-[13px] font-semibold ${testStatus.tone === 'success' ? 'text-[#0F766E]' : 'text-[#A24E37]'}`}>{testStatus.message}</p>}
             </div>
+          </SettingsPanel>
+          )}
+
+          {activeSection === 'assistant_preferences' && (
+          <SettingsPanel title="AI Assistant" icon={Bot}>
+            <form
+              className="grid gap-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveSetting('assistant_preferences', assistantPreferences);
+              }}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="studio-label">Your name</span>
+                  <input
+                    className="studio-input h-11"
+                    value={assistantPreferences.userName}
+                    onChange={(event) => setAssistantPreferences({ ...assistantPreferences, userName: event.target.value })}
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="studio-label">Assistant name</span>
+                  <input
+                    className="studio-input h-11"
+                    value={assistantPreferences.assistantName}
+                    onChange={(event) => setAssistantPreferences({ ...assistantPreferences, assistantName: event.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="grid gap-2">
+                <span className="studio-label">Role</span>
+                <input
+                  className="studio-input h-11"
+                  value={assistantPreferences.roleDescription}
+                  onChange={(event) => setAssistantPreferences({ ...assistantPreferences, roleDescription: event.target.value })}
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="grid gap-2">
+                  <span className="studio-label">Tone</span>
+                  <FilterDropdown
+                    name="assistant_tone"
+                    value={assistantPreferences.tone}
+                    onChange={(value) => setAssistantPreferences({ ...assistantPreferences, tone: value as AssistantPreferences['tone'] })}
+                    ariaLabel="Choose assistant tone"
+                    options={Object.entries(assistantToneLabels).map(([value, label]) => ({ value, label }))}
+                  />
+                </div>
+                <label className="grid gap-2">
+                  <span className="studio-label">Conversation style</span>
+                  <input
+                    className="studio-input h-11"
+                    value={assistantPreferences.conversationStyle}
+                    onChange={(event) => setAssistantPreferences({ ...assistantPreferences, conversationStyle: event.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="grid gap-2">
+                <span className="studio-label">How it should behave</span>
+                <textarea
+                  value={assistantPreferences.behaviorInstructions}
+                  onChange={(event) => setAssistantPreferences({ ...assistantPreferences, behaviorInstructions: event.target.value })}
+                  rows={5}
+                  className="studio-input min-h-[130px] resize-y py-3 leading-relaxed"
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="studio-label">What it should avoid</span>
+                <textarea
+                  value={assistantPreferences.avoidInstructions}
+                  onChange={(event) => setAssistantPreferences({ ...assistantPreferences, avoidInstructions: event.target.value })}
+                  rows={4}
+                  className="studio-input min-h-[112px] resize-y py-3 leading-relaxed"
+                />
+              </label>
+
+              <div className="grid gap-3 rounded-[8px] bg-[#F8F6F4] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#142334]">Natural greetings</p>
+                    <p className="mt-1 text-[12px] text-[#6B6B6B]">Simple hellos stay conversational.</p>
+                  </div>
+                  <Toggle
+                    checked={assistantPreferences.greetNaturally}
+                    label="Toggle natural greetings"
+                    onChange={(greetNaturally) => setAssistantPreferences({ ...assistantPreferences, greetNaturally })}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-[#E4D8CB] pt-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#142334]">Proactive briefings</p>
+                    <p className="mt-1 text-[12px] text-[#6B6B6B]">Let the assistant surface dashboard priorities without being asked.</p>
+                  </div>
+                  <Toggle
+                    checked={assistantPreferences.proactiveBriefings}
+                    label="Toggle proactive briefings"
+                    onChange={(proactiveBriefings) => setAssistantPreferences({ ...assistantPreferences, proactiveBriefings })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <SaveButton state={saveStates.assistant_preferences || 'idle'} label="Save assistant" />
+                <StatusMessage state={saveStates.assistant_preferences || 'idle'} />
+                <button
+                  type="button"
+                  className="studio-secondary-button"
+                  onClick={() => setAssistantPreferences(DEFAULT_ASSISTANT_PREFERENCES)}
+                >
+                  <RotateCcw className="h-4 w-4" /> Reset defaults
+                </button>
+              </div>
+            </form>
           </SettingsPanel>
           )}
 
