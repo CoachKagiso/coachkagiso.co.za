@@ -202,6 +202,7 @@ type SessionPlannerPillarFocus = ContentPillar | 'auto';
 type SessionPlannerStrategy = 'four_pillar_integrated' | 'pillar_deep_dive' | 'custom_mix';
 type SessionPlannerOutcome = 'auto' | 'career_clarity' | 'paid_session' | 'next_masterclass' | 'trust_community';
 type SessionPlannerSessionNumber = '' | '1' | '2' | '3' | '4' | '5_plus';
+type SessionPlannerSessionTime = '' | 'morning' | 'afternoon' | 'evening';
 type SessionPlannerTab = 'theme' | 'curriculum' | 'runSheet' | 'speakerNotes' | 'intakeForm' | 'postSessionEmail';
 type SessionPlannerTabDrafts = Record<SessionPlannerTab, string>;
 type SessionPlannerPresentationMode = 'outline' | 'external_prompt';
@@ -299,9 +300,11 @@ type SessionPlannerPlan = {
     painPointsSource?: SessionPlannerPainSource;
     sourceCount?: number;
     sessionDate?: string | null;
+    sessionTime?: string | null;
     attendeeCount?: number;
     primaryOutcome?: SessionPlannerOutcome;
     sessionNumber?: string | null;
+    previousSessionTopic?: string | null;
     sessionStrategy?: SessionPlannerStrategy;
     topicDirection?: SessionPlannerTopicDirection;
     fallbacks?: {
@@ -696,6 +699,12 @@ const sessionPlannerNumberOptions: Array<{ value: SessionPlannerSessionNumber; l
   { value: '3', label: '3' },
   { value: '4', label: '4' },
   { value: '5_plus', label: '5+' },
+];
+const sessionPlannerTimeOptions: Array<{ value: SessionPlannerSessionTime; label: string }> = [
+  { value: '', label: 'Not set' },
+  { value: 'morning', label: 'Morning (08:00 - 10:00)' },
+  { value: 'afternoon', label: 'Afternoon (13:00 - 15:00)' },
+  { value: 'evening', label: 'Evening (18:00 - 20:00)' },
 ];
 
 const studioToolMeta: Record<StudioToolKind, {
@@ -10229,6 +10238,7 @@ function StudioToolsPanel({
   const [replyResult, setReplyResult] = useState<ReplyResult | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [sessionDate, setSessionDate] = useState('');
+  const [sessionTime, setSessionTime] = useState<SessionPlannerSessionTime>('');
   const [sessionAttendeeCount, setSessionAttendeeCount] = useState('12');
   const [sessionPainSource, setSessionPainSource] = useState<SessionPlannerPainSource>('inbound');
   const [sessionPainText, setSessionPainText] = useState('');
@@ -10242,6 +10252,7 @@ function StudioToolsPanel({
     desiredOutcome: '',
   });
   const [sessionNumber, setSessionNumber] = useState<SessionPlannerSessionNumber>('');
+  const [previousSessionTopic, setPreviousSessionTopic] = useState('');
   const [sessionOutcome, setSessionOutcome] = useState<SessionPlannerOutcome>('auto');
   const [sessionInboundReplies, setSessionInboundReplies] = useState<SessionPlannerInboundReply[]>([]);
   const [sessionInboundStatus, setSessionInboundStatus] = useState<'idle' | 'found' | 'empty'>('idle');
@@ -10335,6 +10346,7 @@ function StudioToolsPanel({
   const sessionHasPainPoints = sessionPainSource === 'manual'
     ? Boolean(sessionPainText.trim())
     : sessionInboundStatus === 'found' && sessionIncludedReplies.length > 0;
+  const showPreviousSessionTopic = Boolean(sessionNumber && sessionNumber !== '1');
   const sessionGenerateLabel = 'Generate session plan';
   const activeSessionTabDraft = sessionTabDrafts[activeSessionTab] || '';
   const editedSessionPlanMarkdown = buildSessionPlannerMarkdownFromDrafts(sessionTabDrafts);
@@ -10405,13 +10417,20 @@ function StudioToolsPanel({
       }));
   }
 
+  function capSessionPlannerReplies(replies: SessionPlannerInboundReply[]) {
+    return replies
+      .filter((reply) => reply.body?.trim())
+      .slice(0, 15)
+      .map((reply) => ({ ...reply, body: reply.body.slice(0, 800) }));
+  }
+
   async function fetchSessionPlannerWaitlistLeads() {
-    const response = await fetch('/api/leads/masterclass-waitlist?limit=20', {
+    const response = await fetch('/api/leads/masterclass-waitlist?limit=15', {
       headers: { 'x-diagnostic-admin-key': adminKey },
     });
     const data = (await response.json().catch(() => ({}))) as { leads?: SessionPlannerWaitlistLead[]; error?: string };
     if (!response.ok) throw new Error(data.error || 'Could not read masterclass waitlist leads.');
-    return mapWaitlistLeadsToPainPointSources(Array.isArray(data.leads) ? data.leads : []);
+    return capSessionPlannerReplies(mapWaitlistLeadsToPainPointSources(Array.isArray(data.leads) ? data.leads : []));
   }
 
   async function fetchSessionPlannerInboundReplies() {
@@ -10421,14 +10440,14 @@ function StudioToolsPanel({
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch('/api/messages/inbound?source=masterclass_waitlist&limit=20&repair=false', {
+      const response = await fetch('/api/messages/inbound?source=masterclass_waitlist&limit=15&repair=false', {
         headers: { 'x-diagnostic-admin-key': adminKey },
         signal: controller.signal,
       });
       const data = (await response.json().catch(() => ({}))) as { replies?: SessionPlannerInboundReply[]; error?: string };
       if (!response.ok) throw new Error(data.error || 'Could not read inbound emails.');
 
-      let replies = Array.isArray(data.replies) ? data.replies.filter((reply) => reply.body?.trim()) : [];
+      let replies = capSessionPlannerReplies(Array.isArray(data.replies) ? data.replies : []);
       if (replies.length === 0) {
         replies = await fetchSessionPlannerWaitlistLeads();
       }
@@ -10479,14 +10498,16 @@ function StudioToolsPanel({
         key: adminKey,
         sessionName,
         sessionDate,
+        sessionTime,
         attendeeCount: Number(sessionAttendeeCount) || 12,
         painPointsSource: sessionPainSource,
         painPointsText: sessionPainText,
-        inboundEmails: inboundRepliesForPlan.map((reply) => reply.body),
+        inboundEmails: inboundRepliesForPlan.slice(0, 15).map((reply) => reply.body.slice(0, 800)),
         pillarFocus: sessionPillarFocus,
         sessionStrategy,
         topicDirection: sessionTopicDirection,
         sessionNumber,
+        previousSessionTopic: showPreviousSessionTopic ? previousSessionTopic : '',
         primaryOutcome: sessionOutcome,
       });
       const drafts = createSessionPlannerTabDrafts(plan);
@@ -10516,8 +10537,10 @@ function StudioToolsPanel({
         notes: JSON.stringify({
           kind: 'session_planner',
           sessionDate: sessionDate || null,
+          sessionTime: sessionTime || null,
           primaryOutcome: sessionOutcome,
           sessionStrategy,
+          previousSessionTopic: showPreviousSessionTopic ? previousSessionTopic : null,
           topicDirection: sessionTopicDirection,
           painPointsSource: sessionPainSource,
           sourceCount: sessionPlan.metadata?.sourceCount || null,
@@ -10913,6 +10936,21 @@ function StudioToolsPanel({
                   onChange={setSessionDate}
                 />
                 <label className="grid gap-2">
+                  <span className="studio-label">Session time</span>
+                  <select
+                    value={sessionTime}
+                    onChange={(event) => {
+                      setSessionTime(event.target.value as SessionPlannerSessionTime);
+                      resetSessionPlannerResult();
+                    }}
+                    className="studio-input h-11"
+                  >
+                    {sessionPlannerTimeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
                   <span className="studio-label">Number of attendees</span>
                   <input
                     type="number"
@@ -11119,11 +11157,28 @@ function StudioToolsPanel({
               <ToolPillGroup
                 value={sessionNumber}
                 onChange={(value) => {
-                  setSessionNumber(value as SessionPlannerSessionNumber);
+                  const nextSessionNumber = value as SessionPlannerSessionNumber;
+                  setSessionNumber(nextSessionNumber);
+                  if (!nextSessionNumber || nextSessionNumber === '1') {
+                    setPreviousSessionTopic('');
+                  }
                   resetSessionPlannerResult();
                 }}
                 options={sessionPlannerNumberOptions}
               />
+              {showPreviousSessionTopic && (
+                <div className="mt-3">
+                  <TextInput
+                    label="Previous session topic"
+                    value={previousSessionTopic}
+                    onChange={(value) => {
+                      setPreviousSessionTopic(value);
+                      resetSessionPlannerResult();
+                    }}
+                    placeholder="e.g. Strategic networking"
+                  />
+                </div>
+              )}
             </ToolStep>
 
             {localError && activeTool === 'session_planner' && (
@@ -11137,7 +11192,7 @@ function StudioToolsPanel({
             <button
               type="button"
               onClick={() => void generateSessionPlanner()}
-              disabled={Boolean(effectiveBusyTool) || (sessionPainSource === 'manual' && !sessionPainText.trim()) || (sessionPainSource === 'inbound' && sessionInboundStatus === 'found' && !sessionIncludedReplies.length)}
+              disabled={Boolean(effectiveBusyTool) || (sessionPainSource === 'manual' && !sessionPainText.trim()) || (sessionPainSource === 'inbound' && (sessionInboundStatus === 'empty' || (sessionInboundStatus === 'found' && !sessionIncludedReplies.length)))}
               className="studio-primary-button mt-5 w-full justify-center"
             >
               {localBusyTool === 'session_planner' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
