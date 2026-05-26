@@ -830,7 +830,13 @@ As promised, bookings for the July Saturday Masterclass are now open.
 
 Because you reserved early, you're getting first access at R450 until 7 June. After that, it opens to the public at R500.
 
-Here's what the session covers: how you build and use your network strategically, how you make yourself visible to the right people, how you position your personal brand so opportunities find you, and how to find mentors worth having.
+Here's what the session covers:
+
+- How to build and use your network strategically
+- How to make yourself visible to the right people
+- How to position your personal brand so opportunities can find you
+- How to identify and build meaningful relationships with mentors who can support your growth
+- How to develop the right skills, get career direction, and move forward when you feel stuck
 
 One intensive 2-hour session, capped at 12 people.
 

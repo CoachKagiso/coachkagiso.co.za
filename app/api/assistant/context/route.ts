@@ -3,6 +3,8 @@ import { listClientOperations } from '@/lib/client-operations';
 import { listContentBacklogItems, listContentCalendarItems } from '@/lib/content-studio';
 import { isDiagnosticAdminAuthorized, listDiagnosticSubmissions } from '@/lib/diagnostic-submissions';
 import { buildAssistantDashboardContext } from '@/lib/growth-os-assistant';
+import { listInboundEmailReplies } from '@/lib/inbound-email-replies';
+import { listSentEmails } from '@/lib/sent-emails';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,11 +18,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [submissions, operations, backlogItems, calendarItems] = await Promise.all([
+  const [submissions, operations, backlogItems, calendarItems, inboundEmailReplies, sentEmailLog] = await Promise.all([
     listDiagnosticSubmissions(),
     listClientOperations(),
     listContentBacklogItems(),
     listContentCalendarItems(),
+    listInboundEmailReplies({ limit: 60 }),
+    listSentEmails(),
   ]);
 
   return NextResponse.json({
@@ -29,6 +33,8 @@ export async function GET(request: Request) {
       operations,
       backlogItems,
       calendarItems,
+      inboundEmailReplies,
+      sentEmails: sentEmailLog.emails,
     }),
   });
 }
