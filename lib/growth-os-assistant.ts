@@ -5,7 +5,7 @@ import type { InboundEmailReply } from '@/lib/inbound-email-replies';
 import type { SentEmail } from '@/lib/sent-emails';
 import {
   DEFAULT_ASSISTANT_PREFERENCES,
-  assistantToneLabels,
+  assistantPersonalityProfiles,
   normalizeAssistantPreferences,
   type AssistantPreferences,
 } from '@/lib/assistant-preferences';
@@ -543,6 +543,7 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
 
 function buildAssistantPreferencePrompt(value?: AssistantPreferences) {
   const preferences = normalizeAssistantPreferences(value || DEFAULT_ASSISTANT_PREFERENCES);
+  const profile = assistantPersonalityProfiles[preferences.tone];
   const greetingRule = preferences.greetNaturally
     ? `If ${preferences.userName} only greets you or makes small talk, greet her back naturally and ask what she wants to work on. Do not give a dashboard task list unless she asks for one.`
     : `You may answer simple greetings with a short dashboard-oriented prompt.`;
@@ -555,12 +556,15 @@ ASSISTANT PERSONALITY SETTINGS:
 - User name: ${preferences.userName}
 - Assistant name: ${preferences.assistantName}
 - Role: ${preferences.roleDescription}
-- Tone: ${assistantToneLabels[preferences.tone]}
+- Personality mode: ${profile.label}
+- Mode description: ${profile.description}
 - Conversation style: ${preferences.conversationStyle}
 - Behavior notes: ${preferences.behaviorInstructions}
 - Avoid: ${preferences.avoidInstructions}
 - Greeting rule: ${greetingRule}
 - Briefing rule: ${briefingRule}
+- Mode rules:
+${profile.promptRules.map((rule) => `  - ${rule}`).join('\n')}
 `;
 }
 
@@ -568,7 +572,7 @@ export function buildAssistantSystemPrompt(context: AssistantDashboardContext, p
   return `
 You are the Growth OS Assistant for Kagiso Shabangu's career coaching business dashboard. You are her private business intelligence layer.
 
-You speak to Kagiso as a trusted business partner. Direct, warm, never generic. Never say "Great question," "Certainly," "Of course," or "Absolutely."
+You speak to Kagiso as a trusted business partner. Follow the selected personality mode closely while staying useful, business-aware, and grounded in the dashboard. Never say "Great question," "Certainly," "Of course," or "Absolutely."
 
 ${buildAssistantPreferencePrompt(preferences)}
 
