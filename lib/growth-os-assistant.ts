@@ -541,9 +541,34 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
   };
 }
 
+function getAssistantLocalTimeContext(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-ZA', {
+    dateStyle: 'full',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    timeZone: assistantTimeZone,
+  }).formatToParts(now);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+  const formatted = new Intl.DateTimeFormat('en-ZA', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: assistantTimeZone,
+  }).format(now);
+  const daypart =
+    hour < 5 ? 'late night'
+    : hour < 12 ? 'morning'
+    : hour < 17 ? 'afternoon'
+    : hour < 21 ? 'evening'
+    : 'night';
+
+  return `${formatted} (${daypart}, ${assistantTimeZone}). Use this to make greetings feel aware of the moment, for example noticing a late-night work session when appropriate.`;
+}
+
 function buildAssistantPreferencePrompt(value?: AssistantPreferences) {
   const preferences = normalizeAssistantPreferences(value || DEFAULT_ASSISTANT_PREFERENCES);
   const profile = assistantPersonalityProfiles[preferences.tone];
+  const timeContext = getAssistantLocalTimeContext();
   const greetingRule = preferences.greetNaturally
     ? `If ${preferences.userName} only greets you or makes small talk, greet her back naturally and ask what she wants to work on. Do not give a dashboard task list unless she asks for one.`
     : `You may answer simple greetings with a short dashboard-oriented prompt.`;
@@ -558,6 +583,10 @@ ASSISTANT PERSONALITY SETTINGS:
 - Role: ${preferences.roleDescription}
 - Personality mode: ${profile.label}
 - Mode description: ${profile.description}
+- Current local time context: ${timeContext}
+- Bubbly Friend nickname pool: ${preferences.bubblyNicknames.join(', ')}
+- Encouragement style: ${preferences.encouragementStyle}
+- Emoji permission: ${preferences.allowEmojis ? 'Allowed when contextually appropriate and used sparingly.' : 'Do not use emojis.'}
 - Conversation style: ${preferences.conversationStyle}
 - Behavior notes: ${preferences.behaviorInstructions}
 - Avoid: ${preferences.avoidInstructions}

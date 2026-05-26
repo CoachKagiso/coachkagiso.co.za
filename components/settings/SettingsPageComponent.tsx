@@ -386,6 +386,7 @@ export default function SettingsPageComponent({
       behaviorInstructions: profile.behaviorInstructions,
       avoidInstructions: profile.avoidInstructions,
       greetNaturally: tone !== 'focused_operator',
+      allowEmojis: tone !== 'focused_operator',
     }));
   }
 
@@ -968,6 +969,37 @@ export default function SettingsPageComponent({
                         : 'Hey Kagiso, I am here. What are we thinking through today?'}
                   </p>
                 </div>
+                {assistantPreferences.tone === 'bubbly_friend' && (
+                  <div className="grid gap-4 rounded-[10px] border border-[#E4D8CB] bg-[#FCFBFA] p-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Bubbly Friend extras</p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-[#6B6B6B]">
+                        These guide the greeting without locking the assistant into a repeated script.
+                      </p>
+                    </div>
+                    <label className="grid gap-2">
+                      <span className="studio-label">Names it can rotate</span>
+                      <input
+                        className="studio-input h-11"
+                        value={assistantPreferences.bubblyNicknames.join(', ')}
+                        onChange={(event) => setAssistantPreferences({
+                          ...assistantPreferences,
+                          bubblyNicknames: event.target.value.split(',').map((item) => item.trim()).filter(Boolean),
+                        })}
+                      />
+                      <span className="text-[12px] text-[#6B6B6B]">Separate names with commas. The assistant can rotate these and make short variations.</span>
+                    </label>
+                    <label className="grid gap-2">
+                      <span className="studio-label">Encouragement style</span>
+                      <textarea
+                        value={assistantPreferences.encouragementStyle}
+                        onChange={(event) => setAssistantPreferences({ ...assistantPreferences, encouragementStyle: event.target.value })}
+                        rows={3}
+                        className="studio-input min-h-[96px] resize-y py-3 leading-relaxed"
+                      />
+                    </label>
+                  </div>
+                )}
                 <label className="grid gap-2">
                   <span className="studio-label">Conversation style</span>
                   <input
@@ -1008,6 +1040,17 @@ export default function SettingsPageComponent({
                     checked={assistantPreferences.greetNaturally}
                     label="Toggle natural greetings"
                     onChange={(greetNaturally) => setAssistantPreferences({ ...assistantPreferences, greetNaturally })}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-[#E4D8CB] pt-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#142334]">Contextual emojis</p>
+                    <p className="mt-1 text-[12px] text-[#6B6B6B]">Allow emojis only when they fit the moment.</p>
+                  </div>
+                  <Toggle
+                    checked={assistantPreferences.allowEmojis}
+                    label="Toggle contextual emojis"
+                    onChange={(allowEmojis) => setAssistantPreferences({ ...assistantPreferences, allowEmojis })}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4 border-t border-[#E4D8CB] pt-3">
