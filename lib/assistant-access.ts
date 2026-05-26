@@ -3,7 +3,7 @@ import { listContentBacklogItems, type ContentBacklogItem } from '@/lib/content-
 import { listMergedCalendarEvents } from '@/lib/dashboard-calendar';
 import { listDiagnosticSubmissions, type DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import { listInboundEmailReplies, type InboundEmailReply } from '@/lib/inbound-email-replies';
-import { leadSourceLabels } from '@/lib/lead-sources';
+import { leadSourceLabels, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { listSentEmails, type SentEmail } from '@/lib/sent-emails';
 import { getMissingZohoMailEnv, listZohoInboxMessages, type ZohoMailboxMessage } from '@/lib/zoho-mail';
 
@@ -138,6 +138,14 @@ function textMatches(value: string, request: AccessRequest) {
   if (request.emails.some((email) => haystack.includes(email))) return true;
   if (request.terms.length === 0) return true;
   return request.terms.some((term) => haystack.includes(term));
+}
+
+function getRequestedLeadSource(request: AccessRequest): DiagnosticLeadSource | null {
+  if (/\bmasterclass|waitlist|saturday class|class reserve|reserve list\b/i.test(request.query)) return 'masterclass_waitlist';
+  if (/\blinkedin headline|headline builder|linkedin swipe\b/i.test(request.query)) return 'linkedin_headline';
+  if (/\bfirst 90|90 days|new manager checklist\b/i.test(request.query)) return 'first_90_days';
+  if (/\bdiagnostic|career diagnostic|archetype\b/i.test(request.query)) return 'diagnostic';
+  return null;
 }
 
 function leadSearchText(lead: DiagnosticSubmission) {
@@ -279,15 +287,17 @@ async function fetchApprovedUrl(url: string) {
 async function buildLeadAccessBlock(request: AccessRequest): Promise<AccessBlock | null> {
   if (!request.wantsLeads && request.emails.length === 0) return null;
   const leads = await listDiagnosticSubmissions();
-  const matched = leads.filter((lead) => textMatches(leadSearchText(lead), request));
-  const source = matched.length ? matched : leads.slice(0, 20);
+  const requestedSource = getRequestedLeadSource(request);
+  const leadPool = requestedSource ? leads.filter((lead) => lead.source === requestedSource) : leads;
+  const matched = leadPool.filter((lead) => textMatches(leadSearchText(lead), request));
+  const source = matched.length ? matched : leadPool.slice(0, 20);
   const includeAnswers = request.emails.length > 0 || /\bprofile|diagnostic answers?|pain points?|specific lead|full lead/i.test(request.query);
 
   return {
     name: 'searchLeads',
     description: 'Read-only lead search across diagnostic, lead-magnet, and masterclass waitlist records.',
     content: [
-      `Total leads scanned: ${leads.length}; matching leads returned: ${source.slice(0, 20).length}`,
+      `Total leads scanned: ${leads.length}; source filter: ${requestedSource || 'all'}; matching leads returned: ${source.slice(0, 20).length}`,
       ...source.slice(0, 20).map((lead) => formatLead(lead, includeAnswers)),
     ].join('\n'),
   };
@@ -295,22 +305,27 @@ async function buildLeadAccessBlock(request: AccessRequest): Promise<AccessBlock
 
 async function buildEmailAccessBlock(request: AccessRequest): Promise<AccessBlock | null> {
   if (!request.wantsEmail && request.emails.length === 0) return null;
+  const requestedSource = getRequestedLeadSource(request);
   const [inboundReplies, sentEmailLog] = await Promise.all([
-    listInboundEmailReplies({ limit: 200 }),
+    listInboundEmailReplies({ limit: 200, source: requestedSource, repairLeadLinks: Boolean(requestedSource) }),
     listSentEmails(),
   ]);
-  const sentEmails = sentEmailLog.emails;
-  const inboundMatches = inboundReplies.filter((reply) =>
-    textMatches([
-      reply.fromEmail,
-      reply.fromName,
-      reply.subject,
-      reply.body,
-      reply.lead?.source,
-      reply.lead?.serviceInterest,
-      reply.lead?.archetype,
-    ].join(' '), request),
-  );
+  const sentEmails = requestedSource
+    ? sentEmailLog.emails.filter((email) => email.leadSource === requestedSource)
+    : sentEmailLog.emails;
+  const inboundMatches = requestedSource
+    ? inboundReplies
+    : inboundReplies.filter((reply) =>
+        textMatches([
+          reply.fromEmail,
+          reply.fromName,
+          reply.subject,
+          reply.body,
+          reply.lead?.source,
+          reply.lead?.serviceInterest,
+          reply.lead?.archetype,
+        ].join(' '), request),
+      );
   const sentMatches = sentEmails.filter((email) =>
     textMatches([
       email.toEmail,
@@ -331,10 +346,10 @@ async function buildEmailAccessBlock(request: AccessRequest): Promise<AccessBloc
     name: 'getEmailThread',
     description: 'Read-only synced inbound replies and logged outbound emails. This does not send anything.',
     content: [
-      `Inbound replies scanned: ${inboundReplies.length}; inbound replies returned: ${inboundSource.slice(0, 12).length}`,
+      `Inbound replies scanned: ${inboundReplies.length}; source filter: ${requestedSource || 'all'}; inbound replies returned: ${inboundSource.slice(0, 12).length}`,
       ...inboundSource.slice(0, 12).map((reply) => formatInboundReply(reply)),
       '',
-      `Outbound emails scanned: ${sentEmails.length}; outbound emails returned: ${sentSource.slice(0, 12).length}`,
+      `Outbound emails scanned: ${sentEmails.length}; source filter: ${requestedSource || 'all'}; outbound emails returned: ${sentSource.slice(0, 12).length}`,
       ...sentSource.slice(0, 12).map((email) => formatSentEmail(email)),
     ].join('\n'),
   };
