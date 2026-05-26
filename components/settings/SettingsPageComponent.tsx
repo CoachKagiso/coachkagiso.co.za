@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_ASSISTANT_PREFERENCES,
-  assistantToneLabels,
+  assistantPersonalityProfiles,
   normalizeAssistantPreferences,
 } from '@/lib/assistant-preferences';
 import { EMAIL_TEMPLATES, getBookingLink, getDownloadLink } from '@/lib/email-templates';
@@ -375,6 +375,18 @@ export default function SettingsPageComponent({
 
   function updateTemplate(id: string, updates: Partial<StoredEmailTemplate>) {
     setTemplates((current) => current.map((template) => (template.id === id ? { ...template, ...updates } : template)));
+  }
+
+  function applyAssistantPersonality(tone: AssistantPreferences['tone']) {
+    const profile = assistantPersonalityProfiles[tone];
+    setAssistantPreferences((current) => ({
+      ...current,
+      tone,
+      conversationStyle: profile.conversationStyle,
+      behaviorInstructions: profile.behaviorInstructions,
+      avoidInstructions: profile.avoidInstructions,
+      greetNaturally: tone !== 'focused_operator',
+    }));
   }
 
   async function testAiConnection(provider: 'zai' | 'openrouter') {
@@ -913,16 +925,48 @@ export default function SettingsPageComponent({
                 />
               </label>
 
-              <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
-                <div className="grid gap-2">
-                  <span className="studio-label">Tone</span>
-                  <FilterDropdown
-                    name="assistant_tone"
-                    value={assistantPreferences.tone}
-                    onChange={(value) => setAssistantPreferences({ ...assistantPreferences, tone: value as AssistantPreferences['tone'] })}
-                    ariaLabel="Choose assistant tone"
-                    options={Object.entries(assistantToneLabels).map(([value, label]) => ({ value, label }))}
-                  />
+              <div className="grid gap-3">
+                <span className="studio-label">Personality mode</span>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {Object.entries(assistantPersonalityProfiles).map(([value, profile]) => {
+                    const tone = value as AssistantPreferences['tone'];
+                    const active = assistantPreferences.tone === tone;
+                    const Icon = tone === 'bubbly_friend' ? Sparkles : tone === 'focused_operator' ? BriefcaseBusiness : Bot;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => applyAssistantPersonality(tone)}
+                        className={`group min-h-[150px] rounded-[10px] border p-4 text-left transition ${
+                          active
+                            ? 'border-[#142334] bg-[#142334] text-white shadow-[0_12px_28px_rgba(20,35,52,0.18)]'
+                            : 'border-[#E4D8CB] bg-[#FCFBFA] text-[#142334] hover:border-[#C9AD98] hover:bg-[#F8F6F4]'
+                        }`}
+                        aria-pressed={active}
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className={`grid h-9 w-9 place-items-center rounded-[8px] ${active ? 'bg-white/12' : 'bg-[#F5F3EE]'}`}>
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          {active && <Check className="h-4 w-4 shrink-0" />}
+                        </span>
+                        <span className="mt-4 block font-serif text-[20px] leading-tight">{profile.label}</span>
+                        <span className={`mt-2 block text-[12px] leading-relaxed ${active ? 'text-white/72' : 'text-[#6B6B6B]'}`}>
+                          {profile.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="rounded-[8px] bg-[#F8F6F4] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Mode preview</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/72">
+                    {assistantPreferences.tone === 'bubbly_friend'
+                      ? 'Hey girl, I am here. What are we fixing, finessing, or making money from today?'
+                      : assistantPreferences.tone === 'focused_operator'
+                        ? 'Ready. Send the task, and I will keep it direct.'
+                        : 'Hey Kagiso, I am here. What are we thinking through today?'}
+                  </p>
                 </div>
                 <label className="grid gap-2">
                   <span className="studio-label">Conversation style</span>
