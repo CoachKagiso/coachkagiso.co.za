@@ -2,11 +2,10 @@ import { createManualTask, createNote } from '@/lib/dashboard-task-records';
 import {
   isDiagnosticLeadStatus,
   updateDiagnosticSubmissionCrm,
-  type DiagnosticLeadSource,
   type DiagnosticLeadStatus,
 } from '@/lib/diagnostic-submissions';
 import { getContactEmail } from '@/lib/env';
-import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
+import { isDiagnosticLeadSource, leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { callToolAi, extractToolJsonObject } from '@/lib/content/tools-ai';
 import {
@@ -84,6 +83,13 @@ type SentEmailMatch = {
   sent_at: string | null;
 };
 
+type InboundEmailReplyListFilters = {
+  limit?: number;
+  status?: string | null;
+  source?: DiagnosticLeadSource | 'all' | null;
+  repairLeadLinks?: boolean;
+};
+
 type InboundReplyRow = {
   id: string;
   provider: string;
@@ -132,6 +138,7 @@ export type InboundReplyImportResult = {
 
 const AI_API_KEY_ENV = 'ZAI_API_KEY';
 const localTimeZone = 'Africa/Johannesburg';
+const INBOUND_REPLY_LEAD_SELECT = 'id, first_name, email, archetype_name, archetype_payload, source, lead_status, follow_up_count, last_contacted_at, next_follow_up_at, download_link';
 
 function isMissingInboundTable(message?: string) {
   const normalized = String(message || '');
@@ -314,6 +321,28 @@ async function findLastSentEmail(email: string) {
   return (data || null) as SentEmailMatch | null;
 }
 
+async function findSentEmailById(id?: string | null) {
+  if (!id) return null;
+
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('sent_emails')
+    .select('id, lead_id, to_email, to_name, subject, body, template_id, archetype, service_interest, sent_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) return null;
+  return (data || null) as SentEmailMatch | null;
+}
+
+async function resolveLeadForInboundEmail(email: string, sentEmail?: SentEmailMatch | null) {
+  let lead = await findLeadByEmail(email);
+  if (!lead && sentEmail?.lead_id) {
+    lead = await findLeadById(sentEmail.lead_id);
+  }
+  return lead;
+}
+
 function buildDraftSystemPrompt() {
   return `
 You are drafting email replies for Kagiso Shabangu, a South African Career Development and Personal Brand Coach.
@@ -465,10 +494,7 @@ async function importInboundMessage(message: ZohoMailboxMessage, mailbox: string
   if (await hasExistingInboundMessage(message.providerMessageId)) return 'duplicate' as const;
 
   const sentEmail = await findLastSentEmail(message.fromEmail);
-  let lead = await findLeadByEmail(message.fromEmail);
-  if (!lead && sentEmail?.lead_id) {
-    lead = await findLeadById(sentEmail.lead_id);
-  }
+  const lead = await resolveLeadForInboundEmail(message.fromEmail, sentEmail);
 
   if (!lead && !sentEmail) return 'ignored' as const;
 
@@ -589,22 +615,64 @@ export async function importZohoInboundReplies({
   return result;
 }
 
+export async function repairInboundEmailReplyLeadLinks({ limit = 200 }: { limit?: number } = {}) {
+  const supabase = createSupabaseServiceClient();
+  const safeLimit = Math.max(1, Math.min(Math.floor(limit), 250));
+  const { data, error } = await supabase
+    .from('inbound_email_replies')
+    .select('id, from_email, sent_email_id')
+    .is('lead_id', null)
+    .order('received_at', { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    if (isMissingInboundTable(error.message)) return { scanned: 0, linked: 0 };
+    throw new Error(error.message);
+  }
+
+  let linked = 0;
+  for (const row of data || []) {
+    const sentEmail = await findSentEmailById(row.sent_email_id) || await findLastSentEmail(row.from_email);
+    const lead = await resolveLeadForInboundEmail(row.from_email, sentEmail);
+    if (!lead?.id) continue;
+
+    const update = await supabase
+      .from('inbound_email_replies')
+      .update({ lead_id: lead.id })
+      .eq('id', row.id)
+      .is('lead_id', null);
+
+    if (!update.error) linked += 1;
+  }
+
+  return { scanned: data?.length || 0, linked };
+}
+
 export async function listInboundEmailReplies({
   limit = 50,
   status,
-}: {
-  limit?: number;
-  status?: string | null;
-} = {}) {
+  source,
+  repairLeadLinks = false,
+}: InboundEmailReplyListFilters = {}) {
+  if (repairLeadLinks) {
+    await repairInboundEmailReplyLeadLinks({ limit: Math.max(limit, 50) });
+  }
+
   const supabase = createSupabaseServiceClient();
+  const sourceFilter = isDiagnosticLeadSource(source) ? source : null;
+  const leadJoin = sourceFilter ? 'diagnostic_submissions!inner' : 'diagnostic_submissions';
   let query = supabase
     .from('inbound_email_replies')
-    .select('*, diagnostic_submissions(id, first_name, email, archetype_name, archetype_payload, source, lead_status, follow_up_count, last_contacted_at, next_follow_up_at, download_link)')
+    .select(`*, ${leadJoin}(${INBOUND_REPLY_LEAD_SELECT})`)
     .order('received_at', { ascending: false })
     .limit(Math.max(1, Math.min(Math.floor(limit), 250)));
 
   if (status === 'new' || status === 'reviewed' || status === 'archived') {
     query = query.eq('status', status);
+  }
+
+  if (sourceFilter) {
+    query = query.eq('diagnostic_submissions.source', sourceFilter);
   }
 
   const { data, error } = await query;
