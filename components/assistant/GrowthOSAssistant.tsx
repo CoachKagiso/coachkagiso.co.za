@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { WheelEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowUp,
@@ -174,6 +175,25 @@ function isTextUpload(file: File) {
     file.type.startsWith('text/') ||
     /\.(txt|md|markdown|csv|json)$/i.test(file.name)
   );
+}
+
+function containAssistantWheel<T extends HTMLElement>(event: WheelEvent<T>) {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  if (target?.closest('textarea, select')) return;
+
+  const el = event.currentTarget;
+  if (el.scrollHeight <= el.clientHeight) return;
+
+  const deltaY =
+    event.deltaMode === 1
+      ? event.deltaY * 16
+      : event.deltaMode === 2
+        ? event.deltaY * el.clientHeight
+        : event.deltaY;
+
+  event.preventDefault();
+  event.stopPropagation();
+  el.scrollTop += deltaY;
 }
 
 function plainTextToEmailHtml(value: string) {
@@ -919,6 +939,9 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
         aria-label="Growth OS Assistant"
         aria-hidden={!isOpen}
         inert={!isOpen ? true : undefined}
+        data-lenis-prevent
+        data-lenis-prevent-wheel
+        data-lenis-prevent-touch
         className={`${panelClassName} ${visiblePanelClassName}`}
       >
         <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-[#E4D8CB] px-3 py-2 md:px-4">
@@ -1021,7 +1044,12 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
                   <Sparkles className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="mt-3 grid max-h-[calc(100vh-190px)] gap-2 overflow-y-auto pr-1">
+              <div
+                data-lenis-prevent-wheel
+                data-lenis-prevent-touch
+                onWheel={containAssistantWheel}
+                className="mt-3 grid max-h-[calc(100vh-190px)] gap-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]"
+              >
                 {savedThreads.length === 0 ? (
                   <p className="rounded-[8px] bg-white px-3 py-3 text-[12px] leading-relaxed text-[#6B6B6B]">
                     No saved chats yet.
@@ -1058,7 +1086,13 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
             </aside>
           )}
 
-        <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div
+          ref={threadRef}
+          data-lenis-prevent-wheel
+          data-lenis-prevent-touch
+          onWheel={containAssistantWheel}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable]"
+        >
           {messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <Sparkles className="h-6 w-6 text-[#C9AD98]" />
