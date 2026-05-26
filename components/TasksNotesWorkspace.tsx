@@ -13,10 +13,8 @@ import {
   Mail,
   Mic,
   PackageCheck,
-  Pencil,
   Plus,
   Save,
-  Search,
   SlidersHorizontal,
   StickyNote,
   Trash2,
@@ -271,8 +269,6 @@ export default function TasksNotesWorkspace({
   const [sortBy, setSortBy] = useState<TaskSort>('priority');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
-  const [noteSearch, setNoteSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const tasks = useMemo(() => {
@@ -311,17 +307,6 @@ export default function TasksNotesWorkspace({
     return [...groups, { label, tasks: [task] }];
   }, []);
 
-  const standaloneNotes = notes.filter((note) => !note.linkedTaskId);
-  const visibleNotes = standaloneNotes.filter((note) => {
-    const linkedLead = note.linkedLeadId ? leadRecords.find((lead) => lead.id === note.linkedLeadId) : null;
-    const linkedOperation = note.linkedPaymentId
-      ? clientOps.find((operation) => operation.payment.payment_id === note.linkedPaymentId)
-      : null;
-    const linkedName = linkedLead?.first_name || (linkedOperation ? getPaymentClientName(linkedOperation) : '');
-    const query = noteSearch.trim().toLowerCase();
-    if (!query) return true;
-    return [note.body, linkedName].some((value) => value.toLowerCase().includes(query));
-  });
   const statCards = [
     { label: 'Active leads', value: String(activeLeadCount), description: 'Lead movement still in play', Icon: Mail },
     { label: 'Client work', value: String(activeClientTaskCount), description: 'Paid delivery still moving', Icon: PackageCheck },
@@ -472,57 +457,6 @@ export default function TasksNotesWorkspace({
     }
   }
 
-  async function createStandaloneNote(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    const form = new FormData(event.currentTarget);
-    const body = String(form.get('body') || '').trim();
-    if (!body) return;
-
-    try {
-      const data = await requestJson<{ note: DashboardNote }>('/api/dashboard/notes', 'POST', {
-        key: adminKey,
-        body,
-        linkedLeadId: form.get('linkedLeadId') || null,
-        linkedPaymentId: form.get('linkedPaymentId') || null,
-      });
-      setNotes((current) => [data.note, ...current]);
-      setShowNoteModal(false);
-    } catch (noteError) {
-      setError(noteError instanceof Error ? noteError.message : 'Could not create the note.');
-    }
-  }
-
-  async function updateStandaloneNote(note: DashboardNote, body: string) {
-    const trimmed = body.trim();
-    if (!trimmed) return;
-    const previous = notes;
-    setNotes((current) => current.map((item) => (item.id === note.id ? { ...item, body: trimmed } : item)));
-
-    try {
-      const data = await requestJson<{ note: DashboardNote }>(`/api/dashboard/notes/${note.id}`, 'PATCH', {
-        key: adminKey,
-        body: trimmed,
-      });
-      setNotes((current) => current.map((item) => (item.id === note.id ? data.note : item)));
-    } catch (noteError) {
-      setNotes(previous);
-      setError(noteError instanceof Error ? noteError.message : 'Could not update the note.');
-    }
-  }
-
-  async function deleteStandaloneNote(note: DashboardNote) {
-    const previous = notes;
-    setNotes((current) => current.filter((item) => item.id !== note.id));
-
-    try {
-      await requestJson<{ ok: true }>(`/api/dashboard/notes/${note.id}`, 'DELETE', { key: adminKey });
-    } catch (noteError) {
-      setNotes(previous);
-      setError(noteError instanceof Error ? noteError.message : 'Could not delete the note.');
-    }
-  }
-
   return (
     <section id="tasks-notes" className="pb-8">
       <div className="space-y-3">
@@ -548,13 +482,12 @@ export default function TasksNotesWorkspace({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowNoteModal(true)}
+              <Link
+                href={buildTabHref(adminKey, 'notes')}
                 className="inline-flex h-10 items-center gap-2 rounded-full bg-[#C9AD98] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#142334] transition hover:bg-[#142334] hover:text-white"
               >
-                <Plus className="h-4 w-4" /> New note
-              </button>
+                <StickyNote className="h-4 w-4" /> Personal notes
+              </Link>
               <button
                 type="button"
                 onClick={() => setShowTaskModal(true)}
@@ -796,48 +729,6 @@ export default function TasksNotesWorkspace({
           )}
         </div>
 
-        <details className="rounded-[16px] bg-[#FCFBFA] p-4 ring-1 ring-[#E6DDD6] md:p-5">
-          <summary className="flex cursor-pointer list-none flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">Notes</p>
-              <h2 className="mt-2 font-serif text-[34px] leading-tight">Standalone notes</h2>
-            </div>
-            <span className="inline-flex w-fit rounded-full bg-[#F8F6F4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7B695F]">
-              {standaloneNotes.length} saved
-            </span>
-          </summary>
-
-          <label className="relative mt-5 block">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A09086]" />
-            <span className="sr-only">Search notes</span>
-            <input
-              type="search"
-              value={noteSearch}
-              onChange={(event) => setNoteSearch(event.target.value)}
-              placeholder="Search note body or linked name"
-              className="h-12 w-full rounded-full bg-[#F8F6F4] pl-11 pr-4 text-[14px] text-[#142334] outline-none ring-1 ring-[#E6DDD6] focus:ring-[#142334]"
-            />
-          </label>
-
-          <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {visibleNotes.length === 0 ? (
-              <div className="rounded-[16px] bg-[#F8F6F4] p-5 text-[13px] leading-relaxed text-[#142334]/58 ring-1 ring-[#E6DDD6] xl:col-span-2">
-                No standalone notes match this search.
-              </div>
-            ) : (
-              visibleNotes.map((note) => (
-                <StandaloneNoteCard
-                  key={note.id}
-                  note={note}
-                  leads={leadRecords}
-                  clientOps={clientOps}
-                  onUpdate={updateStandaloneNote}
-                  onDelete={deleteStandaloneNote}
-                />
-              ))
-            )}
-          </div>
-        </details>
       </div>
 
       {showTaskModal && (
@@ -860,31 +751,6 @@ export default function TasksNotesWorkspace({
               </button>
               <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
                 Create task <Save className="h-4 w-4" />
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {showNoteModal && (
-        <Modal title="New note" onClose={() => setShowNoteModal(false)}>
-          <form onSubmit={createStandaloneNote} className="grid gap-4">
-            <label className="grid gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7B695F]">Note</span>
-              <textarea
-                name="body"
-                required
-                rows={5}
-                className="resize-y rounded-[16px] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none ring-1 ring-[#E6DDD6] focus:ring-[#142334]"
-              />
-            </label>
-            <LinkedRecordFields leads={leadRecords} clientOps={clientOps} />
-            <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => setShowNoteModal(false)} className="rounded-full px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#142334]/62">
-                Cancel
-              </button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-                Save note <Save className="h-4 w-4" />
               </button>
             </div>
           </form>
@@ -1092,74 +958,5 @@ function LinkedRecordFields({ leads, clientOps }: { leads: DiagnosticSubmission[
         </select>
       </div>
     </div>
-  );
-}
-
-function StandaloneNoteCard({
-  note,
-  leads,
-  clientOps,
-  onUpdate,
-  onDelete,
-}: {
-  note: DashboardNote;
-  leads: DiagnosticSubmission[];
-  clientOps: ClientOperation[];
-  onUpdate: (note: DashboardNote, body: string) => Promise<void>;
-  onDelete: (note: DashboardNote) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [body, setBody] = useState(note.body);
-  const linkedLead = note.linkedLeadId ? leads.find((lead) => lead.id === note.linkedLeadId) : null;
-  const linkedOperation = note.linkedPaymentId
-    ? clientOps.find((operation) => operation.payment.payment_id === note.linkedPaymentId)
-    : null;
-  const linkedName = linkedLead?.first_name || (linkedOperation ? getPaymentClientName(linkedOperation) : '');
-
-  return (
-    <article className="rounded-[16px] bg-[#F8F6F4] p-4 ring-1 ring-[#E6DDD6]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {linkedName && (
-            <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B695F]">
-              {linkedName}
-            </span>
-          )}
-          <span className="text-[11px] text-[#142334]/45">{getRelativeTime(note.createdAt)}</span>
-        </div>
-        <div className="flex gap-1">
-          <button type="button" onClick={() => setEditing((value) => !value)} className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#142334]">
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button type="button" onClick={() => onDelete(note)} className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#A24E37]">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-      {editing ? (
-        <form
-          className="mt-3 grid gap-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            await onUpdate(note, body);
-            setEditing(false);
-          }}
-        >
-          <textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            rows={4}
-            className="resize-y rounded-[16px] bg-white px-4 py-3 text-[13px] leading-relaxed text-[#142334] outline-none ring-1 ring-[#E6DDD6] focus:ring-[#142334]"
-          />
-          <button type="submit" className="inline-flex w-fit items-center gap-2 rounded-full bg-[#142334] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-            Save <Save className="h-4 w-4" />
-          </button>
-        </form>
-      ) : (
-        <p className="mt-4 rounded-[16px] bg-white p-4 text-[13px] leading-relaxed text-[#142334]/70 ring-1 ring-[#E6DDD6]">
-          {note.body}
-        </p>
-      )}
-    </article>
   );
 }

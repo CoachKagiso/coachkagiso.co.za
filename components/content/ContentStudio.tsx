@@ -146,7 +146,7 @@ type ImagePromptOption = {
   negativePrompt: string;
   aspectRatio: string;
 };
-type StudioToolKind = 'hook' | 'cta' | 'caption' | 'reply';
+type StudioToolKind = 'hook' | 'cta' | 'caption' | 'reply' | 'session_planner';
 type StudioGeneratedToolKind = 'hook' | 'cta';
 type StudioToolPayload = {
   source: string;
@@ -196,6 +196,132 @@ type ReplyResult = {
   shortReply: string;
   chosenGoal?: string;
   analysis?: string;
+};
+type SessionPlannerPainSource = 'inbound' | 'manual';
+type SessionPlannerPillarFocus = ContentPillar | 'auto';
+type SessionPlannerStrategy = 'four_pillar_integrated' | 'pillar_deep_dive' | 'custom_mix';
+type SessionPlannerOutcome = 'auto' | 'career_clarity' | 'paid_session' | 'next_masterclass' | 'trust_community';
+type SessionPlannerSessionNumber = '' | '1' | '2' | '3' | '4' | '5_plus';
+type SessionPlannerTab = 'theme' | 'curriculum' | 'runSheet' | 'speakerNotes' | 'intakeForm' | 'postSessionEmail';
+type SessionPlannerTabDrafts = Record<SessionPlannerTab, string>;
+type SessionPlannerPresentationMode = 'outline' | 'external_prompt';
+type SessionPlannerTopicDirection = {
+  mainTopic: string;
+  specificFocus: string;
+  mustCover: string;
+  avoid: string;
+  desiredOutcome: string;
+};
+type SessionPlannerInboundReply = {
+  id: string;
+  subject: string;
+  body: string;
+  fromName: string;
+  fromEmail: string;
+  receivedAt: string;
+  lead?: {
+    firstName?: string;
+    source?: string;
+    archetype?: string;
+  } | null;
+};
+type SessionPlannerWaitlistLead = {
+  id: string;
+  firstName: string;
+  email: string;
+  focus: string;
+  whatsapp?: string | null;
+  submittedAt: string;
+};
+type SessionPlannerPlan = {
+  theme: {
+    title: string;
+    pillar: ContentPillar;
+    rationale: string;
+    painPoints: string[];
+    painPointsSummary: string;
+    pillarCoverage?: Array<{
+      pillar: ContentPillar;
+      role: string;
+      coverage: string;
+    }>;
+    sessionPromise: string;
+    primaryOutcome: string;
+  };
+  curriculum: {
+    mainTopic: string;
+    subtopics: Array<{
+      title: string;
+      description: string;
+      keyQuestions: string[];
+      teachingBlock: number;
+    }>;
+    reflectionExercise: string;
+    hotSeatSetup: string;
+  };
+  runSheet: {
+    totalMinutes: number;
+    blocks: Array<{
+      startMinute: number;
+      endMinute: number;
+      duration: number;
+      label: string;
+      description: string;
+      facilitation: string;
+    }>;
+  };
+  speakerNotes: {
+    blocks: Array<{
+      blockLabel: string;
+      openingLine: string;
+      keyPoints: string[];
+      storyOrExample: string;
+      audienceQuestions: string[];
+      transition: string;
+      doNotForget: string;
+    }>;
+  };
+  intakeForm: {
+    intro: string;
+    questions: Array<{
+      question: string;
+      type: 'text' | 'multiple_choice' | 'scale';
+      options: string[];
+      purpose: string;
+    }>;
+  };
+  postSessionEmail: {
+    subject: string;
+    body: string;
+  };
+  metadata?: {
+    generatedAt?: string;
+    painPointsSource?: SessionPlannerPainSource;
+    sourceCount?: number;
+    sessionDate?: string | null;
+    attendeeCount?: number;
+    primaryOutcome?: SessionPlannerOutcome;
+    sessionNumber?: string | null;
+    sessionStrategy?: SessionPlannerStrategy;
+    topicDirection?: SessionPlannerTopicDirection;
+    fallbacks?: {
+      runSheet?: boolean;
+      speakerNotes?: boolean;
+      intakeForm?: boolean;
+      postSessionEmail?: boolean;
+    };
+  };
+};
+type SessionPlannerResources = {
+  title: string;
+  markdown: string;
+  generatedAt: string;
+};
+type SessionPlannerPresentationOutput = {
+  mode: SessionPlannerPresentationMode;
+  title: string;
+  markdown: string;
+  generatedAt: string;
 };
 type HookType = 'text_post' | 'spoken_video' | 'visual' | 'visual_spoken';
 type TransformInputType = 'text' | 'image';
@@ -529,6 +655,48 @@ const imagePromptMeta: Record<ImagePromptKind, { label: string; icon: LucideIcon
 };
 const captionLoadingMessages = ['Reading your image...', 'Finding three angles...', "Writing in Kagiso's voice..."];
 const replyLoadingMessages = ['Reading the content...', 'Finding the right tone...', 'Writing your reply...'];
+const sessionPlannerLoadingMessages = [
+  'Reading attendee emails...',
+  'Identifying pain points...',
+  'Building the curriculum...',
+  'Writing the run sheet...',
+  'Almost there...',
+];
+const sessionPlannerTabs: Array<{ value: SessionPlannerTab; label: string }> = [
+  { value: 'theme', label: 'Theme' },
+  { value: 'curriculum', label: 'Curriculum' },
+  { value: 'runSheet', label: 'Run Sheet' },
+  { value: 'speakerNotes', label: 'Speaker Notes' },
+  { value: 'intakeForm', label: 'Intake Form' },
+  { value: 'postSessionEmail', label: 'Post-Session Email' },
+];
+const sessionPlannerOutcomeOptions: Array<{ value: SessionPlannerOutcome; label: string; detail: string }> = [
+  { value: 'auto', label: 'Let AI decide', detail: 'Best when the pain points should lead the session.' },
+  { value: 'career_clarity', label: 'Career clarity', detail: 'Attendees leave with a clear next move.' },
+  { value: 'paid_session', label: 'Paid session', detail: 'Build trust and guide ready attendees toward booking.' },
+  { value: 'next_masterclass', label: 'Next masterclass', detail: 'Prepare people for the next session in the series.' },
+  { value: 'trust_community', label: 'Trust and community', detail: 'Create safety, connection, and momentum in the room.' },
+];
+const sessionPlannerStrategyOptions: Array<{ value: SessionPlannerStrategy; label: string; detail: string }> = [
+  { value: 'four_pillar_integrated', label: 'Four-pillar masterclass', detail: 'Use all four pillars as the framework while pain points shape the angle.' },
+  { value: 'pillar_deep_dive', label: 'Pillar deep dive', detail: 'Go deep into the selected pillar and sub-niche.' },
+  { value: 'custom_mix', label: 'Custom mix', detail: 'Blend the selected topic, pillar, and pain points in a flexible way.' },
+];
+const sessionPlannerPillarOptions: Array<{ value: SessionPlannerPillarFocus; label: string; detail?: string }> = [
+  { value: 'auto', label: 'Let AI decide', detail: 'Best when the topic direction should guide the blend.' },
+  { value: 'career_growth', label: 'Career Growth', detail: 'Movement, clarity, pivots, promotions, job search.' },
+  { value: 'leadership', label: 'Leadership', detail: 'Readiness, influence, confidence, people leadership.' },
+  { value: 'personal_brand', label: 'Personal Brand', detail: 'Positioning, LinkedIn, visibility, professional reputation.' },
+  { value: 'mentorship', label: 'Mentorship', detail: 'Support systems, networking, community, accountability.' },
+];
+const sessionPlannerNumberOptions: Array<{ value: SessionPlannerSessionNumber; label: string }> = [
+  { value: '', label: 'Not set' },
+  { value: '1', label: '1' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
+  { value: '5_plus', label: '5+' },
+];
 
 const studioToolMeta: Record<StudioToolKind, {
   label: string;
@@ -571,6 +739,14 @@ const studioToolMeta: Record<StudioToolKind, {
     icon: MessageSquare,
     status: 'ready',
   },
+  session_planner: {
+    label: 'Session Planner',
+    eyebrow: 'Masterclass prep',
+    description: 'Plan a complete masterclass session from attendee pain points to run sheet.',
+    buttonLabel: 'Generate session plan',
+    icon: CalendarDays,
+    status: 'ready',
+  },
 };
 
 const studioToolGoalOptions: Record<StudioToolKind, string[]> = {
@@ -604,6 +780,7 @@ const studioToolGoalOptions: Record<StudioToolKind, string[]> = {
     'Respectfully disagree',
     'Open a DM bridge',
   ],
+  session_planner: ['Plan around attendee pain points'],
 };
 
 const calendarStatusMeta: Record<ContentCalendarStatus, { label: string; className: string }> = {
@@ -635,6 +812,7 @@ const sourceLabels: Record<ContentBacklogSource, string> = {
   manual: 'Manual',
   insights: 'Insights Article',
   assistant: 'Assistant Draft',
+  session_planner: 'Session Planner',
 };
 
 const calendarDayOptions: CalendarDayOption[] = [
@@ -2737,6 +2915,175 @@ async function requestJson<T>(url: string, method: string, payload: Record<strin
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
+}
+
+function formatSessionMinute(value: number) {
+  const safeValue = Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0);
+  const hours = Math.floor(safeValue / 60);
+  const minutes = safeValue % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function getSessionPlannerSafeFilename(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'session-plan';
+}
+
+function getSessionPlannerTabMarkdown(plan: SessionPlannerPlan, tab: SessionPlannerTab) {
+  if (tab === 'theme') {
+    return [
+      `# ${plan.theme.title}`,
+      '',
+      `Pillar: ${pillarMeta[plan.theme.pillar].label}`,
+      '',
+      '## Rationale',
+      plan.theme.rationale,
+      '',
+      ...(plan.theme.painPointsSummary ? [
+        '## Pain Points Summary',
+        plan.theme.painPointsSummary,
+        '',
+      ] : []),
+      ...(plan.theme.pillarCoverage?.length ? [
+        '## Pillar Coverage',
+        ...plan.theme.pillarCoverage.map((item) => `- ${pillarMeta[item.pillar].label}: ${item.role}${item.coverage ? ` - ${item.coverage}` : ''}`),
+        '',
+      ] : []),
+      '## Common Pain Points',
+      ...plan.theme.painPoints.map((item) => `- ${item}`),
+      '',
+      '## Session Promise',
+      plan.theme.sessionPromise,
+      '',
+      '## Primary Outcome',
+      plan.theme.primaryOutcome,
+    ].join('\n');
+  }
+
+  if (tab === 'curriculum') {
+    return [
+      `# Curriculum: ${plan.curriculum.mainTopic}`,
+      '',
+      ...plan.curriculum.subtopics.flatMap((item) => [
+        `## Teaching Block ${item.teachingBlock}: ${item.title}`,
+        item.description,
+        '',
+        'Key questions:',
+        ...item.keyQuestions.map((question) => `- ${question}`),
+        '',
+      ]),
+      '## Reflection Exercise',
+      plan.curriculum.reflectionExercise,
+      '',
+      '## Hot Seat Setup',
+      plan.curriculum.hotSeatSetup,
+    ].join('\n');
+  }
+
+  if (tab === 'runSheet') {
+    return [
+      '# 120-Minute Run Sheet',
+      '',
+      ...plan.runSheet.blocks.flatMap((block) => [
+        `## ${formatSessionMinute(block.startMinute)} - ${formatSessionMinute(block.endMinute)}: ${block.label} (${block.duration} min)`,
+        block.description,
+        '',
+        `Facilitation: ${block.facilitation}`,
+        '',
+      ]),
+    ].join('\n');
+  }
+
+  if (tab === 'speakerNotes') {
+    return [
+      '# Speaker Notes',
+      '',
+      ...plan.speakerNotes.blocks.flatMap((block) => [
+        `## ${block.blockLabel}`,
+        '',
+        `Opening line: ${block.openingLine}`,
+        '',
+        'Key points:',
+        ...block.keyPoints.map((item) => `- ${item}`),
+        '',
+        `Story or example: ${block.storyOrExample}`,
+        '',
+        'Ask the room:',
+        ...block.audienceQuestions.map((question) => `- ${question}`),
+        '',
+        `Transition: ${block.transition}`,
+        '',
+        `Do not forget: ${block.doNotForget}`,
+        '',
+      ]),
+    ].join('\n');
+  }
+
+  if (tab === 'intakeForm') {
+    return [
+      '# Pre-Session Intake Form',
+      '',
+      plan.intakeForm.intro,
+      '',
+      ...plan.intakeForm.questions.flatMap((item, index) => [
+        `## Question ${index + 1}`,
+        item.question,
+        '',
+        `Type: ${item.type.replace('_', ' ')}`,
+        item.options.length ? `Options: ${item.options.join(', ')}` : '',
+        `Purpose: ${item.purpose}`,
+        '',
+      ]),
+    ].filter(Boolean).join('\n');
+  }
+
+  return [
+    '# Post-Session Email',
+    '',
+    `Subject: ${plan.postSessionEmail.subject}`,
+    '',
+    plan.postSessionEmail.body,
+  ].join('\n');
+}
+
+function buildSessionPlannerMarkdown(plan: SessionPlannerPlan) {
+  return sessionPlannerTabs
+    .map((tab) => getSessionPlannerTabMarkdown(plan, tab.value))
+    .join('\n\n---\n\n');
+}
+
+function createSessionPlannerTabDrafts(plan: SessionPlannerPlan): SessionPlannerTabDrafts {
+  return {
+    theme: getSessionPlannerTabMarkdown(plan, 'theme'),
+    curriculum: getSessionPlannerTabMarkdown(plan, 'curriculum'),
+    runSheet: getSessionPlannerTabMarkdown(plan, 'runSheet'),
+    speakerNotes: getSessionPlannerTabMarkdown(plan, 'speakerNotes'),
+    intakeForm: getSessionPlannerTabMarkdown(plan, 'intakeForm'),
+    postSessionEmail: getSessionPlannerTabMarkdown(plan, 'postSessionEmail'),
+  };
+}
+
+function buildSessionPlannerMarkdownFromDrafts(drafts: Partial<SessionPlannerTabDrafts>) {
+  return sessionPlannerTabs
+    .map((tab) => drafts[tab.value]?.trim())
+    .filter(Boolean)
+    .join('\n\n---\n\n');
+}
+
+function downloadMarkdownFile(filename: string, markdown: string) {
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function Badge({ children, className }: { children: ReactNode; className: string }) {
@@ -4892,6 +5239,7 @@ export default function ContentStudio({
             error={studioToolError}
             result={studioToolResult}
             onGenerate={(kind, payload) => void generateStudioTool(kind, payload)}
+            onVaultSaved={(item) => setBacklogRecords((current) => [item, ...current.filter((record) => record.id !== item.id)])}
             onOpenDrafting={() => navigateContent('studio', { topic: context.strongestTheme })}
           />
         )}
@@ -9842,6 +10190,7 @@ function StudioToolsPanel({
   error,
   result,
   onGenerate,
+  onVaultSaved,
   onOpenDrafting,
 }: {
   adminKey: string;
@@ -9852,6 +10201,7 @@ function StudioToolsPanel({
   error: string | null;
   result: StudioToolResult | null;
   onGenerate: (kind: StudioGeneratedToolKind, payload: StudioToolPayload) => void;
+  onVaultSaved: (item: ContentBacklogItem) => void;
   onOpenDrafting: () => void;
 }) {
   const [activeTool, setActiveTool] = useState<StudioToolKind | null>(null);
@@ -9862,6 +10212,7 @@ function StudioToolsPanel({
   const [quantity, setQuantity] = useState<StudioToolPayload['quantity']>('10');
   const [hookType, setHookType] = useState<HookType>('text_post');
   const [copied, setCopied] = useState(false);
+  const [editableToolOutputDraft, setEditableToolOutputDraft] = useState({ key: '', value: '' });
   const [captionInputMode, setCaptionInputMode] = useState<CaptionInputMode>('text');
   const [captionImageFile, setCaptionImageFile] = useState<File | null>(null);
   const [captionSourceText, setCaptionSourceText] = useState('');
@@ -9876,7 +10227,35 @@ function StudioToolsPanel({
   const [replyGoal, setReplyGoal] = useState<ReplyGoal>('auto');
   const [replyPersonType, setReplyPersonType] = useState<ReplyPersonType>('general_audience');
   const [replyResult, setReplyResult] = useState<ReplyResult | null>(null);
-  const [localBusyTool, setLocalBusyTool] = useState<'caption' | 'reply' | null>(null);
+  const [sessionName, setSessionName] = useState('');
+  const [sessionDate, setSessionDate] = useState('');
+  const [sessionAttendeeCount, setSessionAttendeeCount] = useState('12');
+  const [sessionPainSource, setSessionPainSource] = useState<SessionPlannerPainSource>('inbound');
+  const [sessionPainText, setSessionPainText] = useState('');
+  const [sessionPillarFocus, setSessionPillarFocus] = useState<SessionPlannerPillarFocus>('auto');
+  const [sessionStrategy, setSessionStrategy] = useState<SessionPlannerStrategy>('four_pillar_integrated');
+  const [sessionTopicDirection, setSessionTopicDirection] = useState<SessionPlannerTopicDirection>({
+    mainTopic: '',
+    specificFocus: '',
+    mustCover: '',
+    avoid: '',
+    desiredOutcome: '',
+  });
+  const [sessionNumber, setSessionNumber] = useState<SessionPlannerSessionNumber>('');
+  const [sessionOutcome, setSessionOutcome] = useState<SessionPlannerOutcome>('auto');
+  const [sessionInboundReplies, setSessionInboundReplies] = useState<SessionPlannerInboundReply[]>([]);
+  const [sessionInboundStatus, setSessionInboundStatus] = useState<'idle' | 'found' | 'empty'>('idle');
+  const [sessionExcludedReplyIds, setSessionExcludedReplyIds] = useState<Set<string>>(new Set());
+  const [sessionPlan, setSessionPlan] = useState<SessionPlannerPlan | null>(null);
+  const [sessionTabDrafts, setSessionTabDrafts] = useState<Partial<SessionPlannerTabDrafts>>({});
+  const [sessionOriginalTabDrafts, setSessionOriginalTabDrafts] = useState<Partial<SessionPlannerTabDrafts>>({});
+  const [activeSessionTab, setActiveSessionTab] = useState<SessionPlannerTab>('theme');
+  const [sessionPlannerSaved, setSessionPlannerSaved] = useState(false);
+  const [sessionResources, setSessionResources] = useState<SessionPlannerResources | null>(null);
+  const [sessionResourceBusy, setSessionResourceBusy] = useState(false);
+  const [sessionPresentation, setSessionPresentation] = useState<SessionPlannerPresentationOutput | null>(null);
+  const [sessionPresentationBusy, setSessionPresentationBusy] = useState<SessionPlannerPresentationMode | null>(null);
+  const [localBusyTool, setLocalBusyTool] = useState<StudioToolKind | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [loadingIndex, setLoadingIndex] = useState(0);
   const activeMeta = activeTool ? studioToolMeta[activeTool] : null;
@@ -9914,12 +10293,21 @@ function StudioToolsPanel({
     ? captionLoadingMessages[loadingIndex % captionLoadingMessages.length]
     : localBusyTool === 'reply'
       ? replyLoadingMessages[loadingIndex % replyLoadingMessages.length]
-      : '';
+      : localBusyTool === 'session_planner'
+        ? sessionPlannerLoadingMessages[loadingIndex % sessionPlannerLoadingMessages.length]
+        : '';
   const generatedToolResult = result && (!activeTool || activeTool === result.kind) ? result : null;
+  const generatedToolOutputKey = generatedToolResult ? `${generatedToolResult.kind}:${generatedToolResult.generatedAt}` : '';
+  const editableToolOutput = editableToolOutputDraft.key === generatedToolOutputKey
+    ? editableToolOutputDraft.value
+    : generatedToolResult?.output || '';
   const hasCaptionOutput = activeTool === 'caption' && Boolean(captionResult?.captions.length);
   const hasReplyOutput = activeTool === 'reply' && Boolean(replyResult?.reply);
+  const hasSessionPlannerOutput = activeTool === 'session_planner' && Boolean(sessionPlan);
   const outputTitle = activeTool
-    ? studioToolMeta[activeTool].label
+    ? activeTool === 'session_planner' && sessionPlan?.theme.title
+      ? sessionPlan.theme.title
+      : studioToolMeta[activeTool].label
     : generatedToolResult
       ? studioToolMeta[generatedToolResult.kind].label
       : 'Ready when the idea is';
@@ -9927,6 +10315,10 @@ function StudioToolsPanel({
     ? `${captionPlatformLabels[captionPlatform]} - ${captionToneLabels[captionTone]}`
     : activeTool === 'reply'
       ? `${replyPlatformLabels[replyPlatform]} - ${replyResponseTypeLabels[replyResponseType].label}${replyGoal === 'auto' && replyResult?.chosenGoal ? ` - Auto → ${replyGoalLabels[replyResult.chosenGoal as ReplyGoal]?.label ?? replyResult.chosenGoal}` : ` - ${replyGoalLabels[resolvedReplyGoal].label}`}`
+      : activeTool === 'session_planner'
+        ? sessionPlan
+          ? `${pillarMeta[sessionPlan.theme.pillar].label} - ${sessionPlan.metadata?.sourceCount || 0} pain point source${(sessionPlan.metadata?.sourceCount || 0) === 1 ? '' : 's'}`
+          : 'Saturday Masterclass planning from real attendee pain points'
       : generatedToolResult
         ? `${generatedToolResult.kind === 'hook' && generatedToolResult.payload.hookType ? `${hookTypeLabels[generatedToolResult.payload.hookType].label} - ` : ''}${generatedToolResult.payload.platform === 'auto' ? 'Auto platform' : platformLabels[generatedToolResult.payload.platform]} - ${generatedToolResult.payload.pillar === 'auto' ? 'Auto pillar' : pillarMeta[generatedToolResult.payload.pillar].label} - ${generatedToolResult.payload.goal}`
         : '';
@@ -9934,9 +10326,22 @@ function StudioToolsPanel({
     ? '3 captions'
     : activeTool === 'reply'
       ? '2 versions'
+      : activeTool === 'session_planner'
+        ? sessionPlan ? '6 tabs' : '120 min'
       : generatedToolResult
         ? `${generatedToolResult.payload.quantity} options`
         : '';
+  const sessionIncludedReplies = sessionInboundReplies.filter((reply) => !sessionExcludedReplyIds.has(reply.id));
+  const sessionHasPainPoints = sessionPainSource === 'manual'
+    ? Boolean(sessionPainText.trim())
+    : sessionInboundStatus === 'found' && sessionIncludedReplies.length > 0;
+  const sessionGenerateLabel = 'Generate session plan';
+  const activeSessionTabDraft = sessionTabDrafts[activeSessionTab] || '';
+  const editedSessionPlanMarkdown = buildSessionPlannerMarkdownFromDrafts(sessionTabDrafts);
+  const sessionTopicHasDirection = Object.values(sessionTopicDirection).some((value) => value.trim());
+  const sessionPlannerHasDraftEdits = Boolean(sessionPlan) && sessionPlannerTabs.some((tab) => (
+    (sessionTabDrafts[tab.value] || '').trim() !== (sessionOriginalTabDrafts[tab.value] || '').trim()
+  ));
 
   useEffect(() => {
     if (!localBusyTool) return;
@@ -9947,8 +10352,8 @@ function StudioToolsPanel({
   }, [localBusyTool]);
 
   async function copyToolOutput() {
-    if (!result?.output) return;
-    await navigator.clipboard.writeText(result.output);
+    if (!editableToolOutput.trim()) return;
+    await navigator.clipboard.writeText(editableToolOutput);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
@@ -9958,6 +10363,228 @@ function StudioToolsPanel({
     await navigator.clipboard.writeText(value);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function resetSessionPlannerResult() {
+    setSessionPlan(null);
+    setSessionTabDrafts({});
+    setSessionOriginalTabDrafts({});
+    setActiveSessionTab('theme');
+    setSessionPlannerSaved(false);
+    setSessionResources(null);
+    setSessionPresentation(null);
+    setSessionPresentationBusy(null);
+  }
+
+  function updateSessionTopicDirection(field: keyof SessionPlannerTopicDirection, value: string) {
+    setSessionTopicDirection((current) => ({ ...current, [field]: value }));
+    resetSessionPlannerResult();
+  }
+
+  function mapWaitlistLeadsToPainPointSources(leads: SessionPlannerWaitlistLead[]): SessionPlannerInboundReply[] {
+    return leads
+      .filter((lead) => lead.focus?.trim())
+      .map((lead) => ({
+        id: `waitlist-${lead.id}`,
+        subject: 'Masterclass reservation focus',
+        body: [
+          `Name: ${lead.firstName || lead.email}`,
+          `Email: ${lead.email}`,
+          '',
+          'What they want help with:',
+          lead.focus,
+        ].join('\n'),
+        fromName: lead.firstName || lead.email,
+        fromEmail: lead.email,
+        receivedAt: lead.submittedAt,
+        lead: {
+          firstName: lead.firstName,
+          source: 'masterclass_waitlist',
+          archetype: 'Masterclass Waitlist',
+        },
+      }));
+  }
+
+  async function fetchSessionPlannerWaitlistLeads() {
+    const response = await fetch('/api/leads/masterclass-waitlist?limit=20', {
+      headers: { 'x-diagnostic-admin-key': adminKey },
+    });
+    const data = (await response.json().catch(() => ({}))) as { leads?: SessionPlannerWaitlistLead[]; error?: string };
+    if (!response.ok) throw new Error(data.error || 'Could not read masterclass waitlist leads.');
+    return mapWaitlistLeadsToPainPointSources(Array.isArray(data.leads) ? data.leads : []);
+  }
+
+  async function fetchSessionPlannerInboundReplies() {
+    setLocalBusyTool('session_planner');
+    setLoadingIndex(0);
+    setLocalError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch('/api/messages/inbound?source=masterclass_waitlist&limit=20&repair=false', {
+        headers: { 'x-diagnostic-admin-key': adminKey },
+        signal: controller.signal,
+      });
+      const data = (await response.json().catch(() => ({}))) as { replies?: SessionPlannerInboundReply[]; error?: string };
+      if (!response.ok) throw new Error(data.error || 'Could not read inbound emails.');
+
+      let replies = Array.isArray(data.replies) ? data.replies.filter((reply) => reply.body?.trim()) : [];
+      if (replies.length === 0) {
+        replies = await fetchSessionPlannerWaitlistLeads();
+      }
+      setSessionInboundReplies(replies);
+      setSessionInboundStatus(replies.length ? 'found' : 'empty');
+      setSessionExcludedReplyIds(new Set());
+      return replies;
+    } catch (error) {
+      setSessionInboundStatus('idle');
+      const message = error instanceof Error && error.name === 'AbortError'
+        ? 'Reading waitlist replies took too long. Try again, sync inbound emails from Messages, or paste the pain points manually.'
+        : error instanceof Error ? error.message : 'Could not read inbound emails.';
+      setLocalError(message);
+      return [];
+    } finally {
+      window.clearTimeout(timeout);
+      setLocalBusyTool(null);
+    }
+  }
+
+  async function generateSessionPlanner() {
+    let inboundRepliesForPlan = sessionIncludedReplies;
+
+    if (sessionPainSource === 'inbound' && sessionInboundStatus !== 'found') {
+      inboundRepliesForPlan = await fetchSessionPlannerInboundReplies();
+      if (!inboundRepliesForPlan.length) {
+        setLocalError((current) => current || 'No synced masterclass replies or reservation focus notes were found. Sync inbound emails from Messages, or switch to Paste manually and add the pain points yourself.');
+        return;
+      }
+    }
+
+    if (sessionPainSource === 'inbound' && !inboundRepliesForPlan.length) {
+      setLocalError('Include at least one waitlist reply so the session is built around real attendee needs.');
+      return;
+    }
+
+    if (sessionPainSource === 'manual' && !sessionPainText.trim()) {
+      setLocalError('Add pain points first so the session is built around real attendee needs.');
+      return;
+    }
+
+    setLocalBusyTool('session_planner');
+    setLoadingIndex(1);
+    setLocalError(null);
+    resetSessionPlannerResult();
+    try {
+      const plan = await requestJson<SessionPlannerPlan>('/api/tools/session-planner', 'POST', {
+        key: adminKey,
+        sessionName,
+        sessionDate,
+        attendeeCount: Number(sessionAttendeeCount) || 12,
+        painPointsSource: sessionPainSource,
+        painPointsText: sessionPainText,
+        inboundEmails: inboundRepliesForPlan.map((reply) => reply.body),
+        pillarFocus: sessionPillarFocus,
+        sessionStrategy,
+        topicDirection: sessionTopicDirection,
+        sessionNumber,
+        primaryOutcome: sessionOutcome,
+      });
+      const drafts = createSessionPlannerTabDrafts(plan);
+      setSessionPlan(plan);
+      setSessionTabDrafts(drafts);
+      setSessionOriginalTabDrafts(drafts);
+      setActiveSessionTab('theme');
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Could not generate the session plan.');
+    } finally {
+      setLocalBusyTool(null);
+    }
+  }
+
+  async function saveSessionPlannerToVault() {
+    if (!sessionPlan) return;
+    setLocalError(null);
+    try {
+      const content = editedSessionPlanMarkdown || buildSessionPlannerMarkdown(sessionPlan);
+      const data = await requestJson<{ item: ContentBacklogItem }>('/api/content/backlog', 'POST', {
+        key: adminKey,
+        title: `Session Plan - ${sessionPlan.theme.title}${sessionDate ? ` - ${sessionDate}` : ''}`,
+        pillar: sessionPlan.theme.pillar,
+        status: 'draft',
+        source: 'session_planner',
+        content,
+        notes: JSON.stringify({
+          kind: 'session_planner',
+          sessionDate: sessionDate || null,
+          primaryOutcome: sessionOutcome,
+          sessionStrategy,
+          topicDirection: sessionTopicDirection,
+          painPointsSource: sessionPainSource,
+          sourceCount: sessionPlan.metadata?.sourceCount || null,
+        }),
+      });
+      onVaultSaved(data.item);
+      setSessionPlannerSaved(true);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Could not save this session plan to the Vault.');
+    }
+  }
+
+  async function generateSessionResources() {
+    if (!sessionPlan) return;
+    const sessionMarkdown = editedSessionPlanMarkdown || buildSessionPlannerMarkdown(sessionPlan);
+    if (!sessionMarkdown.trim()) {
+      setLocalError('There is no edited session plan to turn into resources yet.');
+      return;
+    }
+
+    setSessionResourceBusy(true);
+    setLocalError(null);
+    try {
+      const data = await requestJson<SessionPlannerResources>('/api/tools/session-planner/resources', 'POST', {
+        key: adminKey,
+        sessionTitle: sessionPlan.theme.title,
+        pillar: sessionPlan.theme.pillar,
+        primaryOutcome: sessionOutcome,
+        sessionDate,
+        sessionPlanMarkdown: sessionMarkdown,
+      });
+      setSessionResources(data);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Could not generate the attendee resources.');
+    } finally {
+      setSessionResourceBusy(false);
+    }
+  }
+
+  async function generateSessionPresentation(mode: SessionPlannerPresentationMode) {
+    if (!sessionPlan) return;
+    const sessionMarkdown = editedSessionPlanMarkdown || buildSessionPlannerMarkdown(sessionPlan);
+    if (!sessionMarkdown.trim()) {
+      setLocalError('There is no edited session plan to turn into a presentation yet.');
+      return;
+    }
+
+    setSessionPresentationBusy(mode);
+    setLocalError(null);
+    try {
+      const data = await requestJson<SessionPlannerPresentationOutput>('/api/tools/session-planner/presentation', 'POST', {
+        key: adminKey,
+        mode,
+        sessionTitle: sessionPlan.theme.title,
+        pillar: sessionPlan.theme.pillar,
+        sessionStrategy,
+        topicDirection: sessionTopicDirection,
+        primaryOutcome: sessionOutcome,
+        sessionDate,
+        sessionPlanMarkdown: sessionMarkdown,
+      });
+      setSessionPresentation(data);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Could not generate the presentation asset.');
+    } finally {
+      setSessionPresentationBusy(null);
+    }
   }
 
   function getImageValidationError(file: File) {
@@ -10101,8 +10728,8 @@ function StudioToolsPanel({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {(Object.keys(studioToolMeta) as StudioToolKind[]).map((kind) => {
+        <div className={`mt-5 grid gap-3 ${activeTool ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+          {((activeTool ? [activeTool] : Object.keys(studioToolMeta)) as StudioToolKind[]).map((kind) => {
             const meta = studioToolMeta[kind];
             const Icon = meta.icon;
             const isSelected = activeTool === kind;
@@ -10132,7 +10759,14 @@ function StudioToolsPanel({
                 <span className={`mt-4 block text-[10px] font-bold uppercase tracking-[0.16em] ${isSelected ? 'text-white/62' : 'text-[#8C7466]'}`}>
                   {meta.eyebrow}
                 </span>
-                <span className="mt-1 block font-serif text-[25px] leading-tight">{meta.label}</span>
+                <span className="mt-1 flex flex-wrap items-end justify-between gap-2">
+                  <span className="block font-serif text-[25px] leading-tight">{meta.label}</span>
+                  {isSelected && (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/55">
+                      Click to change tool
+                    </span>
+                  )}
+                </span>
                 <span className={`mt-2 block text-[12px] leading-relaxed ${isSelected ? 'text-white/65' : 'text-[#142334]/62'}`}>
                   {meta.description}
                 </span>
@@ -10249,6 +10883,267 @@ function StudioToolsPanel({
             {isBusy ? 'Generating...' : activeMeta.buttonLabel}
           </button>
         </div>
+        )}
+
+        {activeTool === 'session_planner' && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Masterclass prep</p>
+                <h3 className="mt-1 font-serif text-[27px] leading-tight text-[#142334]">Session Planner</h3>
+                <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-[#142334]/62">
+                  Build the theme, curriculum, run sheet, speaker notes, intake form, and post-session email from real attendee pain points.
+                </p>
+              </div>
+              <Badge className="bg-white text-[#8C7466]">6 outputs</Badge>
+            </div>
+
+            <ToolStep number="01" title="Session context">
+              <div className="grid gap-3 md:grid-cols-2">
+                <TextInput
+                  label="Session name / theme"
+                  value={sessionName}
+                  onChange={setSessionName}
+                  placeholder="Optional. Leave blank and AI will suggest."
+                />
+                <TextInput
+                  label="Session date"
+                  type="date"
+                  value={sessionDate}
+                  onChange={setSessionDate}
+                />
+                <label className="grid gap-2">
+                  <span className="studio-label">Number of attendees</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={sessionAttendeeCount}
+                    onChange={(event) => setSessionAttendeeCount(event.target.value)}
+                    className="studio-input h-11"
+                  />
+                </label>
+              </div>
+            </ToolStep>
+
+            <ToolStep number="02" title="Attendee pain points">
+              <ToolPillGroup
+                value={sessionPainSource}
+                onChange={(value) => {
+                  setSessionPainSource(value as SessionPlannerPainSource);
+                  setSessionInboundStatus('idle');
+                  setSessionInboundReplies([]);
+                  setSessionExcludedReplyIds(new Set());
+                  setLocalError(null);
+                  resetSessionPlannerResult();
+                }}
+                options={[
+                  { value: 'inbound', label: 'Read from emails', detail: 'Use masterclass waitlist replies. Recommended.' },
+                  { value: 'manual', label: 'Paste manually', detail: 'Paste replies, poll results, or your own notes.' },
+                ]}
+              />
+
+              {sessionPainSource === 'manual' ? (
+                <textarea
+                  value={sessionPainText}
+                  onChange={(event) => {
+                    setSessionPainText(event.target.value);
+                    resetSessionPlannerResult();
+                  }}
+                  onWheel={trapWheel}
+                  rows={7}
+                  placeholder="Paste attendee emails, themes, LinkedIn poll results, diagnostic themes, or anything that shows what people are struggling with..."
+                  className="studio-input mt-3 w-full resize-y px-4 py-3 leading-relaxed"
+                />
+              ) : (
+                <div className="mt-3">
+                  {sessionInboundStatus === 'found' ? (
+                    <>
+                      <div className="flex items-center justify-between gap-3 rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
+                        <p className="text-[12px] leading-relaxed text-[#142334]/72">
+                          Using <span className="font-semibold text-[#142334]">{sessionIncludedReplies.length}</span> of {sessionInboundReplies.length} waitlist pain point source{sessionInboundReplies.length === 1 ? '' : 's'}.
+                          {sessionExcludedReplyIds.size > 0 && <span className="text-[#8C7466]"> Remove irrelevant ones so the AI only reads useful input.</span>}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSessionExcludedReplyIds(new Set())}
+                            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8C7466] hover:text-[#142334]"
+                          >
+                            Include all
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-2 max-h-[340px] divide-y divide-[#E4D8CB] overflow-y-auto rounded-[8px] border border-[#E4D8CB] bg-white">
+                        {sessionInboundReplies.map((reply) => {
+                          const excluded = sessionExcludedReplyIds.has(reply.id);
+                          return (
+                            <label
+                              key={reply.id}
+                              className={`flex cursor-pointer gap-3 px-4 py-3 text-[12px] leading-relaxed transition ${excluded ? 'bg-[#F5F3EE]/50 opacity-50' : 'hover:bg-[#FBFAF8]'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!excluded}
+                                onChange={() => {
+                                  setSessionExcludedReplyIds((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(reply.id)) next.delete(reply.id);
+                                    else next.add(reply.id);
+                                    return next;
+                                  });
+                                  resetSessionPlannerResult();
+                                }}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-[#142334]"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-semibold text-[#142334]">{reply.fromName || reply.fromEmail}</span>
+                                {reply.subject && <span className="block text-[11px] text-[#8C7466]">{reply.subject}</span>}
+                                <span className="mt-1 block truncate text-[#142334]/60">{reply.body.slice(0, 180)}{reply.body.length > 180 ? '...' : ''}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : sessionInboundStatus === 'empty' ? (
+                    <div className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3 text-[12px] leading-relaxed text-[#142334]/65">
+                      No synced masterclass replies or reservation focus notes found yet. Switch to Paste manually if you want to enter pain points yourself.
+                    </div>
+                  ) : (
+                    <div className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3 text-[12px] leading-relaxed text-[#142334]/65">
+                      Click Generate Session Plan to fetch masterclass waitlist replies or reservation focus notes before generation.
+                    </div>
+                  )}
+                </div>
+              )}
+            </ToolStep>
+
+            <ToolStep number="03" title="Topic direction">
+              <div className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-bold text-[#142334]">Tell the AI what Kagiso wants to teach.</p>
+                    <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-[#142334]/60">
+                      Pain points explain what attendees are struggling with. This tells the AI the exact topic, sub-niche, and boundaries of the masterclass.
+                    </p>
+                  </div>
+                  {sessionTopicHasDirection && <Badge className="bg-[#F5F3EE] text-[#8C7466]">topic set</Badge>}
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <TextInput
+                    label="Main topic"
+                    value={sessionTopicDirection.mainTopic}
+                    onChange={(value) => updateSessionTopicDirection('mainTopic', value)}
+                    placeholder="Personal branding for career movement"
+                  />
+                  <TextInput
+                    label="Specific focus / sub-niche"
+                    value={sessionTopicDirection.specificFocus}
+                    onChange={(value) => updateSessionTopicDirection('specificFocus', value)}
+                    placeholder="LinkedIn positioning when you feel stuck"
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="studio-label">Must cover</span>
+                    <textarea
+                      value={sessionTopicDirection.mustCover}
+                      onChange={(event) => updateSessionTopicDirection('mustCover', event.target.value)}
+                      onWheel={trapWheel}
+                      rows={4}
+                      placeholder="LinkedIn headline, career story, visibility, leadership readiness..."
+                      className="studio-input resize-y px-4 py-3 leading-relaxed"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="studio-label">Avoid / do not focus on</span>
+                    <textarea
+                      value={sessionTopicDirection.avoid}
+                      onChange={(event) => updateSessionTopicDirection('avoid', event.target.value)}
+                      onWheel={trapWheel}
+                      rows={4}
+                      placeholder="Do not make it only about CV writing. Do not make it too theoretical..."
+                      className="studio-input resize-y px-4 py-3 leading-relaxed"
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 grid gap-2">
+                  <span className="studio-label">Desired attendee outcome</span>
+                  <textarea
+                    value={sessionTopicDirection.desiredOutcome}
+                    onChange={(event) => updateSessionTopicDirection('desiredOutcome', event.target.value)}
+                    onWheel={trapWheel}
+                    rows={3}
+                    placeholder="Attendees should leave knowing how to position themselves for the next opportunity."
+                    className="studio-input resize-y px-4 py-3 leading-relaxed"
+                  />
+                </label>
+              </div>
+            </ToolStep>
+
+            <ToolStep number="04" title="Session architecture">
+              <ToolPillGroup
+                value={sessionStrategy}
+                onChange={(value) => {
+                  setSessionStrategy(value as SessionPlannerStrategy);
+                  resetSessionPlannerResult();
+                }}
+                options={sessionPlannerStrategyOptions}
+              />
+            </ToolStep>
+
+            <ToolStep number="05" title="Pillar umbrella">
+              <ToolPillGroup
+                value={sessionPillarFocus}
+                onChange={(value) => {
+                  setSessionPillarFocus(value as SessionPlannerPillarFocus);
+                  resetSessionPlannerResult();
+                }}
+                options={sessionPlannerPillarOptions}
+              />
+            </ToolStep>
+
+            <ToolStep number="06" title="Primary outcome">
+              <ToolPillGroup
+                value={sessionOutcome}
+                onChange={(value) => {
+                  setSessionOutcome(value as SessionPlannerOutcome);
+                  resetSessionPlannerResult();
+                }}
+                options={sessionPlannerOutcomeOptions}
+              />
+            </ToolStep>
+
+            <ToolStep number="07" title="Session number in series">
+              <ToolPillGroup
+                value={sessionNumber}
+                onChange={(value) => {
+                  setSessionNumber(value as SessionPlannerSessionNumber);
+                  resetSessionPlannerResult();
+                }}
+                options={sessionPlannerNumberOptions}
+              />
+            </ToolStep>
+
+            {localError && activeTool === 'session_planner' && (
+              <div className="mt-4">
+                <Notice tone="error">{localError}</Notice>
+              </div>
+            )}
+            {localBusyTool === 'session_planner' && (
+              <p className="mt-4 rounded-[8px] bg-white px-4 py-3 text-[13px] font-semibold text-[#142334]/70">{currentLoadingMessage}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => void generateSessionPlanner()}
+              disabled={Boolean(effectiveBusyTool) || (sessionPainSource === 'manual' && !sessionPainText.trim()) || (sessionPainSource === 'inbound' && sessionInboundStatus === 'found' && !sessionIncludedReplies.length)}
+              className="studio-primary-button mt-5 w-full justify-center"
+            >
+              {localBusyTool === 'session_planner' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
+              {localBusyTool === 'session_planner' ? currentLoadingMessage || 'Working...' : sessionGenerateLabel}
+            </button>
+          </div>
         )}
 
         {activeTool === 'caption' && (
@@ -10484,15 +11379,19 @@ function StudioToolsPanel({
 
         {generatedToolResult?.output ? (
           <>
-            <div className="mt-5 rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
-              <pre className="max-h-[620px] overflow-y-auto whitespace-pre-wrap font-sans text-[14px] leading-[1.7]">{generatedToolResult.output}</pre>
-            </div>
+            <textarea
+              value={editableToolOutput}
+              onChange={(event) => setEditableToolOutputDraft({ key: generatedToolOutputKey, value: event.target.value })}
+              onWheel={trapWheel}
+              rows={22}
+              className="studio-input mt-5 max-h-[620px] min-h-[420px] w-full resize-y border-white/10 bg-white px-4 py-4 font-sans text-[14px] leading-[1.7] text-[#142334]"
+            />
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" onClick={copyToolOutput} className="studio-primary-button">
                 <ClipboardCheck className="h-4 w-4" />
                 {copied ? 'Copied' : 'Copy output'}
               </button>
-              <button type="button" onClick={() => setSource(generatedToolResult.output)} className="studio-secondary-button">
+              <button type="button" onClick={() => setSource(editableToolOutput)} className="studio-secondary-button">
                 Use as source
               </button>
             </div>
@@ -10515,7 +11414,20 @@ function StudioToolsPanel({
                     </div>
                     <Badge className="bg-[#F5F3EE] text-[#8C7466]">{captionPlatformLabels[captionPlatform]}</Badge>
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap text-[14px] leading-[1.7] text-[#142334]/78">{item.caption}</p>
+                  <textarea
+                    value={item.caption}
+                    onChange={(event) => {
+                      setCaptionResult((current) => current ? {
+                        ...current,
+                        captions: current.captions.map((caption, captionIndex) => (
+                          captionIndex === index ? { ...caption, caption: event.target.value } : caption
+                        )),
+                      } : current);
+                    }}
+                    onWheel={trapWheel}
+                    rows={8}
+                    className="studio-input mt-4 w-full resize-y px-4 py-3 text-[14px] leading-[1.7] text-[#142334]"
+                  />
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button type="button" onClick={() => void copyText(item.caption)} className="studio-primary-button">
                       <ClipboardCheck className="h-4 w-4" />
@@ -10550,7 +11462,13 @@ function StudioToolsPanel({
                   </div>
                   <Badge className="bg-[#F5F3EE] text-[#8C7466]">{replyPlatformLabels[replyPlatform]}</Badge>
                 </div>
-                <p className="mt-4 whitespace-pre-wrap text-[14px] leading-[1.7] text-[#142334]/78">{replyResult?.reply}</p>
+                <textarea
+                  value={replyResult?.reply || ''}
+                  onChange={(event) => setReplyResult((current) => current ? { ...current, reply: event.target.value } : current)}
+                  onWheel={trapWheel}
+                  rows={8}
+                  className="studio-input mt-4 w-full resize-y px-4 py-3 text-[14px] leading-[1.7] text-[#142334]"
+                />
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button type="button" onClick={() => void copyText(replyResult?.reply || '')} className="studio-primary-button">
                     <ClipboardCheck className="h-4 w-4" />
@@ -10571,7 +11489,13 @@ function StudioToolsPanel({
               {replyResult?.shortReply && (
                 <div className="rounded-[8px] border border-white/10 bg-white/[0.08] p-4 text-white">
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/58">Shorter version</p>
-                  <p className="mt-3 whitespace-pre-wrap text-[14px] leading-[1.7] text-white/80">{replyResult.shortReply}</p>
+                  <textarea
+                    value={replyResult.shortReply}
+                    onChange={(event) => setReplyResult((current) => current ? { ...current, shortReply: event.target.value } : current)}
+                    onWheel={trapWheel}
+                    rows={5}
+                    className="studio-input mt-3 w-full resize-y border-white/10 bg-white px-4 py-3 text-[14px] leading-[1.7] text-[#142334]"
+                  />
                   <button type="button" onClick={() => void copyText(replyResult.shortReply)} className="studio-secondary-button mt-4">
                     <ClipboardCheck className="h-4 w-4" />
                     {copied ? 'Copied' : 'Copy short reply'}
@@ -10579,6 +11503,165 @@ function StudioToolsPanel({
                 </div>
               )}
             </div>
+          </>
+        ) : hasSessionPlannerOutput && sessionPlan ? (
+          <>
+            <div className="mt-5 flex gap-2 overflow-x-auto border-b border-white/10 pb-1" onWheel={trapWheel}>
+              {sessionPlannerTabs.map((tab) => {
+                const usedFallback = sessionPlan?.metadata?.fallbacks?.[tab.value as keyof typeof sessionPlan.metadata.fallbacks];
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setActiveSessionTab(tab.value)}
+                    className={`shrink-0 border-b-2 px-3 py-2 text-[12px] font-bold transition ${
+                      activeSessionTab === tab.value
+                        ? 'border-[#C9AD98] text-white'
+                        : 'border-transparent text-white/55 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                    {usedFallback && <span className="ml-1.5 inline-block rounded-full bg-[#F59E0B]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#F59E0B]" title="This section used fallback data because the AI response was incomplete">fallback</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <textarea
+              value={activeSessionTabDraft}
+              onChange={(event) => {
+                setSessionTabDrafts((current) => ({ ...current, [activeSessionTab]: event.target.value }));
+                setSessionPlannerSaved(false);
+                setSessionResources(null);
+                setSessionPresentation(null);
+              }}
+              onWheel={trapWheel}
+              rows={24}
+              className="studio-input mt-4 max-h-[680px] min-h-[500px] w-full resize-y border-white/10 bg-white px-4 py-4 font-sans text-[14px] leading-[1.7] text-[#142334]"
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={() => void copyText(activeSessionTabDraft)} className="studio-primary-button">
+                <ClipboardCheck className="h-4 w-4" />
+                {copied ? 'Copied' : 'Copy this tab'}
+              </button>
+              <button type="button" onClick={() => void copyText(editedSessionPlanMarkdown || buildSessionPlannerMarkdown(sessionPlan))} className="studio-secondary-button">
+                <ClipboardCheck className="h-4 w-4" />
+                Copy all as Markdown
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadMarkdownFile(`${getSessionPlannerSafeFilename(sessionPlan.theme.title)}.md`, editedSessionPlanMarkdown || buildSessionPlannerMarkdown(sessionPlan))}
+                className="studio-secondary-button"
+              >
+                <Download className="h-4 w-4" />
+                Download Markdown
+              </button>
+              <button type="button" onClick={() => void saveSessionPlannerToVault()} className="studio-secondary-button">
+                <Save className="h-4 w-4" />
+                {sessionPlannerSaved ? 'Saved to Vault' : 'Save to Vault'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void generateSessionResources()}
+                disabled={sessionResourceBusy || Boolean(effectiveBusyTool)}
+                className="studio-secondary-button"
+              >
+                {sessionResourceBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {sessionResourceBusy ? 'Generating resources' : 'Generate attendee resources'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void generateSessionPresentation('outline')}
+                disabled={Boolean(sessionPresentationBusy) || Boolean(effectiveBusyTool)}
+                className="studio-secondary-button"
+              >
+                {sessionPresentationBusy === 'outline' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+                {sessionPresentationBusy === 'outline' ? 'Building outline' : 'Build slide outline'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void generateSessionPresentation('external_prompt')}
+                disabled={Boolean(sessionPresentationBusy) || Boolean(effectiveBusyTool)}
+                className="studio-secondary-button"
+              >
+                {sessionPresentationBusy === 'external_prompt' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                {sessionPresentationBusy === 'external_prompt' ? 'Writing prompt' : 'Create presentation prompt'}
+              </button>
+              <button type="button" onClick={() => {
+                if (sessionPlannerHasDraftEdits && !window.confirm('Regenerate will overwrite all edits, attendee resources, and presentation outputs. Continue?')) return;
+                void generateSessionPlanner();
+              }} disabled={Boolean(effectiveBusyTool)} className="studio-secondary-button">
+                <RefreshCcw className="h-4 w-4" />
+                Regenerate
+              </button>
+            </div>
+            {sessionResources && (
+              <div className="mt-5 rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Attendee Resources</p>
+                    <h4 className="mt-1 font-serif text-[22px] leading-tight text-[#142334]">{sessionResources.title}</h4>
+                  </div>
+                  <Badge className="bg-[#F5F3EE] text-[#8C7466]">90-day plan</Badge>
+                </div>
+                <textarea
+                  value={sessionResources.markdown}
+                  onChange={(event) => setSessionResources((current) => current ? { ...current, markdown: event.target.value } : current)}
+                  onWheel={trapWheel}
+                  rows={22}
+                  className="studio-input mt-4 max-h-[620px] min-h-[420px] w-full resize-y px-4 py-3 font-sans text-[14px] leading-[1.7] text-[#142334]"
+                />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void copyText(sessionResources.markdown)} className="studio-primary-button">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {copied ? 'Copied' : 'Copy resources'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadMarkdownFile(`${getSessionPlannerSafeFilename(sessionResources.title)}.md`, sessionResources.markdown)}
+                    className="studio-secondary-button"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download resources
+                  </button>
+                </div>
+              </div>
+            )}
+            {sessionPresentation && (
+              <div className="mt-5 rounded-[8px] border border-white/10 bg-white p-4 text-[#142334]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
+                      {sessionPresentation.mode === 'outline' ? 'Presentation Outline' : 'External Presentation Prompt'}
+                    </p>
+                    <h4 className="mt-1 font-serif text-[22px] leading-tight text-[#142334]">{sessionPresentation.title}</h4>
+                  </div>
+                  <Badge className="bg-[#F5F3EE] text-[#8C7466]">
+                    {sessionPresentation.mode === 'outline' ? 'inside dashboard' : 'paste-ready'}
+                  </Badge>
+                </div>
+                <textarea
+                  value={sessionPresentation.markdown}
+                  onChange={(event) => setSessionPresentation((current) => current ? { ...current, markdown: event.target.value } : current)}
+                  onWheel={trapWheel}
+                  rows={24}
+                  className="studio-input mt-4 max-h-[680px] min-h-[460px] w-full resize-y px-4 py-3 font-sans text-[14px] leading-[1.7] text-[#142334]"
+                />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void copyText(sessionPresentation.markdown)} className="studio-primary-button">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {copied ? 'Copied' : sessionPresentation.mode === 'outline' ? 'Copy outline' : 'Copy prompt'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadMarkdownFile(`${getSessionPlannerSafeFilename(sessionPresentation.title)}.md`, sessionPresentation.markdown)}
+                    className="studio-secondary-button"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Markdown
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="mt-5 grid min-h-[420px] place-items-center rounded-[8px] border border-white/10 bg-white/5 p-6 text-center">
@@ -10593,6 +11676,169 @@ function StudioToolsPanel({
         )}
       </aside>
     </section>
+  );
+}
+
+function SessionPlannerTabContent({ plan, tab }: { plan: SessionPlannerPlan; tab: SessionPlannerTab }) {
+  if (tab === 'theme') {
+    return (
+      <div className="grid gap-5">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Session Theme</p>
+          <h4 className="mt-2 font-serif text-[26px] leading-tight text-[#142334]">{plan.theme.title}</h4>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge className="bg-[#F5F3EE] text-[#8C7466]">{pillarMeta[plan.theme.pillar].label}</Badge>
+            <Badge className="bg-[#E4D8CB] text-[#142334]">120 minutes</Badge>
+          </div>
+        </div>
+        <SessionPlannerSection title="Rationale">{plan.theme.rationale}</SessionPlannerSection>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Common pain points identified</p>
+          <ul className="mt-3 grid gap-2">
+            {plan.theme.painPoints.map((point, index) => (
+              <li key={`${point}-${index}`} className="rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[13px] leading-relaxed text-[#142334]/76">
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <SessionPlannerSection title="Session Promise">{plan.theme.sessionPromise}</SessionPlannerSection>
+        <SessionPlannerSection title="Primary Outcome">{plan.theme.primaryOutcome}</SessionPlannerSection>
+      </div>
+    );
+  }
+
+  if (tab === 'curriculum') {
+    return (
+      <div className="grid gap-5">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Curriculum</p>
+          <h4 className="mt-2 font-serif text-[24px] leading-tight text-[#142334]">{plan.curriculum.mainTopic}</h4>
+        </div>
+        {plan.curriculum.subtopics.map((subtopic, index) => (
+          <div key={`${subtopic.title}-${index}`} className="rounded-[8px] border border-[#E4D8CB] p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Teaching block {subtopic.teachingBlock}</p>
+            <h5 className="mt-1 text-[16px] font-bold text-[#142334]">{subtopic.title}</h5>
+            <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/72">{subtopic.description}</p>
+            <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">Key questions</p>
+            <ul className="mt-2 grid gap-1 text-[13px] leading-relaxed text-[#142334]/76">
+              {subtopic.keyQuestions.map((question, questionIndex) => <li key={`${question}-${questionIndex}`}>- {question}</li>)}
+            </ul>
+          </div>
+        ))}
+        <SessionPlannerSection title="Reflection Exercise">{plan.curriculum.reflectionExercise}</SessionPlannerSection>
+        <SessionPlannerSection title="Hot Seat Setup">{plan.curriculum.hotSeatSetup}</SessionPlannerSection>
+      </div>
+    );
+  }
+
+  if (tab === 'runSheet') {
+    return (
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">120-Minute Run Sheet</p>
+          <Badge className="bg-[#F5F3EE] text-[#8C7466]">{plan.runSheet.totalMinutes} min</Badge>
+        </div>
+        {plan.runSheet.blocks.map((block, index) => {
+          const isBreak = block.label.toLowerCase().includes('break');
+          return (
+            <div key={`${block.label}-${index}`} className={`rounded-[8px] border p-4 ${isBreak ? 'border-[#F59E0B]/30 bg-[#FEF3C7]' : 'border-[#E4D8CB] bg-white'}`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[13px] font-bold text-[#142334]">{formatSessionMinute(block.startMinute)} - {formatSessionMinute(block.endMinute)}</span>
+                <Badge className="bg-[#F5F3EE] text-[#6B6B6B]">{block.duration} min</Badge>
+              </div>
+              <h5 className="mt-2 text-[14px] font-bold uppercase tracking-[0.08em] text-[#142334]">{block.label}</h5>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/74">{block.description}</p>
+              <p className="mt-2 text-[12px] italic leading-relaxed text-[#6B6B6B]">{block.facilitation}</p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (tab === 'speakerNotes') {
+    return (
+      <div className="grid gap-4">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Speaker Notes</p>
+        {plan.speakerNotes.blocks.map((block, index) => (
+          <div key={`${block.blockLabel}-${index}`} className="rounded-[8px] border border-[#E4D8CB] p-4">
+            <p className="border-b border-[#E4D8CB] pb-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#142334]">{block.blockLabel}</p>
+            <SessionPlannerMiniSection title="Opening line" italic>{block.openingLine}</SessionPlannerMiniSection>
+            <SessionPlannerMiniList title="Key points" items={block.keyPoints} />
+            <SessionPlannerMiniSection title="Story / example">{block.storyOrExample}</SessionPlannerMiniSection>
+            <SessionPlannerMiniList title="Ask the room" items={block.audienceQuestions} />
+            <SessionPlannerMiniSection title="Transition" italic>{block.transition}</SessionPlannerMiniSection>
+            <div className="mt-3 rounded-[8px] bg-[#F5F3EE] px-3 py-2 text-[12px] font-semibold leading-relaxed text-[#8C7466]">
+              {block.doNotForget}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (tab === 'intakeForm') {
+    return (
+      <div className="grid gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Pre-Session Intake Form</p>
+          <p className="mt-3 text-[14px] leading-relaxed text-[#142334]/76">{plan.intakeForm.intro}</p>
+        </div>
+        {plan.intakeForm.questions.map((question, index) => (
+          <div key={`${question.question}-${index}`} className="rounded-[8px] border border-[#E4D8CB] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Question {index + 1}</p>
+              <Badge className="bg-[#F5F3EE] text-[#6B6B6B]">{question.type.replace('_', ' ')}</Badge>
+            </div>
+            <p className="mt-2 text-[14px] font-semibold leading-relaxed text-[#142334]">{question.question}</p>
+            {question.options.length > 0 && (
+              <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/62">Options: {question.options.join(', ')}</p>
+            )}
+            <p className="mt-2 text-[12px] italic leading-relaxed text-[#6B6B6B]">{question.purpose}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Post-Session Email</p>
+        <p className="mt-3 rounded-[8px] bg-[#F5F3EE] px-3 py-2 text-[13px] font-bold text-[#142334]">{plan.postSessionEmail.subject}</p>
+      </div>
+      <p className="whitespace-pre-wrap text-[14px] leading-[1.7] text-[#142334]/78">{plan.postSessionEmail.body}</p>
+    </div>
+  );
+}
+
+function SessionPlannerSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{title}</p>
+      <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/76">{children}</p>
+    </div>
+  );
+}
+
+function SessionPlannerMiniSection({ title, children, italic = false }: { title: string; children: ReactNode; italic?: boolean }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{title}</p>
+      <p className={`mt-1 text-[13px] leading-relaxed text-[#142334]/76 ${italic ? 'italic' : ''}`}>{children}</p>
+    </div>
+  );
+}
+
+function SessionPlannerMiniList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{title}</p>
+      <ul className="mt-1 grid gap-1 text-[13px] leading-relaxed text-[#142334]/76">
+        {items.map((item, index) => <li key={`${item}-${index}`}>- {item}</li>)}
+      </ul>
+    </div>
   );
 }
 
