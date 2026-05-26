@@ -11,12 +11,16 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  Flag,
   Loader2,
   Mail,
+  Plus,
   RotateCcw,
   Save,
   Send,
   Sparkles,
+  Target,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 import {
@@ -29,11 +33,18 @@ import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 import FilterDropdown from '@/components/FilterDropdown';
 import DashboardTimePicker from '@/components/DashboardTimePicker';
+import { normalizeBusinessGoalsSettings } from '@/lib/settings';
 import type {
   AiConfigSettings,
   AssistantPreferences,
+  BusinessGoal,
+  BusinessGoalsSettings,
   BusinessHoursSettings,
   BusinessProfileSettings,
+  GoalCategory,
+  GoalHorizon,
+  GoalLinkedArea,
+  GoalStatus,
   NotificationSettings,
   ServiceSetting,
   SettingsMap,
@@ -70,6 +81,12 @@ const settingsNavItems = [
     title: 'Business Profile',
     description: 'Identity, email, website',
     icon: UserRound,
+  },
+  {
+    id: 'business_goals',
+    title: 'Goals',
+    description: 'Targets, timelines, focus',
+    icon: Flag,
   },
   {
     id: 'services',
@@ -164,6 +181,41 @@ const openRouterModelOptions = [
   { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro' },
 ];
 
+const goalHorizonOptions: { value: GoalHorizon; label: string }[] = [
+  { value: 'short_term', label: 'Short term' },
+  { value: 'ninety_day', label: '90-day' },
+  { value: 'one_year', label: '12-month' },
+  { value: 'long_term', label: 'Long term' },
+];
+
+const goalCategoryOptions: { value: GoalCategory; label: string }[] = [
+  { value: 'clients', label: 'Clients' },
+  { value: 'revenue', label: 'Revenue' },
+  { value: 'brand_visibility', label: 'Brand visibility' },
+  { value: 'social_growth', label: 'Social growth' },
+  { value: 'content', label: 'Content' },
+  { value: 'operations', label: 'Operations' },
+];
+
+const goalStatusOptions: { value: GoalStatus; label: string }[] = [
+  { value: 'not_started', label: 'Not started' },
+  { value: 'active', label: 'Active' },
+  { value: 'at_risk', label: 'At risk' },
+  { value: 'achieved', label: 'Achieved' },
+  { value: 'paused', label: 'Paused' },
+];
+
+const goalLinkedAreaOptions: { value: GoalLinkedArea; label: string }[] = [
+  { value: 'leads', label: 'Leads' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'clients', label: 'Clients' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'content', label: 'Content' },
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'messages', label: 'Messages' },
+  { value: 'tasks', label: 'Tasks' },
+];
+
 function coerceArray<T>(value: unknown, fallback: T[]): T[] {
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
@@ -195,6 +247,41 @@ async function patchJson<T>(url: string, payload: Record<string, unknown>) {
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
+}
+
+function createId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createGoal(): BusinessGoal {
+  return {
+    id: createId('goal'),
+    title: 'New business goal',
+    horizon: 'ninety_day',
+    category: 'clients',
+    metricLabel: 'Target',
+    currentValue: 0,
+    targetValue: 0,
+    deadline: '',
+    priority: 3,
+    status: 'active',
+    linkedArea: 'leads',
+    notes: '',
+  };
+}
+
+function getGoalProgress(goal: BusinessGoal) {
+  if (!goal.targetValue || goal.targetValue <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100)));
+}
+
+function getGoalStatusClass(status: GoalStatus) {
+  if (status === 'achieved') return 'border-[#0F766E]/25 bg-[#ECFDF5] text-[#0F766E]';
+  if (status === 'at_risk') return 'border-[#A24E37]/25 bg-[#FEF2F2] text-[#A24E37]';
+  if (status === 'paused') return 'border-[#6B6B6B]/20 bg-[#F3F4F6] text-[#6B6B6B]';
+  if (status === 'not_started') return 'border-[#8C7466]/25 bg-[#F8F6F4] text-[#8C7466]';
+  return 'border-[#142334]/15 bg-[#EAF0F5] text-[#142334]';
 }
 
 function Toggle({
@@ -288,6 +375,9 @@ export default function SettingsPageComponent({
   const [assistantPreferences, setAssistantPreferences] = useState<AssistantPreferences>(
     normalizeAssistantPreferences(getSetting(settings, 'assistant_preferences', sectionDefaults.assistant_preferences)),
   );
+  const [businessGoals, setBusinessGoals] = useState<BusinessGoalsSettings>(
+    normalizeBusinessGoalsSettings(settings.business_goals),
+  );
   const [notifications, setNotifications] = useState<NotificationSettings>(
     getSetting(settings, 'notifications', sectionDefaults.notifications),
   );
@@ -320,6 +410,17 @@ export default function SettingsPageComponent({
       { title: 'MASTERCLASS WAITLIST', groups: groupByArchetype(waitlist) },
     ];
   }, [templates]);
+
+  const goalSummary = useMemo(() => {
+    const activeGoals = businessGoals.goals.filter((goal) => !['achieved', 'paused'].includes(goal.status));
+    const highestPriority = [...activeGoals].sort((a, b) => b.priority - a.priority)[0];
+    return {
+      active: activeGoals.length,
+      atRisk: businessGoals.goals.filter((goal) => goal.status === 'at_risk').length,
+      achieved: businessGoals.goals.filter((goal) => goal.status === 'achieved').length,
+      highestPriority,
+    };
+  }, [businessGoals]);
 
   async function saveSetting(key: string, value: unknown) {
     setSaveStates((current) => ({ ...current, [key]: 'saving' }));
@@ -388,6 +489,36 @@ export default function SettingsPageComponent({
       greetNaturally: tone !== 'focused_operator',
       allowEmojis: tone !== 'focused_operator',
     }));
+  }
+
+  function updateBusinessGoal(id: string, updates: Partial<BusinessGoal>) {
+    setBusinessGoals((current) => ({
+      ...current,
+      goals: current.goals.map((goal) => (goal.id === id ? { ...goal, ...updates } : goal)),
+    }));
+  }
+
+  function addBusinessGoal() {
+    setBusinessGoals((current) => ({
+      ...current,
+      goals: [...current.goals, createGoal()],
+    }));
+  }
+
+  function removeBusinessGoal(id: string) {
+    setBusinessGoals((current) => ({
+      ...current,
+      goals: current.goals.filter((goal) => goal.id !== id),
+    }));
+  }
+
+  function saveBusinessGoals() {
+    const nextGoals = normalizeBusinessGoalsSettings({
+      ...businessGoals,
+      updatedAt: new Date().toISOString(),
+    });
+    setBusinessGoals(nextGoals);
+    void saveSetting('business_goals', nextGoals);
   }
 
   async function testAiConnection(provider: 'zai' | 'openrouter') {
@@ -567,6 +698,215 @@ export default function SettingsPageComponent({
               <div className="flex flex-wrap items-center gap-3">
                 <SaveButton state={saveStates.business_profile || 'idle'} label="Save profile" />
                 <StatusMessage state={saveStates.business_profile || 'idle'} />
+              </div>
+            </form>
+          </SettingsPanel>
+          )}
+
+          {activeSection === 'business_goals' && (
+          <SettingsPanel title="Goals" icon={Flag}>
+            <form
+              className="grid gap-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveBusinessGoals();
+              }}
+            >
+              <div className="grid gap-3 rounded-[8px] bg-[#142334] p-4 text-white md:grid-cols-[1fr_auto] md:items-center">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Active goals</p>
+                    <p className="mt-2 font-serif text-[34px] leading-none">{goalSummary.active}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">At risk</p>
+                    <p className="mt-2 font-serif text-[34px] leading-none">{goalSummary.atRisk}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Achieved</p>
+                    <p className="mt-2 font-serif text-[34px] leading-none">{goalSummary.achieved}</p>
+                  </div>
+                </div>
+                <button type="button" className="studio-secondary-button border-white/20 bg-white text-[#142334] hover:bg-[#F8F6F4]" onClick={addBusinessGoal}>
+                  <Plus className="h-4 w-4" /> Add goal
+                </button>
+              </div>
+
+              {goalSummary.highestPriority && (
+                <div className="rounded-[8px] border border-[#D8C8BB] bg-[#F8F6F4] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Top focus</p>
+                  <p className="mt-2 font-serif text-[24px] leading-tight text-[#142334]">{goalSummary.highestPriority.title}</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/66">
+                    {goalSummary.highestPriority.metricLabel}: {goalSummary.highestPriority.currentValue} / {goalSummary.highestPriority.targetValue || 'set target'}.
+                    {goalSummary.highestPriority.deadline ? ` Due ${goalSummary.highestPriority.deadline}.` : ' Add a deadline when you are ready.'}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-4">
+                {businessGoals.goals.length === 0 ? (
+                  <div className="grid place-items-center rounded-[8px] border border-dashed border-[#D8C8BB] bg-[#FCFBFA] px-5 py-10 text-center">
+                    <Target className="h-8 w-8 text-[#C9AD98]" />
+                    <p className="mt-4 font-serif text-[24px] leading-tight text-[#142334]">Add the first goal</p>
+                    <p className="mt-2 max-w-md text-[13px] leading-relaxed text-[#6B6B6B]">
+                      Give the assistant a target, a timeline, and a metric so every recommendation has a direction.
+                    </p>
+                    <button type="button" className="studio-primary-button mt-5" onClick={addBusinessGoal}>
+                      <Plus className="h-4 w-4" /> Add goal
+                    </button>
+                  </div>
+                ) : (
+                  businessGoals.goals.map((goal, index) => {
+                    const progress = getGoalProgress(goal);
+                    const statusLabel = goalStatusOptions.find((option) => option.value === goal.status)?.label || 'Active';
+
+                    return (
+                      <div key={goal.id} className="rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <label className="grid min-w-0 flex-1 gap-2">
+                            <span className="studio-label">Goal {index + 1}</span>
+                            <input
+                              className="studio-input h-11"
+                              value={goal.title}
+                              onChange={(event) => updateBusinessGoal(goal.id, { title: event.target.value })}
+                            />
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className={`mt-7 inline-flex h-9 items-center rounded-full border px-3 text-[11px] font-semibold uppercase tracking-[0.13em] ${getGoalStatusClass(goal.status)}`}>
+                              {statusLabel}
+                            </span>
+                            <button
+                              type="button"
+                              className="studio-ghost-icon mt-7"
+                              onClick={() => removeBusinessGoal(goal.id)}
+                              aria-label={`Remove ${goal.title}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                          <div className="grid gap-2">
+                            <span className="studio-label">Timeline</span>
+                            <FilterDropdown
+                              name={`goal-${goal.id}-horizon`}
+                              value={goal.horizon}
+                              onChange={(value) => updateBusinessGoal(goal.id, { horizon: value as GoalHorizon })}
+                              ariaLabel="Choose goal timeline"
+                              options={goalHorizonOptions}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <span className="studio-label">Category</span>
+                            <FilterDropdown
+                              name={`goal-${goal.id}-category`}
+                              value={goal.category}
+                              onChange={(value) => updateBusinessGoal(goal.id, { category: value as GoalCategory })}
+                              ariaLabel="Choose goal category"
+                              options={goalCategoryOptions}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <span className="studio-label">Status</span>
+                            <FilterDropdown
+                              name={`goal-${goal.id}-status`}
+                              value={goal.status}
+                              onChange={(value) => updateBusinessGoal(goal.id, { status: value as GoalStatus })}
+                              ariaLabel="Choose goal status"
+                              options={goalStatusOptions}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <span className="studio-label">Dashboard area</span>
+                            <FilterDropdown
+                              name={`goal-${goal.id}-linked-area`}
+                              value={goal.linkedArea}
+                              onChange={(value) => updateBusinessGoal(goal.id, { linkedArea: value as GoalLinkedArea })}
+                              ariaLabel="Choose linked dashboard area"
+                              options={goalLinkedAreaOptions}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 md:grid-cols-4">
+                          <label className="grid gap-2">
+                            <span className="studio-label">Metric</span>
+                            <input
+                              className="studio-input h-11"
+                              value={goal.metricLabel}
+                              onChange={(event) => updateBusinessGoal(goal.id, { metricLabel: event.target.value })}
+                            />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="studio-label">Current</span>
+                            <input
+                              className="studio-input h-11"
+                              type="number"
+                              value={goal.currentValue}
+                              onChange={(event) => updateBusinessGoal(goal.id, { currentValue: Number(event.target.value || 0) })}
+                            />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="studio-label">Target</span>
+                            <input
+                              className="studio-input h-11"
+                              type="number"
+                              value={goal.targetValue}
+                              onChange={(event) => updateBusinessGoal(goal.id, { targetValue: Number(event.target.value || 0) })}
+                            />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="studio-label">Deadline</span>
+                            <input
+                              className="studio-input h-11"
+                              type="date"
+                              value={goal.deadline}
+                              onChange={(event) => updateBusinessGoal(goal.id, { deadline: event.target.value })}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 md:grid-cols-[120px_1fr]">
+                          <label className="grid gap-2">
+                            <span className="studio-label">Priority</span>
+                            <input
+                              className="studio-input h-11"
+                              type="number"
+                              min={1}
+                              max={5}
+                              value={goal.priority}
+                              onChange={(event) => updateBusinessGoal(goal.id, { priority: Number(event.target.value || 1) })}
+                            />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="studio-label">Notes for the AI</span>
+                            <textarea
+                              className="studio-input min-h-[88px] resize-y py-3 leading-relaxed"
+                              value={goal.notes}
+                              onChange={(event) => updateBusinessGoal(goal.id, { notes: event.target.value })}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between gap-4 text-[12px] font-semibold text-[#142334]/62">
+                            <span>{progress}% progress</span>
+                            <span>{goal.targetValue > 0 ? `${goal.currentValue} / ${goal.targetValue}` : 'Target not set'}</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E6DDD6]">
+                            <div className="h-full rounded-full bg-[#C9AD98]" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <SaveButton state={saveStates.business_goals || 'idle'} label="Save goals" />
+                <StatusMessage state={saveStates.business_goals || 'idle'} />
               </div>
             </form>
           </SettingsPanel>
