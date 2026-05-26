@@ -57,6 +57,37 @@ export type NotificationSettings = {
   sent_email_log: boolean;
 };
 
+export type GoalHorizon = 'short_term' | 'ninety_day' | 'one_year' | 'long_term';
+export type GoalCategory =
+  | 'clients'
+  | 'revenue'
+  | 'brand_visibility'
+  | 'social_growth'
+  | 'content'
+  | 'operations';
+export type GoalStatus = 'not_started' | 'active' | 'at_risk' | 'achieved' | 'paused';
+export type GoalLinkedArea = 'leads' | 'pipeline' | 'clients' | 'finance' | 'content' | 'calendar' | 'messages' | 'tasks';
+
+export type BusinessGoal = {
+  id: string;
+  title: string;
+  horizon: GoalHorizon;
+  category: GoalCategory;
+  metricLabel: string;
+  currentValue: number;
+  targetValue: number;
+  deadline: string;
+  priority: number;
+  status: GoalStatus;
+  linkedArea: GoalLinkedArea;
+  notes: string;
+};
+
+export type BusinessGoalsSettings = {
+  goals: BusinessGoal[];
+  updatedAt?: string | null;
+};
+
 export type {
   AssistantConversationStore,
   AssistantPreferences,
@@ -98,6 +129,11 @@ export const DEFAULT_SERVICES: ServiceSetting[] = [
   { name: 'Leadership Launchpad', slug: 'leadership-launchpad', price: 2000, turnaround: 'Session-based', active: true },
 ];
 
+export const DEFAULT_BUSINESS_GOALS: BusinessGoalsSettings = {
+  goals: [],
+  updatedAt: null,
+};
+
 export const DEFAULT_SETTINGS = {
   business_profile: {
     name: 'Coach Kagiso',
@@ -131,6 +167,7 @@ export const DEFAULT_SETTINGS = {
     cal_booking: true,
     sent_email_log: false,
   } satisfies NotificationSettings,
+  business_goals: DEFAULT_BUSINESS_GOALS satisfies BusinessGoalsSettings,
   assistant_preferences: DEFAULT_ASSISTANT_PREFERENCES satisfies AssistantPreferences,
   assistant_conversations: DEFAULT_ASSISTANT_CONVERSATIONS satisfies AssistantConversationStore,
 } as const;
@@ -181,6 +218,55 @@ export function stripSecretsFromSettings(settings: SettingsMap): SettingsMap {
   return {
     ...settings,
     ai_config: aiConfig,
+  };
+}
+
+const goalHorizons: GoalHorizon[] = ['short_term', 'ninety_day', 'one_year', 'long_term'];
+const goalCategories: GoalCategory[] = ['clients', 'revenue', 'brand_visibility', 'social_growth', 'content', 'operations'];
+const goalStatuses: GoalStatus[] = ['not_started', 'active', 'at_risk', 'achieved', 'paused'];
+const goalLinkedAreas: GoalLinkedArea[] = ['leads', 'pipeline', 'clients', 'finance', 'content', 'calendar', 'messages', 'tasks'];
+
+function cleanString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value.trim() : fallback;
+}
+
+function cleanNumber(value: unknown, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function cleanPriority(value: unknown) {
+  const priority = Math.round(cleanNumber(value, 3));
+  return Math.max(1, Math.min(priority, 5));
+}
+
+function pickValue<T extends string>(value: unknown, allowed: T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+export function normalizeBusinessGoalsSettings(value: unknown): BusinessGoalsSettings {
+  const source = (value && typeof value === 'object' ? value : {}) as Partial<BusinessGoalsSettings>;
+  const rawGoals = Array.isArray(source.goals) ? source.goals : [];
+
+  return {
+    goals: rawGoals.slice(0, 40).map((goal, index) => {
+      const item = (goal && typeof goal === 'object' ? goal : {}) as Partial<BusinessGoal>;
+      return {
+        id: cleanString(item.id, `goal-${index + 1}`) || `goal-${index + 1}`,
+        title: cleanString(item.title, 'Untitled goal') || 'Untitled goal',
+        horizon: pickValue(item.horizon, goalHorizons, 'ninety_day'),
+        category: pickValue(item.category, goalCategories, 'clients'),
+        metricLabel: cleanString(item.metricLabel, 'Progress') || 'Progress',
+        currentValue: cleanNumber(item.currentValue, 0),
+        targetValue: cleanNumber(item.targetValue, 0),
+        deadline: cleanString(item.deadline, ''),
+        priority: cleanPriority(item.priority),
+        status: pickValue(item.status, goalStatuses, 'active'),
+        linkedArea: pickValue(item.linkedArea, goalLinkedAreas, 'leads'),
+        notes: cleanString(item.notes, ''),
+      };
+    }),
+    updatedAt: cleanString(source.updatedAt, '') || null,
   };
 }
 

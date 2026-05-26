@@ -8,6 +8,7 @@ import {
   CreditCard,
   Download,
   FileText,
+  Flag,
   Lightbulb,
   ListChecks,
   LockKeyhole,
@@ -92,9 +93,12 @@ import { EMAIL_TEMPLATES } from '@/lib/email-templates';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import {
   DEFAULT_SETTINGS,
+  type BusinessGoal,
+  type BusinessGoalsSettings,
   type BusinessProfileSettings,
   listStoredEmailTemplates,
   loadSettings,
+  normalizeBusinessGoalsSettings,
   seedSettings,
   stripSecretsFromSettings,
   type SettingsMap,
@@ -185,6 +189,22 @@ const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
   { tab: 'tasks', label: 'Tasks & Notes' },
   { tab: 'settings', label: 'Settings' },
 ];
+
+const goalHorizonLabels: Record<BusinessGoal['horizon'], string> = {
+  short_term: 'Short term',
+  ninety_day: '90-day',
+  one_year: '12-month',
+  long_term: 'Long term',
+};
+
+const goalCategoryLabels: Record<BusinessGoal['category'], string> = {
+  clients: 'Clients',
+  revenue: 'Revenue',
+  brand_visibility: 'Brand',
+  social_growth: 'Social',
+  content: 'Content',
+  operations: 'Ops',
+};
 
 function isDashboardTab(value?: string | null): value is DashboardTab {
   return Boolean(value && dashboardTabValues.includes(value as DashboardTab));
@@ -352,6 +372,28 @@ function formatMoney(value: number) {
 function getPercent(value: number, total: number) {
   if (!total) return 0;
   return Math.round((value / total) * 100);
+}
+
+function getGoalProgress(goal: BusinessGoal) {
+  if (!goal.targetValue || goal.targetValue <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100)));
+}
+
+function getGoalDeadlineRank(goal: BusinessGoal) {
+  if (!goal.deadline) return Number.POSITIVE_INFINITY;
+  const time = new Date(goal.deadline).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
+function getGoalDashboardTab(goal: BusinessGoal): DashboardTab {
+  if (goal.linkedArea === 'pipeline') return 'pipeline';
+  if (goal.linkedArea === 'clients') return 'clients';
+  if (goal.linkedArea === 'finance') return 'finance';
+  if (goal.linkedArea === 'content') return 'content';
+  if (goal.linkedArea === 'calendar') return 'calendar';
+  if (goal.linkedArea === 'messages') return 'messages';
+  if (goal.linkedArea === 'tasks') return 'tasks';
+  return 'leads';
 }
 
 function getDonutBackground(segments: { count: number; color: string }[], total: number) {
@@ -969,6 +1011,17 @@ async function loadSettingsBundle(): Promise<{ settings: SettingsMap; emailTempl
   }
 }
 
+async function loadBusinessGoalsSettings(): Promise<BusinessGoalsSettings> {
+  try {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase.from('settings').select('value').eq('key', 'business_goals').single();
+    if (error || !data?.value) return normalizeBusinessGoalsSettings(DEFAULT_SETTINGS.business_goals);
+    return normalizeBusinessGoalsSettings(data.value);
+  } catch {
+    return normalizeBusinessGoalsSettings(DEFAULT_SETTINGS.business_goals);
+  }
+}
+
 async function loadDashboardProfilePhoto() {
   try {
     const supabase = createSupabaseServiceClient();
@@ -1094,6 +1147,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     dashboardEventNotificationCount,
     dashboardEventNotifications,
     sidebarFollowUps,
+    businessGoalsSettings,
     settingsBundle,
     profilePhotoUrl,
   ] = await Promise.all([
@@ -1133,6 +1187,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     getDashboardEventNotificationCount(),
     listDashboardEventNotifications({ limit: 120, status: 'all' }),
     listFollowUpNotifications({ includeTomorrow: false, limit: 4 }),
+    loadBusinessGoalsSettings(),
     activeTab === 'settings' ? loadSettingsBundle() : Promise.resolve(null),
     loadDashboardProfilePhoto(),
   ]);
@@ -1430,6 +1485,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
       href: buildFilterHref(key, currentFilters, { tab: 'clients' }),
     },
   ] as const;
+  const activeBusinessGoals = businessGoalsSettings.goals
+    .filter((goal) => goal.status !== 'achieved' && goal.status !== 'paused')
+    .sort((a, b) => b.priority - a.priority || getGoalDeadlineRank(a) - getGoalDeadlineRank(b));
+  const primaryBusinessGoal = activeBusinessGoals[0] || null;
+  const averageGoalProgress = activeBusinessGoals.length
+    ? Math.round(activeBusinessGoals.reduce((total, goal) => total + getGoalProgress(goal), 0) / activeBusinessGoals.length)
+    : 0;
   const contentDashboardContext = buildDashboardContext(submissions, operations);
   const assistantContext = buildAssistantDashboardContext({
     submissions,
@@ -1438,6 +1500,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     calendarItems: contentCalendarItems,
     inboundEmailReplies,
     sentEmails: assistantSentEmailLog.emails,
+    businessGoals: businessGoalsSettings,
     now: dashboardNow,
   });
 
@@ -1571,6 +1634,70 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     <p className="mt-2 font-serif text-[28px] leading-none">{topArchetype}</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4 rounded-[8px] bg-white/72 p-4 backdrop-blur">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[#142334] text-white">
+                        <Flag className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8C7466]">Goal compass</p>
+                        <h2 className="font-serif text-[25px] leading-tight text-[#142334]">
+                          {primaryBusinessGoal ? primaryBusinessGoal.title : 'Set the dashboard direction'}
+                        </h2>
+                      </div>
+                    </div>
+                    <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-[#142334]/66">
+                      {primaryBusinessGoal
+                        ? `${activeBusinessGoals.length} active goal${activeBusinessGoals.length === 1 ? '' : 's'} in focus. Average progress is ${averageGoalProgress}%, and the assistant will use these targets when recommending priorities.`
+                        : 'Add a 90-day, 12-month, or long-term goal so the assistant can judge priorities against what the business is actually trying to achieve.'}
+                    </p>
+                  </div>
+                  <Link
+                    href={buildFilterHref(key, currentFilters, { tab: 'settings' })}
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#142334] transition hover:border-[#142334]"
+                  >
+                    Manage goals <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+
+                {activeBusinessGoals.length > 0 && (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    {activeBusinessGoals.slice(0, 3).map((goal) => {
+                      const progress = getGoalProgress(goal);
+                      return (
+                        <Link
+                          key={goal.id}
+                          href={buildFilterHref(key, currentFilters, { tab: getGoalDashboardTab(goal) })}
+                          className="group rounded-[8px] bg-[#FCFBFA] p-4 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#142334]"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8C7466]">
+                                {goalHorizonLabels[goal.horizon]} / {goalCategoryLabels[goal.category]}
+                              </p>
+                              <p className="mt-2 line-clamp-2 font-serif text-[21px] leading-tight text-[#142334]">{goal.title}</p>
+                            </div>
+                            <ArrowUpRight className="h-4 w-4 shrink-0 translate-x-1 text-[#8C7466] opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" />
+                          </div>
+                          <div className="mt-4 flex items-center justify-between gap-3 text-[12px] font-semibold text-[#142334]/62">
+                            <span>{goal.metricLabel}</span>
+                            <span>{goal.targetValue > 0 ? `${goal.currentValue}/${goal.targetValue}` : 'Target open'}</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E6DDD6]">
+                            <div className="h-full rounded-full bg-[#C9AD98]" style={{ width: `${progress}%` }} />
+                          </div>
+                          <p className="mt-3 text-[12px] text-[#142334]/54">
+                            {goal.deadline ? `Due ${formatShortDate(goal.deadline)}` : 'No deadline set'} - Priority {goal.priority}/5
+                          </p>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
             )}

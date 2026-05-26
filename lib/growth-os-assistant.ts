@@ -9,6 +9,15 @@ import {
   normalizeAssistantPreferences,
   type AssistantPreferences,
 } from '@/lib/assistant-preferences';
+import {
+  normalizeBusinessGoalsSettings,
+  type BusinessGoal,
+  type BusinessGoalsSettings,
+  type GoalCategory,
+  type GoalHorizon,
+  type GoalLinkedArea,
+  type GoalStatus,
+} from '@/lib/settings';
 
 export type AssistantDashboardContext = {
   totalLeads: number;
@@ -103,6 +112,27 @@ export type AssistantDashboardContext = {
       clickedAt: string | null;
     }[];
   };
+  goals: {
+    activeCount: number;
+    atRiskCount: number;
+    achievedCount: number;
+    primaryFocus: string;
+    activeGoals: {
+      id: string;
+      title: string;
+      horizon: GoalHorizon;
+      category: GoalCategory;
+      metricLabel: string;
+      currentValue: number;
+      targetValue: number;
+      progressPercent: number;
+      deadline: string;
+      priority: number;
+      status: GoalStatus;
+      linkedArea: GoalLinkedArea;
+      notes: string;
+    }[];
+  };
 };
 
 const assistantTimeZone = 'Africa/Johannesburg';
@@ -121,6 +151,27 @@ const contentSignalByArchetype = {
   D: 'career transition anxiety',
   E: 'career growth clarity',
 } as const;
+const goalHorizonLabels: Record<GoalHorizon, string> = {
+  short_term: 'Short term',
+  ninety_day: '90-day',
+  one_year: '12-month',
+  long_term: 'Long term',
+};
+const goalCategoryLabels: Record<GoalCategory, string> = {
+  clients: 'Clients',
+  revenue: 'Revenue',
+  brand_visibility: 'Brand visibility',
+  social_growth: 'Social growth',
+  content: 'Content',
+  operations: 'Operations',
+};
+const goalStatusLabels: Record<GoalStatus, string> = {
+  not_started: 'Not started',
+  active: 'Active',
+  at_risk: 'At risk',
+  achieved: 'Achieved',
+  paused: 'Paused',
+};
 
 function getDateKey(value: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -189,6 +240,40 @@ function getSubmissionFocus(submission: DiagnosticSubmission) {
         : '',
     700,
   );
+}
+
+function getGoalProgress(goal: BusinessGoal) {
+  if (!goal.targetValue || goal.targetValue <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100)));
+}
+
+function getGoalDeadlineRank(goal: BusinessGoal) {
+  if (!goal.deadline) return Number.POSITIVE_INFINITY;
+  const time = new Date(goal.deadline).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
+function getActiveGoalSnapshots(businessGoals?: BusinessGoalsSettings | null) {
+  const normalized = normalizeBusinessGoalsSettings(businessGoals);
+  return normalized.goals
+    .filter((goal) => goal.status !== 'achieved' && goal.status !== 'paused')
+    .sort((a, b) => b.priority - a.priority || getGoalDeadlineRank(a) - getGoalDeadlineRank(b))
+    .slice(0, 12)
+    .map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      horizon: goal.horizon,
+      category: goal.category,
+      metricLabel: goal.metricLabel,
+      currentValue: goal.currentValue,
+      targetValue: goal.targetValue,
+      progressPercent: getGoalProgress(goal),
+      deadline: goal.deadline,
+      priority: goal.priority,
+      status: goal.status,
+      linkedArea: goal.linkedArea,
+      notes: compactText(goal.notes, 500),
+    }));
 }
 
 function isMasterclassSubmission(submission: DiagnosticSubmission) {
@@ -275,6 +360,7 @@ export function buildAssistantDashboardContext(input: {
   calendarItems?: ContentCalendarItem[];
   inboundEmailReplies?: InboundEmailReply[];
   sentEmails?: SentEmail[];
+  businessGoals?: BusinessGoalsSettings | null;
   now?: Date;
 }): AssistantDashboardContext {
   const {
@@ -284,6 +370,7 @@ export function buildAssistantDashboardContext(input: {
     calendarItems = [],
     inboundEmailReplies = [],
     sentEmails = [],
+    businessGoals = null,
     now = new Date(),
   } = input;
   const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
@@ -301,6 +388,8 @@ export function buildAssistantDashboardContext(input: {
     .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
   const masterclassInboundReplies = inboundEmailReplies.filter(isMasterclassInboundReply);
   const masterclassSentEmails = sentEmails.filter(isMasterclassSentEmail);
+  const normalizedGoals = normalizeBusinessGoalsSettings(businessGoals);
+  const activeGoalSnapshots = getActiveGoalSnapshots(normalizedGoals);
 
   return {
     totalLeads: submissions.length,
@@ -411,11 +500,19 @@ export function buildAssistantDashboardContext(input: {
         clickedAt: email.clickedAt,
       })),
     },
+    goals: {
+      activeCount: activeGoalSnapshots.length,
+      atRiskCount: normalizedGoals.goals.filter((goal) => goal.status === 'at_risk').length,
+      achievedCount: normalizedGoals.goals.filter((goal) => goal.status === 'achieved').length,
+      primaryFocus: activeGoalSnapshots[0]?.title || 'No active goals set',
+      activeGoals: activeGoalSnapshots,
+    },
   };
 }
 
 export function getSuggestedQuestions(context: AssistantDashboardContext): string[] {
   const suggestions: string[] = [];
+  if (context.goals.activeCount > 0) suggestions.push('What should I do next to move my goals?');
   if (context.masterclass.waitlistCount > 0) suggestions.push('What should the masterclass cover?');
   if (context.emailContext.inboundRepliesTotal > 0) suggestions.push('Summarise recent inbound replies');
   if (context.followUpsDueToday > 0) suggestions.push('Who needs a follow-up today?');
@@ -538,6 +635,37 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
           }))
         : [],
     },
+    goals: {
+      activeCount: Number(context.goals?.activeCount || 0),
+      atRiskCount: Number(context.goals?.atRiskCount || 0),
+      achievedCount: Number(context.goals?.achievedCount || 0),
+      primaryFocus: String(context.goals?.primaryFocus || 'No active goals set'),
+      activeGoals: Array.isArray(context.goals?.activeGoals)
+        ? context.goals.activeGoals.slice(0, 12).map((goal) => ({
+            id: String(goal.id || ''),
+            title: String(goal.title || 'Untitled goal'),
+            horizon: ['short_term', 'ninety_day', 'one_year', 'long_term'].includes(String(goal.horizon))
+              ? (goal.horizon as GoalHorizon)
+              : 'ninety_day',
+            category: ['clients', 'revenue', 'brand_visibility', 'social_growth', 'content', 'operations'].includes(String(goal.category))
+              ? (goal.category as GoalCategory)
+              : 'clients',
+            metricLabel: String(goal.metricLabel || 'Progress'),
+            currentValue: Number(goal.currentValue || 0),
+            targetValue: Number(goal.targetValue || 0),
+            progressPercent: Math.max(0, Math.min(100, Number(goal.progressPercent || 0))),
+            deadline: String(goal.deadline || ''),
+            priority: Math.max(1, Math.min(5, Number(goal.priority || 3))),
+            status: ['not_started', 'active', 'at_risk', 'achieved', 'paused'].includes(String(goal.status))
+              ? (goal.status as GoalStatus)
+              : 'active',
+            linkedArea: ['leads', 'pipeline', 'clients', 'finance', 'content', 'calendar', 'messages', 'tasks'].includes(String(goal.linkedArea))
+              ? (goal.linkedArea as GoalLinkedArea)
+              : 'leads',
+            notes: compactText(goal.notes, 500),
+          }))
+        : [],
+    },
   };
 }
 
@@ -616,6 +744,24 @@ DASHBOARD SNAPSHOT (data at session start - tell Kagiso to refresh if she needs 
 - Vault drafts: ${context.vaultDraftCount}
 - Scheduled posts this week: ${context.scheduledPostsThisWeek}
 - Status breakdown: new ${context.statusCounts.new}, contacted ${context.statusCounts.contacted}, booked ${context.statusCounts.booked}, nurture ${context.statusCounts.nurture}
+
+GOALS CONTEXT:
+- Active goals: ${context.goals.activeCount}
+- At-risk goals: ${context.goals.atRiskCount}
+- Achieved goals: ${context.goals.achievedCount}
+- Primary focus: ${context.goals.primaryFocus}
+
+Active goal details:
+${context.goals.activeGoals.length > 0
+  ? context.goals.activeGoals.map((goal) =>
+      `- ${goal.title} (${goalHorizonLabels[goal.horizon]}, ${goalCategoryLabels[goal.category]}, ${goalStatusLabels[goal.status]}, priority ${goal.priority}/5) - ${goal.metricLabel}: ${goal.currentValue}/${goal.targetValue || 'target not set'} (${goal.progressPercent}%). Deadline: ${goal.deadline || 'not set'}. Linked area: ${goal.linkedArea}. Notes: ${goal.notes || 'No notes'}`
+    ).join('\n')
+  : 'No active goals are set. If Kagiso asks for direction, ask her to add one clear 90-day, 12-month, or long-term goal in Settings > Goals.'}
+
+Goal-aware operating rules:
+- When Kagiso asks what to do next, prioritize actions that move the active goals before generic dashboard housekeeping.
+- Tie content ideas, email priorities, and follow-up recommendations to the most relevant active goal when possible.
+- If the dashboard activity does not support the stated goals, say that clearly and suggest a better-aligned next action.
 
 Follow-ups due today:
 ${context.followUpsDueTodayList.length > 0
