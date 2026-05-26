@@ -50,6 +50,7 @@ import MasterclassBookingsOpenButton from '@/components/leads/MasterclassBooking
 import MoveToNurtureButton from '@/components/leads/MoveToNurtureButton';
 import MessagesInboundPanel from '@/components/messages/MessagesInboundPanel';
 import MessagesLog from '@/components/messages/MessagesLog';
+import NotesWorkspace from '@/components/NotesWorkspace';
 import TasksNotesWorkspace from '@/components/TasksNotesWorkspace';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -172,7 +173,7 @@ const archetypeColors = {
   D: '#79A580',
   E: '#C98672',
 } as const;
-const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'career-tools', 'content', 'calendar', 'messages', 'tasks', 'settings'] as const;
+const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'career-tools', 'content', 'calendar', 'messages', 'tasks', 'notes', 'settings'] as const;
 type DashboardTab = (typeof dashboardTabValues)[number];
 const studioWorkspaceValues = ['content', 'carousel', 'tools'] as const;
 type StudioWorkspace = (typeof studioWorkspaceValues)[number];
@@ -186,7 +187,8 @@ const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
   { tab: 'content', label: 'Studio' },
   { tab: 'calendar', label: 'Calendar' },
   { tab: 'messages', label: 'Messages' },
-  { tab: 'tasks', label: 'Tasks & Notes' },
+  { tab: 'tasks', label: 'Tasks' },
+  { tab: 'notes', label: 'Notes' },
   { tab: 'settings', label: 'Settings' },
 ];
 
@@ -1529,6 +1531,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
               activeTab === 'career-tools' ||
               activeTab === 'messages' ||
               activeTab === 'tasks' ||
+              activeTab === 'notes' ||
               activeTab === 'settings'
                 ? 'space-y-3 p-0'
                 : 'space-y-5 p-4 md:p-6 lg:p-7'
@@ -1541,7 +1544,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                 query={q}
                 updatedTimeLabel={dashboardTimeLabel}
                 notificationCount={dashboardNotificationCount}
-                showSearch={activeTab !== 'leads' && activeTab !== 'pipeline' && activeTab !== 'career-tools'}
+                showSearch={activeTab !== 'leads' && activeTab !== 'pipeline' && activeTab !== 'career-tools' && activeTab !== 'notes'}
                 profilePhotoUrl={profilePhotoUrl}
               />
             )}
@@ -2450,6 +2453,15 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
             newLeadCount={newLeadCount}
             dueFollowUpCount={dueFollowUpCount}
             paidDeliveryPressureCount={paidDeliveryPressureCount}
+          />
+        )}
+        {activeTab === 'notes' && (
+          <NotesWorkspace
+            adminKey={key || ''}
+            initialNotes={taskNotes}
+            leads={submissions}
+            clientOps={operations}
+            tasks={dashboardTasks}
           />
         )}
         {activeTab === 'settings' && (

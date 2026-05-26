@@ -7,6 +7,7 @@ import {
   FileSearch,
   Layers3,
   LayoutDashboard,
+  ListChecks,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -38,7 +39,8 @@ const studioNavItems = [
 const secondaryDashboardNavItems = [
   { label: 'Calendar', tab: 'calendar', icon: CalendarDays },
   { label: 'Messages', tab: 'messages', icon: MessageSquare },
-  { label: 'Tasks & Notes', tab: 'tasks', icon: StickyNote },
+  { label: 'Tasks', tab: 'tasks', icon: ListChecks },
+  { label: 'Notes', tab: 'notes', icon: StickyNote },
   { label: 'Settings', tab: 'settings', icon: Settings },
 ] as const;
 
