@@ -1,6 +1,8 @@
 import type { ClientOperation } from '@/lib/client-operations';
 import type { ContentBacklogItem, ContentCalendarItem } from '@/lib/content-studio';
-import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import { isDiagnosticLeadStatus, type DiagnosticLeadStatus, type DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import type { InboundEmailReply } from '@/lib/inbound-email-replies';
+import type { SentEmail } from '@/lib/sent-emails';
 
 export type AssistantDashboardContext = {
   totalLeads: number;
@@ -34,6 +36,67 @@ export type AssistantDashboardContext = {
     archetype: string;
     priorityScore: number;
   }[];
+  masterclass: {
+    waitlistCount: number;
+    recentReservations: {
+      firstName: string;
+      email: string;
+      submittedAt: string;
+      status: DiagnosticLeadStatus;
+      focus: string;
+    }[];
+    recentInboundReplies: {
+      fromName: string;
+      fromEmail: string;
+      receivedAt: string;
+      subject: string;
+      bodyExcerpt: string;
+      status: string;
+      draftStatus: string;
+    }[];
+    recentOutboundEmails: {
+      toName: string;
+      toEmail: string;
+      sentAt: string;
+      subject: string;
+      bodyExcerpt: string;
+      deliveryStatus: string;
+    }[];
+  };
+  emailContext: {
+    inboundRepliesTotal: number;
+    newInboundReplies: number;
+    draftedInboundReplies: number;
+    sentEmailsTotal: number;
+    sentEmailsThisWeek: number;
+    engagedSentEmails: number;
+    recentInboundReplies: {
+      fromName: string;
+      fromEmail: string;
+      receivedAt: string;
+      source: string;
+      archetype: string;
+      serviceInterest: string;
+      subject: string;
+      bodyExcerpt: string;
+      replyDraftExcerpt: string;
+      status: string;
+      draftStatus: string;
+    }[];
+    recentOutboundEmails: {
+      toName: string;
+      toEmail: string;
+      sentAt: string;
+      source: string;
+      archetype: string;
+      serviceInterest: string;
+      subject: string;
+      bodyExcerpt: string;
+      deliveryStatus: string;
+      openedAt: string | null;
+      clickedAt: string | null;
+    }[];
+  };
 };
 
 const assistantTimeZone = 'Africa/Johannesburg';
@@ -104,6 +167,47 @@ function splitStoredName(value: string) {
   };
 }
 
+function compactText(value?: string | null, maxLength = 700) {
+  const compacted = String(value || '').replace(/\s+/g, ' ').trim();
+  if (compacted.length <= maxLength) return compacted;
+  return `${compacted.slice(0, maxLength).trim()}...`;
+}
+
+function getSubmissionFocus(submission: DiagnosticSubmission) {
+  const payload = submission.archetype_payload || {};
+  return compactText(
+    typeof payload.focus === 'string'
+      ? payload.focus
+      : typeof payload.action === 'string'
+        ? payload.action
+        : '',
+    700,
+  );
+}
+
+function isMasterclassSubmission(submission: DiagnosticSubmission) {
+  const service = String(submission.archetype_payload?.service || '').toLowerCase();
+  return submission.source === 'masterclass_waitlist' || service.includes('masterclass');
+}
+
+function isMasterclassInboundReply(reply: InboundEmailReply) {
+  const source = reply.lead?.source;
+  const service = String(reply.lead?.serviceInterest || '').toLowerCase();
+  return source === 'masterclass_waitlist' || service.includes('masterclass');
+}
+
+function isMasterclassSentEmail(email: SentEmail) {
+  const searchable = [
+    email.leadSource,
+    email.templateId,
+    email.templateName,
+    email.archetype,
+    email.serviceInterest,
+    email.subject,
+  ].join(' ').toLowerCase();
+  return searchable.includes('masterclass');
+}
+
 function getTopEntry(counts: Record<string, number>) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
 }
@@ -163,9 +267,19 @@ export function buildAssistantDashboardContext(input: {
   operations: ClientOperation[];
   backlogItems?: ContentBacklogItem[];
   calendarItems?: ContentCalendarItem[];
+  inboundEmailReplies?: InboundEmailReply[];
+  sentEmails?: SentEmail[];
   now?: Date;
 }): AssistantDashboardContext {
-  const { submissions, operations, backlogItems = [], calendarItems = [], now = new Date() } = input;
+  const {
+    submissions,
+    operations,
+    backlogItems = [],
+    calendarItems = [],
+    inboundEmailReplies = [],
+    sentEmails = [],
+    now = new Date(),
+  } = input;
   const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   const todayKey = getDateKey(now);
   const activeSubmissions = submissions.filter((submission) => !inactiveLeadStatuses.includes(submission.lead_status));
@@ -176,6 +290,11 @@ export function buildAssistantDashboardContext(input: {
     const dateKey = getStoredDateKey(submission.next_follow_up_at);
     return Boolean(dateKey && dateKey < todayKey);
   });
+  const masterclassReservations = submissions
+    .filter(isMasterclassSubmission)
+    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+  const masterclassInboundReplies = inboundEmailReplies.filter(isMasterclassInboundReply);
+  const masterclassSentEmails = sentEmails.filter(isMasterclassSentEmail);
 
   return {
     totalLeads: submissions.length,
@@ -222,11 +341,77 @@ export function buildAssistantDashboardContext(input: {
         archetype: submission.archetype_name,
         priorityScore: getPriorityScore(submission),
       })),
+    masterclass: {
+      waitlistCount: masterclassReservations.length,
+      recentReservations: masterclassReservations.slice(0, 16).map((submission) => {
+        const name = splitStoredName(submission.first_name);
+        return {
+          firstName: name.firstName,
+          email: submission.email,
+          submittedAt: submission.submitted_at,
+          status: submission.lead_status,
+          focus: getSubmissionFocus(submission),
+        };
+      }),
+      recentInboundReplies: masterclassInboundReplies.slice(0, 10).map((reply) => ({
+        fromName: reply.fromName,
+        fromEmail: reply.fromEmail,
+        receivedAt: reply.receivedAt,
+        subject: compactText(reply.subject, 180),
+        bodyExcerpt: compactText(reply.body, 900),
+        status: reply.status,
+        draftStatus: reply.draftStatus,
+      })),
+      recentOutboundEmails: masterclassSentEmails.slice(0, 8).map((email) => ({
+        toName: email.toName,
+        toEmail: email.toEmail,
+        sentAt: email.sentAt,
+        subject: compactText(email.subject, 180),
+        bodyExcerpt: compactText(email.body, 700),
+        deliveryStatus: email.deliveryStatus || 'sent',
+      })),
+    },
+    emailContext: {
+      inboundRepliesTotal: inboundEmailReplies.length,
+      newInboundReplies: inboundEmailReplies.filter((reply) => reply.status === 'new').length,
+      draftedInboundReplies: inboundEmailReplies.filter((reply) => reply.draftStatus === 'drafted').length,
+      sentEmailsTotal: sentEmails.length,
+      sentEmailsThisWeek: sentEmails.filter((email) => new Date(email.sentAt).getTime() >= weekAgo).length,
+      engagedSentEmails: sentEmails.filter((email) => email.openedAt || email.clickedAt).length,
+      recentInboundReplies: inboundEmailReplies.slice(0, 12).map((reply) => ({
+        fromName: reply.fromName,
+        fromEmail: reply.fromEmail,
+        receivedAt: reply.receivedAt,
+        source: reply.lead?.source || 'matched_email',
+        archetype: reply.lead?.archetype || '',
+        serviceInterest: reply.lead?.serviceInterest || '',
+        subject: compactText(reply.subject, 180),
+        bodyExcerpt: compactText(reply.body, 800),
+        replyDraftExcerpt: compactText(reply.replyDraft, 500),
+        status: reply.status,
+        draftStatus: reply.draftStatus,
+      })),
+      recentOutboundEmails: sentEmails.slice(0, 12).map((email) => ({
+        toName: email.toName,
+        toEmail: email.toEmail,
+        sentAt: email.sentAt,
+        source: email.leadSource,
+        archetype: email.archetype || '',
+        serviceInterest: email.serviceInterest || '',
+        subject: compactText(email.subject, 180),
+        bodyExcerpt: compactText(email.body, 650),
+        deliveryStatus: email.deliveryStatus || 'sent',
+        openedAt: email.openedAt,
+        clickedAt: email.clickedAt,
+      })),
+    },
   };
 }
 
 export function getSuggestedQuestions(context: AssistantDashboardContext): string[] {
   const suggestions: string[] = [];
+  if (context.masterclass.waitlistCount > 0) suggestions.push('What should the masterclass cover?');
+  if (context.emailContext.inboundRepliesTotal > 0) suggestions.push('Summarise recent inbound replies');
   if (context.followUpsDueToday > 0) suggestions.push('Who needs a follow-up today?');
   if (context.hotLeadsCount > 0) suggestions.push('Who are my hottest leads right now?');
   if (context.vaultDraftCount > 0) suggestions.push('What drafts are waiting in my Vault?');
@@ -276,6 +461,77 @@ export function normalizeAssistantDashboardContext(value: unknown): AssistantDas
           priorityScore: Number(lead.priorityScore || 0),
         }))
       : [],
+    masterclass: {
+      waitlistCount: Number(context.masterclass?.waitlistCount || 0),
+      recentReservations: Array.isArray(context.masterclass?.recentReservations)
+        ? context.masterclass.recentReservations.slice(0, 16).map((lead) => ({
+            firstName: String(lead.firstName || 'Lead'),
+            email: String(lead.email || ''),
+            submittedAt: String(lead.submittedAt || ''),
+            status: isDiagnosticLeadStatus(lead.status) ? lead.status : 'contacted',
+            focus: compactText(lead.focus, 700),
+          }))
+        : [],
+      recentInboundReplies: Array.isArray(context.masterclass?.recentInboundReplies)
+        ? context.masterclass.recentInboundReplies.slice(0, 10).map((reply) => ({
+            fromName: String(reply.fromName || 'Lead'),
+            fromEmail: String(reply.fromEmail || ''),
+            receivedAt: String(reply.receivedAt || ''),
+            subject: compactText(reply.subject, 180),
+            bodyExcerpt: compactText(reply.bodyExcerpt, 900),
+            status: String(reply.status || 'new'),
+            draftStatus: String(reply.draftStatus || 'drafted'),
+          }))
+        : [],
+      recentOutboundEmails: Array.isArray(context.masterclass?.recentOutboundEmails)
+        ? context.masterclass.recentOutboundEmails.slice(0, 8).map((email) => ({
+            toName: String(email.toName || 'Lead'),
+            toEmail: String(email.toEmail || ''),
+            sentAt: String(email.sentAt || ''),
+            subject: compactText(email.subject, 180),
+            bodyExcerpt: compactText(email.bodyExcerpt, 700),
+            deliveryStatus: String(email.deliveryStatus || 'sent'),
+          }))
+        : [],
+    },
+    emailContext: {
+      inboundRepliesTotal: Number(context.emailContext?.inboundRepliesTotal || 0),
+      newInboundReplies: Number(context.emailContext?.newInboundReplies || 0),
+      draftedInboundReplies: Number(context.emailContext?.draftedInboundReplies || 0),
+      sentEmailsTotal: Number(context.emailContext?.sentEmailsTotal || 0),
+      sentEmailsThisWeek: Number(context.emailContext?.sentEmailsThisWeek || 0),
+      engagedSentEmails: Number(context.emailContext?.engagedSentEmails || 0),
+      recentInboundReplies: Array.isArray(context.emailContext?.recentInboundReplies)
+        ? context.emailContext.recentInboundReplies.slice(0, 12).map((reply) => ({
+            fromName: String(reply.fromName || 'Lead'),
+            fromEmail: String(reply.fromEmail || ''),
+            receivedAt: String(reply.receivedAt || ''),
+            source: String(reply.source || 'matched_email'),
+            archetype: String(reply.archetype || ''),
+            serviceInterest: String(reply.serviceInterest || ''),
+            subject: compactText(reply.subject, 180),
+            bodyExcerpt: compactText(reply.bodyExcerpt, 800),
+            replyDraftExcerpt: compactText(reply.replyDraftExcerpt, 500),
+            status: String(reply.status || 'new'),
+            draftStatus: String(reply.draftStatus || 'drafted'),
+          }))
+        : [],
+      recentOutboundEmails: Array.isArray(context.emailContext?.recentOutboundEmails)
+        ? context.emailContext.recentOutboundEmails.slice(0, 12).map((email) => ({
+            toName: String(email.toName || 'Lead'),
+            toEmail: String(email.toEmail || ''),
+            sentAt: String(email.sentAt || ''),
+            source: String(email.source || 'diagnostic'),
+            archetype: String(email.archetype || ''),
+            serviceInterest: String(email.serviceInterest || ''),
+            subject: compactText(email.subject, 180),
+            bodyExcerpt: compactText(email.bodyExcerpt, 650),
+            deliveryStatus: String(email.deliveryStatus || 'sent'),
+            openedAt: email.openedAt ? String(email.openedAt) : null,
+            clickedAt: email.clickedAt ? String(email.clickedAt) : null,
+          }))
+        : [],
+    },
   };
 }
 
@@ -311,6 +567,54 @@ ${context.recentLeads.length > 0
   ? context.recentLeads.map((lead) => `- ${lead.firstName} (${lead.archetype}, priority ${lead.priorityScore})`).join('\n')
   : 'No new leads this week'}
 
+MASTERCLASS WAITLIST CONTEXT:
+- Waitlist leads: ${context.masterclass.waitlistCount}
+- Masterclass inbound replies in context: ${context.masterclass.recentInboundReplies.length}
+- Masterclass outbound emails in context: ${context.masterclass.recentOutboundEmails.length}
+
+Recent masterclass reservation focus answers:
+${context.masterclass.recentReservations.length > 0
+  ? context.masterclass.recentReservations.map((lead) =>
+      `- ${lead.firstName} <${lead.email}> (${lead.status}) - Wants help with: ${lead.focus || 'No focus captured'}`
+    ).join('\n')
+  : 'No masterclass reservation focus answers are in the current context.'}
+
+Recent masterclass inbound replies:
+${context.masterclass.recentInboundReplies.length > 0
+  ? context.masterclass.recentInboundReplies.map((reply) =>
+      `- ${reply.fromName} <${reply.fromEmail}> (${reply.receivedAt}, ${reply.status}/${reply.draftStatus}) - ${reply.subject}: ${reply.bodyExcerpt || 'No readable body'}`
+    ).join('\n')
+  : 'No synced masterclass inbound replies are in the current context.'}
+
+Recent masterclass outbound emails:
+${context.masterclass.recentOutboundEmails.length > 0
+  ? context.masterclass.recentOutboundEmails.map((email) =>
+      `- To ${email.toName} <${email.toEmail}> (${email.sentAt}, ${email.deliveryStatus}) - ${email.subject}: ${email.bodyExcerpt || 'No body recorded'}`
+    ).join('\n')
+  : 'No masterclass outbound emails are in the current context.'}
+
+EMAIL MESSAGE CONTEXT:
+- Imported inbound replies: ${context.emailContext.inboundRepliesTotal}
+- New inbound replies: ${context.emailContext.newInboundReplies}
+- Inbound drafts awaiting review: ${context.emailContext.draftedInboundReplies}
+- Logged outbound emails: ${context.emailContext.sentEmailsTotal}
+- Outbound emails this week: ${context.emailContext.sentEmailsThisWeek}
+- Outbound emails opened or clicked: ${context.emailContext.engagedSentEmails}
+
+Recent synced inbound replies:
+${context.emailContext.recentInboundReplies.length > 0
+  ? context.emailContext.recentInboundReplies.map((reply) =>
+      `- ${reply.fromName} <${reply.fromEmail}> (${reply.source}, ${reply.serviceInterest || reply.archetype || 'No service'}, ${reply.receivedAt}) - ${reply.subject}: ${reply.bodyExcerpt || 'No readable body'}`
+    ).join('\n')
+  : 'No synced inbound replies are in the current context.'}
+
+Recent logged outbound emails:
+${context.emailContext.recentOutboundEmails.length > 0
+  ? context.emailContext.recentOutboundEmails.map((email) =>
+      `- To ${email.toName} <${email.toEmail}> (${email.source}, ${email.serviceInterest || email.archetype || 'No service'}, ${email.sentAt}, ${email.deliveryStatus}) - ${email.subject}: ${email.bodyExcerpt || 'No body recorded'}`
+    ).join('\n')
+  : 'No logged outbound emails are in the current context.'}
+
 KAGISO'S SERVICES:
 - Career Clarity Session: R800, 75 min 1-on-1
 - Glow Up VIP Package: R1,200, 30-day reset
@@ -323,14 +627,19 @@ KAGISO'S SERVICES:
 WHAT YOU CAN DO:
 Answer questions about leads, pipeline, content, and performance.
 Recommend who to follow up with and why.
+Analyze synced inbound replies and logged outbound emails when they are present in the context.
+Turn masterclass waitlist focus answers and inbound replies into pain-point maps, session structures, and curriculum outlines.
+Use read-only tool context when it is provided for lead search, lead profiles, email threads, live mailbox previews, Vault drafts, payment summaries, booking/calendar summaries, and public URLs Kagiso explicitly mentions.
 Draft follow-up emails for specific leads (archetype-matched).
 Draft LinkedIn posts, TikTok scripts, or captions.
 Summarise what needs attention today.
 
 WHAT YOU CANNOT DO:
 Send emails or post content directly - always draft for approval.
-Access external websites.
-Reference leads not in the snapshot above - if data is missing, say so.
+Edit records, change statuses, refund payments, delete records, book sessions, send messages, or publish content.
+Access WhatsApp conversations unless Kagiso pastes or imports them.
+Access private/local URLs.
+Reference leads, replies, sent emails, payments, bookings, Vault drafts, or URLs not in the snapshot or read-only tool context. If data is missing, tell Kagiso what should be synced, searched, or opened next.
 
 EMAIL VOICE - MATCH EXACTLY:
 
@@ -386,7 +695,7 @@ OUTPUT FORMAT - STRICTLY ENFORCED:
 You are an API. Every response must be valid JSON. Never return markdown or plain text outside JSON.
 One draft per response maximum. If multiple are requested, output the first and say "Reply 'next' for the next draft."
 
-For answers: { "type": "answer", "message": "Direct answer, 3 sentences max" }
+For answers: { "type": "answer", "message": "Direct answer. For analysis, pain-point maps, or curriculum requests, use concise headings and bullets inside this string." }
 
 For recommendations: { "type": "recommendation", "message": "One sentence framing", "items": [{ "label": "Name (Archetype)", "detail": "Why", "action": "follow_up" }] }
 

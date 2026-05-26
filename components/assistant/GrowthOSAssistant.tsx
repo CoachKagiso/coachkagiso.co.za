@@ -15,6 +15,12 @@ type AssistantRecommendationItem = {
   action?: string;
 };
 
+type AssistantResponseMeta = {
+  finishReason?: string;
+  mayBeTruncated?: boolean;
+  accessContextUsed?: boolean;
+};
+
 type EmailDraft = {
   to: string;
   toName: string;
@@ -31,10 +37,10 @@ type ContentDraft = {
 };
 
 type AssistantResponse =
-  | { type: 'answer'; message: string }
-  | { type: 'recommendation'; message: string; items: AssistantRecommendationItem[] }
-  | { type: 'email_draft'; message: string; draft: EmailDraft }
-  | { type: 'content_draft'; message: string; draft: ContentDraft };
+  | { type: 'answer'; message: string; meta?: AssistantResponseMeta }
+  | { type: 'recommendation'; message: string; items: AssistantRecommendationItem[]; meta?: AssistantResponseMeta }
+  | { type: 'email_draft'; message: string; draft: EmailDraft; meta?: AssistantResponseMeta }
+  | { type: 'content_draft'; message: string; draft: ContentDraft; meta?: AssistantResponseMeta };
 
 type AssistantMessage = {
   id: string;
@@ -195,8 +201,12 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
 
     const recentHistory = messages
       .filter((message) => message.role === 'user' || message.role === 'assistant')
-      .slice(-10)
-      .map((message) => ({ role: message.role, content: message.content }));
+      .slice(-14)
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+        mayBeTruncated: message.response?.meta?.mayBeTruncated === true,
+      }));
     const userMessage: AssistantMessage = {
       id: createId(),
       role: 'user',
@@ -647,6 +657,11 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
                         )}
                         {message.response?.type === 'email_draft' && renderEmailDraftCard(message.id, message.response.draft)}
                         {message.response?.type === 'content_draft' && renderContentDraftCard(message.id, message.response.draft)}
+                        {message.response?.meta?.mayBeTruncated && (
+                          <p className="mt-3 rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] px-3 py-2 text-[12px] leading-relaxed text-[#6B6B6B]">
+                            This response hit the length limit. Type “continue” and I will keep going from here.
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

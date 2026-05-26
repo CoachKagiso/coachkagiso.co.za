@@ -4,6 +4,7 @@ import {
   normalizeAssistantDashboardContext,
   type AssistantDashboardContext,
 } from '@/lib/growth-os-assistant';
+import { buildAssistantAccessContext } from '@/lib/assistant-access';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
@@ -12,6 +13,13 @@ export const dynamic = 'force-dynamic';
 type ConversationMessage = {
   role: 'user' | 'assistant';
   content: string;
+  mayBeTruncated?: boolean;
+};
+
+type AssistantResponseMeta = {
+  finishReason?: string;
+  mayBeTruncated?: boolean;
+  accessContextUsed?: boolean;
 };
 
 type AssistantRecommendationItem = {
@@ -21,8 +29,8 @@ type AssistantRecommendationItem = {
 };
 
 type AssistantResult =
-  | { type: 'answer'; message: string }
-  | { type: 'recommendation'; message: string; items: AssistantRecommendationItem[] }
+  | { type: 'answer'; message: string; meta?: AssistantResponseMeta }
+  | { type: 'recommendation'; message: string; items: AssistantRecommendationItem[]; meta?: AssistantResponseMeta }
   | {
       type: 'email_draft';
       message: string;
@@ -34,6 +42,7 @@ type AssistantResult =
         templateId: string;
         leadId: string;
       };
+      meta?: AssistantResponseMeta;
     }
   | {
       type: 'content_draft';
@@ -43,7 +52,14 @@ type AssistantResult =
         contentType: string;
         content: string;
       };
+      meta?: AssistantResponseMeta;
     };
+
+const USER_MESSAGE_LIMIT = 4000;
+const HISTORY_MESSAGE_LIMIT = 4000;
+const ANSWER_MESSAGE_LIMIT = 8000;
+const DRAFT_BODY_LIMIT = 10000;
+const CONTENT_DRAFT_LIMIT = 12000;
 
 function getRequestKey(request: Request) {
   const url = new URL(request.url);
@@ -58,11 +74,11 @@ function sanitizeConversationHistory(value: unknown): ConversationMessage[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .slice(-10)
-    .map((message) => {
+    .slice(-14)
+    .map((message): ConversationMessage | null => {
       const role = message?.role === 'assistant' ? 'assistant' : message?.role === 'user' ? 'user' : null;
-      const content = cleanString(message?.content, 2000);
-      return role && content ? { role, content } : null;
+      const content = cleanString(message?.content, HISTORY_MESSAGE_LIMIT);
+      return role && content ? { role, content, mayBeTruncated: message?.mayBeTruncated === true } : null;
     })
     .filter((message): message is ConversationMessage => Boolean(message));
 }
@@ -88,7 +104,7 @@ function normalizeAssistantResult(value: unknown): AssistantResult | null {
   if (!value || typeof value !== 'object') return null;
   const result = value as Record<string, unknown>;
   const type = cleanString(result.type, 40);
-  const message = cleanString(result.message, 1200);
+  const message = cleanString(result.message, ANSWER_MESSAGE_LIMIT);
 
   if (!message) return null;
 
@@ -102,7 +118,7 @@ function normalizeAssistantResult(value: unknown): AssistantResult | null {
 
   if (type === 'email_draft' && result.draft && typeof result.draft === 'object') {
     const draft = result.draft as Record<string, unknown>;
-    const body = cleanString(draft.body, 6000);
+    const body = cleanString(draft.body, DRAFT_BODY_LIMIT);
     const subject = cleanString(draft.subject, 160);
     return {
       type,
@@ -126,7 +142,7 @@ function normalizeAssistantResult(value: unknown): AssistantResult | null {
       draft: {
         platform: cleanString(draft.platform, 40) || 'linkedin',
         contentType: cleanString(draft.contentType, 80) || 'text_post',
-        content: cleanString(draft.content, 8000),
+        content: cleanString(draft.content, CONTENT_DRAFT_LIMIT),
       },
     };
   }
@@ -136,6 +152,26 @@ function normalizeAssistantResult(value: unknown): AssistantResult | null {
   }
 
   return null;
+}
+
+function isContinuationRequest(message: string) {
+  return /^(continue|proceed|carry on|go on|finish|complete it|keep going|resume)\b/i.test(message.trim());
+}
+
+function withResponseMeta(result: AssistantResult, meta: AssistantResponseMeta): AssistantResult {
+  return {
+    ...result,
+    meta,
+  } as AssistantResult;
+}
+
+function buildConversationMessages(history: ConversationMessage[]) {
+  return history.map((message) => ({
+    role: message.role,
+    content: message.mayBeTruncated
+      ? `${message.content}\n\n[System note: this previous assistant response may have been truncated before it reached Kagiso.]`
+      : message.content,
+  }));
 }
 
 function formatErrorMessage(status: number) {
@@ -150,12 +186,15 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const message = cleanString(body?.message, 1000);
+  const requestKey = getRequestKey(request);
+  const message = cleanString(body?.message, USER_MESSAGE_LIMIT);
   if (!message) return NextResponse.json({ error: 'Message is required' }, { status: 400 });
 
   const conversationHistory = sanitizeConversationHistory(body?.conversationHistory);
   const dashboardContext: AssistantDashboardContext = normalizeAssistantDashboardContext(body?.dashboardContext);
   const isDraftRequest = /draft|write|create|generate|compose/i.test(message);
+  const isAnalysisRequest = /analy[sz]e|summari[sz]e|theme|pain point|curriculum|structure|masterclass|inbound|outbound|email/i.test(message);
+  const shouldContinueTruncated = isContinuationRequest(message) && conversationHistory.some((item) => item.role === 'assistant' && item.mayBeTruncated);
   const runtime = await resolveAiRuntimeConfig();
 
   if (!runtime) {
@@ -164,6 +203,10 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
+
+  const accessContext = await buildAssistantAccessContext(message, requestKey).catch((error) =>
+    `READ-ONLY ASSISTANT ACCESS CONTEXT\nA scoped access lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+  );
 
   let response: Response;
   try {
@@ -174,10 +217,14 @@ export async function POST(request: Request) {
         model: runtime.model,
         messages: [
           { role: 'system', content: buildAssistantSystemPrompt(dashboardContext) },
-          ...conversationHistory,
+          accessContext ? { role: 'system', content: accessContext } : null,
+          shouldContinueTruncated
+            ? { role: 'system', content: 'Kagiso asked you to continue after a truncated answer. Continue from the last visible point. Do not say you already finished unless the visible conversation genuinely contains the ending.' }
+            : null,
+          ...buildConversationMessages(conversationHistory),
           { role: 'user', content: message },
-        ],
-        max_tokens: 1000,
+        ].filter(Boolean),
+        max_tokens: isAnalysisRequest || accessContext ? 4000 : 2500,
         temperature: isDraftRequest ? 0.7 : 0.3,
         response_format: { type: 'json_object' },
       })),
@@ -195,22 +242,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ type: 'answer', message: formatErrorMessage(response.status) });
   }
 
-  let data: { choices?: Array<{ message?: { content?: string } }> };
+  let data: { choices?: Array<{ finish_reason?: string; message?: { content?: string } }> };
   try {
     data = JSON.parse(responseText);
   } catch {
     return NextResponse.json({ type: 'answer', message: 'I had trouble reading that response. Try asking differently.' });
   }
 
-  const text = stripMarkdownFences(data?.choices?.[0]?.message?.content || '{}');
+  const choice = data?.choices?.[0];
+  const finishReason = choice?.finish_reason;
+  const mayBeTruncated = finishReason === 'length';
+  const responseMeta: AssistantResponseMeta = {
+    finishReason,
+    mayBeTruncated,
+    accessContextUsed: Boolean(accessContext),
+  };
+  const text = stripMarkdownFences(choice?.message?.content || '{}');
 
   try {
     const result = normalizeAssistantResult(JSON.parse(text));
     if (!result) {
       return NextResponse.json({ type: 'answer', message: 'I had trouble formatting that. Try asking differently.' });
     }
-    return NextResponse.json(result);
+    return NextResponse.json(withResponseMeta(result, responseMeta));
   } catch {
-    return NextResponse.json({ type: 'answer', message: 'I had trouble formatting that. Try asking differently.' });
+    if (mayBeTruncated) {
+      return NextResponse.json({
+        type: 'answer',
+        message: 'The model response hit the length limit before it could return valid JSON. Ask me to continue, or ask for the answer in sections.',
+        meta: responseMeta,
+      });
+    }
+    return NextResponse.json({ type: 'answer', message: 'I had trouble formatting that. Try asking differently.', meta: responseMeta });
   }
 }

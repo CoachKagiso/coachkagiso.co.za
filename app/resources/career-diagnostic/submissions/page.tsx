@@ -1085,6 +1085,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     taskNotes,
     sentEmailLog,
     inboundEmailReplies,
+    assistantSentEmailLog,
     clientRecords,
     contentCalendarItems,
     contentBacklogItems,
@@ -1122,7 +1123,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
           stateOptions: [],
           hasFilters: false,
         }),
-    activeTab === 'messages' ? listInboundEmailReplies({ limit: 40 }) : Promise.resolve([]),
+    listInboundEmailReplies({ limit: 60 }),
+    listSentEmails(),
     activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
     listContentCalendarItems(),
     listContentBacklogItems(),
@@ -1434,6 +1436,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     operations,
     backlogItems: contentBacklogItems,
     calendarItems: contentCalendarItems,
+    inboundEmailReplies,
+    sentEmails: assistantSentEmailLog.emails,
     now: dashboardNow,
   });
 
