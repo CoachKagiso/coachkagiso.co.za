@@ -454,6 +454,7 @@ type BriefRecord = {
   title: string;
   text: string;
   createdAt: string;
+  targetLabel?: string;
 };
 
 type SignalBriefPayload = {
@@ -2417,7 +2418,28 @@ function formatSignalBriefForDisplay(raw: string) {
 
 function getSignalBriefTitle(raw: string) {
   const brief = parseSignalBriefPayload(raw);
-  return (brief?.contentAngle || brief?.strongestSignal || '').slice(0, 96);
+  return brief?.contentAngle || brief?.strongestSignal || '';
+}
+
+function getSignalBriefHistoryTitle(targetLabel?: string | null) {
+  return targetLabel?.trim() ? `${targetLabel.trim()} brief` : 'Signal brief';
+}
+
+function getSignalBriefHistoryPreview(raw: string) {
+  const brief = parseSignalBriefPayload(raw);
+  if (brief?.contentAngle) return brief.contentAngle;
+  if (brief?.strongestSignal) return brief.strongestSignal;
+  return titleFromText(raw, 'Generated brief');
+}
+
+function formatBriefHistoryTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-ZA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Africa/Johannesburg',
+  }).format(date);
 }
 
 function isImagePromptKind(value: string): value is ImagePromptKind {
@@ -3380,6 +3402,7 @@ export default function ContentStudio({
   });
   const [createPillarFocus, setCreatePillarFocus] = useState<CreatePillarFocus>('auto');
   const [brief, setBrief] = useState<string | null>(null);
+  const [briefTarget, setBriefTarget] = useState<string | null>(null);
   const [briefHistory, setBriefHistory] = useState<BriefRecord[]>([]);
   const [briefBusy, setBriefBusy] = useState(false);
   const [briefError, setBriefError] = useState<string | null>(null);
@@ -3544,14 +3567,16 @@ export default function ContentStudio({
             setBriefHistory((current) => [
               {
                 id: `brief-${Date.now()}`,
-                title: titleFromText(brief, context.strongestTheme),
+                title: getSignalBriefHistoryTitle(briefTarget),
                 text: brief,
                 createdAt: new Date().toISOString(),
+                targetLabel: briefTarget || undefined,
               },
               ...current,
             ].slice(0, 5));
           }
           setBrief(result);
+          setBriefTarget(target?.trim() || null);
         }
       } catch (error) {
         setBriefError(error instanceof Error ? error.message : 'Could not generate the brief.');
@@ -3559,7 +3584,7 @@ export default function ContentStudio({
         setBriefBusy(false);
       }
     },
-    [brief, callAi, context.strongestTheme, researchRecords],
+    [brief, briefTarget, callAi, researchRecords],
   );
 
   const itemsByDate = useMemo(() => {
@@ -3774,14 +3799,14 @@ export default function ContentStudio({
     : anglePlaceholders.default;
   const signalBriefOptions = useMemo(() => {
     const current = brief
-      ? [{ id: 'current-brief', title: titleFromText(brief, context.strongestTheme), text: brief }]
+      ? [{ id: 'current-brief', title: getSignalBriefHistoryTitle(briefTarget), text: brief }]
       : [];
     const history = briefHistory.map((item) => ({ id: item.id, title: item.title, text: item.text }));
     const saved = backlogRecords
       .filter((item) => item.source === 'signal_brief' && item.content)
       .map((item) => ({ id: item.id, title: item.title, text: item.content || '' }));
     return [...current, ...history, ...saved].slice(0, 6);
-  }, [backlogRecords, brief, briefHistory, context.strongestTheme]);
+  }, [backlogRecords, brief, briefHistory, briefTarget]);
   const carouselDraftRecords = useMemo<CarouselDraftRecord[]>(() => {
     const records = backlogRecords
       .map((item) => {
@@ -5165,9 +5190,23 @@ export default function ContentStudio({
                     ) : (
                       briefHistory.map((item) => (
                         <details key={item.id} className="rounded-[8px] bg-[#F5F3EE] p-3">
-                          <summary className="cursor-pointer text-[13px] font-semibold text-[#142334]">{item.title}</summary>
+                          <summary className="cursor-pointer text-[#142334]">
+                            <span className="flex flex-wrap items-start justify-between gap-2">
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[13px] font-semibold leading-snug">{item.title}</span>
+                                <span className="mt-1 block whitespace-normal break-words text-[12px] font-normal leading-relaxed text-[#142334]/58">
+                                  {getSignalBriefHistoryPreview(item.text)}
+                                </span>
+                              </span>
+                              {formatBriefHistoryTime(item.createdAt) && (
+                                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                                  {formatBriefHistoryTime(item.createdAt)}
+                                </span>
+                              )}
+                            </span>
+                          </summary>
                           <p className="mt-3 whitespace-pre-line text-[12px] leading-relaxed text-[#142334]/68">{formatSignalBriefForDisplay(item.text)}</p>
-                          <button type="button" onClick={() => setBrief(item.text)} className="mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]">
+                          <button type="button" onClick={() => { setBrief(item.text); setBriefTarget(item.targetLabel || null); }} className="mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]">
                             Use this
                           </button>
                         </details>
