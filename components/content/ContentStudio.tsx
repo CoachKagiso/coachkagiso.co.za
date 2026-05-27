@@ -459,6 +459,18 @@ type BriefRecord = {
   createdAt: string;
 };
 
+type SignalBriefPayload = {
+  strongestSignal: string;
+  contentAngle: string;
+  audiencePain: string;
+  writingRegister: string;
+  postFormat: string;
+  platform: string;
+  cta: string;
+  offerToMention: string;
+  offerApproach: string;
+};
+
 type CalendarModalState = {
   mode: 'create' | 'edit';
   item?: ContentCalendarItem;
@@ -542,6 +554,32 @@ const platformLabels: Record<ContentPlatform, string> = {
   instagram: 'Instagram',
   facebook: 'Facebook',
   email: 'Email',
+};
+
+const signalBriefPlatformLabels: Record<string, string> = {
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  facebook: 'Facebook',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+};
+
+const signalBriefFormatLabels: Record<string, string> = {
+  text_post: 'Text post',
+  carousel: 'Carousel',
+  short_script: 'Short script',
+  article: 'Article',
+  email: 'Email',
+  voice_note: 'Voice note',
+};
+
+const signalBriefCtaLabels: Record<string, string> = {
+  download: 'Download',
+  book: 'Book',
+  reply: 'Reply',
+  follow: 'Follow',
+  save: 'Save',
 };
 
 const defaultOutputPlatform: ContentPlatform = 'linkedin';
@@ -2331,6 +2369,66 @@ function parseJsonFromAiOutput(raw: string): unknown | null {
   return null;
 }
 
+function humanizeSignalBriefValue(value: string, labels: Record<string, string> = {}) {
+  if (!value) return '';
+  return labels[value] || getRegisterLabel(value);
+}
+
+function parseSignalBriefPayload(raw: string): SignalBriefPayload | null {
+  const record = asPlainObject(parseJsonFromAiOutput(raw));
+  if (!record) return null;
+
+  const payload: SignalBriefPayload = {
+    strongestSignal: multilineString(record.strongestSignal ?? record.strongest_signal),
+    contentAngle: multilineString(record.contentAngle ?? record.content_angle),
+    audiencePain: multilineString(record.audiencePain ?? record.audience_pain),
+    writingRegister: compactString(record.writingRegister ?? record.writing_register),
+    postFormat: compactString(record.postFormat ?? record.post_format),
+    platform: compactString(record.platform),
+    cta: compactString(record.cta),
+    offerToMention: compactString(record.offerToMention ?? record.offer_to_mention),
+    offerApproach: multilineString(record.offerApproach ?? record.offer_approach),
+  };
+
+  if (!payload.strongestSignal && !payload.contentAngle && !payload.audiencePain) {
+    return null;
+  }
+
+  return payload;
+}
+
+function hasBriefOffer(brief: SignalBriefPayload) {
+  const normalizedOffer = brief.offerToMention.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return Boolean(brief.offerToMention && !['none', 'na'].includes(normalizedOffer));
+}
+
+function formatSignalBriefForDisplay(raw: string) {
+  const brief = parseSignalBriefPayload(raw);
+  if (!brief) return raw.trim();
+
+  const recommendation = [
+    brief.platform && `Platform: ${humanizeSignalBriefValue(brief.platform, signalBriefPlatformLabels)}`,
+    brief.postFormat && `Format: ${humanizeSignalBriefValue(brief.postFormat, signalBriefFormatLabels)}`,
+    brief.writingRegister && `Writing register: ${humanizeSignalBriefValue(brief.writingRegister)}`,
+    brief.cta && `CTA: ${humanizeSignalBriefValue(brief.cta, signalBriefCtaLabels)}`,
+  ].filter(Boolean);
+
+  return [
+    'SIGNAL BRIEF',
+    '',
+    brief.strongestSignal && `Strongest signal:\n${brief.strongestSignal}`,
+    brief.audiencePain && `Audience pain:\n${brief.audiencePain}`,
+    brief.contentAngle && `Content angle:\n${brief.contentAngle}`,
+    recommendation.length > 0 && `Recommendation:\n${recommendation.join('\n')}`,
+    hasBriefOffer(brief) && `Offer mention:\n${brief.offerToMention}${brief.offerApproach ? `\n${brief.offerApproach}` : ''}`,
+  ].filter(Boolean).join('\n\n');
+}
+
+function getSignalBriefTitle(raw: string) {
+  const brief = parseSignalBriefPayload(raw);
+  return (brief?.contentAngle || brief?.strongestSignal || '').slice(0, 96);
+}
+
 function isImagePromptKind(value: string): value is ImagePromptKind {
   return imagePromptKinds.includes(value as ImagePromptKind);
 }
@@ -2881,6 +2979,9 @@ function formatImageSize(bytes: number) {
 }
 
 function titleFromText(text: string, fallback: string) {
+  const signalBriefTitle = getSignalBriefTitle(text);
+  if (signalBriefTitle) return signalBriefTitle;
+
   const line = text
     .split('\n')
     .map((item) => item.replace(/^[-*#\s:]+/, '').trim())
@@ -3161,6 +3262,86 @@ function CalendarPostCard({
         </span>
       </button>
     </span>
+  );
+}
+
+function SignalBriefOutput({ value, className = '' }: { value: string; className?: string }) {
+  const brief = parseSignalBriefPayload(value);
+  if (!brief) return <OutputPanel value={value} className={className} />;
+
+  const recommendation = [
+    brief.platform && { label: 'Platform', value: humanizeSignalBriefValue(brief.platform, signalBriefPlatformLabels) },
+    brief.postFormat && { label: 'Format', value: humanizeSignalBriefValue(brief.postFormat, signalBriefFormatLabels) },
+    brief.writingRegister && { label: 'Register', value: humanizeSignalBriefValue(brief.writingRegister) },
+    brief.cta && { label: 'CTA', value: humanizeSignalBriefValue(brief.cta, signalBriefCtaLabels) },
+  ].filter((item): item is { label: string; value: string } => Boolean(item && item.value));
+  const offerVisible = hasBriefOffer(brief);
+
+  return (
+    <div className={`rounded-[8px] border border-[#E4D8CB] bg-[#F5F3EE] p-5 text-[#142334] ${className}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Generated brief</p>
+          <h3 className="mt-2 font-serif text-[28px] leading-tight">This week&apos;s content direction</h3>
+        </div>
+        {brief.platform && (
+          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+            {humanizeSignalBriefValue(brief.platform, signalBriefPlatformLabels)}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-2">
+        {brief.strongestSignal && (
+          <article className="rounded-[8px] bg-white p-4">
+            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
+              <Lightbulb className="h-3.5 w-3.5" />
+              Signal to respond to
+            </p>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#142334]/78">{brief.strongestSignal}</p>
+          </article>
+        )}
+
+        {brief.audiencePain && (
+          <article className="rounded-[8px] bg-white p-4">
+            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Reader tension
+            </p>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#142334]/78">{brief.audiencePain}</p>
+          </article>
+        )}
+      </div>
+
+      {brief.contentAngle && (
+        <section className="mt-4 rounded-[8px] bg-[#142334] p-5 text-white">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/52">Content angle</p>
+          <p className="mt-3 font-serif text-[24px] leading-snug">{brief.contentAngle}</p>
+        </section>
+      )}
+
+      {recommendation.length > 0 && (
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {recommendation.map((item) => (
+            <div key={item.label} className="rounded-[8px] bg-white px-4 py-3">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">{item.label}</dt>
+              <dd className="mt-1 text-[14px] font-semibold text-[#142334]">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {offerVisible && (
+        <div className="mt-4 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
+            <FileText className="h-3.5 w-3.5" />
+            Offer mention
+          </p>
+          <p className="mt-3 text-[14px] font-semibold text-[#142334]">{brief.offerToMention}</p>
+          {brief.offerApproach && <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/68">{brief.offerApproach}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3935,6 +4116,7 @@ export default function ContentStudio({
   async function saveBriefToBacklog(text = brief ?? '') {
     if (!text.trim()) return;
     if (!canAddToVaultSection('ideas')) return;
+    const displayText = formatSignalBriefForDisplay(text);
     const data = await requestJson<{ item: ContentBacklogItem }>('/api/content/backlog', 'POST', {
       key: adminKey,
       title: titleFromText(text, context.strongestTheme),
@@ -3942,7 +4124,7 @@ export default function ContentStudio({
       platform: 'linkedin',
       source: 'signal_brief',
       status: 'idea',
-      content: text,
+      content: displayText,
     });
     setBacklogRecords((current) => [data.item, ...current]);
     activateWorkspace('content');
@@ -4253,7 +4435,7 @@ export default function ContentStudio({
     if (activeSection !== 'studio') resetSmartSuggestSession();
     setActiveVaultDraftId(null);
     activateWorkspace('content');
-    setTopic(text);
+    setTopic(formatSignalBriefForDisplay(text));
     setTopicSource('brief');
     setStudioMode('create');
     setActiveSection('studio');
@@ -4945,7 +5127,7 @@ export default function ContentStudio({
                   <Badge className="bg-[#F5F3EE] text-[#6B6B6B]">{context.leadsThisWeek} leads this week</Badge>
                 </div>
                 {brief ? (
-                  <OutputPanel value={brief} className="mt-5 min-h-[360px]" />
+                  <SignalBriefOutput value={brief} className="mt-5 min-h-[360px]" />
                 ) : (
                   <SignalBriefEmptyState busy={briefBusy} onGenerate={() => generateSignalBrief()} />
                 )}
@@ -4993,7 +5175,7 @@ export default function ContentStudio({
                       briefHistory.map((item) => (
                         <details key={item.id} className="rounded-[8px] bg-[#F5F3EE] p-3">
                           <summary className="cursor-pointer text-[13px] font-semibold text-[#142334]">{item.title}</summary>
-                          <p className="mt-3 whitespace-pre-line text-[12px] leading-relaxed text-[#142334]/68">{item.text}</p>
+                          <p className="mt-3 whitespace-pre-line text-[12px] leading-relaxed text-[#142334]/68">{formatSignalBriefForDisplay(item.text)}</p>
                           <button type="button" onClick={() => setBrief(item.text)} className="mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]">
                             Use this
                           </button>
@@ -5104,7 +5286,7 @@ export default function ContentStudio({
                 }}
                 onTopicSourceSelect={applyTopicSource}
                 onBriefSelect={(text) => {
-                  setTopic(text);
+                  setTopic(formatSignalBriefForDisplay(text));
                   setTopicSource('brief');
                   setGeneratedCarouselDraft(null);
                 }}
