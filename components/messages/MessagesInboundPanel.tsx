@@ -18,6 +18,16 @@ type ImportResult = {
   notesCreated?: number;
   missingConfig?: string[];
   errors?: string[];
+  sent?: {
+    scanned?: number;
+    matched?: number;
+    imported?: number;
+    duplicates?: number;
+    linkedDrafts?: number;
+    skipped?: number;
+    ignored?: number;
+    errors?: string[];
+  };
 };
 
 function formatLogDate(value: string) {
@@ -98,6 +108,8 @@ export default function MessagesInboundPanel({
   const newCount = activeReplies.filter((reply) => reply.status === 'new').length;
   const draftedCount = activeReplies.filter((reply) => reply.draftStatus === 'drafted').length;
   const busy = isSyncing || isPending;
+  const sentImported = result?.sent?.imported || 0;
+  const sentLinkedDrafts = result?.sent?.linkedDrafts || 0;
 
   async function syncInboundReplies() {
     if (!adminKey || busy) return;
@@ -170,7 +182,7 @@ export default function MessagesInboundPanel({
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Messages / Replies</p>
           <h2 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">Inbound replies</h2>
           <p className="mt-2 text-[14px] leading-relaxed text-[#6B6B6B]">
-            Zoho replies become tasks, notes, and approval-ready drafts.
+            Zoho replies become tasks, notes, and approval-ready drafts. Sent replies are logged back to the thread.
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -185,9 +197,9 @@ export default function MessagesInboundPanel({
           </button>
           {result && (
             <p className="max-w-sm text-[12px] leading-relaxed text-[#142334]/58">
-              {result.imported
-                ? `${result.imported} replies imported, ${result.drafted || 0} drafts prepared.`
-                : `No new replies found. ${result.scanned || 0} messages checked.`}
+              {result.imported || sentImported || sentLinkedDrafts
+                ? `${result.imported || 0} replies imported, ${result.drafted || 0} drafts prepared, ${sentImported} sent emails logged, ${sentLinkedDrafts} drafts marked sent.`
+                : `No new replies or sent emails found. ${(result.scanned || 0) + (result.sent?.scanned || 0)} messages checked.`}
             </p>
           )}
           {error && <p className="max-w-sm text-[12px] leading-relaxed text-[#8A3B2D]">{error}</p>}
