@@ -110,7 +110,7 @@ export function TaskModal({
       >
         <div className="mx-auto mt-3 h-1 w-9 shrink-0 rounded-full bg-[#E4D8CB] md:hidden" />
         <TaskModalHeader task={task} createdLabel={getTaskCreatedLabel(task, lead, operation)} onClose={requestClose} />
-        <TaskModalTabs activeTab={activeTab} taskType={task.type} onChange={setActiveTab} />
+        <TaskModalTabs activeTab={activeTab} taskType={task.type} notesCount={task.notes.length} onChange={setActiveTab} />
 
         <div className="min-h-0 flex-1 overflow-hidden">
           {activeTab === 'detail' && (
