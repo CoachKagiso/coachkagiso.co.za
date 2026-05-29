@@ -1636,6 +1636,7 @@ const angleGroupsByKey: Record<string, AngleGroup[]> = {
         { id: 'x_tips_for_y', label: 'X Tips for Y', register: 'tactical_teacher' },
         { id: 'checklists_workflows', label: 'Checklists & Workflows', register: 'tactical_teacher' },
         { id: 'myth_vs_fact', label: 'Myth vs. Fact', register: 'conviction_reframe' },
+        { id: 'this_not_that', label: 'This, Not That', register: 'tactical_teacher' },
         { id: 'resource_roundup', label: 'Resource Roundup', register: 'tactical_teacher' },
         { id: 'faq', label: 'FAQ', register: 'tactical_teacher' },
       ],
@@ -2024,6 +2025,7 @@ const anglePlaceholders: Record<string, string> = {
   relatable_observation: 'What universal professional experience do you want to name?',
   career_hot_take: "What's the strongest position you can take on a career topic?",
   the_challenger: 'What bad career advice are you reacting to?',
+  this_not_that: 'What phrase, habit, mistake, or career belief should Kagiso compare side by side?',
   warm_checkin: "What do you want to say to someone who's been quiet?",
   conviction_reframe: "What safe choice has a hidden cost?",
   pov_scenario: 'Describe the situation, for example being passed over for promotion again.',
@@ -2514,6 +2516,9 @@ function buildCreateUserPrompt(
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === selection.subType);
   const angle = findAngleOption(selection);
+  const carouselSlideCountPrompt = selection.angle === 'this_not_that'
+    ? 'Create a cover slide, 5 to 7 comparison slides, and a final close slide. This angle overrides generic Quick, Full, or Auto slide count controls.'
+    : getCarouselSlideCountOption(selection.carouselSlideCount).prompt;
   const carouselStructuredOutput = selection.contentType === 'carousel'
     ? [
         'CAROUSEL STUDIO STRUCTURED OUTPUT:',
@@ -2523,7 +2528,7 @@ function buildCreateUserPrompt(
         'Set composition to "auto" unless you have a clear reason to force a layout.',
         'Each slide headline must be 8 words or fewer. Each slide body must be 40 words or fewer.',
         'Every slide must be usable as an HTML/CSS visual slide later. Put layout or image direction in visualSuggestion, not in body.',
-        `Carousel slide count: ${getCarouselSlideCountOption(selection.carouselSlideCount).prompt}`,
+        `Carousel slide count: ${carouselSlideCountPrompt}`,
         `Output frame: ${getCarouselAspectRatioLabel(selection.carouselAspectRatio, selection.platform)}. ${getCarouselAspectRatioOption(selection.carouselAspectRatio, selection.platform).prompt}`,
         buildCarouselTemplatePromptBlock(selection.carouselTemplate, selection.carouselLayoutRecipe),
       ].join('\n')
