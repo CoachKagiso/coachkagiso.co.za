@@ -15,6 +15,7 @@ import {
   getEmailTemplate,
   getTemplateIdForLeadStage,
   isMasterclassBookingsOpenTemplate,
+  isNewsletterBridgeTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
 import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
@@ -277,12 +278,12 @@ export function EmailTab({
           {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent' : 'Send Email'}
         </button>
         {sendError && <p className="text-[12px] leading-relaxed text-[#A24E37]">Email failed to send. Try again.</p>}
-        {selectedTemplate.sequenceIndex === 3 && (
+        {selectedTemplate.sequenceIndex === 3 && !isNewsletterBridgeTemplate(selectedTemplateId) && (
           <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
-            After this email, the newsletter bridge reminder will appear in 7 days if there&apos;s no response.
+            After this email, the newsletter bridge reminder will appear in 2 days if there&apos;s no response.
           </p>
         )}
-        {selectedTemplate.sequenceIndex === 4 && (
+        {isNewsletterBridgeTemplate(selectedTemplateId) && (
           <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">
             This is the newsletter bridge. After sending, the lead moves to Nurture and direct follow-up reminders stop.
           </p>

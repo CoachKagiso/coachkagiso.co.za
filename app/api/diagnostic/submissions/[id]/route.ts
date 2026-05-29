@@ -66,7 +66,8 @@ export async function POST(request: Request, context: RouteContext) {
             existing?.follow_up_count ?? 0,
             null,
             contactedAt,
-            existing?.lead_status === 'contacted' || Boolean(existing?.last_contacted_at)
+            existing?.lead_status === 'contacted' || Boolean(existing?.last_contacted_at),
+            existing?.source
           )
         : null;
 
@@ -120,7 +121,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         existing?.follow_up_count ?? 0,
         templateId,
         contactedAt,
-        existing?.lead_status === 'contacted' || Boolean(existing?.last_contacted_at)
+        existing?.lead_status === 'contacted' || Boolean(existing?.last_contacted_at),
+        existing?.source
       )
     : null;
   const shouldClear = clearNextFollowUp || shouldClearNextFollowUp(leadStatus);

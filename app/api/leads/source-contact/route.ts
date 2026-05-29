@@ -69,7 +69,8 @@ export async function POST(request: Request) {
         submission.follow_up_count ?? 0,
         templateId,
         sentAt,
-        hadPriorContact
+        hadPriorContact,
+        source
       );
       const nextLeadStatus = getLeadStatusAfterSend('contacted', templateId);
 
