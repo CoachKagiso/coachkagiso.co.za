@@ -33,7 +33,7 @@ const VALID_ANGLES = [
   'thought_leadership_framework', 'contrarian_with_evidence', 'industry_trend_analysis',
   'ultimate_guide', 'problem_solution_breakdown', 'evergreen_resource',
   'career_lessons_reflections', 'longform_case_study', 'leadership_wisdom',
-  'how_to_guide', 'x_tips_for_y', 'checklists_workflows', 'myth_vs_fact',
+  'how_to_guide', 'x_tips_for_y', 'checklists_workflows', 'myth_vs_fact', 'this_not_that',
   'resource_roundup', 'faq', 'stats_data_story', 'problem_and_solution',
   'career_journey_timeline', 'personal_brand_values', 'product_service_deep_dive',
   'quotes_and_insights', 'career_decision', 'hot_take_vote', 'experience_check',
