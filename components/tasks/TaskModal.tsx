@@ -100,7 +100,7 @@ export function TaskModal({
       role="presentation"
     >
       <section
-        className={`task-modal-panel flex h-[92vh] max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-auto md:max-h-[80vh] md:w-[560px] md:rounded-[16px] ${
+        className={`task-modal-panel flex h-[92vh] max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-[82vh] md:max-h-[760px] md:w-[560px] md:rounded-[16px] ${
           isClosing ? 'task-modal-panel-closing' : ''
         }`}
         role="dialog"

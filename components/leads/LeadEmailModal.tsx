@@ -687,7 +687,7 @@ export default function LeadEmailModal({
           role="presentation"
         >
           <section
-            className={`task-modal-panel flex h-[88vh] max-h-[88vh] w-full overscroll-contain flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-auto md:max-h-[72vh] md:w-[520px] md:rounded-[16px] ${
+            className={`task-modal-panel flex h-[88vh] max-h-[88vh] w-full overscroll-contain flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-[82vh] md:max-h-[760px] md:w-[520px] md:rounded-[16px] ${
               isClosing ? 'task-modal-panel-closing' : ''
             }`}
             role="dialog"
@@ -736,7 +736,7 @@ export default function LeadEmailModal({
 
             <div className="min-h-0 flex-1 overflow-hidden">
               {activeTab === 'email' && (
-                <div className="grid gap-4 px-5 py-4 md:px-6">
+                <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6" onWheel={containScrollableWheel}>
                   <div className="rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/70">
                     Source: <span className="font-semibold text-[#142334]">{leadSourceLabels[leadSource]}</span>
                     {modalLead.downloadLink ? ' - download link is available for this lead.' : ''}
@@ -908,7 +908,7 @@ export default function LeadEmailModal({
               )}
 
               {activeTab === 'notes' && (
-                <div className="grid gap-4 px-5 py-4 md:px-6">
+                <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6" onWheel={containScrollableWheel}>
                   {notes.length === 0 ? (
                     <div className="grid h-[92px] place-items-center rounded-[8px] bg-[#F5F3EE] text-center text-[13px] text-[#6B6B6B]">
                       No notes saved for this lead yet.

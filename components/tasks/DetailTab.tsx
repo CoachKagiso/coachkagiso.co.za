@@ -86,7 +86,7 @@ export function DetailTab({
       : null;
 
   return (
-    <div className="grid gap-4 px-5 py-4 md:px-6">
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6">
       {(lead || operation) && (
         <section className="rounded-[12px] bg-[#F5F3EE] p-4">
           {lead && (
