@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import { AlertTriangle, Clock, Loader2, MailCheck, Send, X } from 'lucide-react';
 import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
@@ -94,6 +94,28 @@ function prepareTaskTemplateDraft(
   }
 
   return injected;
+}
+
+function containScrollableWheel<T extends HTMLElement>(event: WheelEvent<T>) {
+  const target = event.currentTarget;
+  if (target.scrollHeight <= target.clientHeight) return;
+
+  const deltaY =
+    event.deltaMode === 1
+      ? event.deltaY * 16
+      : event.deltaMode === 2
+        ? event.deltaY * target.clientHeight
+        : event.deltaY;
+
+  event.preventDefault();
+  event.stopPropagation();
+  target.scrollTop += deltaY;
+}
+
+function fitEmailBodyTextarea(textarea: HTMLTextAreaElement) {
+  const minHeight = window.matchMedia('(min-width: 768px)').matches ? 480 : 320;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${Math.max(minHeight, textarea.scrollHeight)}px`;
 }
 
 function escapeHtml(value: string) {
@@ -205,6 +227,7 @@ export function EmailTab({
   const hasSequenceGap = Boolean(sequenceGap?.detected && sequenceGap.firstTemplateId);
   const sequenceIsManual = templateGuardrail?.sequenceRepairStatus === 'manual';
   const scheduleTimerRef = useRef<number | null>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const sendWindowGuidance = useMemo(() => getSendWindowGuidance(sendTimeSnapshot), [sendTimeSnapshot]);
   const showSendTimeReminder = !sendWindowGuidance.withinWindow && !sendTimeNoticeDismissed && !scheduleConfirmation;
 
@@ -216,6 +239,11 @@ export function EmailTab({
   }, []);
 
   useEffect(() => () => clearScheduleTimer(), [clearScheduleTimer]);
+
+  useEffect(() => {
+    if (!bodyTextareaRef.current) return;
+    fitEmailBodyTextarea(bodyTextareaRef.current);
+  }, [emailBody, selectedTemplateId]);
 
   useEffect(() => {
     const leadForRequest = lead;
@@ -411,7 +439,7 @@ export function EmailTab({
   }
 
   return (
-    <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6">
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6" onWheel={containScrollableWheel}>
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</p>
@@ -528,9 +556,11 @@ export function EmailTab({
       <label className="grid gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Body</span>
         <textarea
+          ref={bodyTextareaRef}
           value={emailBody}
           onChange={(event) => setEmailBody(event.target.value)}
-          className="h-[160px] resize-none rounded-[8px] border border-[#E4D8CB] bg-white px-3 py-2.5 text-[13px] leading-[1.6] text-[#142334] outline-none transition focus:border-[#142334]"
+          onWheel={containScrollableWheel}
+          className="min-h-[320px] resize-y overflow-y-auto overscroll-contain rounded-[8px] border border-[#E4D8CB] bg-white px-3 py-2.5 text-[13px] leading-[1.6] text-[#142334] outline-none transition focus:border-[#142334] md:min-h-[480px]"
         />
       </label>
 

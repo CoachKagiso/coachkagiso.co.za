@@ -204,6 +204,12 @@ function containScrollableWheel<T extends HTMLElement>(event: WheelEvent<T>) {
   target.scrollTop += deltaY;
 }
 
+function fitEmailBodyTextarea(textarea: HTMLTextAreaElement) {
+  const minHeight = window.matchMedia('(min-width: 768px)').matches ? 480 : 320;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${Math.max(minHeight, textarea.scrollHeight)}px`;
+}
+
 export default function LeadEmailModal({
   isOpen,
   onClose,
@@ -287,6 +293,7 @@ export default function LeadEmailModal({
   const hasSequenceGap = Boolean(sequenceGap?.detected && sequenceGap.firstTemplateId);
   const sequenceIsManual = templateGuardrail?.sequenceRepairStatus === 'manual';
   const scheduleTimerRef = useRef<number | null>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const sendWindowGuidance = useMemo(() => getSendWindowGuidance(sendTimeSnapshot), [sendTimeSnapshot]);
   const showSendTimeReminder = isOpen && !sendWindowGuidance.withinWindow && !sendTimeNoticeDismissed && !scheduleConfirmation;
 
@@ -331,10 +338,10 @@ export default function LeadEmailModal({
     document.documentElement.style.overscrollBehavior = 'contain';
 
     const timeout = window.setTimeout(() => {
-      const template = getEmailTemplate(activeDefaultTemplateId);
-      const draft = prepareTemplateDraft(template, modalLead, activeDefaultTemplateId, templateGuardrail);
+      const template = getEmailTemplate(defaultTemplateId);
+      const draft = prepareTemplateDraft(template, modalLead, defaultTemplateId, null);
       setActiveTab('email');
-      setSelectedTemplateId(activeDefaultTemplateId);
+      setSelectedTemplateId(defaultTemplateId);
       setSubject(initialSubject || draft.subject);
       setBody(initialBody || draft.body);
       setNotes(initialNotesRef.current);
@@ -361,9 +368,14 @@ export default function LeadEmailModal({
       document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
       window.scrollTo(0, scrollY);
     };
-  }, [activeDefaultTemplateId, clearScheduleTimer, initialBody, initialSubject, isOpen, modalLead, templateGuardrail]);
+  }, [clearScheduleTimer, defaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
 
   useEffect(() => () => clearScheduleTimer(), [clearScheduleTimer]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'email' || !bodyTextareaRef.current) return;
+    fitEmailBodyTextarea(bodyTextareaRef.current);
+  }, [activeTab, body, isOpen, selectedTemplateId]);
 
   useEffect(() => {
     if (!isOpen || !adminKey || !modalLead.id) {
@@ -687,7 +699,7 @@ export default function LeadEmailModal({
           role="presentation"
         >
           <section
-            className={`task-modal-panel flex h-[88vh] max-h-[88vh] w-full overscroll-contain flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-[82vh] md:max-h-[760px] md:w-[520px] md:rounded-[16px] ${
+            className={`task-modal-panel flex h-[90vh] max-h-[90vh] w-full overscroll-contain flex-col overflow-hidden rounded-t-[16px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] md:h-[92vh] md:max-h-[860px] md:w-[640px] md:rounded-[16px] ${
               isClosing ? 'task-modal-panel-closing' : ''
             }`}
             role="dialog"
@@ -842,10 +854,11 @@ export default function LeadEmailModal({
                   <label className="grid gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Body</span>
                     <textarea
+                      ref={bodyTextareaRef}
                       value={body}
                       onChange={(event) => setBody(event.target.value)}
                       onWheel={containScrollableWheel}
-                      className="h-[180px] resize-none overflow-y-auto overscroll-contain rounded-[8px] border border-[#E4D8CB] bg-white px-3 py-2.5 text-[13px] leading-[1.6] text-[#142334] outline-none transition focus:border-[#142334]"
+                      className="min-h-[320px] resize-y overflow-y-auto overscroll-contain rounded-[8px] border border-[#E4D8CB] bg-white px-3 py-2.5 text-[13px] leading-[1.6] text-[#142334] outline-none transition focus:border-[#142334] md:min-h-[480px]"
                     />
                   </label>
 
