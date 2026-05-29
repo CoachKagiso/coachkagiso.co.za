@@ -362,8 +362,8 @@ function getFollowUpSequenceLabel(submission: DiagnosticSubmission) {
     return 'LinkedIn newsletter bridge (Day 10)';
   }
   if (source === 'masterclass_waitlist') return 'Bookings-open email (manual)';
-  if (followUpCount <= 0) return 'Follow-up 1 (Day 4)';
-  if (followUpCount === 1) return 'Follow-up 2 (Day 10)';
+  if (followUpCount <= 0) return 'Second contact (Day 4)';
+  if (followUpCount === 1) return 'Third contact (Day 10)';
   return 'Newsletter bridge (Day 12)';
 }
 
