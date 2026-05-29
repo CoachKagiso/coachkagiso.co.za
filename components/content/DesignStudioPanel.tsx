@@ -2691,6 +2691,16 @@ function isFullCanvasLayer(layer: DesignLayer, width: number, height: number) {
   return layer.locked && layer.x === 0 && layer.y === 0 && layer.width >= width && layer.height >= height;
 }
 
+function isCanvasCoveringLayer(layer: DesignLayer, width: number, height: number) {
+  const tolerance = 2;
+  return (
+    layer.x <= tolerance &&
+    layer.y <= tolerance &&
+    layer.x + layer.width >= width - tolerance &&
+    layer.y + layer.height >= height - tolerance
+  );
+}
+
 function resizeLayerForCanvas(layer: DesignLayer, currentWidth: number, currentHeight: number, nextWidth: number, nextHeight: number) {
   const scaleX = nextWidth / currentWidth;
   const scaleY = nextHeight / currentHeight;
@@ -4775,7 +4785,9 @@ function DesignLayerView({
 
   if (!layer.visible) return null;
   const isCanvasBackground = layer.locked && layer.x === 0 && layer.y === 0 && layer.width >= design.width && layer.height >= design.height;
-  const layerZIndex = selected ? 90 : isCanvasBackground ? 2 : 20 + stackIndex;
+  const shouldPreserveStackWhenSelected = isCanvasCoveringLayer(layer, design.width, design.height);
+  const baseLayerZIndex = isCanvasBackground ? 2 : 20 + stackIndex;
+  const layerZIndex = selected && !shouldPreserveStackWhenSelected ? 90 : baseLayerZIndex;
   const layerAsset = layer.type === 'asset' ? assetLibrary[layer.assetId] : null;
 
   return (
@@ -5291,7 +5303,15 @@ function DesignCanvas({
   }
 
   return (
-    <div className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-3" data-design-canvas-viewport="true">
+    <div
+      className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-3"
+      data-design-canvas-viewport="true"
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        setEditingTextLayerId(null);
+        onSelectLayer(null);
+      }}
+    >
       <div
         className="mx-auto"
         style={{
@@ -7035,23 +7055,69 @@ export default function DesignStudioPanel({
                   </p>
                   <div className="design-studio-scroll-area mt-3 grid max-h-[360px] gap-2 overflow-y-auto pr-2" onWheel={trapDesignWheel}>
                     {[...activePage.layers].reverse().map((layer) => (
-                      <button
+                      <div
                         key={layer.id}
-                        type="button"
-                        onClick={(event) => selectLayer(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)}
-                        className={`min-w-0 rounded-[8px] border px-3 py-2 text-left transition ${
-                          selectedLayerIds.includes(layer.id)
-                            ? 'border-[#142334] bg-[#142334] text-white'
-                            : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
-                        }`}
+                        className="group relative"
                       >
-                        <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">
-                          {layer.type === 'text' ? <Type className="h-3.5 w-3.5" /> : layer.type === 'shape' ? <Square className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
-                          {layer.locked ? 'Locked' : layer.type}
-                          {layer.templateSlot ? `- ${getDesignTemplateSlotLabel(layer.templateSlot)}` : ''}
-                        </span>
-                        <span className="mt-1 block truncate text-[12px] font-semibold">{getLayerPreviewLabel(layer, assetLibrary)}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(event) => selectLayer(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)}
+                          className={`min-w-0 w-full rounded-[8px] border px-3 py-2 pr-28 text-left transition ${
+                            selectedLayerIds.includes(layer.id)
+                              ? 'border-[#142334] bg-[#142334] text-white'
+                              : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">
+                            {layer.type === 'text' ? <Type className="h-3.5 w-3.5" /> : layer.type === 'shape' ? <Square className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                            {layer.locked ? 'Locked' : layer.type}
+                            {layer.templateSlot ? `- ${getDesignTemplateSlotLabel(layer.templateSlot)}` : ''}
+                          </span>
+                          <span className="mt-1 block truncate text-[12px] font-semibold">{getLayerPreviewLabel(layer, assetLibrary)}</span>
+                        </button>
+                        <div className="absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                          <button
+                            type="button"
+                            title={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                            aria-label={layer.locked ? `Unlock ${getLayerPreviewLabel(layer, assetLibrary)}` : `Lock ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleLayerLock(layer.id);
+                            }}
+                            className="grid h-7 w-7 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334] shadow-sm transition hover:border-[#C9AD98] hover:bg-[#F8F6F4]"
+                          >
+                            {layer.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                          </button>
+                          {!layer.locked && (
+                            <>
+                              <button
+                                type="button"
+                                title="Duplicate layer"
+                                aria-label={`Duplicate ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  duplicateLayer(layer.id);
+                                }}
+                                className="grid h-7 w-7 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334] shadow-sm transition hover:border-[#C9AD98] hover:bg-[#F8F6F4]"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete layer"
+                                aria-label={`Delete ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  deleteLayer(layer.id);
+                                }}
+                                className="grid h-7 w-7 place-items-center rounded-full border border-red-100 bg-white/95 text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </>
