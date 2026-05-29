@@ -39,8 +39,8 @@ export type EmailTemplateId =
 
 export type EmailTemplateStageLabel =
   | 'First contact'
-  | 'Follow-up 1'
-  | 'Follow-up 2'
+  | 'Second contact'
+  | 'Third contact'
   | 'Newsletter bridge'
   | 'Waitlist confirmation'
   | 'Bookings open';
@@ -111,7 +111,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Glow Up VIP Package',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'Still thinking about your answer, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -139,7 +139,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Glow Up VIP Package',
     variant: 3,
     sequenceIndex: 3,
-    stageLabel: 'Follow-up 2',
+    stageLabel: 'Third contact',
     subject: 'Last one from me, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -230,11 +230,11 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Saturday Masterclass',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'You never told me, {{firstName}}',
     body: `Hi {{firstName}},
 
-I sent you an email last week asking what made you take the diagnostic in the first place.
+I sent you an email a few days ago asking what made you take the diagnostic in the first place.
 
 You didn't answer, which tells me one of two things: either you're still figuring out how to put it into words, or the question didn't land.
 
@@ -256,7 +256,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Saturday Masterclass',
     variant: 3,
     sequenceIndex: 3,
-    stageLabel: 'Follow-up 2',
+    stageLabel: 'Third contact',
     subject: 'Stepping back now, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -332,7 +332,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Saturday Masterclass',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'I have a theory, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -358,7 +358,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Saturday Masterclass',
     variant: 3,
     sequenceIndex: 3,
-    stageLabel: 'Follow-up 2',
+    stageLabel: 'Third contact',
     subject: 'One last thing, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -438,11 +438,11 @@ hello@coachkagiso.co.za`,
     bookingKey: 'CV + LinkedIn Bundle',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'I think I know why you didn\'t reply, {{firstName}}',
     body: `Hi {{firstName}},
 
-I asked you a question last week about your LinkedIn, and you didn't reply.
+I asked you a question a few days ago about your LinkedIn, and you didn't reply.
 
 I think I know why. It's not that you don't care. It's that looking at your own LinkedIn and being honest about what's missing feels like admitting you've been invisible.
 
@@ -466,7 +466,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'CV + LinkedIn Bundle',
     variant: 3,
     sequenceIndex: 3,
-    stageLabel: 'Follow-up 2',
+    stageLabel: 'Third contact',
     subject: 'Signing off, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -544,11 +544,11 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Career Clarity Session',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'No agenda here, {{firstName}}',
     body: `Hi {{firstName}},
 
-I sent you an email last week just asking how you're doing. You didn't reply, which is fine. I know what inbox overload looks like.
+I sent you an email a few days ago just asking how you're doing. You didn't reply, which is fine. I know what inbox overload looks like.
 
 But I meant it. I wasn't trying to soften you up for a pitch. I just know that when someone answers a diagnostic the way you did, they're usually holding more than they're saying out loud.
 
@@ -570,7 +570,7 @@ hello@coachkagiso.co.za`,
     bookingKey: 'Career Clarity Session',
     variant: 3,
     sequenceIndex: 3,
-    stageLabel: 'Follow-up 2',
+    stageLabel: 'Third contact',
     subject: 'Leaving this here, {{firstName}}',
     body: `Hi {{firstName}},
 
@@ -654,11 +654,11 @@ hello@coachkagiso.co.za`,
     source: 'first_90_days',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'The part nobody warns you about, {{firstName}}',
     body: `Hi {{firstName}},
 
-I sent you the First 90 Days checklist last week and wanted to follow up.
+I sent you the First 90 Days checklist a few days ago and wanted to follow up.
 
 Here's what I see most often with new managers in corporate SA: the technical skills that got you promoted are not the skills that will make you successful in the new role.
 
@@ -738,11 +738,11 @@ hello@coachkagiso.co.za`,
     source: 'linkedin_headline',
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Follow-up 1',
+    stageLabel: 'Second contact',
     subject: 'Why your headline is costing you, {{firstName}}',
     body: `Hi {{firstName}},
 
-I wanted to follow up on the LinkedIn Headline Builder I sent last week.
+I wanted to follow up on the LinkedIn Headline Builder I sent a few days ago.
 
 Here's the thing most people don't realise: your LinkedIn headline is the first thing recruiters see when they search for someone like you. Before your experience, before your skills, before anything else, your headline either matches their search or it doesn't.
 

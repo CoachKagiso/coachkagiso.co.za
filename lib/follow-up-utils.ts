@@ -117,8 +117,8 @@ export function shouldClearNextFollowUp(status?: DiagnosticLeadStatus | null) {
 
 export function getFollowUpActionLabel(status: DiagnosticLeadStatus, followUpCount = 0) {
   if (status === 'new') return 'Send first email';
-  if (followUpCount <= 0) return 'Send follow-up 1';
-  if (followUpCount === 1) return 'Send follow-up 2';
+  if (followUpCount <= 0) return 'Send second contact';
+  if (followUpCount === 1) return 'Send third contact';
   if (followUpCount === 2) return 'Send newsletter bridge';
   return 'Sequence complete';
 }

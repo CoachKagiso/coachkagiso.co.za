@@ -186,9 +186,9 @@ function getFollowUpOneTask(submission: DiagnosticSubmission, clientName: string
   }
   return {
     id: `followup1-${submission.id}`,
-    title: `${clientName} - Send Follow-up 1`,
+    title: `${clientName} - Send second contact`,
     subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name} - Day 4 check-in`,
-    tags: ['FOLLOW-UP', 'DAY 4'],
+    tags: ['SECOND CONTACT', 'DAY 4'],
   };
 }
 
@@ -212,9 +212,9 @@ function getFollowUpTwoTask(submission: DiagnosticSubmission, clientName: string
   }
   return {
     id: `followup2-${submission.id}`,
-    title: `${clientName} - Send Follow-up 2`,
+    title: `${clientName} - Send third contact`,
     subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - ${submission.archetype_name} - Soft close`,
-    tags: ['FOLLOW-UP', 'FINAL', 'DAY 10'],
+    tags: ['THIRD CONTACT', 'FINAL', 'DAY 10'],
   };
 }
 
