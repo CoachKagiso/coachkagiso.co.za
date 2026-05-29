@@ -3,6 +3,7 @@ import {
   isMasterclassWaitlistSource,
   type DiagnosticLeadSource,
 } from '@/lib/lead-sources';
+import { normalizeDiagnosticArchetypeName } from '@/lib/diagnostic-archetype-names';
 
 const publicSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://coachkagiso.co.za').replace(/\/$/, '');
 
@@ -868,7 +869,7 @@ export function getTemplateIdForArchetype(
   archetypeName?: string | null,
   archetypeKey?: string | null
 ): BaseEmailTemplateId {
-  const byName = EMAIL_TEMPLATE_MAP[(archetypeName || '').toLowerCase().trim()];
+  const byName = EMAIL_TEMPLATE_MAP[normalizeDiagnosticArchetypeName(archetypeName).toLowerCase().trim()];
   if (byName) return byName;
 
   const byKey: Record<string, BaseEmailTemplateId> = {
