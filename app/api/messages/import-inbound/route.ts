@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { importZohoInboundReplies } from '@/lib/inbound-email-replies';
+import { importZohoSentEmails } from '@/lib/zoho-sent-email-import';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -27,12 +28,20 @@ function isRequestAuthorized(request: Request, key?: string | null) {
   return isCronAuthorized(request) || isDiagnosticAdminAuthorized(key);
 }
 
-function buildResponse(result: Awaited<ReturnType<typeof importZohoInboundReplies>>, missingConfigStatus = 409) {
-  const configured = result.missingConfig.length === 0;
+type InboundImportResult = Awaited<ReturnType<typeof importZohoInboundReplies>>;
+type SentImportResult = Awaited<ReturnType<typeof importZohoSentEmails>>;
+
+function buildResponse(inbound: InboundImportResult, sent: SentImportResult, missingConfigStatus = 409) {
+  const missingConfig = Array.from(new Set([...inbound.missingConfig, ...sent.missingConfig]));
+  const errors = [...inbound.errors, ...sent.errors];
+  const configured = missingConfig.length === 0;
   return NextResponse.json(
     {
-      success: configured && result.errors.length === 0,
-      ...result,
+      success: configured && errors.length === 0,
+      ...inbound,
+      missingConfig,
+      errors,
+      sent,
     },
     { status: configured ? 200 : missingConfigStatus },
   );
@@ -47,12 +56,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const result = await importZohoInboundReplies({
+  const importOptions = {
     limit: normalizeLimit(url.searchParams.get('limit')),
     days: normalizeDays(url.searchParams.get('days')),
-  });
+  };
+  const inbound = await importZohoInboundReplies(importOptions);
+  const sent = await importZohoSentEmails(importOptions);
 
-  return buildResponse(result, cronAuthorized ? 200 : 409);
+  return buildResponse(inbound, sent, cronAuthorized ? 200 : 409);
 }
 
 export async function POST(request: Request) {
@@ -64,10 +75,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const result = await importZohoInboundReplies({
+  const importOptions = {
     limit: normalizeLimit(body.limit),
     days: normalizeDays(body.days),
-  });
+  };
+  const inbound = await importZohoInboundReplies(importOptions);
+  const sent = await importZohoSentEmails(importOptions);
 
-  return buildResponse(result);
+  return buildResponse(inbound, sent);
 }
