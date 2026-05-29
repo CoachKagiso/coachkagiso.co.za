@@ -125,6 +125,7 @@ function normalizeSubmission(row: Partial<DiagnosticSubmission>) {
     lastContactedAt: row.last_contacted_at,
     leadStatus: status,
     nextFollowUpAt: row.next_follow_up_at,
+    source: normalizeLeadSource(row.source),
     submittedAt: row.submitted_at,
   });
 
@@ -535,7 +536,7 @@ export async function upsertSourceLead(input: SourceLeadInput) {
       lead_status: 'contacted',
       follow_up_count: 0,
       last_contacted_at: now.toISOString(),
-      next_follow_up_at: input.source === 'masterclass_waitlist' ? null : addSastDaysAsDateKey(now, 4),
+      next_follow_up_at: input.source === 'masterclass_waitlist' ? null : addSastDaysAsDateKey(now, 5),
     })
     .select(SOURCE_SELECT)
     .single();

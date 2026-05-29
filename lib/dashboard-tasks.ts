@@ -179,7 +179,7 @@ function getFollowUpOneTask(submission: DiagnosticSubmission, clientName: string
   if (source === 'masterclass_waitlist') {
     return {
       id: `masterclass-bookings-open-${submission.id}`,
-      title: `${clientName} - Send bookings-open email`,
+      title: `${clientName} - Send bookings-open email (manual)`,
       subtitle: 'Saturday Masterclass - manual trigger only when bookings are live',
       tags: ['MANUAL TRIGGER', 'WAITLIST', 'BOOKINGS OPEN'],
     };
@@ -235,6 +235,7 @@ export function generateTasks(
     const clientName = lead.first_name || lead.email || 'Lead';
     const subtitle = getLeadSubtitle(lead);
     const followUpCount = lead.follow_up_count ?? 0;
+    const leadSource = normalizeLeadSource(lead.source);
     const hasDueSequenceFollowUp =
       lead.lead_status === 'contacted' &&
       Boolean(lead.next_follow_up_at) &&
@@ -260,6 +261,32 @@ export function generateTasks(
           updatedAt: lead.updated_at || lead.submitted_at,
         })
       );
+    }
+
+    if (leadSource === 'masterclass_waitlist' && lead.lead_status === 'contacted' && followUpCount === 0) {
+      const followUpTask = getFollowUpOneTask(lead, clientName);
+      tasks.push(
+        buildTask({
+          id: followUpTask.id,
+          title: followUpTask.title,
+          subtitle: followUpTask.subtitle,
+          type: 'LEAD',
+          status: 'waiting',
+          priority: 70,
+          clientName,
+          leadId: lead.id,
+          tags: ['MASTERCLASS', 'MANUAL TRIGGER'],
+          isManual: false,
+          notes: [],
+          createdAt: lead.submitted_at,
+          updatedAt: lead.updated_at || lead.submitted_at,
+        })
+      );
+      return;
+    }
+
+    if (leadSource === 'masterclass_waitlist' && lead.lead_status === 'contacted') {
+      return;
     }
 
     if (lead.next_follow_up_at && isTodayOrPast(lead.next_follow_up_at, now) && lead.lead_status !== 'contacted' && !isClosedLead(lead)) {

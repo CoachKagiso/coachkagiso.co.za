@@ -58,14 +58,19 @@ export function getEffectiveNextFollowUpAt({
   lastContactedAt,
   leadStatus,
   nextFollowUpAt,
+  source,
   submittedAt,
 }: {
   followUpCount?: number | null;
   lastContactedAt?: string | null;
   leadStatus?: DiagnosticLeadStatus | null;
   nextFollowUpAt?: string | null;
+  source?: string | null;
   submittedAt?: string | null;
 }) {
+  const count = Number.isFinite(Number(followUpCount)) ? Number(followUpCount) : 0;
+  if (source === 'masterclass_waitlist' && leadStatus === 'contacted') return null;
+
   const storedFollowUpDate = toDateKey(nextFollowUpAt);
   if (storedFollowUpDate) return storedFollowUpDate;
 
@@ -77,10 +82,17 @@ export function getEffectiveNextFollowUpAt({
     const contactedDate = lastContactedAt ? new Date(lastContactedAt) : null;
     if (!contactedDate || Number.isNaN(contactedDate.getTime())) return getSastDateKey();
 
-    const count = Number.isFinite(Number(followUpCount)) ? Number(followUpCount) : 0;
     if (count >= 3) return null;
+    if (source === 'masterclass_waitlist') return null;
 
-    const daysUntilNext = count <= 0 ? 4 : count === 1 ? 6 : 7;
+    const daysUntilNext =
+      source === 'first_90_days' || source === 'linkedin_headline'
+        ? 5
+        : count <= 0
+          ? 4
+          : count === 1
+            ? 6
+            : 2;
     return addSastDaysAsDateKey(contactedDate, daysUntilNext);
   }
 
