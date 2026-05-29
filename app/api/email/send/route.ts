@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { recordSentEmail } from '@/lib/sent-emails';
+import { hasSentEmailTemplateAlreadySent, recordSentEmail } from '@/lib/sent-emails';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,21 @@ export async function POST(request: Request) {
 
   if (!isEmail(to) || !subject || !htmlContent) {
     return NextResponse.json({ error: 'Recipient, subject, and email body are required.' }, { status: 400 });
+  }
+
+  if (templateId) {
+    const duplicateTemplate = await hasSentEmailTemplateAlreadySent({
+      leadId: leadId || null,
+      toEmail: to,
+      templateId,
+    });
+
+    if (duplicateTemplate) {
+      return NextResponse.json(
+        { error: 'This template has already been sent to this lead. Choose the next template before sending again.' },
+        { status: 409 }
+      );
+    }
   }
 
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {

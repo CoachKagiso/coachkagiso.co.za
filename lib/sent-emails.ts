@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { normalizeDiagnosticArchetypeName } from '@/lib/diagnostic-archetype-names';
 import { isDiagnosticLeadStatus, type DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
 import { EMAIL_TEMPLATES, getEmailTemplate, type EmailTemplateId } from '@/lib/email-templates';
 import { leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
@@ -125,6 +126,8 @@ function getTemplateName(templateId?: string | null) {
 }
 
 function normalizeSentEmail(row: SentEmailRow): SentEmail {
+  const archetype = normalizeDiagnosticArchetypeName(row.archetype);
+
   return {
     id: row.id,
     leadId: row.lead_id || null,
@@ -134,7 +137,7 @@ function normalizeSentEmail(row: SentEmailRow): SentEmail {
     body: row.body,
     templateId: row.template_id || null,
     templateName: getTemplateName(row.template_id),
-    archetype: row.archetype || null,
+    archetype: archetype || null,
     serviceInterest: row.service_interest || null,
     sentAt: row.sent_at,
     leadStatus: getJoinedLeadStatus(row),
@@ -182,9 +185,14 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
     if (segment) {
       if (segment.startsWith('source:') && email.leadSource !== segment.slice('source:'.length)) return false;
       if (segment.startsWith('service:') && email.serviceInterest !== segment.slice('service:'.length)) return false;
-      if (segment.startsWith('archetype:') && email.archetype !== segment.slice('archetype:'.length)) return false;
+      if (
+        segment.startsWith('archetype:') &&
+        email.archetype !== normalizeDiagnosticArchetypeName(segment.slice('archetype:'.length))
+      ) {
+        return false;
+      }
     } else {
-      if (archetype && email.archetype !== archetype) return false;
+      if (archetype && email.archetype !== normalizeDiagnosticArchetypeName(archetype)) return false;
       if (source && source !== 'all' && email.leadSource !== source) return false;
     }
 
@@ -297,6 +305,7 @@ function cleanOptionalDate(value?: string | Date | null) {
 
 function getSentEmailPayload(input: SentEmailInsert, includeOptionalColumns = true) {
   const sentAt = cleanOptionalDate(input.sentAt) || new Date().toISOString();
+  const archetype = normalizeDiagnosticArchetypeName(input.archetype);
   const basePayload = {
     lead_id: input.leadId || null,
     to_email: input.toEmail.trim().toLowerCase(),
@@ -304,7 +313,7 @@ function getSentEmailPayload(input: SentEmailInsert, includeOptionalColumns = tr
     subject: input.subject.trim(),
     body: cleanText(input.body, 'No email body was available for this imported message.'),
     template_id: input.templateId || null,
-    archetype: input.archetype || null,
+    archetype: archetype || null,
     service_interest: input.serviceInterest || null,
     sent_at: sentAt,
   };
@@ -368,6 +377,54 @@ export async function recordSentEmail(input: SentEmailInsert) {
   }
 
   throw new Error(result.error.message);
+}
+
+export async function hasSentEmailTemplateAlreadySent({
+  leadId,
+  toEmail,
+  templateId,
+}: {
+  leadId?: string | null;
+  toEmail: string;
+  templateId?: string | null;
+}) {
+  const cleanTemplateId = cleanText(templateId);
+  const cleanToEmail = cleanText(toEmail).toLowerCase();
+  if (!cleanTemplateId || !cleanToEmail) return false;
+
+  const supabase = createSupabaseServiceClient();
+
+  if (leadId) {
+    const byLead = await supabase
+      .from('sent_emails')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('template_id', cleanTemplateId)
+      .limit(1)
+      .maybeSingle();
+
+    if (byLead.error) {
+      if (isMissingSentEmailsTable(byLead.error.message)) return false;
+      throw new Error(byLead.error.message);
+    }
+
+    if (byLead.data?.id) return true;
+  }
+
+  const byEmail = await supabase
+    .from('sent_emails')
+    .select('id')
+    .eq('to_email', cleanToEmail)
+    .eq('template_id', cleanTemplateId)
+    .limit(1)
+    .maybeSingle();
+
+  if (byEmail.error) {
+    if (isMissingSentEmailsTable(byEmail.error.message)) return false;
+    throw new Error(byEmail.error.message);
+  }
+
+  return Boolean(byEmail.data?.id);
 }
 
 export async function updateSentEmailDeliveryById(

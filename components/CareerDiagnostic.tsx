@@ -150,7 +150,7 @@ const questions: DiagnosticQuestion[] = [
 const archetypes: Record<OptionKey, Archetype> = {
   A: {
     key: 'A',
-    name: 'The Plateaued Performer',
+    name: 'Plateaued Performer',
     tagline: 'You are doing well. You have stopped being stretched.',
     description:
       'You are not failing. In fact, that is part of the problem. You are competent enough to keep things moving, but the work is no longer asking enough of you.',
@@ -186,7 +186,7 @@ const archetypes: Record<OptionKey, Archetype> = {
   },
   B: {
     key: 'B',
-    name: 'The Quiet Pivoter',
+    name: 'Quiet Pivoter',
     tagline: 'Your value is real. It is not landing clearly enough.',
     description:
       'You are not deeply unhappy, but you are starting to notice a gap between what you contribute and what people seem to understand about you.',
@@ -222,7 +222,7 @@ const archetypes: Record<OptionKey, Archetype> = {
   },
   C: {
     key: 'C',
-    name: 'The Burnt-Out Builder',
+    name: 'Burnt-Out Builder',
     tagline: 'You are tired in a way a holiday may not fix.',
     description:
       'You have been carrying projects, people, expectations, or pressure for too long. The issue may not be your effort. It may be the shape of the work.',
@@ -258,7 +258,7 @@ const archetypes: Record<OptionKey, Archetype> = {
   },
   D: {
     key: 'D',
-    name: 'The Lost Pivoter',
+    name: 'Lost Pivoter',
     tagline: 'You know something is wrong. You do not know what to fix.',
     description:
       'Every piece of advice feels too generic because your real question is still underneath the surface. You do not need more tips. You need a clearer map.',
@@ -294,7 +294,7 @@ const archetypes: Record<OptionKey, Archetype> = {
   },
   E: {
     key: 'E',
-    name: 'The Engaged Strategist',
+    name: 'Engaged Strategist',
     tagline: 'You are not stuck. You are sharpening.',
     description:
       'You already have motion. What you need now is structure, accountability, and smarter rooms so your next move is not left to chance.',
