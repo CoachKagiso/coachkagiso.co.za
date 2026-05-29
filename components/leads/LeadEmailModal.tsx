@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FormEvent, WheelEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, Loader2, MailCheck, Save, Send, X } from 'lucide-react';
+import { AlertTriangle, Clock, Loader2, MailCheck, Save, Send, X } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
@@ -27,6 +27,11 @@ import {
   type EmailTemplateGuardrailLead,
 } from '@/lib/email-template-guardrails';
 import { buildRecoveryEmailDraft, type SequenceRepairAction } from '@/lib/email-sequence-repair';
+import {
+  getScheduledSendSummary,
+  getSendWindowGuidance,
+  type NextRecommendedSendWindow,
+} from '@/lib/email-send-windows';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
@@ -66,6 +71,10 @@ type LeadEmailTab = 'email' | 'notes';
 type GuardrailResponse = { guardrail?: EmailTemplateGuardrail };
 type RepairResponse = { guardrail?: EmailTemplateGuardrail; note?: DashboardNote; submission?: SentLeadUpdate | null };
 type DraftTemplate = { subject: string; body: string };
+type ScheduleConfirmation = {
+  window: NextRecommendedSendWindow;
+  scheduledAt: Date;
+};
 
 function getFirstName(lead: LeadEmailModalLead) {
   return lead.firstName.trim().split(/\s+/)[0] || 'there';
@@ -144,6 +153,10 @@ function plainTextToEmailHtml(value: string) {
     .join('');
 
   return `<div style="font-family: Arial, sans-serif; font-size: 15px; color: #142334; line-height: 1.7; max-width: 560px;">${paragraphs}</div>`;
+}
+
+function getScheduleConfirmationText(confirmation: ScheduleConfirmation) {
+  return `Scheduled for ${confirmation.window.time} ${confirmation.window.tomorrow ? 'tomorrow' : 'today'}.`;
 }
 
 function getRelativeTime(value: string) {
@@ -240,6 +253,9 @@ export default function LeadEmailModal({
   const [sendError, setSendError] = useState(false);
   const [repairState, setRepairState] = useState<SequenceRepairAction | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
+  const [sendTimeSnapshot, setSendTimeSnapshot] = useState(() => new Date());
+  const [sendTimeNoticeDismissed, setSendTimeNoticeDismissed] = useState(false);
+  const [scheduleConfirmation, setScheduleConfirmation] = useState<ScheduleConfirmation | null>(null);
   const [notes, setNotes] = useState<DashboardNote[]>(initialNotes);
   const [noteBody, setNoteBody] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
@@ -270,6 +286,9 @@ export default function LeadEmailModal({
   const sequenceGap = templateGuardrail?.sequenceGap;
   const hasSequenceGap = Boolean(sequenceGap?.detected && sequenceGap.firstTemplateId);
   const sequenceIsManual = templateGuardrail?.sequenceRepairStatus === 'manual';
+  const scheduleTimerRef = useRef<number | null>(null);
+  const sendWindowGuidance = useMemo(() => getSendWindowGuidance(sendTimeSnapshot), [sendTimeSnapshot]);
+  const showSendTimeReminder = isOpen && !sendWindowGuidance.withinWindow && !sendTimeNoticeDismissed && !scheduleConfirmation;
 
   useEffect(() => {
     initialNotesRef.current = initialNotes;
@@ -282,6 +301,13 @@ export default function LeadEmailModal({
       onClose();
     }, 220);
   }, [onClose]);
+
+  const clearScheduleTimer = useCallback(() => {
+    if (scheduleTimerRef.current) {
+      window.clearTimeout(scheduleTimerRef.current);
+      scheduleTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -316,6 +342,10 @@ export default function LeadEmailModal({
       setSendError(false);
       setRepairState(null);
       setRepairError(null);
+      clearScheduleTimer();
+      setSendTimeSnapshot(new Date());
+      setSendTimeNoticeDismissed(false);
+      setScheduleConfirmation(null);
       setNoteError(null);
       setSendState('idle');
       setIsClosing(false);
@@ -331,7 +361,9 @@ export default function LeadEmailModal({
       document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
       window.scrollTo(0, scrollY);
     };
-  }, [activeDefaultTemplateId, initialBody, initialSubject, isOpen, modalLead, templateGuardrail]);
+  }, [activeDefaultTemplateId, clearScheduleTimer, initialBody, initialSubject, isOpen, modalLead, templateGuardrail]);
+
+  useEffect(() => () => clearScheduleTimer(), [clearScheduleTimer]);
 
   useEffect(() => {
     if (!isOpen || !adminKey || !modalLead.id) {
@@ -478,11 +510,13 @@ export default function LeadEmailModal({
     }
   }
 
-  async function sendEmail() {
+  async function sendEmail(options: { scheduledAt?: Date } = {}) {
     if (!modalLead.email || sendState === 'sending') return;
 
     setSendError(false);
     setSendState('sending');
+    clearScheduleTimer();
+    const scheduledAt = options.scheduledAt || null;
     const sendsSequenceRecovery = Boolean(
       templateGuardrail?.sequenceGap.detected &&
         templateGuardrail.sequenceGap.firstTemplateId === selectedTemplateId,
@@ -500,6 +534,7 @@ export default function LeadEmailModal({
         templateId: selectedTemplateId,
         archetype: modalLead.archetype,
         serviceInterest: modalLead.serviceInterest,
+        scheduledAt: scheduledAt?.toISOString(),
       });
 
       let submission: SentLeadUpdate | null = null;
@@ -557,6 +592,7 @@ export default function LeadEmailModal({
               subject,
               templateLabel: getEmailTemplateOptionLabel(selectedTemplate),
               recipientEmail: modalLead.email,
+              scheduledAt,
             }),
             linkedLeadId: noteLeadId,
           });
@@ -577,15 +613,35 @@ export default function LeadEmailModal({
       if (submission) onSent?.(submission);
       router.refresh();
       setSendState('sent');
-      setToast(`Email sent to ${getFirstName(modalLead)}.`);
+      setToast(scheduledAt ? `Email scheduled for ${getFirstName(modalLead)}.` : `Email sent to ${getFirstName(modalLead)}.`);
       window.setTimeout(() => {
         setSendState('idle');
         closeWithAnimation();
-      }, 2000);
+      }, scheduledAt ? 650 : 2000);
     } catch {
       setSendState('idle');
+      setScheduleConfirmation(null);
       setSendError(true);
     }
+  }
+
+  function scheduleEmail() {
+    if (sendState === 'sending' || sequenceIsManual) return;
+    const confirmation = {
+      window: sendWindowGuidance.nextWindow,
+      scheduledAt: sendWindowGuidance.scheduledAt,
+    };
+    setScheduleConfirmation(confirmation);
+    setSendError(false);
+    clearScheduleTimer();
+    scheduleTimerRef.current = window.setTimeout(() => {
+      void sendEmail({ scheduledAt: confirmation.scheduledAt });
+    }, 1500);
+  }
+
+  function undoScheduledEmail() {
+    clearScheduleTimer();
+    setScheduleConfirmation(null);
   }
 
   async function saveNote(event: FormEvent<HTMLFormElement>) {
@@ -759,6 +815,24 @@ export default function LeadEmailModal({
                       className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
                     />
                   </label>
+                  {showSendTimeReminder && (
+                    <div className="flex items-start gap-2 rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-3.5 py-2.5 text-[#92400E]">
+                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#F59E0B]" />
+                      <div className="min-w-0 flex-1 text-[12px] font-medium leading-relaxed">
+                        <p className="font-semibold">Outside recommended send times.</p>
+                        <p>Best open rates: 7:30 AM / 12:30 PM / 5:30 PM (Tue-Thu)</p>
+                        <p>Consider scheduling for {getScheduledSendSummary(sendWindowGuidance.nextWindow)}.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSendTimeNoticeDismissed(true)}
+                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[#92400E] transition hover:bg-[#FDE68A]"
+                        aria-label="Dismiss send time reminder"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                   {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
                     <p className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#92400E]">
                       This is the manual trigger email. Only send when July bookings are confirmed live.
@@ -776,21 +850,48 @@ export default function LeadEmailModal({
                   </label>
 
                   <div className="grid gap-2">
-                    <button
-                      type="button"
-                      onClick={sendEmail}
-                      disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0 || sequenceIsManual}
-                      className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        sendState === 'sent'
-                          ? 'bg-[#22C55E] text-white'
-                          : 'bg-[#142334] text-white hover:bg-[#C9AD98] hover:text-[#142334]'
-                      }`}
-                    >
-                      {sendState === 'sending' && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {sendState === 'idle' && <Send className="h-4 w-4" />}
-                      {sendState === 'sent' && <MailCheck className="h-4 w-4" />}
-                      {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent' : 'Send Email'}
-                    </button>
+                    {scheduleConfirmation ? (
+                      <div className="flex items-center justify-between gap-3 rounded-[8px] border border-[#79A580] bg-[#EEF7EF] px-3.5 py-2.5 text-[12px] font-semibold text-[#355C3A]">
+                        <span>{getScheduleConfirmationText(scheduleConfirmation)}</span>
+                        <button
+                          type="button"
+                          onClick={undoScheduledEmail}
+                          disabled={sendState === 'sending'}
+                          className="text-[#355C3A] underline-offset-4 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={`grid gap-2 ${sendWindowGuidance.withinWindow ? '' : 'grid-cols-2'}`}>
+                        <button
+                          type="button"
+                          onClick={() => void sendEmail()}
+                          disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0 || sequenceIsManual}
+                          className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            sendState === 'sent'
+                              ? 'bg-[#22C55E] text-white'
+                              : 'bg-[#142334] text-white hover:bg-[#C9AD98] hover:text-[#142334]'
+                          }`}
+                        >
+                          {sendState === 'sending' && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {sendState === 'idle' && <Send className="h-4 w-4" />}
+                          {sendState === 'sent' && <MailCheck className="h-4 w-4" />}
+                          {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent' : sendWindowGuidance.withinWindow ? 'Send Email' : 'Send now'}
+                        </button>
+                        {!sendWindowGuidance.withinWindow && (
+                          <button
+                            type="button"
+                            onClick={scheduleEmail}
+                            disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0 || sequenceIsManual}
+                            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-3 text-[13px] font-semibold text-[#142334] transition hover:bg-[#142334] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Clock className="h-4 w-4" />
+                            Schedule for {sendWindowGuidance.nextWindow.time}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {sendError && <p className="text-[12px] leading-relaxed text-[#DC2626]">Email failed to send. Try again.</p>}
                     {selectedTemplate.sequenceIndex === 3 && !isNewsletterBridgeTemplate(selectedTemplateId) && (
                       <p className="rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-relaxed text-[#7B5D49]">

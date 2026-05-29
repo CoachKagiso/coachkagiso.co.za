@@ -51,13 +51,19 @@ function getStatusClass(status?: DiagnosticLeadStatus | null) {
 
 function getDeliveryClass(status?: string | null) {
   const normalized = String(status || '').toLowerCase();
+  if (normalized === 'sent') {
+    return 'border-[#A7F3D0] bg-[#D1FAE5] text-[#065F46]';
+  }
+  if (normalized === 'scheduled') {
+    return 'border-[#F59E0B] bg-[#FEF3C7] text-[#92400E]';
+  }
   if (normalized === 'clicked' || normalized === 'opened' || normalized === 'delivered') {
     return 'border-[#79A580] bg-[#EEF7EF] text-[#355C3A]';
   }
-  if (normalized === 'bounced' || normalized === 'blocked') {
+  if (normalized === 'bounced' || normalized === 'blocked' || normalized === 'failed') {
     return 'border-[#C98672] bg-[#FFF5F2] text-[#7A2F22]';
   }
-  if (normalized === 'sent' || normalized === 'deferred') {
+  if (normalized === 'deferred') {
     return 'border-[#C9AD98] bg-[#F7F1EC] text-[#7B5D49]';
   }
   return 'border-[#D8C8BB] bg-white text-[#142334]/62';
@@ -110,6 +116,14 @@ function formatLogDate(value: string) {
     year: 'numeric',
     timeZone: 'Africa/Johannesburg',
   }).format(new Date(value));
+}
+
+function getEmailTimelineLabel(email: SentEmail) {
+  if (String(email.deliveryStatus || '').toLowerCase() === 'scheduled' && email.scheduledAt) {
+    return `Scheduled ${formatLogDate(email.scheduledAt)}`;
+  }
+
+  return formatLogDate(email.sentAt);
 }
 
 function formatBody(value: string) {
@@ -362,7 +376,7 @@ export default function MessagesLog({
                     <span className={`w-fit rounded-full px-3 py-1.5 text-[11px] font-semibold ${archetypeBadgeClasses[email.archetype || ''] || 'bg-[#F5F3EE] text-[#6B6B6B]'}`}>
                       {email.archetype || 'No archetype'}
                     </span>
-                    <p className="text-[12px] text-[#6B6B6B]">{formatLogDate(email.sentAt)}</p>
+                    <p className="text-[12px] text-[#6B6B6B]">{getEmailTimelineLabel(email)}</p>
                     {expanded ? <ChevronDown className="h-5 w-5 text-[#C9AD98]" /> : <ChevronRight className="h-5 w-5 text-[#C9AD98]" />}
                   </div>
 
@@ -376,6 +390,7 @@ export default function MessagesLog({
                         </div>
                         <p className="mt-4 text-[12px] leading-relaxed text-[#6B6B6B]">
                           Sent {formatDateTime(email.sentAt)} - Template: {email.templateName} - Source: {sourceLabel} - Log: {getOriginLabel(email.origin)}
+                          {email.scheduledAt ? ` - Scheduled for ${formatDateTime(email.scheduledAt)}` : ''}
                           {email.clickedAt ? ` - Clicked ${formatLogDate(email.clickedAt)}` : email.openedAt ? ` - Opened ${formatLogDate(email.openedAt)}` : ''}
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
