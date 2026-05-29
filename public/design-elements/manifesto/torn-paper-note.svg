@@ -1,0 +1,16 @@
+<svg width="520" height="360" viewBox="0 0 520 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="130%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="10" dy="16" stdDeviation="14" flood-color="#142334" flood-opacity="0.22"/>
+    </filter>
+    <pattern id="fiber" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M0 8H24M4 0V24" stroke="#142334" stroke-opacity="0.035" stroke-width="1"/>
+      <path d="M16 2L22 8M2 20L7 15" stroke="#C9AD98" stroke-opacity="0.12" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M32 42C62 28 86 35 112 26C142 16 174 35 206 25C247 12 282 35 318 27C358 17 391 35 430 29C460 24 486 38 493 71C501 107 481 134 491 169C501 204 482 226 491 260C499 291 470 318 435 313C399 308 372 331 335 318C301 306 274 333 238 320C201 306 171 325 137 311C104 298 78 318 51 298C23 277 39 247 27 219C13 188 32 165 22 135C12 103 2 58 32 42Z" fill="#F7F4EE"/>
+    <path d="M32 42C62 28 86 35 112 26C142 16 174 35 206 25C247 12 282 35 318 27C358 17 391 35 430 29C460 24 486 38 493 71C501 107 481 134 491 169C501 204 482 226 491 260C499 291 470 318 435 313C399 308 372 331 335 318C301 306 274 333 238 320C201 306 171 325 137 311C104 298 78 318 51 298C23 277 39 247 27 219C13 188 32 165 22 135C12 103 2 58 32 42Z" fill="url(#fiber)"/>
+    <path d="M52 82H460M48 126H468M54 170H452M62 214H472M52 258H430" stroke="#142334" stroke-opacity="0.055" stroke-width="2"/>
+  </g>
+</svg>

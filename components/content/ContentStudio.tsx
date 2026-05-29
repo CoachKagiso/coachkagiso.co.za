@@ -43,6 +43,12 @@ import DashboardDatePicker from '@/components/DashboardDatePicker';
 import FilterDropdown from '@/components/FilterDropdown';
 import { OutputPanel, OutputWithActions } from '@/components/content/shared/OutputPanel';
 import { EditorialCalendarTab } from '@/components/content/tabs/EditorialCalendarTab';
+import DesignStudioPanel, {
+  DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY,
+  type DesignStudioCarouselImport,
+  type DesignStudioImportRequest,
+  type DesignStudioTextImport,
+} from '@/components/content/DesignStudioPanel';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
@@ -91,6 +97,7 @@ import {
   vaultPolicies,
   type VaultSection,
 } from '@/lib/content/vault-policy';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import type {
   ContentBacklogItem,
   ContentBacklogSource,
@@ -116,7 +123,7 @@ type ContentStudioProps = {
   profilePhotoUrl?: string | null;
 };
 
-type StudioWorkspace = 'content' | 'carousel' | 'tools';
+type StudioWorkspace = 'content' | 'carousel' | 'design' | 'tools';
 type ContentSection = 'home' | 'briefs' | 'studio' | 'vault' | 'editorial' | 'research';
 type StudioMode = 'create' | 'transform';
 type CreatePlatform = CarouselPlatform;
@@ -354,6 +361,35 @@ interface CreateSelection {
   carouselTemplate: CarouselTemplate;
   carouselLayoutRecipe: CarouselLayoutRecipe;
 }
+
+type ManifestoMonthId =
+  | 'june_career_clarity'
+  | 'july_visibility'
+  | 'august_leadership'
+  | 'september_mentorship'
+  | 'october_positioning'
+  | 'november_next_move'
+  | 'december_career_reset';
+
+type ManifestoOutputStyle = 'full_package' | 'graphic_and_post' | 'idea_bank';
+
+type ManifestoSeriesSettings = {
+  monthId: ManifestoMonthId;
+  fridayDate: string;
+  outputStyle: ManifestoOutputStyle;
+};
+
+type ManifestoMonthOption = {
+  id: ManifestoMonthId;
+  monthLabel: string;
+  title: string;
+  pillar: ContentPillar;
+  fridayDates: string[];
+  theme: string;
+  beliefShift: string;
+  exampleHeadline: string;
+  exampleHandNote: string;
+};
 
 type ExtractedFramework = {
   hookPattern: string;
@@ -635,6 +671,107 @@ const replyPersonTypeLabels: Record<ReplyPersonType, string> = {
   peer: 'Peer / fellow professional',
   unknown: 'Unknown',
 };
+const manifestoMonthOptions: ManifestoMonthOption[] = [
+  {
+    id: 'june_career_clarity',
+    monthLabel: 'June 2026',
+    title: 'The Career Clarity Manifesto',
+    pillar: 'career_growth',
+    fridayDates: ['2026-06-05', '2026-06-12', '2026-06-19', '2026-06-26'],
+    theme: 'Naming what is no longer aligned, choosing direction, and moving from career fog into honest next steps.',
+    beliefShift: 'Clarity is not knowing the whole path. Clarity is telling yourself the truth about the next step.',
+    exampleHeadline: "You are not confused. You are avoiding the truth you already know.",
+    exampleHandNote: 'Love, clarity gets louder when you stop negotiating with old versions of yourself.',
+  },
+  {
+    id: 'july_visibility',
+    monthLabel: 'July 2026',
+    title: 'The Visibility Manifesto',
+    pillar: 'personal_brand',
+    fridayDates: ['2026-07-03', '2026-07-10', '2026-07-17', '2026-07-24', '2026-07-31'],
+    theme: 'Being seen for the right work, making value visible, and refusing to be the quiet best-kept secret.',
+    beliefShift: 'Visibility is not showing off. Visibility is making your value easier to trust.',
+    exampleHeadline: 'Being excellent in silence is still being invisible.',
+    exampleHandNote: 'Love, your work cannot open doors if nobody knows what room to find it in.',
+  },
+  {
+    id: 'august_leadership',
+    monthLabel: 'August 2026',
+    title: 'The Leadership Manifesto',
+    pillar: 'leadership',
+    fridayDates: ['2026-08-07', '2026-08-14', '2026-08-21', '2026-08-28'],
+    theme: 'Owning influence before the title arrives, leading with steadiness, and building trust through presence.',
+    beliefShift: 'Leadership is not waiting to be chosen. Leadership is how you carry responsibility before the room notices.',
+    exampleHeadline: 'The title does not make you a leader. Your standard does.',
+    exampleHandNote: 'Love, the room feels your leadership before it reads your title.',
+  },
+  {
+    id: 'september_mentorship',
+    monthLabel: 'September 2026',
+    title: 'The Mentorship Manifesto',
+    pillar: 'mentorship',
+    fridayDates: ['2026-09-04', '2026-09-11', '2026-09-18', '2026-09-25'],
+    theme: 'Receiving guidance, asking better questions, and refusing to build a career in isolation.',
+    beliefShift: 'Mentorship is not dependency. Mentorship is wisdom borrowed before the mistake becomes expensive.',
+    exampleHeadline: 'You do not need to figure everything out alone.',
+    exampleHandNote: 'Love, asking for guidance is not weakness. It is career intelligence.',
+  },
+  {
+    id: 'october_positioning',
+    monthLabel: 'October 2026',
+    title: 'The Positioning Manifesto',
+    pillar: 'personal_brand',
+    fridayDates: ['2026-10-02', '2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30'],
+    theme: 'Choosing the story your work tells, tightening your market signal, and becoming easier to understand.',
+    beliefShift: 'Positioning is not pretending to be more. It is making the truth of your value impossible to miss.',
+    exampleHeadline: 'If people cannot explain what you do, they cannot refer you.',
+    exampleHandNote: 'Love, unclear value gets overlooked even when it is excellent.',
+  },
+  {
+    id: 'november_next_move',
+    monthLabel: 'November 2026',
+    title: 'The Next Move Manifesto',
+    pillar: 'career_growth',
+    fridayDates: ['2026-11-06', '2026-11-13', '2026-11-20', '2026-11-27'],
+    theme: 'Turning reflection into movement, choosing the next strategic action, and preparing for the transition.',
+    beliefShift: 'Your next move does not need to be dramatic. It needs to be deliberate.',
+    exampleHeadline: 'The next level will require a decision, not just a desire.',
+    exampleHandNote: 'Love, a quiet decision can change the whole direction of your year.',
+  },
+  {
+    id: 'december_career_reset',
+    monthLabel: 'December 2026',
+    title: 'The Career Reset Manifesto',
+    pillar: 'career_growth',
+    fridayDates: ['2026-12-04', '2026-12-11', '2026-12-18', '2026-12-25'],
+    theme: 'Closing the year with honesty, releasing old definitions of success, and entering the new year with intention.',
+    beliefShift: 'A reset is not starting over. It is refusing to carry what no longer belongs in the next year.',
+    exampleHeadline: 'Do not drag an expired version of yourself into a new year.',
+    exampleHandNote: 'Love, you are allowed to outgrow the plan that once made you feel safe.',
+  },
+];
+const manifestoOutputStyleOptions: Array<{ value: ManifestoOutputStyle; label: string; description: string }> = [
+  {
+    value: 'full_package',
+    label: 'Full package',
+    description: 'Graphic copy, LinkedIn post, caption, carousel option, visual direction, and guide prompt.',
+  },
+  {
+    value: 'graphic_and_post',
+    label: 'Graphic + post',
+    description: 'The main square graphic text, handwritten note, LinkedIn post, and visual direction.',
+  },
+  {
+    value: 'idea_bank',
+    label: 'Idea bank',
+    description: 'A batch of manifesto post ideas for the selected month.',
+  },
+];
+const defaultManifestoSettings: ManifestoSeriesSettings = {
+  monthId: 'june_career_clarity',
+  fridayDate: '',
+  outputStyle: 'full_package',
+};
 const hookTypeLabels: Record<HookType, { label: string; detail: string; placeholder: string }> = {
   text_post: {
     label: 'Text / post hook',
@@ -862,6 +999,9 @@ const sourceLabels: Record<ContentBacklogSource, string> = {
   assistant: 'Assistant Draft',
   session_planner: 'Session Planner',
 };
+
+const GENERATED_CAROUSEL_DESIGN_IMPORT_ID = 'generated-carousel-draft';
+const GENERATED_TEXT_DESIGN_IMPORT_ID = 'generated-text-draft';
 
 const calendarDayOptions: CalendarDayOption[] = [
   { value: 1, label: 'Mon', longLabel: 'Monday' },
@@ -1423,6 +1563,7 @@ const angleGroupsByKey: Record<string, AngleGroup[]> = {
       label: 'Inspire and connect',
       angles: [
         { id: 'reflection_friday', label: 'Reflection Friday', register: 'reflection_friday' },
+        { id: 'manifesto_series', label: 'Manifesto Series', register: 'reflection_friday' },
         { id: 'community_call', label: 'Community Call', register: 'reflection_friday' },
       ],
     },
@@ -1722,7 +1863,7 @@ const angleDetails: Record<string, { whatItIs: string; whyItWorks: string; examp
   hot_observation: {
     whatItIs: 'A sharp, timely observation about something happening in the professional world right now.',
     whyItWorks: 'Speed and specificity. The reader recognises the moment and wants to know your take before the moment passes.',
-    exampleOpener: 'Every company just added "AI skills required" to their job posts. Nobody defined what that means.',
+    exampleOpener: 'Your company just updated the career framework. Nobody told you what it actually means for your promotion timeline.',
     bestPlatform: 'LinkedIn',
   },
   thought_provoking_question: {
@@ -1783,6 +1924,12 @@ const angleDetails: Record<string, { whatItIs: string; whyItWorks: string; examp
     whatItIs: 'One honest question with no explanation needed.',
     whyItWorks: "It resonates with people carrying career weight they have not named yet.",
     exampleOpener: 'Are you running away from something, or running towards something?',
+    bestPlatform: 'LinkedIn',
+  },
+  manifesto_series: {
+    whatItIs: 'A collectible Reflection Friday post that belongs to a monthly manifesto theme.',
+    whyItWorks: 'It turns weekly reflection into a branded series people can follow, save, and later receive as a guide.',
+    exampleOpener: 'Clarity is not knowing everything. It is finally telling yourself the truth.',
     bestPlatform: 'LinkedIn',
   },
   community_call: {
@@ -1872,6 +2019,7 @@ const anglePlaceholders: Record<string, string> = {
   industry_insight: 'What trend, shift, or pattern are you noticing in the professional landscape?',
   resource_worth_sharing: 'What resource do you want to share and why does it matter?',
   reflection_friday: 'What are you sitting with this week?',
+  manifesto_series: 'What belief should this manifesto post help the reader sit with?',
   community_call: 'Who do you want to invite into a conversation?',
   relatable_observation: 'What universal professional experience do you want to name?',
   career_hot_take: "What's the strongest position you can take on a career topic?",
@@ -1942,6 +2090,19 @@ function formatDisplayDate(value: string) {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function getManifestoMonthOption(monthId: ManifestoMonthId) {
+  return manifestoMonthOptions.find((option) => option.id === monthId) || manifestoMonthOptions[0];
+}
+
+function formatManifestoDate(value: string) {
+  if (!value) return 'Auto choose';
+  return new Intl.DateTimeFormat('en-ZA', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
   }).format(new Date(`${value}T00:00:00`));
 }
 
@@ -2254,7 +2415,101 @@ function buildCaptionReelPromptBlock(selection: CreateSelection) {
   return '';
 }
 
-function buildCreateUserPrompt(selection: CreateSelection, topicValue: string, pillarFocus: CreatePillarFocus = 'auto') {
+function buildManifestoSeriesPromptBlock(selection: CreateSelection, settings: ManifestoSeriesSettings) {
+  if (selection.angle !== 'manifesto_series') return '';
+
+  const month = getManifestoMonthOption(settings.monthId);
+  const selectedDate = settings.fridayDate
+    ? `${formatManifestoDate(settings.fridayDate)} (${settings.fridayDate})`
+    : 'Auto choose the strongest Friday in the selected month.';
+  const outputStyle = manifestoOutputStyleOptions.find((option) => option.value === settings.outputStyle) || manifestoOutputStyleOptions[0];
+  const requiredOutput = settings.outputStyle === 'idea_bank'
+    ? [
+        'REQUIRED OUTPUT FOR IDEA BANK:',
+        'MONTHLY IDEA BANK',
+        'Generate 8 strong manifesto post ideas for this month. For each idea include:',
+        '- Recommended Friday date',
+        '- Graphic headline',
+        '- Handwritten note copy',
+        '- LinkedIn opening line',
+        '- Post angle in one sentence',
+        '- Visual direction',
+        '- Guide journal prompt',
+      ].join('\n')
+    : settings.outputStyle === 'graphic_and_post'
+      ? [
+          'REQUIRED OUTPUT FOR GRAPHIC + POST:',
+          'GRAPHIC TEXT',
+          '- Series label',
+          '- Manifesto title',
+          '- Main headline for the image',
+          '- Handwritten note copy',
+          'LINKEDIN POST',
+          '- First line',
+          '- Body',
+          '- Close with exactly: That is my reflection for Friday.',
+          'VISUAL DIRECTION',
+          '- One designed graphic direction that can be made in Canva or HTML/CSS.',
+          'GUIDE JOURNAL PROMPT',
+          '- One reflective prompt that could later go into the year-end manifesto guide.',
+        ].join('\n')
+      : [
+          'REQUIRED OUTPUT FOR FULL PACKAGE:',
+          'MANIFESTO IDENTITY',
+          '- Monthly manifesto title',
+          '- Selected Friday',
+          '- Core belief',
+          '- Audience tension',
+          'GRAPHIC TEXT',
+          '- Series label',
+          '- Main headline',
+          '- Handwritten note copy',
+          'LINKEDIN POST',
+          '- First line',
+          '- Body',
+          '- Close with exactly: That is my reflection for Friday.',
+          'SHORT CAPTION',
+          '- A shorter caption version for Instagram/Facebook.',
+          'CAROUSEL OPTION',
+          '- 5 slide outline if Kagiso wants to turn this into a carousel later.',
+          'VISUAL DIRECTION',
+          '- One designed graphic direction that follows the manifesto note aesthetic.',
+          'GUIDE JOURNAL PROMPT',
+          '- One reflective prompt for the year-end free manifesto guide.',
+        ].join('\n');
+
+  return [
+    'MANIFESTO SERIES MODE:',
+    'The user selected the Reflection Friday: Manifesto Series path. Treat this as a branded monthly campaign, not a standalone motivational post.',
+    `Monthly manifesto: ${month.title}`,
+    `Month: ${month.monthLabel}`,
+    `Available Friday dates: ${month.fridayDates.map(formatManifestoDate).join(', ')}`,
+    `Selected Friday: ${selectedDate}`,
+    `Primary pillar: ${pillarMeta[month.pillar].label}`,
+    `Monthly theme: ${month.theme}`,
+    `Belief shift: ${month.beliefShift}`,
+    `Example graphic headline: ${month.exampleHeadline}`,
+    `Example handwritten note: ${month.exampleHandNote}`,
+    `Output style: ${outputStyle.label}. ${outputStyle.description}`,
+    '',
+    requiredOutput,
+    '',
+    'MANIFESTO RULES:',
+    '- The graphic headline should feel quotable and visually strong.',
+    '- The handwritten note should feel like a short private note from Kagiso to the reader. Keep it 18 to 32 words.',
+    '- The LinkedIn post should sound like Kagiso on Reflection Friday: warm, honest, grounded, and useful.',
+    '- Keep the reader as a South African professional navigating career growth, visibility, leadership, and mentorship.',
+    '- Do not hard sell. If there is a CTA, make it a soft reflection or save/share prompt.',
+    '- Do not use em dashes or en dashes. Use periods, commas, or simple hyphens.',
+  ].join('\n');
+}
+
+function buildCreateUserPrompt(
+  selection: CreateSelection,
+  topicValue: string,
+  pillarFocus: CreatePillarFocus = 'auto',
+  manifestoSettings: ManifestoSeriesSettings = defaultManifestoSettings,
+) {
   const platformLabel = selection.platform ? createPlatformLabels[selection.platform] : '';
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === selection.subType);
@@ -2281,6 +2536,7 @@ function buildCreateUserPrompt(selection: CreateSelection, topicValue: string, p
     `Pillar: ${getPillarFocusPrompt(pillarFocus)}`,
     carouselStructuredOutput,
     buildCaptionReelPromptBlock(selection),
+    buildManifestoSeriesPromptBlock(selection, manifestoSettings),
     `Topic: ${topicValue.trim() || 'Suggest the strongest topic from the dashboard signal and selected angle.'}`,
   ]
     .filter((item) => item && !item.endsWith(': '))
@@ -3428,8 +3684,9 @@ export default function ContentStudio({
   const [insightsSuccess, setInsightsSuccess] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [topic, setTopic] = useState(context.strongestTheme);
+  const [topic, setTopic] = useState('');
   const [topicSource, setTopicSource] = useState<TopicSource>('manual');
+  const [manifestoSettings, setManifestoSettings] = useState<ManifestoSeriesSettings>(defaultManifestoSettings);
   const [smartSuggestState, setSmartSuggestState] = useState<SmartSuggestState>({ type: 'idle' });
   const [smartSuggestSaving, setSmartSuggestSaving] = useState(false);
   const [smartSuggestRefreshing, setSmartSuggestRefreshing] = useState(false);
@@ -3443,6 +3700,7 @@ export default function ContentStudio({
   const [carouselStudioSavingId, setCarouselStudioSavingId] = useState<string | null>(null);
   const [carouselStudioError, setCarouselStudioError] = useState<string | null>(null);
   const [selectedCarouselDraftId, setSelectedCarouselDraftId] = useState<string | null>(null);
+  const [designImportRequest, setDesignImportRequest] = useState<DesignStudioImportRequest | null>(null);
   const [studioToolBusy, setStudioToolBusy] = useState<StudioToolKind | null>(null);
   const [studioToolError, setStudioToolError] = useState<string | null>(null);
   const [studioToolResult, setStudioToolResult] = useState<StudioToolResult | null>(null);
@@ -3830,6 +4088,40 @@ export default function ContentStudio({
       return 0;
     });
   }, [backlogRecords, selectedCarouselDraftId]);
+  const designCarouselImports = useMemo<DesignStudioCarouselImport[]>(() => {
+    const generatedImport: DesignStudioCarouselImport[] = generatedCarouselDraft
+      ? [
+          {
+            id: GENERATED_CAROUSEL_DESIGN_IMPORT_ID,
+            label: generatedCarouselDraft.title,
+            sourceLabel: 'Generated draft',
+            draft: generatedCarouselDraft,
+          },
+        ]
+      : [];
+    return [
+      ...generatedImport,
+      ...carouselDraftRecords.map((record) => ({
+        id: record.item.id,
+        label: record.draft.title,
+        sourceLabel: 'Carousel Studio',
+        draft: record.draft,
+      })),
+    ];
+  }, [carouselDraftRecords, generatedCarouselDraft]);
+  const designTextImports = useMemo<DesignStudioTextImport[]>(() => {
+    const body = cleanDraftContent(generatedPost).trim();
+    if (!body || generatedCarouselDraft) return [];
+    return [
+      {
+        id: GENERATED_TEXT_DESIGN_IMPORT_ID,
+        label: titleFromText(body, topic || 'Generated text'),
+        sourceLabel: 'Generated text',
+        title: topic.trim() || titleFromText(body, 'Generated text'),
+        text: body,
+      },
+    ];
+  }, [generatedCarouselDraft, generatedPost, topic]);
   const canGenerateCreate = isCreateSelectionReady(createSelection);
 
   function resetSmartSuggestSession() {
@@ -3848,6 +4140,64 @@ export default function ContentStudio({
     url.searchParams.set('tab', 'content');
     url.searchParams.set('studio', workspace);
     window.history.replaceState(window.history.state, '', `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+  }
+
+  function queueDesignStudioImport(importItem: DesignStudioCarouselImport | DesignStudioTextImport, kind: DesignStudioImportRequest['kind']) {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY,
+      JSON.stringify({ kind, source: importItem }),
+    );
+  }
+
+  function openCarouselDraftInDesign(record: CarouselDraftRecord) {
+    queueDesignStudioImport({
+      id: record.item.id,
+      label: record.draft.title,
+      sourceLabel: 'Carousel Studio',
+      draft: record.draft,
+    }, 'carousel');
+    setSelectedCarouselDraftId(record.item.id);
+    setDesignImportRequest({
+      id: record.item.id,
+      kind: 'carousel',
+      requestId: Date.now(),
+    });
+    activateWorkspace('design');
+  }
+
+  function openGeneratedCarouselDraftInDesign() {
+    if (!generatedCarouselDraft) return;
+    queueDesignStudioImport({
+      id: GENERATED_CAROUSEL_DESIGN_IMPORT_ID,
+      label: generatedCarouselDraft.title,
+      sourceLabel: 'Generated draft',
+      draft: generatedCarouselDraft,
+    }, 'carousel');
+    setDesignImportRequest({
+      id: GENERATED_CAROUSEL_DESIGN_IMPORT_ID,
+      kind: 'carousel',
+      requestId: Date.now(),
+    });
+    activateWorkspace('design');
+  }
+
+  function openGeneratedTextInDesign() {
+    const body = cleanDraftContent(generatedPost).trim();
+    if (!body || generatedCarouselDraft) return;
+    queueDesignStudioImport({
+      id: GENERATED_TEXT_DESIGN_IMPORT_ID,
+      label: titleFromText(body, topic || 'Generated text'),
+      sourceLabel: 'Generated text',
+      title: topic.trim() || titleFromText(body, 'Generated text'),
+      text: body,
+    }, 'text');
+    setDesignImportRequest({
+      id: GENERATED_TEXT_DESIGN_IMPORT_ID,
+      kind: 'text',
+      requestId: Date.now(),
+    });
+    activateWorkspace('design');
   }
 
   function navigateContent(section: ContentSection, options?: { topic?: string }) {
@@ -3984,6 +4334,15 @@ export default function ContentStudio({
     setCreateFormatOutput('');
   }
 
+  function updateManifestoSettings(nextSettings: ManifestoSeriesSettings) {
+    setManifestoSettings(nextSettings);
+    setGeneratedPost('');
+    setGeneratedCarouselDraft(null);
+    setCreateFormatOutput('');
+    setImagePromptOptions([]);
+    setImagePromptError(null);
+  }
+
   function selectCarouselSlideCount(slideCount: CarouselSlideCount) {
     setCreateSelection((current) => ({
       ...current,
@@ -4028,9 +4387,7 @@ export default function ContentStudio({
     setSmartPrepopulateNotice(null);
     setGeneratedCarouselDraft(null);
     setTopicSource(source);
-    if (source === 'signal') {
-      setTopic(context.strongestTheme);
-    }
+    setTopic(source === 'signal' ? context.strongestTheme : '');
   }
 
   function openVaultSection(section: VaultSection) {
@@ -4582,7 +4939,7 @@ export default function ContentStudio({
     try {
       const result = await callAi(
         deriveCreateMode(selectionToUse),
-        buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse),
+        buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse, manifestoSettings),
         selectionToUse,
       );
       if (selectionToUse.contentType === 'carousel') {
@@ -5294,6 +5651,7 @@ export default function ContentStudio({
                 selectedAngleGroups={selectedAngleGroups}
                 selectedPlatformLabel={selectedCreatePlatformLabel}
                 pillarFocus={createPillarFocus}
+                manifestoSettings={manifestoSettings}
                 topic={topic}
                 topicSource={topicSource}
                 topicPlaceholder={createPlaceholder}
@@ -5313,6 +5671,7 @@ export default function ContentStudio({
                 onTypeSelect={selectCreateType}
                 onSubTypeSelect={selectCreateSubType}
                 onAngleSelect={selectCreateAngle}
+                onManifestoSettingsChange={updateManifestoSettings}
                 onCarouselSlideCountSelect={selectCarouselSlideCount}
                 onCarouselAspectRatioSelect={selectCarouselAspectRatio}
                 onCarouselTemplateSelect={selectCarouselTemplate}
@@ -5343,6 +5702,8 @@ export default function ContentStudio({
                 onSave={() => {
                   void saveCurrentCreateDraft();
                 }}
+                onOpenCarouselDraftInDesign={openGeneratedCarouselDraftInDesign}
+                onOpenTextInDesign={openGeneratedTextInDesign}
                 saveLabel={activeVaultDraftId && !generatedCarouselDraft ? 'Update Vault Draft' : undefined}
                 onCalendar={() =>
                   setCalendarModal({
@@ -5450,12 +5811,22 @@ export default function ContentStudio({
             onDraftSave={(record, draft) => {
               void saveCarouselDraftRecord(record, draft);
             }}
+            onOpenDraftInDesign={openCarouselDraftInDesign}
             selectedDraftId={selectedCarouselDraftId}
             onDraftSelect={(record) => {
               setSelectedCarouselDraftId(record.item.id);
               setCarouselStudioError(null);
             }}
             onStartDraft={() => navigateContent('studio', { topic: context.strongestTheme })}
+          />
+        )}
+
+        {activeWorkspace === 'design' && (
+          <DesignStudioPanel
+            carouselImports={designCarouselImports}
+            textImports={designTextImports}
+            importRequest={designImportRequest}
+            onImportRequestHandled={() => setDesignImportRequest(null)}
           />
         )}
 
@@ -6941,6 +7312,139 @@ function TransformStepHeader({ number, title, description }: { number: string; t
   );
 }
 
+function ManifestoSeriesControls({
+  settings,
+  onChange,
+}: {
+  settings: ManifestoSeriesSettings;
+  onChange: (settings: ManifestoSeriesSettings) => void;
+}) {
+  const month = getManifestoMonthOption(settings.monthId);
+
+  return (
+    <section
+      className="rounded-[8px] border border-[#E4D8CB] bg-white p-5 outline outline-1 outline-[#C9AD98]/70"
+      style={{ outline: '1px solid rgba(201, 173, 152, 0.7)' }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">04 Manifesto details</p>
+          <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">Shape the monthly series</h3>
+        </div>
+        <Badge className={pillarMeta[month.pillar].className}>{pillarMeta[month.pillar].label}</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {manifestoMonthOptions.map((option) => {
+          const isSelected = settings.monthId === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() =>
+                onChange({
+                  ...settings,
+                  monthId: option.id,
+                  fridayDate: option.fridayDates.includes(settings.fridayDate) ? settings.fridayDate : '',
+                })
+              }
+              style={isSelected ? { outline: '2px solid #C9AD98' } : undefined}
+              className={`min-h-[112px] rounded-[8px] border p-4 text-left transition ${
+                isSelected
+                  ? 'border-[#142334] bg-[#142334] text-white outline outline-2 outline-[#C9AD98]'
+                  : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+              }`}
+            >
+              <span className={`inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] ${isSelected ? 'text-white/62' : 'text-[#8C7466]'}`}>
+                <CalendarDays className="h-3.5 w-3.5" />
+                {option.monthLabel}
+              </span>
+              <span className="mt-2 block font-serif text-[22px] leading-tight">{option.title}</span>
+              <span className={`mt-2 block text-[12px] leading-relaxed ${isSelected ? 'text-white/68' : 'text-[#142334]/60'}`}>
+                {option.beliefShift}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[0.8fr_1fr]">
+        <div className="rounded-[8px] bg-[#F8F6F4] p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8C7466]">Friday slot</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onChange({ ...settings, fridayDate: '' })}
+              className={`rounded-full border px-3 py-2 text-[12px] font-semibold transition ${
+                settings.fridayDate === ''
+                  ? 'border-[#142334] bg-[#142334] text-white'
+                  : 'border-white bg-white text-[#142334]/68 hover:border-[#C9AD98] hover:text-[#142334]'
+              }`}
+            >
+              Auto choose
+            </button>
+            {month.fridayDates.map((date) => (
+              <button
+                key={date}
+                type="button"
+                onClick={() => onChange({ ...settings, fridayDate: date })}
+                className={`rounded-full border px-3 py-2 text-[12px] font-semibold transition ${
+                  settings.fridayDate === date
+                    ? 'border-[#142334] bg-[#142334] text-white'
+                    : 'border-white bg-white text-[#142334]/68 hover:border-[#C9AD98] hover:text-[#142334]'
+                }`}
+              >
+                {formatManifestoDate(date)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[8px] bg-[#F8F6F4] p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8C7466]">Output depth</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {manifestoOutputStyleOptions.map((option) => {
+              const isSelected = settings.outputStyle === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange({ ...settings, outputStyle: option.value })}
+                  className={`min-h-[94px] rounded-[8px] border p-3 text-left transition ${
+                    isSelected
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-white bg-white text-[#142334] hover:border-[#C9AD98]'
+                  }`}
+                >
+                  <span className="block text-[12px] font-bold">{option.label}</span>
+                  <span className={`mt-1 block text-[11px] leading-snug ${isSelected ? 'text-white/62' : 'text-[#142334]/55'}`}>
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 rounded-[8px] bg-[#142334] p-4 text-white lg:grid-cols-[0.85fr_1fr]">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">Series direction</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-white/74">{month.theme}</p>
+        </div>
+        <div className="rounded-[8px] bg-white/[0.08] p-3">
+          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
+            <BookOpen className="h-3.5 w-3.5" />
+            Example note
+          </p>
+          <p className="mt-2 font-serif text-[22px] leading-tight text-white">{month.exampleHeadline}</p>
+          <p className="mt-3 text-[13px] italic leading-relaxed text-white/72">{month.exampleHandNote}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CreateFlow({
   selection,
   selectedType,
@@ -6949,6 +7453,7 @@ function CreateFlow({
   selectedAngleGroups,
   selectedPlatformLabel,
   pillarFocus,
+  manifestoSettings,
   topic,
   topicSource,
   topicPlaceholder,
@@ -6969,6 +7474,7 @@ function CreateFlow({
   onTypeSelect,
   onSubTypeSelect,
   onAngleSelect,
+  onManifestoSettingsChange,
   onCarouselSlideCountSelect,
   onCarouselAspectRatioSelect,
   onCarouselTemplateSelect,
@@ -6982,6 +7488,8 @@ function CreateFlow({
   onFormatCheck,
   onGenerateImagePrompts,
   onSave,
+  onOpenCarouselDraftInDesign,
+  onOpenTextInDesign,
   saveLabel,
   onCalendar,
   profilePhotoUrl,
@@ -6993,6 +7501,7 @@ function CreateFlow({
   selectedAngleGroups: AngleGroup[];
   selectedPlatformLabel: string;
   pillarFocus: CreatePillarFocus;
+  manifestoSettings: ManifestoSeriesSettings;
   topic: string;
   topicSource: TopicSource;
   topicPlaceholder: string;
@@ -7013,6 +7522,7 @@ function CreateFlow({
   onTypeSelect: (type: ContentTypeOption) => void;
   onSubTypeSelect: (subType: string) => void;
   onAngleSelect: (angle: AngleOption) => void;
+  onManifestoSettingsChange: (settings: ManifestoSeriesSettings) => void;
   onCarouselSlideCountSelect: (slideCount: CarouselSlideCount) => void;
   onCarouselAspectRatioSelect: (aspectRatio: CarouselAspectRatio) => void;
   onCarouselTemplateSelect: (template: CarouselTemplate) => void;
@@ -7026,6 +7536,8 @@ function CreateFlow({
   onFormatCheck: () => void;
   onGenerateImagePrompts: () => void;
   onSave: () => void;
+  onOpenCarouselDraftInDesign: () => void;
+  onOpenTextInDesign: () => void;
   saveLabel?: string;
   onCalendar: () => void;
   profilePhotoUrl?: string | null;
@@ -7037,6 +7549,8 @@ function CreateFlow({
   const isCaptionReelType = selectedType?.id === 'caption_reel';
   const angleReady = Boolean(selectedType && (selectedType.subTypes.length === 0 || selection.subType));
   const needsCarouselSlideCount = selection.contentType === 'carousel' && Boolean(selection.angle);
+  const isManifestoSeries = selection.angle === 'manifesto_series';
+  const coreIdeaStepLabel = needsCarouselSlideCount ? '08 Core idea' : isManifestoSeries ? '05 Core idea' : '04 Core idea';
   const outputTitle = selection.contentType === 'voice_note'
     ? 'Voice note script'
     : selection.contentType === 'carousel'
@@ -7289,6 +7803,12 @@ function CreateFlow({
                     )}
 
                     {rowHasSelected && carouselSlideCountSection}
+                    {rowHasSelected && isManifestoSeries && (
+                      <ManifestoSeriesControls
+                        settings={manifestoSettings}
+                        onChange={onManifestoSettingsChange}
+                      />
+                    )}
                     {rowHasSelected && carouselAspectRatioSection}
                     {rowHasSelected && carouselTemplateSection}
                     {rowHasSelected && carouselLayoutRecipeSection}
@@ -7304,7 +7824,7 @@ function CreateFlow({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">
-                  {needsCarouselSlideCount ? '08 Core idea' : '04 Core idea'}
+                  {coreIdeaStepLabel}
                 </p>
                 <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">Add a topic, or let AI suggest one</h3>
               </div>
@@ -7398,15 +7918,28 @@ function CreateFlow({
             actionsDisabled={busy}
             isRegenerating={isRegenerating}
             extraAction={
-              <ContentPreviewHelpers
-                busy={busy}
-                formatOutput={formatOutput}
-                imagePromptOptions={imagePromptOptions}
-                imagePromptBusy={imagePromptBusy}
-                imagePromptError={imagePromptError}
-                onFormatCheck={onFormatCheck}
-                onGenerateImagePrompts={onGenerateImagePrompts}
-              />
+              <div className="grid gap-3">
+                {carouselDraft ? (
+                  <button type="button" onClick={onOpenCarouselDraftInDesign} disabled={busy} className="studio-primary-button w-fit">
+                    <ImageIcon className="h-4 w-4" />
+                    Create visuals in Design Studio
+                  </button>
+                ) : generatedPostBody ? (
+                  <button type="button" onClick={onOpenTextInDesign} disabled={busy} className="studio-secondary-button w-fit">
+                    <ImageIcon className="h-4 w-4" />
+                    Create graphic in Design Studio
+                  </button>
+                ) : null}
+                <ContentPreviewHelpers
+                  busy={busy}
+                  formatOutput={formatOutput}
+                  imagePromptOptions={imagePromptOptions}
+                  imagePromptBusy={imagePromptBusy}
+                  imagePromptError={imagePromptError}
+                  onFormatCheck={onFormatCheck}
+                  onGenerateImagePrompts={onGenerateImagePrompts}
+                />
+              </div>
             }
           />
         ) : (
@@ -7477,7 +8010,8 @@ function ImagePromptCards({ options }: { options: ImagePromptOption[] }) {
   const [copiedKind, setCopiedKind] = useState<ImagePromptKind | null>(null);
 
   async function copyPrompt(option: ImagePromptOption) {
-    await navigator.clipboard.writeText(formatImagePromptForClipboard(option));
+    const didCopy = await copyTextToClipboard(formatImagePromptForClipboard(option));
+    if (!didCopy) return;
     setCopiedKind(option.kind);
     window.setTimeout(() => setCopiedKind(null), 1600);
   }
@@ -9360,7 +9894,8 @@ async function captureCarouselSlideCanvas(
   const rect = element.getBoundingClientRect();
   const layoutWidth = Math.max(1, Math.ceil(rect.width));
   const layoutHeight = Math.max(1, Math.round(layoutWidth * (dimensions.height / dimensions.width)));
-  const scale = dimensions.width / layoutWidth;
+  const baseScale = dimensions.width / layoutWidth;
+  const scale = baseScale * 2;
   const captureId = `carousel-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
@@ -9914,6 +10449,7 @@ function CarouselStudioPanel({
   onDraftTemplateChange,
   onDraftLayoutRecipeChange,
   onDraftSave,
+  onOpenDraftInDesign,
   selectedDraftId,
   onDraftSelect,
   onStartDraft,
@@ -9931,6 +10467,7 @@ function CarouselStudioPanel({
   onDraftTemplateChange: (record: CarouselDraftRecord, value: CarouselTemplate) => void;
   onDraftLayoutRecipeChange: (record: CarouselDraftRecord, value: CarouselLayoutRecipe) => void;
   onDraftSave: (record: CarouselDraftRecord, draft: CarouselDraftPayload) => void;
+  onOpenDraftInDesign: (record: CarouselDraftRecord) => void;
   selectedDraftId: string | null;
   onDraftSelect: (record: CarouselDraftRecord) => void;
   onStartDraft: () => void;
@@ -10053,16 +10590,19 @@ function CarouselStudioPanel({
         setExportState({ busy: true, mode, message: 'Building PDF...', tone: 'info' });
         const { jsPDF } = await import('jspdf');
         const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
+        const canvasWidth = canvases[0].width;
+        const canvasHeight = canvases[0].height;
         const pdf = new jsPDF({
           orientation,
           unit: 'px',
-          format: [dimensions.width, dimensions.height],
+          format: [canvasWidth, canvasHeight],
           compress: true,
+          hotfixes: ['px_scaling'],
         });
 
         canvases.forEach((canvas, index) => {
-          if (index > 0) pdf.addPage([dimensions.width, dimensions.height], orientation);
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
+          if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvasWidth, canvasHeight);
         });
         pdf.save(`${baseName}.pdf`);
         setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page PDF.`, tone: 'info' });
@@ -10332,6 +10872,17 @@ function CarouselStudioPanel({
           </button>
           <button
             type="button"
+            onClick={() => {
+              if (latestRecord) onOpenDraftInDesign(latestRecord);
+            }}
+            disabled={!latestRecord}
+            className="studio-secondary-button"
+          >
+            <ImageIcon className="h-4 w-4" />
+            Open in Design Studio
+          </button>
+          <button
+            type="button"
             onClick={() => void exportCarousel('pdf')}
             disabled={!latestDraft || isExporting}
             className="studio-secondary-button"
@@ -10586,14 +11137,16 @@ function StudioToolsPanel({
 
   async function copyToolOutput() {
     if (!editableToolOutput.trim()) return;
-    await navigator.clipboard.writeText(editableToolOutput);
+    const didCopy = await copyTextToClipboard(editableToolOutput);
+    if (!didCopy) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function copyText(value: string) {
     if (!value.trim()) return;
-    await navigator.clipboard.writeText(value);
+    const didCopy = await copyTextToClipboard(value);
+    if (!didCopy) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }

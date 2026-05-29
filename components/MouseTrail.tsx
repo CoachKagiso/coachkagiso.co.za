@@ -114,10 +114,15 @@ export default function MouseTrail() {
     const touchPointer = window.matchMedia("(hover: none), (pointer: coarse)");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    const syncAvailability = () => {
+    const syncCursorClass = (shouldHide = false) => {
       const shouldDisable = touchPointer.matches || reducedMotion.matches;
+      document.documentElement.classList.toggle("has-custom-cursor", !shouldDisable && !shouldHide);
+      return shouldDisable;
+    };
+
+    const syncAvailability = () => {
+      const shouldDisable = syncCursorClass();
       setIsTouch(shouldDisable);
-      document.documentElement.classList.toggle("has-custom-cursor", !shouldDisable);
     };
 
     const handleMouseMove = (event: MouseEvent) => {
@@ -125,6 +130,7 @@ export default function MouseTrail() {
       const shouldHide = Boolean(target?.closest("[data-hide-custom-cursor]"));
       const interactiveTarget = target?.closest(interactiveSelector);
 
+      syncCursorClass(shouldHide);
       cursorX.set(event.clientX);
       cursorY.set(event.clientY);
       circleX.set(event.clientX);
@@ -148,6 +154,7 @@ export default function MouseTrail() {
     };
 
     const handleMouseLeave = () => {
+      syncCursorClass();
       setCursorState((current) => mergeCursorState(current, { pressed: false, visible: false }));
     };
 

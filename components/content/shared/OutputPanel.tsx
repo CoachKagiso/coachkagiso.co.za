@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { extractOutputMetadata } from '@/lib/content/utils';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
 
 type DraftMode = 'edit' | 'preview' | 'details';
@@ -226,7 +227,8 @@ export function OutputWithActions({
 
   async function copyDraft() {
     if (!hasDraft) return;
-    await navigator.clipboard.writeText(editableValue);
+    const didCopy = await copyTextToClipboard(editableValue);
+    if (!didCopy) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }

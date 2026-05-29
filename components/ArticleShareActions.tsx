@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Check, Facebook, Linkedin, Link2, Mail } from 'lucide-react';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type ArticleShareActionsProps = {
   articleUrl: string;
@@ -19,7 +20,8 @@ export default function ArticleShareActions({
 
   async function handleCopyLink() {
     try {
-      await navigator.clipboard.writeText(articleUrl);
+      const didCopy = await copyTextToClipboard(articleUrl);
+      if (!didCopy) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {

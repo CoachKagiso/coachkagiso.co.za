@@ -38,6 +38,8 @@
   ],
   "exclude": [
     "node_modules",
+    "handy-arrows",
+    "handy-arrows/**",
     "video-edits",
     "video-edits/**"
   ]

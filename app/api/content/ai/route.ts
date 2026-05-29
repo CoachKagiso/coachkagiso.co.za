@@ -40,10 +40,11 @@ function isContentAiMode(value: unknown): value is ContentAiMode {
   return typeof value === 'string' && contentAiModes.includes(value as ContentAiMode);
 }
 
-function getMaxTokens(mode: ContentAiMode, contentType?: string) {
+function getMaxTokens(mode: ContentAiMode, contentType?: string, angle?: string) {
   if (mode === 'calendar_plan') return 2400;
   if (mode === 'summarise_insights') return 900;
   if (mode === 'write_post' && contentType === 'carousel') return 2600;
+  if (mode === 'write_post' && angle === 'manifesto_series') return 3200;
   if (mode === 'image_prompts') return 2200;
   if (mode === 'write_post' && contentType === 'caption_reel') return 2200;
   if (mode === 'write_post' || mode === 'voice_note' || mode === 'alchemy_stage2') return 1800;
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
           },
           { role: 'user', content: body.mode === 'cta_generator' || body.mode === 'hook_generator' || body.mode === 'format_recommendation' || body.mode === 'image_prompts' || body.mode === 'summarise_insights' || body.mode === 'signal_brief' || body.mode === 'polish' || body.mode === 'alchemy_stage2' || body.mode === 'calendar_plan' ? `<user_input>\n${userPrompt}\n</user_input>` : userPrompt },
         ],
-        max_tokens: getMaxTokens(body.mode, optionalString(body?.contentType)),
+        max_tokens: getMaxTokens(body.mode, optionalString(body?.contentType), optionalString(body?.angle)),
         temperature: 0.7,
       })),
     });

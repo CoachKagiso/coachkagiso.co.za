@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Manifesto Series - Season One</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    :root {
+      --ink: #142334;
+      --muted: #70635c;
+      --sand: #f5f0ea;
+      --paper: #fbfaf7;
+      --line: #ded0c4;
+      --blush: #d3ad9a;
+      --rose: #a96d87;
+      --gold: #c7a27d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #ece7df;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 16mm 17mm;
+      background:
+        radial-gradient(circle at top right, rgba(211, 173, 154, 0.28), transparent 35%),
+        linear-gradient(135deg, #fffdf9 0%, var(--paper) 52%, #f3ece5 100%);
+      position: relative;
+      overflow: hidden;
+      page-break-after: always;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    .series-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--ink);
+      border-radius: 999px;
+      padding: 7px 13px;
+      font-size: 12px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .series-pill span:first-child {
+      border-radius: 999px;
+      background: #ead3c7;
+      padding: 4px 10px;
+      font-weight: 700;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 30px 0 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 58px;
+      line-height: 0.96;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 27px;
+      line-height: 1.08;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .lede {
+      max-width: 710px;
+      margin-top: 16px;
+      font-size: 15px;
+      line-height: 1.62;
+      color: var(--muted);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 17px;
+      margin-top: 26px;
+      align-items: stretch;
+    }
+
+    .note-card,
+    .strategy-card,
+    .month-card,
+    .footer-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: 0 18px 45px rgba(20, 35, 52, 0.08);
+    }
+
+    .note-card {
+      padding: 21px;
+      min-height: 185px;
+      position: relative;
+    }
+
+    .label {
+      display: inline-block;
+      margin-bottom: 13px;
+      border-radius: 999px;
+      background: #ead3c7;
+      padding: 8px 15px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .quote {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 31px;
+      line-height: 1.08;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .scribble {
+      position: absolute;
+      right: 20px;
+      bottom: 17px;
+      width: 245px;
+      transform: rotate(-3deg);
+      border: 1px solid rgba(20, 35, 52, 0.16);
+      background:
+        linear-gradient(90deg, rgba(20, 35, 52, 0.05) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(20, 35, 52, 0.05) 1px, transparent 1px),
+        #f8f6f0;
+      background-size: 24px 24px;
+      padding: 16px 18px;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.36;
+      color: var(--ink);
+      box-shadow: 0 13px 26px rgba(20, 35, 52, 0.16);
+    }
+
+    .strategy-card {
+      padding: 18px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .mini-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    .strategy-card p,
+    .month-card p,
+    .footer-card p {
+      font-size: 12px;
+      line-height: 1.48;
+      color: var(--muted);
+    }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .stat {
+      border-radius: 14px;
+      background: var(--ink);
+      color: white;
+      padding: 13px;
+    }
+
+    .stat strong {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 5px;
+      font-size: 10px;
+      line-height: 1.25;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .schedule {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 7px;
+    }
+
+    .schedule-month {
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      padding: 9px;
+      min-height: 88px;
+    }
+
+    .schedule-month b {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    .schedule-month span {
+      display: block;
+      font-size: 10.5px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .months-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .month-card {
+      padding: 13px;
+      min-height: 118px;
+    }
+
+    .month-card .month {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    .month-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 19px;
+      line-height: 1.05;
+    }
+
+    .example {
+      margin-top: 9px;
+      border-left: 3px solid var(--blush);
+      padding-left: 9px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 15px;
+      line-height: 1.18;
+      color: var(--ink);
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .footer-card {
+      padding: 15px;
+    }
+
+    .guide-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 23px;
+      line-height: 1.08;
+      margin-bottom: 8px;
+    }
+
+    .tagline {
+      position: absolute;
+      left: 17mm;
+      right: 17mm;
+      bottom: 11mm;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .page {
+        margin: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <div class="brand-row">
+      <div class="brand">Coach Kagiso</div>
+      <div class="series-pill"><span>notes</span><span>reflection friday</span><span>the manifesto series</span></div>
+    </div>
+
+    <h1>The Manifesto Series: Season One</h1>
+    <p class="lede">
+      A June to December Reflection Friday content series for South African professionals who are ready to stop drifting, reset the year with intention, and move toward clarity, visibility, leadership, mentorship, positioning, and their next move.
+    </p>
+
+    <div class="hero-grid">
+      <div class="note-card">
+        <div class="label">The Career Clarity Manifesto</div>
+        <div class="quote">Clarity is not the moment you know everything. It is the moment you stop pretending you are not stuck.</div>
+        <div class="scribble">Love, your next move does not need to be loud. It needs to be honest.</div>
+      </div>
+
+      <div class="strategy-card">
+        <div>
+          <div class="mini-title">The framing</div>
+          <p>Every Friday becomes a reset point. The post closes the week, names the career tension people are carrying, and gives them one honest thought to take into the weekend.</p>
+        </div>
+        <div>
+          <div class="mini-title">The content rhythm</div>
+          <p>One manifesto theme per month. Four to five Reflection Friday posts per theme. Each post can become a LinkedIn text post, a square graphic, a carousel cover, and later a page in the free guide.</p>
+        </div>
+        <div>
+          <div class="mini-title">The end product</div>
+          <p>By December, the series becomes a lead magnet: 30 reflections packaged as a downloadable guide with screenshots, short notes, and a gentle invitation into Kagiso's offers.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><strong>30</strong><span>Friday posts</span></div>
+      <div class="stat"><strong>7</strong><span>monthly manifestos</span></div>
+      <div class="stat"><strong>1</strong><span>free guide by year-end</span></div>
+    </div>
+
+    <div class="schedule">
+      <div class="schedule-month"><b>June</b><span>5, 12, 19, 26</span></div>
+      <div class="schedule-month"><b>July</b><span>3, 10, 17, 24, 31</span></div>
+      <div class="schedule-month"><b>August</b><span>7, 14, 21, 28</span></div>
+      <div class="schedule-month"><b>September</b><span>4, 11, 18, 25</span></div>
+      <div class="schedule-month"><b>October</b><span>2, 9, 16, 23, 30</span></div>
+      <div class="schedule-month"><b>November</b><span>6, 13, 20, 27</span></div>
+      <div class="schedule-month"><b>December</b><span>4, 11, 18, 25</span></div>
+    </div>
+
+    <div class="tagline">
+      <span>Reflect. Research. Reach out.</span>
+      <span>Season One: June to December 2026</span>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="brand-row">
+      <div class="brand">Monthly manifesto map</div>
+      <div class="series-pill"><span>30 posts</span><span>7 themes</span></div>
+    </div>
+
+    <h2>What Each Month Covers</h2>
+    <p class="lede">
+      The series should move through all four pillars, then end with positioning, action, and year-end reset. This keeps Reflection Friday emotionally consistent while letting the manifesto themes expand across Kagiso's full brand.
+    </p>
+
+    <div class="months-grid">
+      <article class="month-card">
+        <div class="month"><span>June</span><span>4 Fridays</span></div>
+        <strong>The Career Clarity Manifesto</strong>
+        <p>For professionals who feel stuck, tired of guessing, or unsure what they want next. This month names the gap between where they are and where they want to go.</p>
+        <div class="example">"You are not confused because you are incapable. You are confused because you have outgrown the version of success you were chasing."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>July</span><span>5 Fridays</span></div>
+        <strong>The Visibility Manifesto</strong>
+        <p>For personal branding, LinkedIn presence, CV positioning, and being seen by the right people. Visibility is framed as evidence, not noise.</p>
+        <div class="example">"You cannot be considered for rooms people do not know you are ready for."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>August</span><span>4 Fridays</span></div>
+        <strong>The Leadership Manifesto</strong>
+        <p>For leadership presence, confidence, influence, feedback, managing up, and becoming trusted before the title fully arrives.</p>
+        <div class="example">"Leadership is not waiting until you feel ready. It is learning to be responsible while you are still becoming."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>September</span><span>4 Fridays</span></div>
+        <strong>The Mentorship Manifesto</strong>
+        <p>For community, networks, support systems, asking for help, and remembering that no one truly builds a career alone.</p>
+        <div class="example">"The right support does not make you less capable. It reminds you that you were never meant to carry the whole journey alone."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>October</span><span>5 Fridays</span></div>
+        <strong>The Positioning Manifesto</strong>
+        <p>For packaging the story, skills, proof, and direction. This month bridges career clarity and personal brand into a stronger professional identity.</p>
+        <div class="example">"If you do not define your value, people will keep describing you by the last thing they saw you do."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>November</span><span>4 Fridays</span></div>
+        <strong>The Next Move Manifesto</strong>
+        <p>For action, applications, conversations, interviews, promotion readiness, follow-through, and choosing one clear next step before the year ends.</p>
+        <div class="example">"A next move is not a miracle. It is a decision you support with evidence, courage, and one uncomfortable conversation."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>December</span><span>4 Fridays</span></div>
+        <strong>The Career Reset Manifesto</strong>
+        <p>For reflection, closure, gratitude, lessons, rest, and preparing the emotional ground for a stronger new year. December 25 can be a soft holiday edition.</p>
+        <div class="example">"Closure is not pretending the year was easy. It is choosing what you will carry forward and what no longer gets to come with you."</div>
+      </article>
+
+      <article class="month-card">
+        <div class="month"><span>Format</span><span>Weekly</span></div>
+        <strong>Post Anatomy</strong>
+        <p>Use the same visual grammar: small notes label, manifesto title, one big belief statement, one handwritten side note, and the close: "That is my reflection for Friday."</p>
+        <div class="example">Main post teaches the belief. Graphic carries the line people save.</div>
+      </article>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="footer-card">
+        <div class="mini-title">Free guide by December</div>
+        <div class="guide-title">The Career Manifesto Collection</div>
+        <p>Package the 30 screenshots with a short note under each one: what this reflection means, one question to journal, and one action to take. The guide becomes a warm lead magnet for professionals planning their next year.</p>
+      </div>
+
+      <div class="footer-card">
+        <div class="mini-title">New year recommendation</div>
+        <div class="guide-title">Continue as Season Two</div>
+        <p>In January 2027, continue The Manifesto Series if the audience is saving and sharing it. If you want a fresh name, make Season Two more action-led: The Career Movement Letters. The manifesto stays the belief system. The new year becomes the execution system.</p>
+      </div>
+    </div>
+
+    <div class="tagline">
+      <span>Reflection Friday is the ritual. The manifesto is the asset.</span>
+      <span>Coach Kagiso</span>
+    </div>
+  </section>
+</body>
+</html>
