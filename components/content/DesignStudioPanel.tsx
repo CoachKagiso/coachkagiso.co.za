@@ -3569,6 +3569,9 @@ async function captureDesignCanvas(
   exportElement.style.minHeight = `${design.height}px`;
   exportElement.style.maxHeight = `${design.height}px`;
   exportElement.style.margin = '0';
+  exportElement.style.border = '0';
+  exportElement.style.borderRadius = '0';
+  exportElement.style.boxShadow = 'none';
 
   exportHost.append(exportElement);
   document.body.append(exportHost);
@@ -3596,6 +3599,9 @@ async function captureDesignCanvas(
           clonedCanvas.style.minHeight = `${design.height}px`;
           clonedCanvas.style.maxHeight = `${design.height}px`;
           clonedCanvas.style.margin = '0';
+          clonedCanvas.style.border = '0';
+          clonedCanvas.style.borderRadius = '0';
+          clonedCanvas.style.boxShadow = 'none';
           if (options?.transparentBackground) {
             clonedCanvas.style.background = 'transparent';
             clonedCanvas.style.backgroundColor = 'transparent';
