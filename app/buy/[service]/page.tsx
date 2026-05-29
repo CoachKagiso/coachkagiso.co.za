@@ -10,7 +10,8 @@ import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService } from '@/lib/buying-flow';
 import { getContactEmail } from '@/lib/env';
-import { createPayFastCheckoutFields, getPayFastProcessUrl, isPayFastManualMode } from '@/lib/payfast';
+import { getPaymentProvider, getPaymentProviderName } from '@/lib/payment-provider';
+import { createPayFastCheckoutFields, getPayFastProcessUrl } from '@/lib/payfast';
 import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
 
 type BuyPageProps = {
@@ -55,16 +56,22 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const hasAppliedUpgrade = Boolean(appliedUpgradeCredit);
   const checkoutAmount = appliedUpgradeCredit?.discounted_amount ?? service.amount;
   const paymentId = `${service.slug}-${randomUUID()}`;
-  const isManualPaymentMode = isPayFastManualMode();
+  const paymentProvider = getPaymentProvider();
+  const providerName = getPaymentProviderName(paymentProvider);
+  const isManualPaymentMode = paymentProvider === 'manual';
+  const isPeachPaymentMode = paymentProvider === 'peach';
+  const isPayFastPaymentMode = paymentProvider === 'payfast';
   const contactEmail = getContactEmail();
   const manualMessage = `Hi Kagiso, I want to book ${service.title} for ${formatCurrency(checkoutAmount)}. Please send me the next step while online checkout is being activated.`;
   const manualEmailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(`Purchase request: ${service.title}`)}&body=${encodeURIComponent(`${manualMessage}\n\nService: ${service.title}\nAmount: ${formatCurrency(checkoutAmount)}`)}`;
   const manualWhatsAppHref = `https://wa.me/27695124398?text=${encodeURIComponent(manualMessage)}`;
-  const fields = createPayFastCheckoutFields(service, paymentId, {
-    amountOverride: checkoutAmount,
-    customFields: appliedUpgradeCredit ? { custom_str2: appliedUpgradeCredit.token } : undefined,
-    extraReturnParams: appliedUpgradeCredit ? { upgrade_token: appliedUpgradeCredit.token } : undefined,
-  });
+  const fields = isPayFastPaymentMode
+    ? createPayFastCheckoutFields(service, paymentId, {
+        amountOverride: checkoutAmount,
+        customFields: appliedUpgradeCredit ? { custom_str2: appliedUpgradeCredit.token } : undefined,
+        extraReturnParams: appliedUpgradeCredit ? { upgrade_token: appliedUpgradeCredit.token } : undefined,
+      })
+    : null;
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
@@ -105,7 +112,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/68">
                 {isManualPaymentMode
                   ? 'Online payment is being activated. Send Kagiso a purchase request and she will reply with the next step directly.'
-                  : 'You will pay securely through PayFast, then return to a private intake page connected to this order.'}
+                  : `You will pay securely through ${providerName}, then return to a private intake page connected to this order.`}
               </p>
               {service.slug === 'cv-revamp' && upgradeOffer && (
                 <div className={`mt-6 border p-4 ${upgradeOffer.valid ? 'border-[#C9AD98]/50 bg-[#F7F1EC]' : 'border-[#D8C8BB] bg-[#FCFBFA]'}`}>
@@ -125,7 +132,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 {[
                   isManualPaymentMode
                     ? { icon: MessageCircle, title: 'Send a purchase request', detail: 'Message Kagiso directly with the service you want and she will reply with the next step.' }
-                    : { icon: LockKeyhole, title: 'Secure payment', detail: 'Complete checkout through PayFast using card, EFT, PayShap, or supported options.' },
+                    : { icon: LockKeyhole, title: 'Secure payment', detail: `Complete checkout through ${providerName} using the supported card, EFT, bank, or wallet options enabled for Coach Kagiso.` },
                   isManualPaymentMode
                     ? { icon: FileText, title: 'Brief follows manually', detail: 'Once the payment route is confirmed, Kagiso will send the correct intake instructions for this service.' }
                     : { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
@@ -194,7 +201,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 </p>
               )}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
-                Turnaround: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : 'Payment is processed securely by PayFast.'}
+                Turnaround: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : `Payment is processed securely by ${providerName}.`}
               </p>
               <div className="mt-6 border border-white/12 bg-white/[0.04] p-4">
                 <div className="flex items-start gap-3">
@@ -222,7 +229,21 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     Email purchase request <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </div>
-              ) : (
+              ) : isPeachPaymentMode ? (
+                <form action="/api/peach/checkout" method="post" className="mt-8">
+                  <input type="hidden" name="service_slug" value={service.slug} />
+                  <input type="hidden" name="payment_id" value={paymentId} />
+                  {appliedUpgradeCredit && (
+                    <input type="hidden" name="upgrade_token" value={appliedUpgradeCredit.token} />
+                  )}
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
+                  >
+                    Continue to Peach <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </form>
+              ) : fields ? (
                 <form action={getPayFastProcessUrl()} method="post" className="mt-8">
                   {Object.entries(fields).map(([key, value]) => (
                     <input key={key} type="hidden" name={key} value={value} />
@@ -234,12 +255,18 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     Continue to PayFast <ArrowUpRight className="h-4 w-4" />
                   </button>
                 </form>
+              ) : (
+                <div className="mt-8 border border-white/12 bg-white/[0.04] p-4 text-[13px] leading-relaxed text-white/68">
+                  Checkout is not configured yet. WhatsApp Kagiso and she will send the safest next step.
+                </div>
               )}
 
               <div className="mt-7 space-y-3 border-t border-white/12 pt-6">
                 {(isManualPaymentMode
-                  ? ['No failed checkout page while PayFast verification is pending', 'Kagiso will reply directly with the safest next step']
-                  : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
+                  ? ['No failed checkout page while payment verification is pending', 'Kagiso will reply directly with the safest next step']
+                  : isPeachPaymentMode
+                    ? ['Card, Pay by Bank, Capitec Pay, PayShap, EFT, and enabled Peach options', 'Secure payment reference generated for this order']
+                    : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
                 ).map((item) => (
                   <div key={item} className="flex gap-3 text-[13px] leading-relaxed text-white/62">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#C9AD98]" />
