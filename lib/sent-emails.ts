@@ -21,6 +21,7 @@ type SentEmailRow = {
   external_provider?: string | null;
   external_message_id?: string | null;
   delivery_status?: string | null;
+  scheduled_at?: string | null;
   opened_at?: string | null;
   clicked_at?: string | null;
   diagnostic_submissions?:
@@ -47,6 +48,7 @@ export type SentEmail = {
   externalProvider: string | null;
   externalMessageId: string | null;
   deliveryStatus: string | null;
+  scheduledAt: string | null;
   openedAt: string | null;
   clickedAt: string | null;
 };
@@ -92,7 +94,7 @@ function isMissingSentEmailsTable(message?: string) {
 
 function isMissingSentEmailOptionalColumn(message?: string) {
   const normalized = String(message || '').toLowerCase();
-  return ['origin', 'external_provider', 'external_message_id', 'delivery_status', 'opened_at', 'clicked_at'].some((column) =>
+  return ['origin', 'external_provider', 'external_message_id', 'delivery_status', 'scheduled_at', 'opened_at', 'clicked_at'].some((column) =>
     normalized.includes(column)
   );
 }
@@ -146,6 +148,7 @@ function normalizeSentEmail(row: SentEmailRow): SentEmail {
     externalProvider: row.external_provider || null,
     externalMessageId: row.external_message_id || null,
     deliveryStatus: row.delivery_status || null,
+    scheduledAt: row.scheduled_at || null,
     openedAt: row.opened_at || null,
     clickedAt: row.clicked_at || null,
   };
@@ -201,9 +204,12 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
       if (state === 'delivery:engaged' && !email.openedAt && !email.clickedAt) return false;
       if (state === 'delivery:opened' && !email.openedAt) return false;
       if (state === 'delivery:clicked' && !email.clickedAt) return false;
-      if (state === 'delivery:issue' && !['bounced', 'blocked', 'deferred'].includes(String(email.deliveryStatus || '').toLowerCase())) return false;
+      if (state === 'delivery:issue' && !['bounced', 'blocked', 'deferred', 'failed'].includes(String(email.deliveryStatus || '').toLowerCase())) return false;
       if (state === 'delivery:sent' && !['sent', 'logged', ''].includes(String(email.deliveryStatus || '').toLowerCase())) return false;
-      if (state.startsWith('delivery:') && !['delivery:engaged', 'delivery:opened', 'delivery:clicked', 'delivery:issue', 'delivery:sent'].includes(state)) {
+      if (
+        state.startsWith('delivery:') &&
+        !['delivery:engaged', 'delivery:opened', 'delivery:clicked', 'delivery:issue', 'delivery:sent'].includes(state)
+      ) {
         if (String(email.deliveryStatus || '').toLowerCase() !== state.slice('delivery:'.length)) return false;
       }
     } else if (status && status !== 'all' && email.leadStatus !== status) {
@@ -220,8 +226,9 @@ function filterSentEmails(emails: SentEmail[], filters: SentEmailFilters) {
 
 function getDeliverySortRank(email: SentEmail) {
   const status = String(email.deliveryStatus || '').toLowerCase();
-  if (status === 'bounced' || status === 'blocked') return 1;
+  if (status === 'bounced' || status === 'blocked' || status === 'failed') return 1;
   if (status === 'deferred') return 2;
+  if (status === 'scheduled') return 3;
   if (status === 'sent' || status === '' || status === 'logged') return 3;
   if (status === 'delivered') return 4;
   if (email.openedAt || status === 'opened') return 5;
@@ -288,6 +295,7 @@ export type SentEmailInsert = {
   externalProvider?: string | null;
   externalMessageId?: string | null;
   deliveryStatus?: string | null;
+  scheduledAt?: string | Date | null;
   openedAt?: string | Date | null;
   clickedAt?: string | Date | null;
 };
@@ -326,6 +334,7 @@ function getSentEmailPayload(input: SentEmailInsert, includeOptionalColumns = tr
     external_provider: input.externalProvider || null,
     external_message_id: input.externalMessageId || null,
     delivery_status: input.deliveryStatus || null,
+    scheduled_at: cleanOptionalDate(input.scheduledAt),
     opened_at: cleanOptionalDate(input.openedAt),
     clicked_at: cleanOptionalDate(input.clickedAt),
   };
@@ -498,6 +507,7 @@ function buildStateOptions(emails: SentEmail[]) {
   addOption(options, 'delivery:engaged', 'Email: Opened or clicked');
   addOption(options, 'delivery:opened', 'Email: Opened');
   addOption(options, 'delivery:clicked', 'Email: Clicked');
+  addOption(options, 'delivery:scheduled', 'Email: Scheduled');
   addOption(options, 'delivery:sent', 'Email: Sent or logged');
   addOption(options, 'delivery:issue', 'Email: Needs delivery attention');
 
@@ -511,7 +521,7 @@ function buildStateOptions(emails: SentEmail[]) {
     }
 
     const deliveryStatus = String(email.deliveryStatus || '').toLowerCase();
-    if (deliveryStatus && !['sent', 'opened', 'clicked', 'bounced', 'blocked', 'deferred', 'delivered'].includes(deliveryStatus)) {
+    if (deliveryStatus && !['sent', 'opened', 'clicked', 'scheduled', 'failed', 'bounced', 'blocked', 'deferred', 'delivered'].includes(deliveryStatus)) {
       addOption(options, `delivery:${deliveryStatus}`, `Email: ${deliveryStatus}`);
     }
   }

@@ -10,6 +10,13 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function getScheduledAt(value: string) {
+  if (!value) return null;
+  const scheduledAt = new Date(value);
+  if (Number.isNaN(scheduledAt.getTime())) return null;
+  return scheduledAt;
+}
+
 async function validateTemplateGuardrails(leadId: string, toEmail: string, templateId: string) {
   if (!leadId || !templateId) return null;
 
@@ -70,6 +77,8 @@ export async function POST(request: Request) {
   const templateId = String(body?.templateId || '').trim();
   const archetype = String(body?.archetype || '').trim();
   const serviceInterest = String(body?.serviceInterest || '').trim();
+  const scheduledAtInput = String(body?.scheduledAt || '').trim();
+  const scheduledAt = getScheduledAt(scheduledAtInput);
   const apiKey = process.env.BREVO_API_KEY;
 
   if (!apiKey) {
@@ -78,6 +87,14 @@ export async function POST(request: Request) {
 
   if (!isEmail(to) || !subject || !htmlContent) {
     return NextResponse.json({ error: 'Recipient, subject, and email body are required.' }, { status: 400 });
+  }
+
+  if (scheduledAtInput && !scheduledAt) {
+    return NextResponse.json({ error: 'Scheduled send time is invalid.' }, { status: 400 });
+  }
+
+  if (scheduledAt && scheduledAt.getTime() <= Date.now()) {
+    return NextResponse.json({ error: 'Scheduled send time must be in the future.' }, { status: 400 });
   }
 
   if (templateId) {
@@ -100,6 +117,20 @@ export async function POST(request: Request) {
     }
   }
 
+  const brevoPayload: Record<string, unknown> = {
+    sender: {
+      name: 'Kagiso Shabangu',
+      email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@coachkagiso.co.za',
+    },
+    to: [{ email: to, name: toName || to }],
+    subject,
+    htmlContent,
+  };
+
+  if (scheduledAt) {
+    brevoPayload.scheduledAt = scheduledAt.toISOString();
+  }
+
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -107,15 +138,7 @@ export async function POST(request: Request) {
       'api-key': apiKey,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      sender: {
-        name: 'Kagiso Shabangu',
-        email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@coachkagiso.co.za',
-      },
-      to: [{ email: to, name: toName || to }],
-      subject,
-      htmlContent,
-    }),
+    body: JSON.stringify(brevoPayload),
   });
 
   if (!response.ok) {
@@ -139,14 +162,15 @@ export async function POST(request: Request) {
       archetype: archetype || null,
       serviceInterest: serviceInterest || null,
       sentAt: new Date().toISOString(),
+      scheduledAt: scheduledAt?.toISOString() || null,
       origin: 'dashboard',
       externalProvider: brevoResult.messageId ? 'brevo' : null,
       externalMessageId: brevoResult.messageId || null,
-      deliveryStatus: 'sent',
+      deliveryStatus: scheduledAt ? 'scheduled' : 'sent',
     });
   } catch (error) {
     console.error('Sent email log write failed', error);
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, scheduledAt: scheduledAt?.toISOString() || null });
 }
