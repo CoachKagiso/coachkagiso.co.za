@@ -411,7 +411,7 @@ export function EmailTab({
   }
 
   return (
-    <div className="grid gap-4 px-5 py-4 md:px-6">
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">To</p>

@@ -45,7 +45,7 @@ export function NotesTab({ task, onAddNote }: { task: Task; onAddNote: (task: Ta
   }
 
   return (
-    <div className="grid gap-4 px-5 py-4 md:px-6">
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-6">
       {task.notes.length === 0 ? (
         <div className="grid h-[96px] place-items-center rounded-[8px] bg-[#F5F3EE] text-[13px] text-[#6B6B6B]">
           No notes saved yet.
