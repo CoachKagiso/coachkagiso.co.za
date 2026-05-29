@@ -3042,7 +3042,11 @@ function recolorSvgMarkup(markup: string, color: string) {
 function getRecoloredSvgDataUrl(asset: DesignAsset, color: string) {
   const decoded = decodeSvgDataUrl(asset.src);
   if (!decoded) return asset.src;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(recolorSvgMarkup(decoded, color))}`;
+  return getRecoloredSvgDataUrlFromMarkup(decoded, color);
+}
+
+function getRecoloredSvgDataUrlFromMarkup(markup: string, color: string) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(recolorSvgMarkup(markup, color))}`;
 }
 
 function shouldUseSvgMaskRecolor(asset: DesignAsset) {
@@ -3073,6 +3077,31 @@ function getSvgMaskRecolorStyle(asset: DesignAsset, color: string, fit: 'contain
     WebkitMaskRepeat: 'no-repeat',
     WebkitMaskSize: fit,
   };
+}
+
+const recoloredSvgExportCache = new Map<string, Promise<string>>();
+
+async function getExportableRecoloredSvgDataUrl(src: string, color: string) {
+  const safeColor = normalizeHexColor(color) || '#142334';
+  const cacheKey = `${src}::${safeColor}`;
+  const cached = recoloredSvgExportCache.get(cacheKey);
+  if (cached) return cached;
+
+  const request = (async () => {
+    if (src.startsWith('data:image/svg+xml')) {
+      const decoded = decodeSvgDataUrl(src);
+      return decoded ? getRecoloredSvgDataUrlFromMarkup(decoded, safeColor) : src;
+    }
+
+    const response = await fetch(src, { cache: 'force-cache' });
+    if (!response.ok) return src;
+    const markup = await response.text();
+    if (!/<svg[\s>]/i.test(markup)) return src;
+    return getRecoloredSvgDataUrlFromMarkup(markup, safeColor);
+  })().catch(() => src);
+
+  recoloredSvgExportCache.set(cacheKey, request);
+  return request;
 }
 
 function getAssetImageBackgroundStyle(src: string, fit: 'contain' | 'cover'): CSSProperties {
@@ -3367,6 +3396,73 @@ function cropCanvasToPngDataUrl(canvas: HTMLCanvasElement, bounds: DesignSelecti
   return cropCanvas.toDataURL('image/png');
 }
 
+async function prepareSvgMaskNodesForExport(element: HTMLElement) {
+  const nodes = Array.from(element.querySelectorAll<HTMLElement>('[data-design-svg-mask-src]'));
+  await Promise.all(
+    nodes.map(async (node) => {
+      const src = node.dataset.designSvgMaskSrc;
+      if (!src) return;
+      const color = node.dataset.designSvgMaskColor || '#142334';
+      const fit = node.dataset.designSvgMaskFit === 'cover' ? 'cover' : 'contain';
+      const imageSrc = await getExportableRecoloredSvgDataUrl(src, color);
+      const doc = node.ownerDocument;
+      const image = doc.createElement('img');
+
+      image.src = imageSrc;
+      image.alt = '';
+      image.setAttribute('aria-hidden', 'true');
+      image.dataset.designSvgMaskExportImage = 'true';
+      image.draggable = false;
+      image.style.display = 'block';
+      image.style.width = '100%';
+      image.style.height = '100%';
+      image.style.objectFit = fit;
+      image.style.objectPosition = 'center';
+      image.style.pointerEvents = 'none';
+      image.style.userSelect = 'none';
+
+      node.querySelectorAll('[data-design-svg-mask-export-image="true"]').forEach((existing) => existing.remove());
+      node.style.background = 'transparent';
+      node.style.backgroundColor = 'transparent';
+      node.style.backgroundImage = 'none';
+      node.style.maskImage = 'none';
+      node.style.maskPosition = 'initial';
+      node.style.maskRepeat = 'initial';
+      node.style.maskSize = 'initial';
+      node.style.webkitMaskImage = 'none';
+      node.style.webkitMaskPosition = 'initial';
+      node.style.webkitMaskRepeat = 'initial';
+      node.style.webkitMaskSize = 'initial';
+      node.append(image);
+    }),
+  );
+}
+
+async function waitForDesignImages(element: HTMLElement) {
+  const images = Array.from(element.querySelectorAll<HTMLImageElement>('img'));
+  await Promise.all(
+    images.map((image) => {
+      if (image.complete) {
+        return image.decode?.().catch(() => null) ?? Promise.resolve(null);
+      }
+
+      return new Promise<null>((resolve) => {
+        let timeoutId: number | undefined;
+        const done = () => {
+          image.removeEventListener('load', done);
+          image.removeEventListener('error', done);
+          if (timeoutId) window.clearTimeout(timeoutId);
+          resolve(null);
+        };
+
+        image.addEventListener('load', done, { once: true });
+        image.addEventListener('error', done, { once: true });
+        timeoutId = window.setTimeout(done, 2500);
+      });
+    }),
+  );
+}
+
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -3415,6 +3511,8 @@ async function captureDesignCanvas(
   document.body.append(exportHost);
 
   try {
+    await prepareSvgMaskNodesForExport(exportElement);
+    await waitForDesignImages(exportElement);
     await waitForDesignFonts(exportElement);
     return await html2canvas(exportElement, {
       backgroundColor: null,
@@ -4379,7 +4477,13 @@ function DesignAssetBody({
   if (shouldUseTexturedSvgRecolor(asset)) {
     return (
       <div className="relative h-full w-full overflow-hidden">
-        <div className="absolute inset-0" style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)} />
+        <div
+          className="absolute inset-0"
+          data-design-svg-mask-src={asset.src}
+          data-design-svg-mask-color={assetColor}
+          data-design-svg-mask-fit={layer.fit}
+          style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)}
+        />
         <div
           className="absolute inset-0 opacity-70 mix-blend-multiply"
           style={getAssetImageBackgroundStyle(asset.src, layer.fit)}
@@ -4389,7 +4493,15 @@ function DesignAssetBody({
   }
 
   if (shouldUseSvgMaskRecolor(asset)) {
-    return <div className="relative h-full w-full" style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)} />;
+    return (
+      <div
+        className="relative h-full w-full"
+        data-design-svg-mask-src={asset.src}
+        data-design-svg-mask-color={assetColor}
+        data-design-svg-mask-fit={layer.fit}
+        style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)}
+      />
+    );
   }
 
   const assetSrc = canRecolorDesignAsset(asset) && isSvgDesignAsset(asset)
@@ -4397,15 +4509,17 @@ function DesignAssetBody({
     : asset.src;
 
   return (
-    <div
-      className="relative h-full w-full"
-      style={{
-        backgroundImage: `url(${assetSrc})`,
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: layer.fit,
-      }}
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      {/* eslint-disable-next-line @next/next/no-img-element -- Native image nodes export reliably through html2canvas. */}
+      <img
+        src={assetSrc}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="block h-full w-full select-none"
+        style={{ objectFit: layer.fit, objectPosition: 'center' }}
+      />
+    </div>
   );
 }
 
