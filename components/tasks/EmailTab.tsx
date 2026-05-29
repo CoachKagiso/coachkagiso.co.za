@@ -18,8 +18,15 @@ import {
   isNewsletterBridgeTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import {
+  getSelectableLeadEmailTemplates,
+  type EmailTemplateGuardrail,
+  type EmailTemplateGuardrailLead,
+} from '@/lib/email-template-guardrails';
 import { leadSourceLabels, normalizeLeadSource } from '@/lib/lead-sources';
 import type { StoredEmailTemplate } from '@/lib/settings';
+
+type GuardrailResponse = { guardrail?: EmailTemplateGuardrail };
 
 function getLeadFirstName(lead?: DiagnosticSubmission) {
   return lead?.first_name?.trim().split(/\s+/)[0] || 'there';
@@ -116,6 +123,17 @@ export function EmailTab({
       }),
     [lead]
   );
+  const guardrailLead = useMemo<EmailTemplateGuardrailLead>(
+    () => ({
+      archetypeName: lead?.archetype_name,
+      archetypeKey: lead?.archetype_key,
+      followUpCount: lead?.follow_up_count,
+      leadStatus: lead?.lead_status,
+      lastContactedAt: lead?.last_contacted_at,
+      source: lead?.source,
+    }),
+    [lead],
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateId>(defaultTemplateId);
   const [emailSubject, setEmailSubject] = useState(() => injectEmailTemplate(getEmailTemplate(defaultTemplateId).subject, lead, defaultTemplateId));
   const [emailBody, setEmailBody] = useState(() => injectEmailTemplate(getEmailTemplate(defaultTemplateId).body, lead, defaultTemplateId));
@@ -124,8 +142,46 @@ export function EmailTab({
   const [availableTemplates, setAvailableTemplates] = useState<StoredEmailTemplate[]>(
     EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
   );
+  const [templateGuardrailState, setTemplateGuardrailState] = useState<{ leadId: string; guardrail: EmailTemplateGuardrail } | null>(null);
+  const templateGuardrail = lead?.id && templateGuardrailState?.leadId === lead.id ? templateGuardrailState.guardrail : null;
+  const activeDefaultTemplateId = templateGuardrail?.recommendedTemplateId || defaultTemplateId;
+  const selectableTemplates = useMemo(
+    () => getSelectableLeadEmailTemplates(availableTemplates, guardrailLead, templateGuardrail?.sentTemplateIds || []),
+    [availableTemplates, guardrailLead, templateGuardrail],
+  );
+  const templateOptions = selectableTemplates.length > 0 ? selectableTemplates : [selectedTemplateId].map(getEmailTemplate);
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
   const leadSource = normalizeLeadSource(lead?.source);
+
+  useEffect(() => {
+    const leadForRequest = lead;
+    if (!adminKey || !leadForRequest?.id) return;
+    const guardrailLeadId = leadForRequest.id;
+    const guardrailLead = leadForRequest;
+
+    let cancelled = false;
+    async function loadGuardrail() {
+      try {
+        const response = await fetch(`/api/email/guardrails?key=${encodeURIComponent(adminKey)}&leadId=${encodeURIComponent(guardrailLeadId)}`);
+        const data = (await response.json().catch(() => ({}))) as GuardrailResponse;
+        if (!response.ok || !data.guardrail || cancelled) return;
+        setTemplateGuardrailState({ leadId: guardrailLeadId, guardrail: data.guardrail });
+        if (data.guardrail.recommendedTemplateId) {
+          const template = availableTemplates.find((item) => item.id === data.guardrail?.recommendedTemplateId) || getEmailTemplate(data.guardrail.recommendedTemplateId);
+          setSelectedTemplateId(data.guardrail.recommendedTemplateId);
+          setEmailSubject(injectEmailTemplate(template.subject, guardrailLead, data.guardrail.recommendedTemplateId));
+          setEmailBody(injectEmailTemplate(template.body, guardrailLead, data.guardrail.recommendedTemplateId));
+        }
+      } catch {
+        // The send endpoint repeats the same guardrails server-side.
+      }
+    }
+
+    void loadGuardrail();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, availableTemplates, lead]);
 
   useEffect(() => {
     if (!adminKey) return;
@@ -138,7 +194,7 @@ export function EmailTab({
         if (!response.ok || !data.templates?.length || cancelled) return;
         setAvailableTemplates(data.templates);
 
-        const template = data.templates.find((item) => item.id === defaultTemplateId) || data.templates[0];
+        const template = data.templates.find((item) => item.id === activeDefaultTemplateId) || data.templates[0];
         if (template) {
           setSelectedTemplateId(template.id);
           setEmailSubject(injectEmailTemplate(template.subject, lead, template.id));
@@ -153,7 +209,7 @@ export function EmailTab({
     return () => {
       cancelled = true;
     };
-  }, [adminKey, defaultTemplateId, lead]);
+  }, [activeDefaultTemplateId, adminKey, lead]);
 
   function switchTemplate(nextTemplateId: EmailTemplateId) {
     const template = availableTemplates.find((item) => item.id === nextTemplateId) || getEmailTemplate(nextTemplateId);
@@ -229,7 +285,7 @@ export function EmailTab({
           onChange={(event) => switchTemplate(event.target.value as EmailTemplateId)}
           className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[13px] text-[#142334] outline-none transition focus:border-[#142334]"
         >
-          {availableTemplates.filter((template) => template.active).map((template) => (
+          {templateOptions.map((template) => (
             <option key={template.id} value={template.id}>
               {getEmailTemplateOptionLabel(template)}
             </option>
@@ -238,6 +294,9 @@ export function EmailTab({
         <span className="text-[12px] leading-relaxed text-[#6B6B6B]">
           {selectedTemplate.stageLabel} - {selectedTemplate.archetypeName}
         </span>
+        {templateGuardrail?.warning && (
+          <span className="text-[12px] leading-relaxed text-[#8A3B2D]">{templateGuardrail.warning}</span>
+        )}
       </label>
 
       <label className="grid gap-2">
@@ -267,7 +326,7 @@ export function EmailTab({
         <button
           type="button"
           onClick={sendEmail}
-          disabled={!lead?.email || sendState === 'sending'}
+          disabled={!lead?.email || sendState === 'sending' || selectableTemplates.length === 0}
           className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
             sendState === 'sent' ? 'bg-[#22C55E] text-white' : 'bg-[#142334] text-white hover:bg-[#C9AD98] hover:text-[#142334]'
           }`}
