@@ -21,6 +21,11 @@ import {
 } from '@/lib/email-templates';
 import { leadSourceLabels, normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { buildEmailHistoryNote } from '@/lib/email-history-note';
+import {
+  getSelectableLeadEmailTemplates,
+  type EmailTemplateGuardrail,
+  type EmailTemplateGuardrailLead,
+} from '@/lib/email-template-guardrails';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
@@ -57,6 +62,7 @@ type LeadEmailModalProps = {
 };
 
 type LeadEmailTab = 'email' | 'notes';
+type GuardrailResponse = { guardrail?: EmailTemplateGuardrail };
 
 function getFirstName(lead: LeadEmailModalLead) {
   return lead.firstName.trim().split(/\s+/)[0] || 'there';
@@ -180,6 +186,16 @@ export default function LeadEmailModal({
     () => ({ id, firstName, email, archetype, serviceInterest, leadStatus, followUpCount, lastContactedAt, source: leadSource, downloadLink, notificationId }),
     [archetype, downloadLink, email, firstName, followUpCount, id, lastContactedAt, leadSource, leadStatus, notificationId, serviceInterest],
   );
+  const guardrailLead = useMemo<EmailTemplateGuardrailLead>(
+    () => ({
+      archetypeName: archetype,
+      followUpCount,
+      leadStatus,
+      lastContactedAt,
+      source: leadSource,
+    }),
+    [archetype, followUpCount, lastContactedAt, leadSource, leadStatus],
+  );
   const initialNotesRef = useRef(initialNotes);
   const defaultTemplateId = useMemo(
     () =>
@@ -207,6 +223,14 @@ export default function LeadEmailModal({
   const [availableTemplates, setAvailableTemplates] = useState<StoredEmailTemplate[]>(
     EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
   );
+  const [templateGuardrailState, setTemplateGuardrailState] = useState<{ leadId: string; guardrail: EmailTemplateGuardrail } | null>(null);
+  const templateGuardrail = templateGuardrailState?.leadId === modalLead.id ? templateGuardrailState.guardrail : null;
+  const activeDefaultTemplateId = templateGuardrail?.recommendedTemplateId || defaultTemplateId;
+  const selectableTemplates = useMemo(
+    () => getSelectableLeadEmailTemplates(availableTemplates, guardrailLead, templateGuardrail?.sentTemplateIds || []),
+    [availableTemplates, guardrailLead, templateGuardrail],
+  );
+  const templateOptions = selectableTemplates.length > 0 ? selectableTemplates : [selectedTemplateId].map(getEmailTemplate);
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
   const sequenceDots = getEmailSequenceDots(selectedTemplateId);
   const sequenceTotal = getEmailSequenceTotal(selectedTemplate);
@@ -245,11 +269,11 @@ export default function LeadEmailModal({
     document.documentElement.style.overscrollBehavior = 'contain';
 
     const timeout = window.setTimeout(() => {
-      const template = getEmailTemplate(defaultTemplateId);
+      const template = getEmailTemplate(activeDefaultTemplateId);
       setActiveTab('email');
-      setSelectedTemplateId(defaultTemplateId);
-      setSubject(initialSubject || injectTemplate(template.subject, modalLead, defaultTemplateId));
-      setBody(initialBody || injectTemplate(template.body, modalLead, defaultTemplateId));
+      setSelectedTemplateId(activeDefaultTemplateId);
+      setSubject(initialSubject || injectTemplate(template.subject, modalLead, activeDefaultTemplateId));
+      setBody(initialBody || injectTemplate(template.body, modalLead, activeDefaultTemplateId));
       setNotes(initialNotesRef.current);
       setNoteBody('');
       setSendError(false);
@@ -268,7 +292,38 @@ export default function LeadEmailModal({
       document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
       window.scrollTo(0, scrollY);
     };
-  }, [defaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
+  }, [activeDefaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
+
+  useEffect(() => {
+    if (!isOpen || !adminKey || !modalLead.id) {
+      return;
+    }
+
+    let cancelled = false;
+    async function loadGuardrail() {
+      try {
+        const response = await fetch(`/api/email/guardrails?key=${encodeURIComponent(adminKey)}&leadId=${encodeURIComponent(modalLead.id)}`);
+        const data = (await response.json().catch(() => ({}))) as GuardrailResponse;
+        if (!response.ok || !data.guardrail || cancelled) return;
+        setTemplateGuardrailState({ leadId: modalLead.id, guardrail: data.guardrail });
+        if (data.guardrail.recommendedTemplateId) {
+          const template = availableTemplates.find((item) => item.id === data.guardrail?.recommendedTemplateId) || getEmailTemplate(data.guardrail.recommendedTemplateId);
+          setSelectedTemplateId(data.guardrail.recommendedTemplateId);
+          if (!initialSubject && !initialBody) {
+            setSubject(injectTemplate(template.subject, modalLead, data.guardrail.recommendedTemplateId));
+            setBody(injectTemplate(template.body, modalLead, data.guardrail.recommendedTemplateId));
+          }
+        }
+      } catch {
+        // The send endpoint repeats the same guardrails server-side.
+      }
+    }
+
+    void loadGuardrail();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, availableTemplates, initialBody, initialSubject, isOpen, modalLead]);
 
   useEffect(() => {
     if (!isOpen || !adminKey) return;
@@ -281,7 +336,7 @@ export default function LeadEmailModal({
         if (!response.ok || !data.templates?.length || cancelled) return;
         setAvailableTemplates(data.templates);
 
-        const defaultTemplate = data.templates.find((template) => template.id === defaultTemplateId) || data.templates[0];
+        const defaultTemplate = data.templates.find((template) => template.id === activeDefaultTemplateId) || data.templates[0];
         if (defaultTemplate && !initialSubject && !initialBody) {
           setSelectedTemplateId(defaultTemplate.id);
           setSubject(injectTemplate(defaultTemplate.subject, modalLead, defaultTemplate.id));
@@ -296,7 +351,7 @@ export default function LeadEmailModal({
     return () => {
       cancelled = true;
     };
-  }, [adminKey, defaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
+  }, [activeDefaultTemplateId, adminKey, initialBody, initialSubject, isOpen, modalLead]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -526,7 +581,7 @@ export default function LeadEmailModal({
                       onChange={(event) => switchTemplate(event.target.value as EmailTemplateId)}
                       className="h-10 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[14px] text-[#142334] outline-none transition focus:border-[#142334]"
                     >
-                          {availableTemplates.filter((template) => template.active).map((template) => (
+                          {templateOptions.map((template) => (
                         <option key={template.id} value={template.id}>
                           {getEmailTemplateOptionLabel(template)}
                         </option>
@@ -535,6 +590,9 @@ export default function LeadEmailModal({
                     <span className="text-[12px] leading-relaxed text-[#6B6B6B]">
                       {selectedTemplate.stageLabel} - {selectedTemplate.archetypeName}
                     </span>
+                    {templateGuardrail?.warning && (
+                      <span className="text-[12px] leading-relaxed text-[#8A3B2D]">{templateGuardrail.warning}</span>
+                    )}
                   </label>
 
                   <label className="grid gap-2">
@@ -565,7 +623,7 @@ export default function LeadEmailModal({
                     <button
                       type="button"
                       onClick={sendEmail}
-                      disabled={sendState === 'sending' || !modalLead.email}
+                      disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0}
                       className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                         sendState === 'sent'
                           ? 'bg-[#22C55E] text-white'
