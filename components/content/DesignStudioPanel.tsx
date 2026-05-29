@@ -167,6 +167,7 @@ type BaseDesignLayer = {
   blurAmount?: number;
   flipX?: boolean;
   flipY?: boolean;
+  borderRadius?: number;
   borderTopLeftRadius?: number;
   borderTopRightRadius?: number;
   borderBottomRightRadius?: number;
@@ -3274,6 +3275,7 @@ const designCornerRadiusControls: Array<{ key: DesignCornerRadiusKey; label: str
 
 function getLayerBaseBorderRadius(layer: DesignLayer) {
   if (layer.type === 'text') return layer.borderRadius ?? 0;
+  if (layer.type === 'asset') return layer.borderRadius ?? 0;
   if (layer.type === 'shape') return layer.borderRadius;
   return 0;
 }
@@ -3415,26 +3417,13 @@ async function prepareSvgMaskNodesForExport(element: HTMLElement) {
       const color = node.dataset.designSvgMaskColor || '#142334';
       const fit = node.dataset.designSvgMaskFit === 'cover' ? 'cover' : 'contain';
       const imageSrc = await getExportableRecoloredSvgDataUrl(src, color);
-      const doc = node.ownerDocument;
-      const image = doc.createElement('img');
-
-      image.src = imageSrc;
-      image.alt = '';
-      image.setAttribute('aria-hidden', 'true');
-      image.dataset.designSvgMaskExportImage = 'true';
-      image.draggable = false;
-      image.style.display = 'block';
-      image.style.width = '100%';
-      image.style.height = '100%';
-      image.style.objectFit = fit;
-      image.style.objectPosition = 'center';
-      image.style.pointerEvents = 'none';
-      image.style.userSelect = 'none';
-
-      node.querySelectorAll('[data-design-svg-mask-export-image="true"]').forEach((existing) => existing.remove());
+      node.replaceChildren();
       node.style.background = 'transparent';
       node.style.backgroundColor = 'transparent';
-      node.style.backgroundImage = 'none';
+      node.style.backgroundImage = `url("${imageSrc}")`;
+      node.style.backgroundPosition = 'center';
+      node.style.backgroundRepeat = 'no-repeat';
+      node.style.backgroundSize = fit;
       node.style.maskImage = 'none';
       node.style.maskPosition = 'initial';
       node.style.maskRepeat = 'initial';
@@ -3443,7 +3432,6 @@ async function prepareSvgMaskNodesForExport(element: HTMLElement) {
       node.style.webkitMaskPosition = 'initial';
       node.style.webkitMaskRepeat = 'initial';
       node.style.webkitMaskSize = 'initial';
-      node.append(image);
     }),
   );
 }
@@ -4519,17 +4507,15 @@ function DesignAssetBody({
     : asset.src;
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element -- Native image nodes export reliably through html2canvas. */}
-      <img
-        src={assetSrc}
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        className="block h-full w-full select-none"
-        style={{ objectFit: layer.fit, objectPosition: 'center' }}
-      />
-    </div>
+    <div
+      className="relative h-full w-full"
+      style={{
+        backgroundImage: `url(${assetSrc})`,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: layer.fit,
+      }}
+    />
   );
 }
 
@@ -4789,6 +4775,7 @@ function DesignLayerView({
   const baseLayerZIndex = isCanvasBackground ? 2 : 20 + stackIndex;
   const layerZIndex = selected && !shouldPreserveStackWhenSelected ? 90 : baseLayerZIndex;
   const layerAsset = layer.type === 'asset' ? assetLibrary[layer.assetId] : null;
+  const assetBorderRadius = layer.type === 'asset' ? getLayerCornerRadiusCss(layer, design) : undefined;
 
   return (
     <div
@@ -4822,6 +4809,12 @@ function DesignLayerView({
         className="h-full w-full"
         style={{
           filter: getLayerEffectFilter(layer, design),
+          ...(layer.type === 'asset'
+            ? {
+                borderRadius: assetBorderRadius,
+                overflow: assetBorderRadius ? 'hidden' : undefined,
+              }
+            : {}),
           ...getLayerContentTransformStyle(layer),
         }}
       >
@@ -7648,19 +7641,25 @@ export default function DesignStudioPanel({
                       )}
 
                       {selectedLayer.type === 'asset' && (
-                        selectedAsset && canRecolorDesignAsset(selectedAsset) ? (
-                          <ColorControl
-                            label="Icon color"
-                            value={selectedLayer.color || selectedAsset.defaultColor || '#142334'}
-                            onChange={(value) => {
-                              if (value) patchLayer(selectedLayer.id, { color: value } as Partial<DesignLayer>);
-                            }}
+                        <>
+                          {selectedAsset && canRecolorDesignAsset(selectedAsset) ? (
+                            <ColorControl
+                              label="Icon color"
+                              value={selectedLayer.color || selectedAsset.defaultColor || '#142334'}
+                              onChange={(value) => {
+                                if (value) patchLayer(selectedLayer.id, { color: value } as Partial<DesignLayer>);
+                              }}
+                            />
+                          ) : (
+                            <p className="rounded-[8px] border border-dashed border-[#E4D8CB] bg-[#F8F6F4] px-3 py-4 text-center text-[12px] leading-relaxed text-[#142334]/56">
+                              This asset has no editable color controls.
+                            </p>
+                          )}
+                          <CornerRadiusControl
+                            layer={selectedLayer}
+                            onChange={(patch) => patchLayer(selectedLayer.id, patch)}
                           />
-                        ) : (
-                          <p className="rounded-[8px] border border-dashed border-[#E4D8CB] bg-[#F8F6F4] px-3 py-4 text-center text-[12px] leading-relaxed text-[#142334]/56">
-                            This asset has no editable style controls.
-                          </p>
-                        )
+                        </>
                       )}
 
                       {selectedLayer.type === 'shape' && (
