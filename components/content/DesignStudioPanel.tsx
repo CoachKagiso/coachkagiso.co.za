@@ -410,6 +410,8 @@ const designAssetLibrary: Record<string, DesignAsset> = {
     name: 'Paper texture',
     src: '/design-elements/manifesto/paper-texture.svg',
     category: 'Background',
+    naturalWidth: 1080,
+    naturalHeight: 1350,
   },
   paper_resource_6_1: {
     id: 'paper_resource_6_1',
@@ -603,18 +605,24 @@ const designAssetLibrary: Record<string, DesignAsset> = {
     name: 'Torn paper note',
     src: '/design-elements/manifesto/torn-paper-note.svg',
     category: 'Manifesto',
+    naturalWidth: 520,
+    naturalHeight: 360,
   },
   tape_left: {
     id: 'tape_left',
     name: 'Tape left',
     src: '/design-elements/manifesto/tape-left.svg',
     category: 'Manifesto',
+    naturalWidth: 150,
+    naturalHeight: 78,
   },
   tape_right: {
     id: 'tape_right',
     name: 'Tape right',
     src: '/design-elements/manifesto/tape-right.svg',
     category: 'Manifesto',
+    naturalWidth: 150,
+    naturalHeight: 78,
   },
   plastic_tape_overlay_6: {
     id: 'plastic_tape_overlay_6',
@@ -677,12 +685,16 @@ const designAssetLibrary: Record<string, DesignAsset> = {
     name: 'Hand arrow',
     src: '/design-elements/manifesto/hand-arrow.svg',
     category: 'Marks',
+    naturalWidth: 250,
+    naturalHeight: 190,
   },
   bookmark: {
     id: 'bookmark',
     name: 'Bookmark',
     src: '/design-elements/manifesto/bookmark.svg',
     category: 'Marks',
+    naturalWidth: 72,
+    naturalHeight: 108,
   },
   scribble_circle: {
     id: 'scribble_circle',
@@ -3124,6 +3136,46 @@ function getAssetImageBackgroundStyle(src: string, fit: 'contain' | 'cover'): CS
   };
 }
 
+function getAssetImageFrameStyle(
+  src: string,
+  fit: 'contain' | 'cover',
+  layerWidth: number,
+  layerHeight: number,
+  naturalWidth?: number,
+  naturalHeight?: number,
+): CSSProperties {
+  const baseStyle = {
+    backgroundImage: `url(${src})`,
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  } satisfies CSSProperties;
+
+  if (!naturalWidth || !naturalHeight || naturalWidth <= 0 || naturalHeight <= 0 || layerWidth <= 0 || layerHeight <= 0) {
+    return {
+      ...baseStyle,
+      position: 'absolute',
+      inset: 0,
+      backgroundSize: fit,
+    };
+  }
+
+  const assetRatio = naturalWidth / naturalHeight;
+  const layerRatio = layerWidth / layerHeight;
+  const fitByWidth = fit === 'contain' ? assetRatio >= layerRatio : assetRatio < layerRatio;
+  const widthPercent = fitByWidth ? 100 : (layerHeight * assetRatio / layerWidth) * 100;
+  const heightPercent = fitByWidth ? (layerWidth / assetRatio / layerHeight) * 100 : 100;
+
+  return {
+    ...baseStyle,
+    position: 'absolute',
+    left: `${(100 - widthPercent) / 2}%`,
+    top: `${(100 - heightPercent) / 2}%`,
+    width: `${widthPercent}%`,
+    height: `${heightPercent}%`,
+    backgroundSize: '100% 100%',
+  };
+}
+
 function getDesignAssetPreviewSrc(asset: DesignAsset) {
   if (!asset.src.startsWith('/design-elements/')) return asset.src;
   const fileName = asset.src.split('/').pop();
@@ -3416,14 +3468,23 @@ async function prepareSvgMaskNodesForExport(element: HTMLElement) {
       if (!src) return;
       const color = node.dataset.designSvgMaskColor || '#142334';
       const fit = node.dataset.designSvgMaskFit === 'cover' ? 'cover' : 'contain';
+      const naturalWidth = Number.parseFloat(node.dataset.designSvgMaskNaturalWidth || '');
+      const naturalHeight = Number.parseFloat(node.dataset.designSvgMaskNaturalHeight || '');
       const imageSrc = await getExportableRecoloredSvgDataUrl(src, color);
+      const child = node.ownerDocument.createElement('div');
+      const childStyle = getAssetImageFrameStyle(
+        imageSrc,
+        fit,
+        node.offsetWidth || 1,
+        node.offsetHeight || 1,
+        Number.isFinite(naturalWidth) ? naturalWidth : undefined,
+        Number.isFinite(naturalHeight) ? naturalHeight : undefined,
+      );
+
       node.replaceChildren();
       node.style.background = 'transparent';
       node.style.backgroundColor = 'transparent';
-      node.style.backgroundImage = `url("${imageSrc}")`;
-      node.style.backgroundPosition = 'center';
-      node.style.backgroundRepeat = 'no-repeat';
-      node.style.backgroundSize = fit;
+      node.style.backgroundImage = 'none';
       node.style.maskImage = 'none';
       node.style.maskPosition = 'initial';
       node.style.maskRepeat = 'initial';
@@ -3432,6 +3493,10 @@ async function prepareSvgMaskNodesForExport(element: HTMLElement) {
       node.style.webkitMaskPosition = 'initial';
       node.style.webkitMaskRepeat = 'initial';
       node.style.webkitMaskSize = 'initial';
+      node.style.position = node.style.position || 'relative';
+      node.style.overflow = 'hidden';
+      Object.assign(child.style, childStyle);
+      node.append(child);
     }),
   );
 }
@@ -4480,6 +4545,8 @@ function DesignAssetBody({
           data-design-svg-mask-src={asset.src}
           data-design-svg-mask-color={assetColor}
           data-design-svg-mask-fit={layer.fit}
+          data-design-svg-mask-natural-width={asset.naturalWidth}
+          data-design-svg-mask-natural-height={asset.naturalHeight}
           style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)}
         />
         <div
@@ -4497,6 +4564,8 @@ function DesignAssetBody({
         data-design-svg-mask-src={asset.src}
         data-design-svg-mask-color={assetColor}
         data-design-svg-mask-fit={layer.fit}
+        data-design-svg-mask-natural-width={asset.naturalWidth}
+        data-design-svg-mask-natural-height={asset.naturalHeight}
         style={getSvgMaskRecolorStyle(asset, assetColor, layer.fit)}
       />
     );
@@ -4507,15 +4576,18 @@ function DesignAssetBody({
     : asset.src;
 
   return (
-    <div
-      className="relative h-full w-full"
-      style={{
-        backgroundImage: `url(${assetSrc})`,
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: layer.fit,
-      }}
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      <div
+        style={getAssetImageFrameStyle(
+          assetSrc,
+          layer.fit,
+          layer.width,
+          layer.height,
+          asset.naturalWidth,
+          asset.naturalHeight,
+        )}
+      />
+    </div>
   );
 }
 
