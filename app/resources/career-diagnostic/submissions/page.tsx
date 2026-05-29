@@ -354,17 +354,17 @@ function getFollowUpSequenceLabel(submission: DiagnosticSubmission) {
   const followUpCount = submission.follow_up_count ?? 0;
   const source = normalizeLeadSource(submission.source);
   if (source === 'first_90_days') {
-    if (followUpCount <= 0) return 'First 90 Days follow-up (Day 4)';
+    if (followUpCount <= 0) return 'First 90 Days follow-up (Day 5)';
     return 'First 90 Days newsletter bridge (Day 10)';
   }
   if (source === 'linkedin_headline') {
-    if (followUpCount <= 0) return 'LinkedIn headline follow-up (Day 4)';
+    if (followUpCount <= 0) return 'LinkedIn headline follow-up (Day 5)';
     return 'LinkedIn newsletter bridge (Day 10)';
   }
   if (source === 'masterclass_waitlist') return 'Bookings-open email (manual)';
-  if (followUpCount <= 0) return 'Follow-up 1 (Day 4)';
-  if (followUpCount === 1) return 'Follow-up 2 (Day 10)';
-  return 'Newsletter bridge (Day 17)';
+  if (followUpCount <= 0) return 'Second contact (Day 4)';
+  if (followUpCount === 1) return 'Third contact (Day 10)';
+  return 'Newsletter bridge (Day 12)';
 }
 
 function formatMoney(value: number) {

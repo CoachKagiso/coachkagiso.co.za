@@ -158,7 +158,7 @@ export const questions: DiagnosticQuestion[] = [
 export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
   A: {
     key: 'A',
-    name: 'The Plateaued Performer',
+    name: 'Plateaued Performer',
     symbol: {
       label: 'North Star',
       meaning: 'A fixed point for choosing the next stretch.',
@@ -224,7 +224,7 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
   },
   B: {
     key: 'B',
-    name: 'The Quiet Pivoter',
+    name: 'Quiet Pivoter',
     symbol: {
       label: 'Signal Line',
       meaning: 'A clearer transmission of work that is already valuable.',
@@ -290,7 +290,7 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
   },
   C: {
     key: 'C',
-    name: 'The Burnt-Out Builder',
+    name: 'Burnt-Out Builder',
     symbol: {
       label: 'Boundary Arch',
       meaning: 'A protective pause before the next decision.',
@@ -356,7 +356,7 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
   },
   D: {
     key: 'D',
-    name: 'The Lost Pivoter',
+    name: 'Lost Pivoter',
     symbol: {
       label: 'Compass Point',
       meaning: 'A way back to the real question underneath the noise.',
@@ -422,7 +422,7 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
   },
   E: {
     key: 'E',
-    name: 'The Engaged Strategist',
+    name: 'Engaged Strategist',
     symbol: {
       label: 'Momentum Grid',
       meaning: 'A structure that turns direction into repeatable movement.',

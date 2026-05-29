@@ -15,7 +15,8 @@ export function getFollowUpScheduleAfterSend(
   currentFollowUpCount: number,
   templateId: string | null,
   now: Date,
-  hasPriorContact = false
+  hasPriorContact = false,
+  source?: string | null
 ) {
   if (isMasterclassBookingsOpenTemplate(templateId)) {
     return {
@@ -31,17 +32,27 @@ export function getFollowUpScheduleAfterSend(
     };
   }
 
+  if (source === 'masterclass_waitlist') {
+    return {
+      follow_up_count: currentFollowUpCount,
+      next_follow_up_at: null,
+    };
+  }
+
   if (isFollowUpTwoTemplate(templateId)) {
     return {
       follow_up_count: 2,
-      next_follow_up_at: addDaysAsDateString(now, 7),
+      next_follow_up_at: addDaysAsDateString(now, 2),
     };
   }
 
   if (isFollowUpOneTemplate(templateId)) {
     return {
       follow_up_count: 1,
-      next_follow_up_at: addDaysAsDateString(now, 6),
+      next_follow_up_at: addDaysAsDateString(
+        now,
+        source === 'first_90_days' || source === 'linkedin_headline' ? 5 : 6
+      ),
     };
   }
 
@@ -49,13 +60,26 @@ export function getFollowUpScheduleAfterSend(
     const nextFollowUpCount = currentFollowUpCount <= 0 ? 1 : currentFollowUpCount === 1 ? 2 : 3;
     return {
       follow_up_count: nextFollowUpCount,
-      next_follow_up_at: nextFollowUpCount >= 3 ? null : addDaysAsDateString(now, nextFollowUpCount === 1 ? 6 : 7),
+      next_follow_up_at:
+        nextFollowUpCount >= 3
+          ? null
+          : addDaysAsDateString(
+              now,
+              source === 'first_90_days' || source === 'linkedin_headline'
+                ? 5
+                : nextFollowUpCount === 1
+                  ? 6
+                  : 2
+            ),
     };
   }
 
   return {
     follow_up_count: currentFollowUpCount,
-    next_follow_up_at: addDaysAsDateString(now, 4),
+    next_follow_up_at: addDaysAsDateString(
+      now,
+      source === 'first_90_days' || source === 'linkedin_headline' ? 5 : 4
+    ),
   };
 }
 

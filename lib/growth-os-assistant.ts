@@ -868,7 +868,7 @@ You don't have to reply to this. But if you want to, I read everything.
 Kagiso
 hello@coachkagiso.co.za
 
-Example 2 - Lost Pivoter, Follow-up 1:
+Example 2 - Lost Pivoter, Second contact:
 Subject: Still thinking about your answer, Sarah
 Hi Sarah,
 

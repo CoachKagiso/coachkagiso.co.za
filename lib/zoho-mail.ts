@@ -21,6 +21,7 @@ type ZohoConfig = {
   refreshToken: string;
   accountId: string;
   inboxFolderId: string;
+  sentFolderId?: string;
   mailbox: string;
 };
 
@@ -51,6 +52,7 @@ function getZohoConfig(): Omit<ZohoConfig, 'accountId' | 'inboxFolderId'> & {
     refreshToken: process.env.ZOHO_MAIL_REFRESH_TOKEN || '',
     accountId: process.env.ZOHO_MAIL_ACCOUNT_ID?.trim(),
     inboxFolderId: process.env.ZOHO_MAIL_INBOX_FOLDER_ID?.trim(),
+    sentFolderId: process.env.ZOHO_MAIL_SENT_FOLDER_ID?.trim(),
     mailbox: (process.env.ZOHO_MAILBOX_EMAIL || getContactEmail()).trim().toLowerCase(),
   };
 }
@@ -93,12 +95,13 @@ function getString(...values: unknown[]) {
 }
 
 function stripAddressName(value: string) {
-  const match = value.match(/<([^>]+)>/);
-  return (match?.[1] || value).trim().toLowerCase();
+  const decoded = decodeHtmlEntities(value);
+  const match = decoded.match(/<([^>]+)>/);
+  return (match?.[1] || decoded).trim().toLowerCase();
 }
 
 function stripEmailName(value: string) {
-  return value.replace(/<[^>]+>/g, '').replace(/^["']|["']$/g, '').trim();
+  return decodeHtmlEntities(value).replace(/<[^>]+>/g, '').replace(/^["']|["']$/g, '').trim();
 }
 
 function normalizeEmail(value?: string | null) {
@@ -219,6 +222,23 @@ function folderLooksLikeInbox(folder: ZohoFolder) {
   return searchable.some((value) => value === 'inbox' || value.endsWith('/inbox'));
 }
 
+function folderLooksLikeSent(folder: ZohoFolder) {
+  const searchable = [
+    folder.folderName,
+    folder.folderPath,
+    folder.folderType,
+    folder.type,
+    folder.name,
+  ].map((value) => String(value || '').toLowerCase());
+
+  return searchable.some((value) =>
+    value === 'sent' ||
+    value.endsWith('/sent') ||
+    value.includes('sent mail') ||
+    value.includes('sent items')
+  );
+}
+
 async function resolveZohoMailbox(config: ReturnType<typeof getZohoConfig>, token: string): Promise<ZohoConfig> {
   let accountId = config.accountId || '';
   if (!accountId) {
@@ -232,11 +252,19 @@ async function resolveZohoMailbox(config: ReturnType<typeof getZohoConfig>, toke
     throw new Error(`Could not find a Zoho Mail account for ${config.mailbox}.`);
   }
 
+  let folders: ZohoFolder[] | null = null;
+  async function loadFolders() {
+    if (!folders) {
+      const foldersResponse = await zohoGet<unknown>(config, token, `/accounts/${accountId}/folders`);
+      folders = getArrayData(foldersResponse);
+    }
+    return folders;
+  }
+
   let inboxFolderId = config.inboxFolderId || '';
   if (!inboxFolderId) {
-    const foldersResponse = await zohoGet<unknown>(config, token, `/accounts/${accountId}/folders`);
-    const folders = getArrayData(foldersResponse);
-    const folder = folders.find(folderLooksLikeInbox) || folders[0];
+    const folderList = await loadFolders();
+    const folder = folderList.find(folderLooksLikeInbox) || folderList[0];
     inboxFolderId = getString(folder?.folderId, folder?.id);
   }
 
@@ -244,10 +272,18 @@ async function resolveZohoMailbox(config: ReturnType<typeof getZohoConfig>, toke
     throw new Error('Could not find the Zoho Mail inbox folder.');
   }
 
+  let sentFolderId = config.sentFolderId || '';
+  if (!sentFolderId) {
+    const folderList = await loadFolders();
+    const folder = folderList.find(folderLooksLikeSent);
+    sentFolderId = getString(folder?.folderId, folder?.id);
+  }
+
   return {
     ...config,
     accountId,
     inboxFolderId,
+    sentFolderId,
   };
 }
 
@@ -298,6 +334,38 @@ function normalizeZohoMessage(message: ZohoMessage, body: string, mailbox: strin
   };
 }
 
+async function listZohoFolderMessages({
+  config,
+  token,
+  folderId,
+  limit,
+  start,
+}: {
+  config: ZohoConfig;
+  token: string;
+  folderId: string;
+  limit: number;
+  start: number;
+}) {
+  const response = await zohoGet<unknown>(config, token, `/accounts/${config.accountId}/messages/view`, {
+    folderId,
+    start,
+    limit,
+    status: 'all',
+  });
+
+  const messages = getArrayData(response);
+  const normalized: ZohoMailboxMessage[] = [];
+
+  for (const message of messages) {
+    const body = await getZohoMessageContent(config, token, message);
+    const item = normalizeZohoMessage(message, body, config.mailbox);
+    if (item) normalized.push(item);
+  }
+
+  return normalized;
+}
+
 export async function listZohoInboxMessages({
   limit = 50,
   start = 1,
@@ -311,26 +379,47 @@ export async function listZohoInboxMessages({
   const safeLimit = Math.max(1, Math.min(Math.floor(limit), 200));
   const safeStart = Math.max(1, Math.floor(start));
 
-  const response = await zohoGet<unknown>(config, token, `/accounts/${config.accountId}/messages/view`, {
-    folderId: config.inboxFolderId,
-    start: safeStart,
-    limit: safeLimit,
-    status: 'all',
-  });
+  return {
+    mailbox: config.mailbox,
+    accountId: config.accountId,
+    inboxFolderId: config.inboxFolderId,
+    messages: await listZohoFolderMessages({
+      config,
+      token,
+      folderId: config.inboxFolderId,
+      limit: safeLimit,
+      start: safeStart,
+    }),
+  };
+}
 
-  const messages = getArrayData(response);
-  const normalized: ZohoMailboxMessage[] = [];
+export async function listZohoSentMessages({
+  limit = 50,
+  start = 1,
+}: {
+  limit?: number;
+  start?: number;
+} = {}) {
+  const baseConfig = getZohoConfig();
+  const token = await refreshZohoAccessToken(baseConfig);
+  const config = await resolveZohoMailbox(baseConfig, token);
+  const safeLimit = Math.max(1, Math.min(Math.floor(limit), 200));
+  const safeStart = Math.max(1, Math.floor(start));
 
-  for (const message of messages) {
-    const body = await getZohoMessageContent(config, token, message);
-    const item = normalizeZohoMessage(message, body, config.mailbox);
-    if (item) normalized.push(item);
+  if (!config.sentFolderId) {
+    throw new Error('Could not find the Zoho Mail sent folder.');
   }
 
   return {
     mailbox: config.mailbox,
     accountId: config.accountId,
-    inboxFolderId: config.inboxFolderId,
-    messages: normalized,
+    sentFolderId: config.sentFolderId,
+    messages: await listZohoFolderMessages({
+      config,
+      token,
+      folderId: config.sentFolderId,
+      limit: safeLimit,
+      start: safeStart,
+    }),
   };
 }
