@@ -788,6 +788,8 @@ function TaskCard({
   onDelete: () => void;
 }) {
   const Icon = taskIconMap[task.type];
+  const noteCount = task.notes.length;
+  const noteCountLabel = `${noteCount} saved note${noteCount === 1 ? '' : 's'}`;
 
   return (
     <button
@@ -843,6 +845,16 @@ function TaskCard({
         {task.isManual && (
           <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B695F]">
             Manual
+          </span>
+        )}
+        {noteCount > 0 && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#F5F3EE] px-2.5 py-1 text-[10px] font-semibold text-[#5E7185] transition group-hover:bg-white/12 group-hover:text-white"
+            aria-label={noteCountLabel}
+            title={noteCountLabel}
+          >
+            <StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
+            {noteCount}
           </span>
         )}
       </div>
