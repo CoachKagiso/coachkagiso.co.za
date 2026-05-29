@@ -6,6 +6,11 @@ import {
   type EmailTemplate,
   type EmailTemplateId,
 } from '@/lib/email-templates';
+import {
+  isSequenceRepairResolved,
+  type SequenceGapInfo,
+  type SequenceRepairStatus,
+} from '@/lib/email-sequence-repair';
 import { normalizeLeadSource } from '@/lib/lead-sources';
 
 export type EmailTemplateGuardrailLead = {
@@ -15,6 +20,7 @@ export type EmailTemplateGuardrailLead = {
   leadStatus?: string | null;
   lastContactedAt?: string | null;
   source?: string | null;
+  sequenceRepairStatus?: string | null;
 };
 
 export type EmailTemplateGuardrail = {
@@ -22,6 +28,8 @@ export type EmailTemplateGuardrail = {
   sentTemplateIds: EmailTemplateId[];
   recommendedTemplateId: EmailTemplateId | null;
   stageTemplateId: EmailTemplateId | null;
+  sequenceRepairStatus: SequenceRepairStatus | null;
+  sequenceGap: SequenceGapInfo;
   warning: string;
 };
 
@@ -65,6 +73,29 @@ export function getEmailTemplateGuardrail(
     (highest, templateId) => Math.max(highest, sequenceTemplateIds.indexOf(templateId)),
     -1,
   );
+  const firstTemplateId = sequenceTemplateIds[0] || null;
+  const firstTemplateSent = Boolean(firstTemplateId && sentSet.has(firstTemplateId));
+  const firstLaterSentTemplateId = sentIds.find((templateId) => templateId !== firstTemplateId) || null;
+  const sequenceRepairStatus = isSequenceRepairResolved(lead.sequenceRepairStatus)
+    ? lead.sequenceRepairStatus
+    : null;
+  const sequenceGapDetected = Boolean(
+    firstTemplateId &&
+      firstLaterSentTemplateId &&
+      !firstTemplateSent &&
+      !sequenceRepairStatus,
+  );
+  const sequenceGap: SequenceGapInfo = {
+    detected: sequenceGapDetected,
+    status: sequenceRepairStatus,
+    firstTemplateId,
+    firstTemplateLabel: firstTemplateId ? getEmailTemplate(firstTemplateId).stageLabel : 'First contact',
+    blockingTemplateId: firstLaterSentTemplateId,
+    blockingTemplateLabel: firstLaterSentTemplateId ? getEmailTemplate(firstLaterSentTemplateId).stageLabel : '',
+    message: sequenceGapDetected
+      ? 'First contact was not logged before the sequence advanced.'
+      : '',
+  };
   const nextFromSentLog = highestSentIndex >= 0 ? sequenceTemplateIds[highestSentIndex + 1] || null : sequenceTemplateIds[0] || null;
   const stageTemplateId = asEmailTemplateId(getTemplateIdForLeadStage({
     archetypeName: lead.archetypeName,
@@ -74,20 +105,31 @@ export function getEmailTemplateGuardrail(
     lastContactedAt: lead.lastContactedAt,
     source: lead.source,
   }));
-  const recommendedTemplateId = nextFromSentLog || null;
+  const recommendedTemplateId =
+    sequenceRepairStatus === 'manual'
+      ? null
+      : sequenceGapDetected
+        ? firstTemplateId
+        : nextFromSentLog || null;
   const warning =
-    stageTemplateId &&
-    recommendedTemplateId &&
-    stageTemplateId !== recommendedTemplateId &&
-    sequenceSet.has(stageTemplateId)
-      ? `The CRM stage points to ${getEmailTemplate(stageTemplateId).stageLabel}, but the sent-email log points to ${getEmailTemplate(recommendedTemplateId).stageLabel}.`
-      : '';
+    sequenceRepairStatus === 'manual'
+      ? 'Manual sequence handling is active for this lead.'
+      : sequenceGapDetected
+        ? 'Sequence gap detected. Send a recovery email before closing the sequence.'
+        : stageTemplateId &&
+            recommendedTemplateId &&
+            stageTemplateId !== recommendedTemplateId &&
+            sequenceSet.has(stageTemplateId)
+          ? `The CRM stage points to ${getEmailTemplate(stageTemplateId).stageLabel}, but the sent-email log points to ${getEmailTemplate(recommendedTemplateId).stageLabel}.`
+          : '';
 
   return {
     sequenceTemplateIds,
     sentTemplateIds: sentIds,
     recommendedTemplateId,
     stageTemplateId,
+    sequenceRepairStatus,
+    sequenceGap,
     warning,
   };
 }
@@ -98,6 +140,13 @@ export function getSelectableLeadEmailTemplates(
   sentTemplateIds: Array<string | null | undefined> = [],
 ) {
   const guardrail = getEmailTemplateGuardrail(lead, sentTemplateIds);
+  if (guardrail.sequenceRepairStatus === 'manual') return [];
+  if (guardrail.sequenceGap.detected && guardrail.sequenceGap.firstTemplateId) {
+    return templates
+      .filter((template) => template.active !== false)
+      .filter((template) => template.id === guardrail.sequenceGap.firstTemplateId);
+  }
+
   const sequenceSet = new Set(guardrail.sequenceTemplateIds);
   const sentSet = new Set(guardrail.sentTemplateIds);
 
@@ -137,6 +186,14 @@ export function validateLeadEmailTemplateSelection({
       valid: false,
       guardrail,
       message: 'This template has already been sent to this lead. Choose the next template.',
+    };
+  }
+
+  if (guardrail.sequenceGap.detected && cleanTemplateId !== guardrail.sequenceGap.firstTemplateId) {
+    return {
+      valid: false,
+      guardrail,
+      message: 'Sequence gap detected. Send the recovery email before choosing the next template.',
     };
   }
 

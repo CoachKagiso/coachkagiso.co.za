@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FormEvent, WheelEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, MailCheck, Save, Send, X } from 'lucide-react';
+import { AlertTriangle, Loader2, MailCheck, Save, Send, X } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import {
   EMAIL_TEMPLATES,
@@ -26,6 +26,7 @@ import {
   type EmailTemplateGuardrail,
   type EmailTemplateGuardrailLead,
 } from '@/lib/email-template-guardrails';
+import { buildRecoveryEmailDraft, type SequenceRepairAction } from '@/lib/email-sequence-repair';
 import type { StoredEmailTemplate } from '@/lib/settings';
 
 export type LeadEmailModalLead = {
@@ -63,6 +64,8 @@ type LeadEmailModalProps = {
 
 type LeadEmailTab = 'email' | 'notes';
 type GuardrailResponse = { guardrail?: EmailTemplateGuardrail };
+type RepairResponse = { guardrail?: EmailTemplateGuardrail; note?: DashboardNote; submission?: SentLeadUpdate | null };
+type DraftTemplate = { subject: string; body: string };
 
 function getFirstName(lead: LeadEmailModalLead) {
   return lead.firstName.trim().split(/\s+/)[0] || 'there';
@@ -100,6 +103,27 @@ function injectTemplate(value: string, lead: LeadEmailModalLead, templateId: Ema
     .join(getBookingUrlForLead(lead, templateId))
     .split('[DOWNLOAD LINK]')
     .join(getDownloadUrlForLead(lead, templateId));
+}
+
+function prepareTemplateDraft(
+  template: DraftTemplate,
+  lead: LeadEmailModalLead,
+  templateId: EmailTemplateId,
+  guardrail?: EmailTemplateGuardrail | null,
+) {
+  const injected = {
+    subject: injectTemplate(template.subject, lead, templateId),
+    body: injectTemplate(template.body, lead, templateId),
+  };
+
+  if (guardrail?.sequenceGap.detected && guardrail.sequenceGap.firstTemplateId === templateId) {
+    return buildRecoveryEmailDraft({
+      firstName: getFirstName(lead),
+      firstContactBody: injected.body,
+    });
+  }
+
+  return injected;
 }
 
 function escapeHtml(value: string) {
@@ -214,6 +238,8 @@ export default function LeadEmailModal({
   const [body, setBody] = useState('');
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [sendError, setSendError] = useState(false);
+  const [repairState, setRepairState] = useState<SequenceRepairAction | null>(null);
+  const [repairError, setRepairError] = useState<string | null>(null);
   const [notes, setNotes] = useState<DashboardNote[]>(initialNotes);
   const [noteBody, setNoteBody] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
@@ -226,14 +252,24 @@ export default function LeadEmailModal({
   const [templateGuardrailState, setTemplateGuardrailState] = useState<{ leadId: string; guardrail: EmailTemplateGuardrail } | null>(null);
   const templateGuardrail = templateGuardrailState?.leadId === modalLead.id ? templateGuardrailState.guardrail : null;
   const activeDefaultTemplateId = templateGuardrail?.recommendedTemplateId || defaultTemplateId;
+  const selectableGuardrailLead = useMemo<EmailTemplateGuardrailLead>(
+    () => ({
+      ...guardrailLead,
+      sequenceRepairStatus: templateGuardrail?.sequenceRepairStatus,
+    }),
+    [guardrailLead, templateGuardrail?.sequenceRepairStatus],
+  );
   const selectableTemplates = useMemo(
-    () => getSelectableLeadEmailTemplates(availableTemplates, guardrailLead, templateGuardrail?.sentTemplateIds || []),
-    [availableTemplates, guardrailLead, templateGuardrail],
+    () => getSelectableLeadEmailTemplates(availableTemplates, selectableGuardrailLead, templateGuardrail?.sentTemplateIds || []),
+    [availableTemplates, selectableGuardrailLead, templateGuardrail],
   );
   const templateOptions = selectableTemplates.length > 0 ? selectableTemplates : [selectedTemplateId].map(getEmailTemplate);
   const selectedTemplate = availableTemplates.find((template) => template.id === selectedTemplateId) || getEmailTemplate(selectedTemplateId);
   const sequenceDots = getEmailSequenceDots(selectedTemplateId);
   const sequenceTotal = getEmailSequenceTotal(selectedTemplate);
+  const sequenceGap = templateGuardrail?.sequenceGap;
+  const hasSequenceGap = Boolean(sequenceGap?.detected && sequenceGap.firstTemplateId);
+  const sequenceIsManual = templateGuardrail?.sequenceRepairStatus === 'manual';
 
   useEffect(() => {
     initialNotesRef.current = initialNotes;
@@ -270,13 +306,16 @@ export default function LeadEmailModal({
 
     const timeout = window.setTimeout(() => {
       const template = getEmailTemplate(activeDefaultTemplateId);
+      const draft = prepareTemplateDraft(template, modalLead, activeDefaultTemplateId, templateGuardrail);
       setActiveTab('email');
       setSelectedTemplateId(activeDefaultTemplateId);
-      setSubject(initialSubject || injectTemplate(template.subject, modalLead, activeDefaultTemplateId));
-      setBody(initialBody || injectTemplate(template.body, modalLead, activeDefaultTemplateId));
+      setSubject(initialSubject || draft.subject);
+      setBody(initialBody || draft.body);
       setNotes(initialNotesRef.current);
       setNoteBody('');
       setSendError(false);
+      setRepairState(null);
+      setRepairError(null);
       setNoteError(null);
       setSendState('idle');
       setIsClosing(false);
@@ -292,7 +331,7 @@ export default function LeadEmailModal({
       document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
       window.scrollTo(0, scrollY);
     };
-  }, [activeDefaultTemplateId, initialBody, initialSubject, isOpen, modalLead]);
+  }, [activeDefaultTemplateId, initialBody, initialSubject, isOpen, modalLead, templateGuardrail]);
 
   useEffect(() => {
     if (!isOpen || !adminKey || !modalLead.id) {
@@ -308,10 +347,11 @@ export default function LeadEmailModal({
         setTemplateGuardrailState({ leadId: modalLead.id, guardrail: data.guardrail });
         if (data.guardrail.recommendedTemplateId) {
           const template = availableTemplates.find((item) => item.id === data.guardrail?.recommendedTemplateId) || getEmailTemplate(data.guardrail.recommendedTemplateId);
+          const draft = prepareTemplateDraft(template, modalLead, data.guardrail.recommendedTemplateId, data.guardrail);
           setSelectedTemplateId(data.guardrail.recommendedTemplateId);
           if (!initialSubject && !initialBody) {
-            setSubject(injectTemplate(template.subject, modalLead, data.guardrail.recommendedTemplateId));
-            setBody(injectTemplate(template.body, modalLead, data.guardrail.recommendedTemplateId));
+            setSubject(draft.subject);
+            setBody(draft.body);
           }
         }
       } catch {
@@ -338,9 +378,10 @@ export default function LeadEmailModal({
 
         const defaultTemplate = data.templates.find((template) => template.id === activeDefaultTemplateId) || data.templates[0];
         if (defaultTemplate && !initialSubject && !initialBody) {
+          const draft = prepareTemplateDraft(defaultTemplate, modalLead, defaultTemplate.id, templateGuardrail);
           setSelectedTemplateId(defaultTemplate.id);
-          setSubject(injectTemplate(defaultTemplate.subject, modalLead, defaultTemplate.id));
-          setBody(injectTemplate(defaultTemplate.body, modalLead, defaultTemplate.id));
+          setSubject(draft.subject);
+          setBody(draft.body);
         }
       } catch {
         // File templates remain the fallback.
@@ -351,7 +392,7 @@ export default function LeadEmailModal({
     return () => {
       cancelled = true;
     };
-  }, [activeDefaultTemplateId, adminKey, initialBody, initialSubject, isOpen, modalLead]);
+  }, [activeDefaultTemplateId, adminKey, initialBody, initialSubject, isOpen, modalLead, templateGuardrail]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -372,10 +413,69 @@ export default function LeadEmailModal({
 
   function switchTemplate(templateId: EmailTemplateId) {
     const template = availableTemplates.find((item) => item.id === templateId) || getEmailTemplate(templateId);
+    const draft = prepareTemplateDraft(template, modalLead, templateId, templateGuardrail);
     setSelectedTemplateId(templateId);
-    setSubject(injectTemplate(template.subject, modalLead, templateId));
-    setBody(injectTemplate(template.body, modalLead, templateId));
+    setSubject(draft.subject);
+    setBody(draft.body);
     setSendError(false);
+    setRepairError(null);
+  }
+
+  function useRecoveryEmailDraft() {
+    if (!sequenceGap?.firstTemplateId) return;
+    switchTemplate(sequenceGap.firstTemplateId);
+  }
+
+  async function repairSequence(
+    action: SequenceRepairAction,
+    options: { showToast?: boolean; refresh?: boolean; notifySubmission?: boolean } = {},
+  ) {
+    if (!modalLead.id || !adminKey || repairState) return null;
+
+    const showToast = options.showToast ?? true;
+    const refresh = options.refresh ?? true;
+    const notifySubmission = options.notifySubmission ?? true;
+    setRepairState(action);
+    setRepairError(null);
+
+    try {
+      const data = await requestJson<RepairResponse>('/api/email/sequence-repair', 'POST', {
+        key: adminKey,
+        leadId: modalLead.id,
+        action,
+      });
+
+      if (data.guardrail) {
+        setTemplateGuardrailState({ leadId: modalLead.id, guardrail: data.guardrail });
+        if (action !== 'recovery_sent' && data.guardrail.recommendedTemplateId) {
+          const template =
+            availableTemplates.find((item) => item.id === data.guardrail?.recommendedTemplateId) ||
+            getEmailTemplate(data.guardrail.recommendedTemplateId);
+          const draft = prepareTemplateDraft(template, modalLead, data.guardrail.recommendedTemplateId, data.guardrail);
+          setSelectedTemplateId(data.guardrail.recommendedTemplateId);
+          setSubject(draft.subject);
+          setBody(draft.body);
+        }
+      }
+
+      if (data.note) {
+        setNotes((current) => [data.note as DashboardNote, ...current]);
+        onNoteCreated?.(data.note);
+      }
+
+      if (notifySubmission && data.submission) onSent?.(data.submission);
+      if (refresh) router.refresh();
+      if (showToast) {
+        setToast(action === 'manual' ? 'Manual sequence handling is active.' : 'Sequence repair saved.');
+      }
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not save the sequence repair.';
+      setRepairError(message);
+      return null;
+    } finally {
+      setRepairState(null);
+    }
   }
 
   async function sendEmail() {
@@ -383,6 +483,10 @@ export default function LeadEmailModal({
 
     setSendError(false);
     setSendState('sending');
+    const sendsSequenceRecovery = Boolean(
+      templateGuardrail?.sequenceGap.detected &&
+        templateGuardrail.sequenceGap.firstTemplateId === selectedTemplateId,
+    );
 
     try {
       await requestJson('/api/email/send', 'POST', {
@@ -460,6 +564,13 @@ export default function LeadEmailModal({
           onNoteCreated?.(data.note);
         } catch {
           setNoteError('Email sent, but the history note did not save.');
+        }
+      }
+
+      if (sendsSequenceRecovery) {
+        const repairResult = await repairSequence('recovery_sent', { showToast: false, refresh: false, notifySubmission: false });
+        if (!repairResult) {
+          setNoteError('Email sent, but the sequence repair note did not save.');
         }
       }
 
@@ -574,6 +685,51 @@ export default function LeadEmailModal({
                     Source: <span className="font-semibold text-[#142334]">{leadSourceLabels[leadSource]}</span>
                     {modalLead.downloadLink ? ' - download link is available for this lead.' : ''}
                   </div>
+                  {hasSequenceGap && (
+                    <div className="rounded-[8px] border border-[#F59E0B] bg-[#FFFBEB] p-3.5 text-[#92400E]">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Sequence gap</p>
+                          <p className="mt-1 text-[12px] leading-relaxed">
+                            {sequenceGap?.message || 'First contact was not logged before the sequence advanced.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <button
+                          type="button"
+                          onClick={useRecoveryEmailDraft}
+                          disabled={Boolean(repairState)}
+                          className="rounded-full bg-[#142334] px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Use recovery email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void repairSequence('resolved')}
+                          disabled={Boolean(repairState)}
+                          className="rounded-full border border-[#F59E0B]/55 bg-white px-3 py-2 text-[12px] font-semibold text-[#92400E] transition hover:border-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Mark resolved
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void repairSequence('manual')}
+                          disabled={Boolean(repairState)}
+                          className="rounded-full border border-[#F59E0B]/55 bg-white px-3 py-2 text-[12px] font-semibold text-[#92400E] transition hover:border-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Manage manually
+                        </button>
+                      </div>
+                      {repairError && <p className="mt-2 text-[12px] leading-relaxed text-[#A24E37]">{repairError}</p>}
+                    </div>
+                  )}
+                  {sequenceIsManual && (
+                    <div className="rounded-[8px] border border-[#D8C8BB] bg-[#F7F1EC] p-3.5 text-[12px] leading-relaxed text-[#7B5D49]">
+                      Manual sequence handling is active for this lead. Automated email suggestions are paused.
+                    </div>
+                  )}
                   <label className="grid gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Template</span>
                     <select
@@ -623,7 +779,7 @@ export default function LeadEmailModal({
                     <button
                       type="button"
                       onClick={sendEmail}
-                      disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0}
+                      disabled={sendState === 'sending' || !modalLead.email || selectableTemplates.length === 0 || sequenceIsManual}
                       className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                         sendState === 'sent'
                           ? 'bg-[#22C55E] text-white'
@@ -633,7 +789,7 @@ export default function LeadEmailModal({
                       {sendState === 'sending' && <Loader2 className="h-4 w-4 animate-spin" />}
                       {sendState === 'idle' && <Send className="h-4 w-4" />}
                       {sendState === 'sent' && <MailCheck className="h-4 w-4" />}
-                      {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent ✓' : 'Send Email'}
+                      {sendState === 'sending' ? 'Sending...' : sendState === 'sent' ? 'Sent' : 'Send Email'}
                     </button>
                     {sendError && <p className="text-[12px] leading-relaxed text-[#DC2626]">Email failed to send. Try again.</p>}
                     {selectedTemplate.sequenceIndex === 3 && !isNewsletterBridgeTemplate(selectedTemplateId) && (

@@ -14,6 +14,7 @@ type LeadRow = {
   lead_status: string | null;
   follow_up_count: number | null;
   last_contacted_at: string | null;
+  sequence_repair_status: string | null;
 };
 
 function getRequestKey(request: Request) {
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
   const supabase = createSupabaseServiceClient();
   const { data, error } = await supabase
     .from('diagnostic_submissions')
-    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at')
+    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at, sequence_repair_status')
     .eq('id', leadId)
     .maybeSingle();
 
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
     leadStatus: lead.lead_status,
     lastContactedAt: lead.last_contacted_at,
     source: lead.source,
+    sequenceRepairStatus: lead.sequence_repair_status,
   }, sentTemplateIds);
 
   return NextResponse.json({ guardrail });

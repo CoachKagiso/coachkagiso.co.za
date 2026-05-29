@@ -236,6 +236,7 @@ export function generateTasks(
     const subtitle = getLeadSubtitle(lead);
     const followUpCount = lead.follow_up_count ?? 0;
     const leadSource = normalizeLeadSource(lead.source);
+    const sequenceHandledManually = lead.sequence_repair_status === 'manual';
     const hasDueSequenceFollowUp =
       lead.lead_status === 'contacted' &&
       Boolean(lead.next_follow_up_at) &&
@@ -286,6 +287,10 @@ export function generateTasks(
     }
 
     if (leadSource === 'masterclass_waitlist' && lead.lead_status === 'contacted') {
+      return;
+    }
+
+    if (sequenceHandledManually) {
       return;
     }
 
