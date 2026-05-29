@@ -18,6 +18,7 @@ import DashboardTopBar from '@/components/dashboard/DashboardTopBar';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
 import LeadProfileEmailButton from '@/components/leads/LeadProfileEmailButton';
 import LeadSourceBadge from '@/components/leads/LeadSourceBadge';
+import SequenceRepairCard from '@/components/leads/SequenceRepairCard';
 import PrintButton from '@/components/PrintButton';
 import Reveal from '@/components/Reveal';
 import {
@@ -319,6 +320,8 @@ export default async function DiagnosticSubmissionSummaryPage({
                   </div>
                 </div>
               </div>
+
+              <SequenceRepairCard adminKey={key || ''} lead={leadEmailModalLead} initialNotes={leadNotes} />
 
               <div className="mt-10 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
                 <div className="border border-[#D8C8BB] bg-[#FCFBFA] p-6">

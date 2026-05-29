@@ -16,7 +16,7 @@ async function validateTemplateGuardrails(leadId: string, toEmail: string, templ
   const supabase = createSupabaseServiceClient();
   const { data: lead, error: leadError } = await supabase
     .from('diagnostic_submissions')
-    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at')
+    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at, sequence_repair_status')
     .eq('id', leadId)
     .maybeSingle();
 
@@ -46,6 +46,7 @@ async function validateTemplateGuardrails(leadId: string, toEmail: string, templ
       leadStatus: lead.lead_status,
       lastContactedAt: lead.last_contacted_at,
       source: lead.source,
+      sequenceRepairStatus: lead.sequence_repair_status,
     },
     sentTemplateIds: (sentRows || []).map((row) => row.template_id as string | null),
     templateId,

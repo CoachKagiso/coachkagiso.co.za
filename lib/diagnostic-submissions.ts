@@ -6,6 +6,10 @@ import {
   normalizeLeadSource,
   type DiagnosticLeadSource,
 } from '@/lib/lead-sources';
+import {
+  isSequenceRepairStatus,
+  type SequenceRepairStatus,
+} from '@/lib/email-sequence-repair';
 
 export type { DiagnosticLeadSource } from '@/lib/lead-sources';
 
@@ -14,7 +18,8 @@ const LEGACY_SELECT =
   'id, first_name, email, answers, score, archetype_key, archetype_name, archetype_payload, submitted_at';
 const CRM_BASE_SELECT = `${LEGACY_SELECT}, lead_status, lead_notes, next_follow_up_at, last_contacted_at, updated_at`;
 const CRM_SELECT = `${LEGACY_SELECT}, lead_status, lead_notes, follow_up_count, next_follow_up_at, last_contacted_at, updated_at`;
-const SOURCE_SELECT = `${CRM_SELECT}, source, download_link`;
+const SOURCE_BASE_SELECT = `${CRM_SELECT}, source, download_link`;
+const SOURCE_SELECT = `${SOURCE_BASE_SELECT}, sequence_repair_status, sequence_repaired_at`;
 
 export type DiagnosticArchetypeKey = (typeof ARCHETYPE_KEYS)[number];
 export type DiagnosticLeadStatus =
@@ -71,6 +76,8 @@ export type DiagnosticSubmission = {
   follow_up_count: number;
   next_follow_up_at: string | null;
   last_contacted_at: string | null;
+  sequence_repair_status: SequenceRepairStatus | null;
+  sequence_repaired_at: string | null;
   updated_at: string | null;
 };
 
@@ -117,6 +124,10 @@ function isMissingSourceColumn(message?: string) {
   return Boolean(message && (message.includes('source') || message.includes('download_link')));
 }
 
+function isMissingSequenceRepairColumn(message?: string) {
+  return Boolean(message && (message.includes('sequence_repair_status') || message.includes('sequence_repaired_at')));
+}
+
 function normalizeSubmission(row: Partial<DiagnosticSubmission>) {
   const status = isDiagnosticLeadStatus(row.lead_status) ? row.lead_status : 'new';
   const followUpCount = Number.isFinite(Number(row.follow_up_count)) ? Number(row.follow_up_count) : 0;
@@ -136,6 +147,8 @@ function normalizeSubmission(row: Partial<DiagnosticSubmission>) {
     follow_up_count: followUpCount,
     next_follow_up_at: nextFollowUpAt,
     last_contacted_at: row.last_contacted_at || null,
+    sequence_repair_status: isSequenceRepairStatus(row.sequence_repair_status) ? row.sequence_repair_status : null,
+    sequence_repaired_at: row.sequence_repaired_at || null,
     updated_at: row.updated_at || null,
     source: normalizeLeadSource(row.source),
     download_link: row.download_link || null,
@@ -199,6 +212,38 @@ export async function listDiagnosticSubmissions(
   const result = await query;
   let data: unknown[] | null = result.data;
   let error = result.error;
+
+  if (error && isMissingSequenceRepairColumn(error.message)) {
+    let sequenceFallbackQuery = supabase
+      .from('diagnostic_submissions')
+      .select(SOURCE_BASE_SELECT)
+      .order('submitted_at', { ascending: false })
+      .limit(250);
+
+    if (isDiagnosticArchetypeKey(filters.archetype)) {
+      sequenceFallbackQuery = sequenceFallbackQuery.eq('archetype_key', filters.archetype);
+    }
+
+    if (isDiagnosticLeadStatus(filters.status)) {
+      sequenceFallbackQuery = sequenceFallbackQuery.eq('lead_status', filters.status);
+    }
+
+    if (isDiagnosticLeadSource(filters.source)) {
+      sequenceFallbackQuery = sequenceFallbackQuery.eq('source', filters.source);
+    }
+
+    if (submittedFrom) {
+      sequenceFallbackQuery = sequenceFallbackQuery.gte('submitted_at', submittedFrom);
+    }
+
+    if (submittedTo) {
+      sequenceFallbackQuery = sequenceFallbackQuery.lte('submitted_at', submittedTo);
+    }
+
+    const sequenceFallbackResult = await sequenceFallbackQuery;
+    data = sequenceFallbackResult.data;
+    error = sequenceFallbackResult.error;
+  }
 
   if (error && isMissingSourceColumn(error.message)) {
     let sourceFallbackQuery = supabase
@@ -340,6 +385,16 @@ export async function getDiagnosticSubmissionById(id: string) {
   let data: unknown | null = result.data;
   let error = result.error;
 
+  if (error && isMissingSequenceRepairColumn(error.message)) {
+    const sequenceFallbackResult = await supabase
+      .from('diagnostic_submissions')
+      .select(SOURCE_BASE_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    data = sequenceFallbackResult.data;
+    error = sequenceFallbackResult.error;
+  }
+
   if (error && isMissingSourceColumn(error.message)) {
     const sourceFallbackResult = await supabase
       .from('diagnostic_submissions')
@@ -385,6 +440,8 @@ export async function updateDiagnosticSubmissionCrm(
     follow_up_count?: number;
     next_follow_up_at?: string | null;
     last_contacted_at?: string | null;
+    sequence_repair_status?: SequenceRepairStatus | null;
+    sequence_repaired_at?: string | null;
   }
 ) {
   const supabase = createSupabaseServiceClient();
