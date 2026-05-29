@@ -4,6 +4,7 @@ import {
   type BrevoTransactionalEmail,
   type BrevoTransactionalEmailContent,
 } from '@/lib/brevo';
+import { normalizeDiagnosticArchetypeName } from '@/lib/diagnostic-archetype-names';
 import { EMAIL_TEMPLATES, type EmailTemplate } from '@/lib/email-templates';
 import { normalizeLeadSource, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { listStoredEmailTemplates } from '@/lib/settings';
@@ -210,6 +211,7 @@ function addCandidate(candidates: Map<string, ImportCandidate>, candidate: Impor
     ...candidate,
     email,
     name: cleanText(candidate.name) || getFirstName(candidate.name, email),
+    archetype: normalizeDiagnosticArchetypeName(candidate.archetype),
   });
 }
 

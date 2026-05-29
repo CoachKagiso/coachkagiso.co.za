@@ -1,11 +1,55 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { recordSentEmail } from '@/lib/sent-emails';
+import { validateLeadEmailTemplateSelection } from '@/lib/email-template-guardrails';
+import { hasSentEmailTemplateAlreadySent, recordSentEmail } from '@/lib/sent-emails';
+import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+async function validateTemplateGuardrails(leadId: string, toEmail: string, templateId: string) {
+  if (!leadId || !templateId) return null;
+
+  const supabase = createSupabaseServiceClient();
+  const { data: lead, error: leadError } = await supabase
+    .from('diagnostic_submissions')
+    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at')
+    .eq('id', leadId)
+    .maybeSingle();
+
+  if (leadError) throw new Error(leadError.message);
+  if (!lead) return null;
+
+  let query = supabase
+    .from('sent_emails')
+    .select('template_id')
+    .not('template_id', 'is', null);
+
+  const cleanLeadEmail = String(lead.email || toEmail || '').trim().toLowerCase();
+  if (cleanLeadEmail) {
+    query = query.or(`lead_id.eq.${leadId},to_email.eq.${cleanLeadEmail}`);
+  } else {
+    query = query.eq('lead_id', leadId);
+  }
+
+  const { data: sentRows, error: sentError } = await query.order('sent_at', { ascending: true }).limit(100);
+  if (sentError) throw new Error(sentError.message);
+
+  return validateLeadEmailTemplateSelection({
+    lead: {
+      archetypeName: lead.archetype_name,
+      archetypeKey: lead.archetype_key,
+      followUpCount: lead.follow_up_count,
+      leadStatus: lead.lead_status,
+      lastContactedAt: lead.last_contacted_at,
+      source: lead.source,
+    },
+    sentTemplateIds: (sentRows || []).map((row) => row.template_id as string | null),
+    templateId,
+  });
 }
 
 export async function POST(request: Request) {
@@ -33,6 +77,26 @@ export async function POST(request: Request) {
 
   if (!isEmail(to) || !subject || !htmlContent) {
     return NextResponse.json({ error: 'Recipient, subject, and email body are required.' }, { status: 400 });
+  }
+
+  if (templateId) {
+    const guardrail = await validateTemplateGuardrails(leadId, to, templateId);
+    if (guardrail && !guardrail.valid) {
+      return NextResponse.json({ error: guardrail.message }, { status: 409 });
+    }
+
+    const duplicateTemplate = await hasSentEmailTemplateAlreadySent({
+      leadId: leadId || null,
+      toEmail: to,
+      templateId,
+    });
+
+    if (duplicateTemplate) {
+      return NextResponse.json(
+        { error: 'This template has already been sent to this lead. Choose the next template before sending again.' },
+        { status: 409 }
+      );
+    }
   }
 
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {

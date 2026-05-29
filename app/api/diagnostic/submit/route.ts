@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
 import { archetypes as diagnosticArchetypes } from '@/lib/career-diagnostic';
+import { getCanonicalDiagnosticArchetypeName } from '@/lib/diagnostic-archetype-names';
 import { getContactEmail } from '@/lib/env';
 import { getSastDateKey } from '@/lib/follow-up-utils';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -220,6 +221,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Diagnostic result is missing.' }, { status: 400 });
     }
 
+    const archetypeName = getCanonicalDiagnosticArchetypeName(archetype.key, archetype.name);
+    const canonicalArchetype = {
+      ...archetype,
+      name: archetypeName,
+    };
+
     const normalisedScore = OPTION_KEYS.reduce<Record<OptionKey, number>>(
       (acc, key) => {
         acc[key] = Number(score[key] || 0);
@@ -235,8 +242,8 @@ export async function POST(request: Request) {
       answers,
       score: normalisedScore,
       archetype_key: archetype.key,
-      archetype_name: archetype.name,
-      archetype_payload: archetype,
+      archetype_name: archetypeName,
+      archetype_payload: canonicalArchetype,
       next_follow_up_at: getSastDateKey(),
     };
 
@@ -251,18 +258,18 @@ export async function POST(request: Request) {
       addClientToBrevoList(email, firstName),
       sendTransactionalEmail({
         to: [{ email, name: firstName }],
-        subject: `Your Career Diagnostic Result: ${archetype.name}`,
-        text: plainResultEmail(firstName, archetype),
-        html: htmlResultEmail(firstName, archetype),
+        subject: `Your Career Diagnostic Result: ${archetypeName}`,
+        text: plainResultEmail(firstName, canonicalArchetype),
+        html: htmlResultEmail(firstName, canonicalArchetype),
       }),
       sendTransactionalEmail({
         to: [{ email: getContactEmail(), name: 'Coach Kagiso' }],
-        subject: `New Diagnostic - ${archetype.name} - ${firstName}`,
+        subject: `New Diagnostic - ${archetypeName} - ${firstName}`,
         text: `A visitor completed the 5-Minute Career Diagnostic.
 
 Name: ${firstName}
 Email: ${email}
-Archetype: ${archetype.name}
+Archetype: ${archetypeName}
 Recommended service: ${archetype.service || 'Not supplied'}
 
 Score:

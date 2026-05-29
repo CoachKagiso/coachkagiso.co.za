@@ -20,13 +20,14 @@ type FollowUpNotificationRow = {
   follow_up_count: number | null;
   lead_status: DiagnosticLeadStatus | null;
   last_contacted_at: string | null;
+  source?: string | null;
   submitted_at?: string | null;
 };
 
 const selectWithFollowUpCount =
-  'id, first_name, email, archetype_name, archetype_payload, next_follow_up_at, follow_up_count, lead_status, last_contacted_at, submitted_at';
+  'id, first_name, email, archetype_name, archetype_payload, next_follow_up_at, follow_up_count, lead_status, last_contacted_at, source, submitted_at';
 const selectWithoutFollowUpCount =
-  'id, first_name, email, archetype_name, archetype_payload, next_follow_up_at, lead_status, last_contacted_at, submitted_at';
+  'id, first_name, email, archetype_name, archetype_payload, next_follow_up_at, lead_status, last_contacted_at, source, submitted_at';
 
 function isMissingNotificationColumn(message?: string) {
   return Boolean(message && ['next_follow_up_at', 'follow_up_count', 'last_contacted_at'].some((column) => message.includes(column)));
@@ -35,6 +36,7 @@ function isMissingNotificationColumn(message?: string) {
 function normalizeNotification(row: FollowUpNotificationRow, today: string, upperDateKey: string): FollowUpNotification | null {
   const leadStatus = row.lead_status === 'new' || row.lead_status === 'contacted' ? row.lead_status : null;
   if (!leadStatus) return null;
+  if (row.source === 'masterclass_waitlist') return null;
 
   const followUpCount = Number.isFinite(Number(row.follow_up_count)) ? Number(row.follow_up_count) : 0;
   const nextFollowUpAt = getEffectiveNextFollowUpAt({
@@ -42,6 +44,7 @@ function normalizeNotification(row: FollowUpNotificationRow, today: string, uppe
     lastContactedAt: row.last_contacted_at,
     leadStatus,
     nextFollowUpAt: row.next_follow_up_at,
+    source: row.source,
     submittedAt: row.submitted_at,
   });
   if (!nextFollowUpAt || nextFollowUpAt > upperDateKey) return null;
@@ -86,6 +89,7 @@ export async function listFollowUpNotifications({
     .select(selectWithFollowUpCount)
     .or(`next_follow_up_at.lte.${upperDateKey},next_follow_up_at.is.null`)
     .in('lead_status', [...activeFollowUpNotificationStatuses])
+    .neq('source', 'masterclass_waitlist')
     .order('next_follow_up_at', { ascending: true })
     .limit(limit);
   let data = initialResult.data as unknown[] | null;
@@ -97,6 +101,7 @@ export async function listFollowUpNotifications({
       .select(selectWithoutFollowUpCount)
       .or(`next_follow_up_at.lte.${upperDateKey},next_follow_up_at.is.null`)
       .in('lead_status', [...activeFollowUpNotificationStatuses])
+      .neq('source', 'masterclass_waitlist')
       .order('next_follow_up_at', { ascending: true })
       .limit(limit);
     data = fallbackResult.data as unknown[] | null;
