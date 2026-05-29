@@ -11,6 +11,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  Palette,
   PenLine,
   Settings,
   Sparkles,
@@ -33,6 +34,7 @@ const primaryDashboardNavItems = [
 const studioNavItems = [
   { label: 'Content Studio', workspace: 'content', icon: LayoutDashboard },
   { label: 'Carousel Studio', workspace: 'carousel', icon: Layers3 },
+  { label: 'Design Studio', workspace: 'design', icon: Palette },
   { label: 'Tools', workspace: 'tools', icon: WandSparkles },
 ] as const;
 

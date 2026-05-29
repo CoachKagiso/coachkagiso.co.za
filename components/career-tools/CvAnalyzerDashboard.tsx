@@ -18,6 +18,7 @@ import {
   TriangleAlert,
   Upload,
 } from 'lucide-react';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type CvGoal =
   | 'new_role'
@@ -459,7 +460,8 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
 
   async function copyReport() {
     if (!result) return;
-    await navigator.clipboard.writeText(formatCvReport(result));
+    const didCopy = await copyTextToClipboard(formatCvReport(result));
+    if (!didCopy) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }

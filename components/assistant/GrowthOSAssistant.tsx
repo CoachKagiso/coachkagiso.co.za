@@ -37,6 +37,7 @@ import {
   type AssistantPreferences,
   type AssistantSavedConversation,
 } from '@/lib/assistant-preferences';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
 type AssistantRecommendationItem = {
   label: string;
@@ -382,7 +383,8 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
 
   async function copyText(value: string, marker: string) {
     if (!value.trim()) return;
-    await navigator.clipboard.writeText(value);
+    const didCopy = await copyTextToClipboard(value);
+    if (!didCopy) return;
     setCopiedId(marker);
     window.setTimeout(() => setCopiedId(null), 1400);
   }

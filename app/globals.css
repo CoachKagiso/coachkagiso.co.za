@@ -1,4 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Aloha Lover";
+  src: url("/fonts/brand/aloha-lover.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "Daughter Hand";
+  src: url("/fonts/brand/daughter-hand.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "Hero In";
+  src: url("/fonts/brand/hero-in-regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "Bableya";
+  src: url("/fonts/brand/bableya-regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Linebrush";
+  src: url("/fonts/brand/linebrush.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Mibrush";
+  src: url("/fonts/brand/mibrush-regular.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Walesia Signature Brush";
+  src: url("/fonts/brand/walesia-signature-brush.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Walking Dream";
+  src: url("/fonts/brand/walking-dream.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Kalieb Luxury";
+  src: url("/fonts/brand/kalieb-luxury-regular.woff") format("woff");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Kalieb Luxury";
+  src: url("/fonts/brand/kalieb-luxury-italic.woff") format("woff");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 400;
+}
 
 @theme {
   --font-display: var(--font-serif);
@@ -6,6 +87,7 @@
 }
 
 :root {
+  --font-primary: 'Poppins', sans-serif;
   --brand-ink: #142334;
   --brand-warm: #C9AD98;
   --brand-scroll-track: #F4EFEB;
@@ -248,6 +330,33 @@ textarea::-webkit-scrollbar-thumb:hover {
   background: var(--brand-ink);
 }
 
+.design-studio-scroll-area {
+  scrollbar-color: rgba(20, 35, 52, 0.36) transparent;
+  scrollbar-width: thin;
+}
+
+.design-studio-scroll-area::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.design-studio-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.design-studio-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(20, 35, 52, 0.28);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.design-studio-scroll-area:hover::-webkit-scrollbar-thumb {
+  background: rgba(20, 35, 52, 0.42);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
 @media (pointer: fine) {
   html.has-custom-cursor,
   html.has-custom-cursor * {
@@ -307,8 +416,12 @@ textarea::-webkit-scrollbar-thumb:hover {
   }
 }
 
-body.cursor-none {
+html.has-custom-cursor body.cursor-none {
   cursor: none;
+}
+
+html:not(.has-custom-cursor) body.cursor-none {
+  cursor: auto;
 }
 
 @keyframes calendar-bell-wobble {

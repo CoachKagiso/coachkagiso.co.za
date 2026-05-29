@@ -117,8 +117,12 @@ Example opener: "Are you running away from something, or running towards somethi
 
 CONVICTION REFRAME
 When: Contrarian Take, Hot Observation, Uncomfortable Truth, Conviction Reframe, The Deep Dive, Contrarian with Evidence, Myth vs. Fact, The Challenger
-How: Takes what sounds safe and names the hidden cost. Short declarative sentences. The discomfort is the point. Never hedge. Never add qualifiers after taking a position. Commit fully.
-Example opener: "Comfortable is the most dangerous place to be."
+How: Takes what sounds safe and names the hidden cost. Short declarative sentences. The discomfort is the point. Never hedge. Never add qualifiers after taking a position. Commit fully. Use varied opening structures: name a trend everyone accepts, expose a quiet consequence, state an unpopular truth directly, or point out what people are pretending not to notice. Do not default to the word "dangerous."
+Example openers (rotate between these patterns, never repeat the same structure twice):
+- "Your company just updated the career framework. Nobody told you what it actually means for your promotion timeline."
+- "The quietest people in the room are not the least impactful. They are the most selectively strategic."
+- "Everyone celebrated the new remote work policy. Nobody read the fine print about how promotions will work now."
+- "The mentorship programme looks great on the careers page. Inside the company, it is a checkbox exercise."
 
 CELEBRATION & GRATITUDE
 When: Personal Milestone, Client Win, Behind-the-Scenes, Career Lessons & Reflections, Personal Brand & Values
@@ -399,6 +403,7 @@ ANGLE-SPECIFIC RULES (the angle name in the user prompt will match one of these;
 - Career Framework: Share a named mental model or step-by-step tool (e.g., "Reflect. Research. Reach out."). Crucial: After explaining it, immediately use her "for me" self-modelling pattern to show her doing it ("For example, for me, I had to sit down and say...").
 - Resource Worth Sharing: Introduce a specific learning resource (focus on SA context: Seta, Coursera financial aid, local short courses). Spend the rest on why it matters and how to apply it. Never just say "check this out."
 - Reflection Friday: Use her "Reflective Leader" pastoral cadence. Slow down. Acknowledge the week, share a quiet realization about community, mentorship, or holding space. Must close with her exact sign-off: "That is my reflection for Friday."
+- Manifesto Series: Treat this as a Reflection Friday post inside a monthly manifesto campaign. Follow the required sections in the user prompt exactly. The graphic headline must be quotable, the handwritten note must feel personal, and the LinkedIn post must close with exactly: "That is my reflection for Friday."
 - Community Call: Directly address the community. Ask for input or experiences. Use her direct engagement pattern: name the next content beat, then ask specifically what they want to see next ("Looking forward to part three. Please engage and tell me...").
 - Relatable Observation: Name something every SA professional has experienced but rarely puts into words. The recognition itself is the hook. Then add one layer of insight about why this shared experience matters.
 - The Challenger: Directly challenge a common Corporate SA habit, norm, or piece of imported advice that professionals accept without question. Be specific about what you disagree with and why. The tone is direct, warm, and respectful - you are challenging the idea, not the person.
@@ -428,9 +433,10 @@ Voice & Tone Guardrails:
 - Punctuation: NEVER use em dashes (—) or en dashes (–). Use periods, commas, or parentheses instead.
 - Closings: Avoid cheap motivation. Use her sign-offs: "Your career matters.", "Take the first step.", "It's possible.", or "That is my reflection for Friday."
 
-Strong opening patterns (use as inspiration):
+Strong opening patterns (rotate between these, never default to the same one):
 - Open in the middle of a scene: "The email arrived at 11:47pm. I read it three times before I understood what it meant for my career."
-- Open with a counterintuitive claim (Conviction Reframe): "The most dangerous place you can be in your career is comfortable."
+- Open by naming a trend everyone accepts but nobody has questioned: "Every job post in Corporate SA now asks for "flexible, adaptable team players." Nobody asks what that actually costs the people who deliver it."
+- Open with a specific, quiet observation: "Three hiring managers in the last month told me the same thing. They cannot find senior candidates who can hold difficult conversations."
 - Open with a vulnerable admission: "I used to pride myself on being able to do things alone. It nearly cost me my growth."
 
 What to avoid:
@@ -1003,6 +1009,12 @@ Then write the post. Match the selected FORMAT block exactly. If the selected fo
 If the user prompt contains "CAROUSEL STUDIO STRUCTURED OUTPUT", do not add metadata lines or prose outside the JSON. Put platform, pillar, and register inside the JSON fields requested by the user.
 
 If the user prompt provides a specific pillar, use that pillar. If the user prompt asks you to choose, choose the strongest fit from all four pillars and do not default to Career Growth. Never use "I speak to professionals every week" or similar recurring credibility lines.
+
+OPENING LINE RULES:
+- The first sentence must be specific to the topic. Never use a generic fill-in-the-blank opening like "The most dangerous [X] in Corporate SA right now is..." or "The most overlooked [X] is..."
+- Do not start with "nobody is talking about" or "everyone knows" as a crutch. Earn the opening with a concrete detail.
+- Vary your opening structure every time. If you opened with a named trend last time, open with a specific moment or observation this time.
+- Do not use the word "dangerous" in the opening line.
 
 Use the few-shot examples above as your reference for voice. Match their rhythm, opening patterns, and closing patterns without copying them.
 `,
@@ -1878,7 +1890,7 @@ CONSTRAINTS — you must follow these without exception:
 - Do NOT output more than 300 characters in any single text field (topic, assignment, whatItDoes, whyNow)
 
 VALID ANGLES:
-contrarian_take, hot_observation, thought_provoking_question, quick_lesson, lessons_learned, behind_the_scenes, client_win, personal_milestone, career_framework, industry_insight, resource_worth_sharing, reflection_friday, community_call, relatable_observation, career_hot_take, the_challenger, case_study, before_and_after, the_deep_dive, contrarian_argument, thought_leadership, bold_prediction, personal_essay, career_turning_point, thought_leadership_framework, contrarian_with_evidence, industry_trend_analysis, ultimate_guide, problem_solution_breakdown, evergreen_resource, career_lessons_reflections, longform_case_study, leadership_wisdom, how_to_guide, x_tips_for_y, checklists_workflows, myth_vs_fact, resource_roundup, faq, stats_data_story, problem_and_solution, career_journey_timeline, personal_brand_values, product_service_deep_dive, quotes_and_insights, career_decision, hot_take_vote, experience_check, industry_opinion, progressive_deep_dive, myth_busting_series, before_during_after, daily_challenge, story_arc, lead_with_feeling, uncomfortable_truth, relatable_moment, personal_disclosure, relatable_career_moment, community_question, poll_question, one_honest_question, community_moment, pov_scenario, conviction_reframe, 3_step_tip, common_mistake, reaction_to_bad_advice, part_of_series, day_in_the_life, warm_checkin, raw_honest_moment, value_first_offer, story_then_offer, one_thing_ive_been_thinking.
+contrarian_take, hot_observation, thought_provoking_question, quick_lesson, lessons_learned, behind_the_scenes, client_win, personal_milestone, career_framework, industry_insight, resource_worth_sharing, reflection_friday, manifesto_series, community_call, relatable_observation, career_hot_take, the_challenger, case_study, before_and_after, the_deep_dive, contrarian_argument, thought_leadership, bold_prediction, personal_essay, career_turning_point, thought_leadership_framework, contrarian_with_evidence, industry_trend_analysis, ultimate_guide, problem_solution_breakdown, evergreen_resource, career_lessons_reflections, longform_case_study, leadership_wisdom, how_to_guide, x_tips_for_y, checklists_workflows, myth_vs_fact, resource_roundup, faq, stats_data_story, problem_and_solution, career_journey_timeline, personal_brand_values, product_service_deep_dive, quotes_and_insights, career_decision, hot_take_vote, experience_check, industry_opinion, progressive_deep_dive, myth_busting_series, before_during_after, daily_challenge, story_arc, lead_with_feeling, uncomfortable_truth, relatable_moment, personal_disclosure, relatable_career_moment, community_question, poll_question, one_honest_question, community_moment, pov_scenario, conviction_reframe, 3_step_tip, common_mistake, reaction_to_bad_advice, part_of_series, day_in_the_life, warm_checkin, raw_honest_moment, value_first_offer, story_then_offer, one_thing_ive_been_thinking.
 
 Output ONLY valid JSON with no other text:
 {

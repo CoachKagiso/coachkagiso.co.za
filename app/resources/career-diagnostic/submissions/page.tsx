@@ -175,7 +175,7 @@ const archetypeColors = {
 } as const;
 const dashboardTabValues = ['dashboard', 'leads', 'pipeline', 'clients', 'finance', 'career-tools', 'content', 'calendar', 'messages', 'tasks', 'notes', 'settings'] as const;
 type DashboardTab = (typeof dashboardTabValues)[number];
-const studioWorkspaceValues = ['content', 'carousel', 'tools'] as const;
+const studioWorkspaceValues = ['content', 'carousel', 'design', 'tools'] as const;
 type StudioWorkspace = (typeof studioWorkspaceValues)[number];
 const dashboardTabItems: { tab: DashboardTab; label: string }[] = [
   { tab: 'dashboard', label: 'Dashboard' },
