@@ -5759,6 +5759,46 @@ export default function DesignStudioPanel({
     setDesignHistory(nextHistory);
   }, [getCurrentHistoryEntry, restoreHistoryEntry]);
 
+  const pasteTextIntoSelectedTextLayer = useCallback((pastedText: string) => {
+    const current = designRef.current;
+    const selectedIds = selectedLayerIdsRef.current;
+    if (selectedIds.length !== 1) return false;
+
+    const selectedId = selectedIds[0];
+    let changed = false;
+    const pages = current.pages.map((page) => {
+      if (page.id !== activePageIdRef.current) return page;
+      const layers = page.layers.map((layer) => {
+        if (layer.id !== selectedId) return layer;
+        if (layer.type !== 'text' || layer.locked || layer.text === pastedText) return layer;
+        changed = true;
+        return { ...layer, text: pastedText } as DesignLayer;
+      });
+      return changed ? { ...page, layers } : page;
+    });
+
+    if (!changed) return false;
+
+    const previous: DesignHistoryEntry = {
+      design: current,
+      activePageId: activePageIdRef.current,
+      selectedLayerId: selectedLayerIdRef.current,
+      selectedLayerIds: selectedLayerIdsRef.current,
+    };
+    const history = designHistoryRef.current;
+    const nextHistory = {
+      past: [...history.past.slice(-(MAX_DESIGN_HISTORY_ENTRIES - 1)), previous],
+      future: [],
+    };
+    const nextDesign = { ...current, pages };
+    designHistoryRef.current = nextHistory;
+    designRef.current = nextDesign;
+    setDesignHistory(nextHistory);
+    setDesign(nextDesign);
+    setSaveMessage('');
+    return true;
+  }, []);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const isModifierKey = event.ctrlKey || event.metaKey;
@@ -5829,6 +5869,22 @@ export default function DesignStudioPanel({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [activePage.id, selectedLayers, undoDesignChange, redoDesignChange]);
+
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      const pastedText = event.clipboardData?.getData('text/plain');
+      if (!pastedText) return;
+      const handled = pasteTextIntoSelectedTextLayer(pastedText);
+      if (!handled) return;
+
+      event.preventDefault();
+    }
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [pasteTextIntoSelectedTextLayer]);
 
   function updateDesign(updater: (current: DesignDocument) => DesignDocument, options: DesignPatchOptions = {}) {
     const current = designRef.current;
