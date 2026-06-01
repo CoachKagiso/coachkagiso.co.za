@@ -209,7 +209,7 @@ const tracks: Track[] = [
         tagline: 'Two hours, twelve people, one real plan you leave with.',
         body: [
           'Live group coaching every second Saturday morning. We work through one career theme per session, in depth, in a small room, with real application to your situation.',
-          'July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you.',
+          'July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you. You will leave with a clear picture of what is holding you back and a map of your next 90 days to move forward.',
         ],
         items: [
           '2-hour live session online',
