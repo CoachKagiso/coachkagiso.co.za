@@ -213,10 +213,12 @@ The Saturday Masterclass series is less about teaching and more about the room. 
 
 Each session is 2 hours online, and the people who show up are the kind who push you to think differently just by being there.
 
-We're still finalising the agenda, and we'll share it once official bookings open. But because you scored in the top tier of this diagnostic, you can bypass the waitlist and grab an early bird spot for R450 right now
+The July Saturday Masterclass is open for booking now. Because you scored in the top tier of this diagnostic, I want you to have the early bird option while it is still live: R450 until Sunday, 7 June 2026. From Monday, 8 June, it moves to R500.
+
+Book your seat here:
 [BOOKING LINK]
 
-If you'd rather wait for the final schedule, no stress. I'll email you when it's live.
+If you would rather sit with it first, no pressure. The link is there when you are ready.
 
 But I'm also curious. What made you take the diagnostic in the first place? If you're already moving, what are you trying to figure out?
 

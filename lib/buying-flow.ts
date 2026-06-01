@@ -423,10 +423,9 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
     title: 'Saturday Masterclass',
     envKey: 'NEXT_PUBLIC_CAL_MASTERCLASS_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/saturday-masterclass',
-    description: 'Reserve your seat for the next Saturday Masterclass. We will email the booking and payment link as soon as the date is confirmed.',
-    mode: 'reservation',
-    ctaLabel: 'Reserve my seat',
-    availabilityNote: 'No live calendar yet. Join the reserve list now and you will get first access before booking opens.',
+    description: 'Book your seat for the July Saturday Masterclass. Early bird is R450 until Sunday, 7 June 2026; from Monday, 8 June, the standard price is R500.',
+    mode: 'calendar',
+    ctaLabel: 'Book my seat',
     faqs: [
       {
         question: 'Who is the masterclass for?',
@@ -437,8 +436,8 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
         answer: 'It is interactive. You will learn, reflect, and leave with a clearer plan than you started with.',
       },
       {
-        question: 'What happens after I reserve my seat?',
-        answer: 'You will be added to the reserve list first. Once booking opens, Coach Kagiso will email you the live booking and payment link for the next confirmed session.',
+        question: 'What happens after I book?',
+        answer: 'You will choose the available masterclass slot and complete the booking through Cal.com. Your confirmation details will be emailed after booking.',
       },
     ],
   },
