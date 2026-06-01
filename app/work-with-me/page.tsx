@@ -23,7 +23,7 @@ type Service = {
   title: string;
   price: string;
   tagline: string;
-  body: string;
+  body: string | string[];
   items: string[];
   cta: string;
   featured?: boolean;
@@ -205,7 +205,10 @@ const tracks: Track[] = [
         title: 'Saturday Masterclass',
         price: 'R450 early bird · R500 from Monday 8 June Early bird closes Sunday 7 June at 21:00',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
-        body: 'Live group coaching every second Saturday morning. We work through one career theme per session — in depth, in a small room, with real application to your situation. July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you.',
+        body: [
+          'Live group coaching every second Saturday morning. We work through one career theme per session — in depth, in a small room, with real application to your situation.',
+          'July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you.',
+        ],
         items: [
           '2-hour live session online',
           'Capped at 12 people',
@@ -352,9 +355,11 @@ export default function WorkWithMePage() {
                             <p className={`mt-4 font-serif text-[22px] italic leading-snug ${isDark ? 'text-white/76' : 'text-[#142334]/72'}`}>
                               {service.tagline}
                             </p>
-                            <p className={`mt-5 text-[16px] leading-relaxed ${isDark ? 'text-white/66' : 'text-[#142334]/72'}`}>
-                              {service.body}
-                            </p>
+                            {(Array.isArray(service.body) ? service.body : [service.body]).map((paragraph) => (
+                              <p key={paragraph} className={`mt-5 text-[16px] leading-relaxed ${isDark ? 'text-white/66' : 'text-[#142334]/72'}`}>
+                                {paragraph}
+                              </p>
+                            ))}
                             {service.note && (
                               <p className="mt-5 border-l border-[#C9AD98] pl-4 text-[14px] leading-relaxed text-[#C9AD98]">
                                 {service.note}
