@@ -48,7 +48,6 @@ function emailShell(preheader: string, body: string) {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #dccdc1;">
             <tr>
               <td style="padding:34px;">
-                <p style="margin:0 0 18px;color:#c5a58e;font:700 12px Arial,sans-serif;letter-spacing:2.4px;text-transform:uppercase;">Coach Kagiso</p>
                 ${body}
               </td>
             </tr>
@@ -100,7 +99,6 @@ If you have any questions before your payment goes through, reply to this email 
 Your career matters. See you on 4 July.
 
 Kagiso Shabangu
-Coach Kagiso
 hello@coachkagiso.co.za
 coachkagiso.co.za
 `;
@@ -183,7 +181,7 @@ ${focus}
           </ul>
           <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">If you have any questions before your payment goes through, reply to this email and we will get back to you.</p>
           <p style="margin:24px 0 0;color:#142334;font:16px/1.7 Arial,sans-serif;">Your career matters. See you on 4 July.</p>
-          <p style="margin:22px 0 0;color:#142334;font:15px/1.7 Arial,sans-serif;">Kagiso Shabangu<br>Coach Kagiso<br>hello@coachkagiso.co.za<br>coachkagiso.co.za</p>`,
+          <p style="margin:22px 0 0;color:#142334;font:15px/1.7 Arial,sans-serif;">Kagiso Shabangu<br>hello@coachkagiso.co.za<br>coachkagiso.co.za</p>`,
         ),
       }),
       upsertSourceLead({
