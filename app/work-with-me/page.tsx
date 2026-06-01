@@ -203,7 +203,7 @@ const tracks: Track[] = [
     services: [
       {
         title: 'Saturday Masterclass',
-        price: 'R450 early bird / R500 standard',
+        price: 'R450 early bird until 7 June / R500 standard',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
         body: 'Live group coaching every second Saturday morning. We work through one career theme at a time, from getting unstuck to networking with intention and owning your personal brand.',
         items: [
@@ -213,8 +213,8 @@ const tracks: Track[] = [
           'Take-home pack and 14-day email follow-up',
           'R100 off CV Revamp or LinkedIn Package for 48 hours after class',
         ],
-        cta: 'Reserve my seat',
-        note: 'Next session date to be confirmed. Reserve your seat now and the booking link will be emailed when the booking window opens.',
+        cta: 'Book my seat',
+        note: 'Registrations are open now. Early bird closes Sunday, 7 June 2026; from Monday, 8 June, the standard price is R500.',
       },
     ],
   },

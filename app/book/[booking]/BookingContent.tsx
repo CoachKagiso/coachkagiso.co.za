@@ -48,7 +48,7 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
         <div className="relative z-10 mx-auto max-w-[1120px] px-6 lg:px-8">
           <Reveal className="max-w-4xl">
             <p className="inline-flex rounded-full border border-[#142334]/25 px-4 py-1 text-[12px] font-semibold uppercase tracking-[0.24em] text-[#142334]/70">
-              {isReservationMode ? 'Reserve your seat' : 'Cal.com booking'}
+              {isReservationMode ? 'Reserve your seat' : page.ctaLabel || 'Book your session'}
             </p>
             <h1 className="mt-7 font-serif text-[52px] leading-[0.94] md:text-[82px]">
               {page.title}
