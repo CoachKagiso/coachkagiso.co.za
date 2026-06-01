@@ -426,11 +426,11 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
     description: 'Registration is open for the July session. Secure your spot now before the early bird price closes on Sunday 7 June at 21:00.',
     mode: 'reservation',
     ctaLabel: 'Secure my spot',
-    availabilityNote: 'This is a live, small-group coaching session built around one career theme. In July, we are working through what is actually keeping your career stuck and building a 30-day plan to change it. Twelve people in the room. Real work, not a lecture.',
+    availabilityNote: 'This is a live, small-group coaching session built around one career theme. In July, we are working through what is actually keeping your career stuck and mapping your next 90 days to change it. Twelve people in the room. Real work, not a lecture.',
     faqs: [
       {
         question: 'Who is the masterclass for?',
-        answer: 'Anyone who feels like their career has stalled and cannot pinpoint why. Graduates who are not getting traction, professionals who have not been promoted in over a year, and career changers who are not sure what to pivot into. If you are stuck and want a concrete plan, this session is for you.',
+        answer: 'Anyone who feels like their career has stalled and cannot pinpoint why. Graduates who are not getting traction, professionals who have not been promoted in over a year, and career changers who are not sure what to pivot into. If you are stuck and want clarity on your next 90 days, this session is for you.',
       },
       {
         question: 'Is it interactive or just teaching?',
