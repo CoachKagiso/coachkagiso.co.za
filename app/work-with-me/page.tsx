@@ -203,9 +203,9 @@ const tracks: Track[] = [
     services: [
       {
         title: 'Saturday Masterclass',
-        price: 'R450 early bird until 7 June / R500 standard',
+        price: 'R450 early bird · R500 from Monday 8 June Early bird closes Sunday 7 June at 21:00',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
-        body: 'Live group coaching every second Saturday morning. We work through one career theme at a time, from getting unstuck to networking with intention and owning your personal brand.',
+        body: 'Live group coaching every second Saturday morning. We work through one career theme per session — in depth, in a small room, with real application to your situation. July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you.',
         items: [
           '2-hour live session online',
           'Capped at 12 people',
@@ -213,8 +213,8 @@ const tracks: Track[] = [
           'Take-home pack and 14-day email follow-up',
           'R100 off CV Revamp or LinkedIn Package for 48 hours after class',
         ],
-        cta: 'Book my seat',
-        note: 'Registrations are open now. Early bird closes Sunday, 7 June 2026; from Monday, 8 June, the standard price is R500.',
+        cta: 'Secure my spot',
+        note: 'July session: Saturday 4 July · 10:00 to 12:00 SAST · Capped at 12 people. Registration is open now. Early bird price of R450 closes Sunday 7 June at 21:00.',
       },
     ],
   },
