@@ -42,6 +42,7 @@ export type EmailTemplateStageLabel =
   | 'Second contact'
   | 'Third contact'
   | 'Newsletter bridge'
+  | 'Registration confirmation'
   | 'Waitlist confirmation'
   | 'Bookings open';
 
@@ -799,22 +800,40 @@ hello@coachkagiso.co.za`,
     source: 'masterclass_waitlist',
     variant: 1,
     sequenceIndex: 1,
-    stageLabel: 'Waitlist confirmation',
-    subject: "You're on the list, {{firstName}}",
+    stageLabel: 'Registration confirmation',
+    subject: 'Your spot is being held — here is how to pay',
     body: `Hi {{firstName}},
 
-You're on the waitlist for the July Saturday Masterclass.
+Thank you for registering for the July Saturday Masterclass. Your details are in.
 
-I read what you wrote about what you're hoping this will help you with. I'm glad you shared that, it tells me exactly what the room needs to cover.
+To secure your spot, please complete your payment using the banking details below:
 
-Here's what to expect: bookings officially open on 1 June. You'll get an email with the booking link and payment details. Because you reserved early, you'll have access to the early bird rate of R450.
+Account name: Kagiso Shabangu
+Bank: Capitec Bank
+Account type: Savings
+Account number: 1248602321
+Branch code: 470010
+Reference: Your full name + JULY
 
-The session is capped at 12 people. You'll have seven days from 1 June to secure your spot at that price. After 7 June, the price moves to R500 and any unclaimed spots open to the public.
+Once your payment reflects, you will receive a confirmation email with everything you need to prepare for the session.
 
-I'll be in touch on 1 June with everything you need.
+A few things to note:
 
-Kagiso
-hello@coachkagiso.co.za`,
+- Session date: Saturday 4 July 2026
+- Time: 10:00 to 12:00 SAST
+- Platform: Microsoft Teams
+- Price: R450 early bird, valid until Sunday 7 June at 21:00
+- Standard price from Monday 8 June: R500
+- Spots are capped at 12
+
+If you have any questions before your payment goes through, reply to this email and we will get back to you.
+
+Your career matters. See you on 4 July.
+
+Kagiso Shabangu
+Coach Kagiso
+hello@coachkagiso.co.za
+coachkagiso.co.za`,
   },
   {
     id: 'masterclass_waitlist_bookings_open',
@@ -826,29 +845,34 @@ hello@coachkagiso.co.za`,
     variant: 2,
     sequenceIndex: 2,
     stageLabel: 'Bookings open',
-    subject: 'Your booking link is ready, {{firstName}}',
+    subject: 'Registration is open — July Masterclass',
     body: `Hi {{firstName}},
 
-As promised, bookings for the July Saturday Masterclass are now open.
+You are on the list. Registration for the July Saturday Masterclass is now open and your spot is available to secure today.
 
-Because you reserved early, you're getting first access at R450 until 7 June. After that, it opens to the public at R500.
+Here is what you need to know:
 
-Here's what the session covers:
+- Session date: Saturday 4 July 2026
+- Time: 10:00 to 12:00 SAST
+- Platform: Microsoft Teams
+- Topic: From Stuck to Strategic
+- Early bird price: R450, closes Sunday 7 June at 21:00
+- Standard price from Monday 8 June: R500
+- Spots are capped at 12
 
-- How to build and use your network strategically
-- How to make yourself visible to the right people
-- How to position your personal brand so opportunities can find you
-- How to identify and build meaningful relationships with mentors who can support your growth
-- How to develop the right skills, get career direction, and move forward when you feel stuck
+To register and receive your payment instructions, go here:
+[REGISTRATION PAGE LINK]
 
-One intensive 2-hour session, capped at 12 people.
+What you will leave with: a clear picture of what is actually holding your career back and a map of your next 90 days to change it. Plus a take-home pack, a 14-day email follow-up, and R100 off any CV Revamp or LinkedIn Package for 48 hours after the session.
 
-Book and pay here: [BOOKING LINK]
+If you have any questions, reply to this email directly.
 
-See you there.
+Your career matters. See you on 4 July.
 
-Kagiso
-hello@coachkagiso.co.za`,
+Kagiso Shabangu
+Coach Kagiso
+hello@coachkagiso.co.za
+coachkagiso.co.za`,
   },
 ];
 

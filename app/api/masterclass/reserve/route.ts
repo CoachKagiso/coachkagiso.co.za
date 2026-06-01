@@ -3,7 +3,7 @@ import { addClientToBrevoList, sendTransactionalEmail } from '@/lib/brevo';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { upsertSourceLead } from '@/lib/diagnostic-submissions';
 import { recordSentEmail } from '@/lib/sent-emails';
-import { getContactEmail, getSiteUrl } from '@/lib/env';
+import { getContactEmail } from '@/lib/env';
 
 type ReservePayload = {
   fullName?: string;
@@ -47,16 +47,9 @@ function emailShell(preheader: string, body: string) {
         <td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #dccdc1;">
             <tr>
-              <td style="padding:34px 34px 12px;">
+              <td style="padding:34px;">
                 <p style="margin:0 0 18px;color:#c5a58e;font:700 12px Arial,sans-serif;letter-spacing:2.4px;text-transform:uppercase;">Coach Kagiso</p>
                 ${body}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 34px 34px;">
-                <p style="margin:28px 0 0;border-top:1px solid #eaded5;padding-top:18px;color:#66727d;font:14px/1.7 Arial,sans-serif;">
-                  Need to add anything? Reply to this email or WhatsApp Kagiso directly.
-                </p>
               </td>
             </tr>
           </table>
@@ -77,24 +70,39 @@ export async function POST(request: Request) {
     const source = String(payload.source || 'masterclass-reserve-form').trim().slice(0, 120);
     const firstName = fullName.split(/\s+/)[0] || 'there';
     const contactEmail = getContactEmail();
-    const workUrl = `${getSiteUrl()}/work-with-me#masterclass`;
-    const confirmationSubject = 'You are on the Saturday Masterclass reserve list';
+    const confirmationSubject = 'Your spot is being held — here is how to pay';
     const confirmationText = `Hi ${firstName},
 
-You are on the reserve list for the next Saturday Masterclass. The date is still being confirmed.
+Thank you for registering for the July Saturday Masterclass. Your details are in.
 
-What happens next:
-1. Coach Kagiso will confirm the next session date.
-2. You will get the booking and payment link by email when the booking window opens.
-3. You can decide then whether you want to confirm your seat.
+To secure your spot, please complete your payment using the banking details below:
 
-For now, no payment is needed from you.
+Account name: Kagiso Shabangu
+Bank: Capitec Bank
+Account type: Savings
+Account number: 1248602321
+Branch code: 470010
+Reference: Your full name + JULY
 
-If you want to review the service details again:
-${workUrl}
+Once your payment reflects, you will receive a confirmation email with everything you need to prepare for the session.
 
-Talk soon,
+A few things to note:
+
+- Session date: Saturday 4 July 2026
+- Time: 10:00 to 12:00 SAST
+- Platform: Microsoft Teams
+- Price: R450 early bird, valid until Sunday 7 June at 21:00
+- Standard price from Monday 8 June: R500
+- Spots are capped at 12
+
+If you have any questions before your payment goes through, reply to this email and we will get back to you.
+
+Your career matters. See you on 4 July.
+
+Kagiso Shabangu
 Coach Kagiso
+hello@coachkagiso.co.za
+coachkagiso.co.za
 `;
 
     if (!fullName || fullName.length > 80 || !/^[\p{L}' -]+$/u.test(fullName)) {
@@ -117,28 +125,30 @@ Coach Kagiso
       addClientToBrevoList(email, fullName),
       sendTransactionalEmail({
         to: [{ email: contactEmail, name: 'Coach Kagiso' }],
-        subject: `New Saturday Masterclass reserve request - ${fullName}`,
-        text: `A new Saturday Masterclass reserve request has been submitted.
+        subject: `New Saturday Masterclass registration - ${fullName}`,
+        text: `A new Saturday Masterclass registration has been submitted.
 
 Name: ${fullName}
 Email: ${email}
 WhatsApp: ${whatsapp || 'Not supplied'}
 Source: ${source}
-Planned session: Date to be confirmed
+Session: Saturday 4 July 2026, 10:00 to 12:00 SAST
+Payment status: Awaiting payment
 
 What they want help with:
 ${focus}
 `,
         html: emailShell(
-          `${fullName} joined the Saturday Masterclass reserve list.`,
-          `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New Saturday Masterclass reserve request.</h1>
-          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">This person wants first access when booking opens for the next Saturday Masterclass.</p>
+          `${fullName} registered for the July Saturday Masterclass.`,
+          `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New Saturday Masterclass registration.</h1>
+          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">This person has registered and should now complete payment to secure their spot.</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
             ${detailRow('Name', fullName)}
             ${detailRow('Email', email)}
             ${detailRow('WhatsApp', whatsapp || 'Not supplied')}
             ${detailRow('Source', source)}
-            ${detailRow('Session', 'Date to be confirmed')}
+            ${detailRow('Session', 'Saturday 4 July 2026, 10:00 to 12:00 SAST')}
+            ${detailRow('Payment status', 'Awaiting payment')}
           </table>
           <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What they want help with</h2>
           <p style="margin:0;color:#4f5b66;font:15px/1.8 Arial,sans-serif;white-space:pre-line;">${escapeHtml(focus)}</p>`,
@@ -149,22 +159,31 @@ ${focus}
         subject: confirmationSubject,
         text: confirmationText,
         html: emailShell(
-          `You are on the Saturday Masterclass reserve list.`,
-          `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">You are on the reserve list, ${escapeHtml(firstName)}.</h1>
-          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Your seat interest is noted for the next Saturday Masterclass. The date is still being confirmed.</p>
+          `Your spot is being held for the July Saturday Masterclass.`,
+          `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your spot is being held, ${escapeHtml(firstName)}.</h1>
+          <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Thank you for registering for the July Saturday Masterclass. Your details are in.</p>
+          <p style="margin:0 0 18px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">To secure your spot, please complete your payment using the banking details below:</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
-            ${detailRow('Session', 'Date to be confirmed')}
-            ${detailRow('Booking window', 'Opens when the date is confirmed')}
-            ${detailRow('Payment now', 'No payment needed yet')}
+            ${detailRow('Account name', 'Kagiso Shabangu')}
+            ${detailRow('Bank', 'Capitec Bank')}
+            ${detailRow('Account type', 'Savings')}
+            ${detailRow('Account number', '1248602321')}
+            ${detailRow('Branch code', '470010')}
+            ${detailRow('Reference', 'Your full name + JULY')}
           </table>
-          <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What happens next</h2>
-          <ol style="margin:0;padding-left:20px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">
-            <li>Coach Kagiso will confirm the next session date.</li>
-            <li>You will get the booking and payment link by email when the booking window opens.</li>
-            <li>You can decide then whether you want to confirm your seat.</li>
-          </ol>
-          <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">For now, nothing else is needed from you.</p>
-          <p style="margin:22px 0 0;"><a href="${escapeHtml(workUrl)}" style="display:inline-block;background:#142334;color:#ffffff;padding:12px 18px;text-decoration:none;font:700 12px Arial,sans-serif;letter-spacing:1.4px;text-transform:uppercase;">Review the masterclass</a></p>`,
+          <p style="margin:22px 0 0;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">Once your payment reflects, you will receive a confirmation email with everything you need to prepare for the session.</p>
+          <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">A few things to note</h2>
+          <ul style="margin:0;padding-left:20px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">
+            <li>Session date: Saturday 4 July 2026</li>
+            <li>Time: 10:00 to 12:00 SAST</li>
+            <li>Platform: Microsoft Teams</li>
+            <li>Price: R450 early bird, valid until Sunday 7 June at 21:00</li>
+            <li>Standard price from Monday 8 June: R500</li>
+            <li>Spots are capped at 12</li>
+          </ul>
+          <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">If you have any questions before your payment goes through, reply to this email and we will get back to you.</p>
+          <p style="margin:24px 0 0;color:#142334;font:16px/1.7 Arial,sans-serif;">Your career matters. See you on 4 July.</p>
+          <p style="margin:22px 0 0;color:#142334;font:15px/1.7 Arial,sans-serif;">Kagiso Shabangu<br>Coach Kagiso<br>hello@coachkagiso.co.za<br>coachkagiso.co.za</p>`,
         ),
       }),
       upsertSourceLead({
@@ -175,22 +194,22 @@ ${focus}
           originalSource: source,
           whatsapp: whatsapp || null,
           focus,
-          plannedSession: 'Date to be confirmed',
+          plannedSession: 'Saturday 4 July 2026, 10:00 to 12:00 SAST',
         },
       }),
       recordDashboardNotification({
         eventType: 'masterclass_reservation',
         source: 'masterclass-reserve-form',
-        title: `New masterclass reservation - ${fullName}`,
-        description: `${fullName} joined the Saturday Masterclass reserve list. ${whatsapp ? `WhatsApp: ${whatsapp}. ` : ''}Focus: ${focus}`,
+        title: `New masterclass registration - ${fullName}`,
+        description: `${fullName} registered for the July Saturday Masterclass. ${whatsapp ? `WhatsApp: ${whatsapp}. ` : ''}Focus: ${focus}`,
         contactName: fullName,
         contactEmail: email,
-        href: `mailto:${email}?subject=${encodeURIComponent('Saturday Masterclass reserve list')}`,
+        href: `mailto:${email}?subject=${encodeURIComponent('Saturday Masterclass registration')}`,
         metadata: {
           source,
           whatsapp: whatsapp || null,
           focus,
-          plannedSession: 'Date to be confirmed',
+          plannedSession: 'Saturday 4 July 2026, 10:00 to 12:00 SAST',
         },
       }),
     ]);

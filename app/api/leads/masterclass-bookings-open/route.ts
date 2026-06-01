@@ -45,6 +45,8 @@ function injectTemplate(value: string, firstName: string) {
     .split('{{firstName}}')
     .join(firstName)
     .split('[BOOKING LINK]')
+    .join(getBookingLink('Saturday Masterclass'))
+    .split('[REGISTRATION PAGE LINK]')
     .join(getBookingLink('Saturday Masterclass'));
 }
 
