@@ -208,7 +208,7 @@ const tracks: Track[] = [
         sessionLine: 'Saturday 4 July · 10:00 to 12:00 SAST',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
         body: [
-          'Live group coaching every second Saturday morning. We work through one career theme per session — in depth, in a small room, with real application to your situation.',
+          'Live group coaching every second Saturday morning. We work through one career theme per session, in depth, in a small room, with real application to your situation.',
           'July session topic: From Stuck to Strategic. If your career has felt stagnant for months and you are not sure what to change, this session is built for you.',
         ],
         items: [
@@ -219,7 +219,6 @@ const tracks: Track[] = [
           'R100 off CV Revamp or LinkedIn Package for 48 hours after class',
         ],
         cta: 'Secure my spot',
-        note: 'July session: Saturday 4 July · 10:00 to 12:00 SAST · Capped at 12 people. Registration is open now. Early bird price of R450 closes Sunday 7 June at 21:00.',
       },
     ],
   },
