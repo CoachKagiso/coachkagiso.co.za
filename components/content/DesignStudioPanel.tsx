@@ -315,6 +315,12 @@ type DesignHistory = {
   future: DesignHistoryEntry[];
 };
 
+type DesignLayerClipboard = {
+  layers: DesignLayer[];
+  sourceDesignId: string;
+  sourcePageId: string;
+};
+
 type DesignPatchOptions = {
   recordHistory?: boolean;
 };
@@ -323,6 +329,7 @@ const DESIGN_STORAGE_KEY = 'coach-kagiso-design-studio-v3-manifesto';
 const BRAND_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-brand-assets';
 const HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
 const DESIGN_TEMPLATES_STORAGE_KEY = 'coach-kagiso-design-studio-v1-templates';
+const DESIGN_LAYER_CLIPBOARD_TEXT = 'Coach Kagiso Design Studio layer selection';
 export const DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY = 'coach-kagiso-design-studio-v1-pending-import';
 const DEFAULT_DESIGN_WIDTH = 1080;
 const DEFAULT_DESIGN_HEIGHT = 1350;
@@ -2023,6 +2030,22 @@ function createBlankDesignDocument(
 
 function cloneDesignDocument(document: DesignDocument): DesignDocument {
   return JSON.parse(JSON.stringify(document)) as DesignDocument;
+}
+
+function cloneDesignLayer(layer: DesignLayer): DesignLayer {
+  return JSON.parse(JSON.stringify(layer)) as DesignLayer;
+}
+
+function createPastedDesignLayer(layer: DesignLayer, design: DesignDocument, offset: number) {
+  const pastedLayer = {
+    ...cloneDesignLayer(layer),
+    id: createDesignId(layer.type),
+    locked: false,
+    x: clamp(layer.x + offset, -layer.width + 24, design.width - 24),
+    y: clamp(layer.y + offset, -layer.height + 24, design.height - 24),
+  } as DesignLayer;
+
+  return pastedLayer;
 }
 
 function getDesignTemplateSlotLabel(slot?: DesignTemplateSlot | null) {
@@ -5406,69 +5429,6 @@ function DesignCanvas({
           }}
         >
         <BackgroundEffectsLayer design={design} effects={backgroundEffects} />
-        {guides.grid && (
-          <div
-            data-design-guide="true"
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-[8]"
-            style={{
-              backgroundImage: [
-                'linear-gradient(to right, rgba(20,35,52,0.09) 1px, transparent 1px)',
-                'linear-gradient(to bottom, rgba(20,35,52,0.09) 1px, transparent 1px)',
-                'linear-gradient(to right, rgba(185,133,103,0.2) 1px, transparent 1px)',
-                'linear-gradient(to bottom, rgba(185,133,103,0.2) 1px, transparent 1px)',
-              ].join(', '),
-              backgroundSize: '6.25% 6.25%, 6.25% 6.25%, 25% 25%, 25% 25%',
-            }}
-          />
-        )}
-        {guides.bleed && (
-          <div
-            data-design-guide="true"
-            aria-hidden="true"
-            className="pointer-events-none absolute z-[9] border border-[#B98567]/80"
-            style={{
-              bottom: `${(DEFAULT_BLEED_MARGIN / design.height) * 100}%`,
-              left: `${(DEFAULT_BLEED_MARGIN / design.width) * 100}%`,
-              right: `${(DEFAULT_BLEED_MARGIN / design.width) * 100}%`,
-              top: `${(DEFAULT_BLEED_MARGIN / design.height) * 100}%`,
-              boxShadow: '0 0 0 9999px rgba(185,133,103,0.05)',
-            }}
-          >
-            <span className="absolute left-2 top-2 rounded-full bg-[#B98567] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
-              Bleed
-            </span>
-          </div>
-        )}
-        {guides.safeArea && (
-          <div
-            data-design-guide="true"
-            aria-hidden="true"
-            className="pointer-events-none absolute z-[10] border-2 border-dashed border-[#142334]/60"
-            style={{
-              bottom: `${(DEFAULT_SAFE_AREA_MARGIN / design.height) * 100}%`,
-              left: `${(DEFAULT_SAFE_AREA_MARGIN / design.width) * 100}%`,
-              right: `${(DEFAULT_SAFE_AREA_MARGIN / design.width) * 100}%`,
-              top: `${(DEFAULT_SAFE_AREA_MARGIN / design.height) * 100}%`,
-            }}
-          />
-        )}
-        {snapGuide?.x !== undefined && (
-          <div
-            data-design-guide="true"
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 z-[85] border-l-2 border-[#0284FF]"
-            style={{ left: `${(snapGuide.x / design.width) * 100}%` }}
-          />
-        )}
-        {snapGuide?.y !== undefined && (
-          <div
-            data-design-guide="true"
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 z-[85] border-t-2 border-[#0284FF]"
-            style={{ top: `${(snapGuide.y / design.height) * 100}%` }}
-          />
-        )}
         {page.layers.map((layer, index) => (
           <DesignLayerView
             key={layer.id}
@@ -5500,6 +5460,69 @@ function DesignCanvas({
             isTextEditing={activeEditingTextLayerId === layer.id}
           />
         ))}
+        {guides.grid && (
+          <div
+            data-design-guide="true"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-[105]"
+            style={{
+              backgroundImage: [
+                'linear-gradient(to right, rgba(20,35,52,0.09) 1px, transparent 1px)',
+                'linear-gradient(to bottom, rgba(20,35,52,0.09) 1px, transparent 1px)',
+                'linear-gradient(to right, rgba(185,133,103,0.2) 1px, transparent 1px)',
+                'linear-gradient(to bottom, rgba(185,133,103,0.2) 1px, transparent 1px)',
+              ].join(', '),
+              backgroundSize: '6.25% 6.25%, 6.25% 6.25%, 25% 25%, 25% 25%',
+            }}
+          />
+        )}
+        {guides.bleed && (
+          <div
+            data-design-guide="true"
+            aria-hidden="true"
+            className="pointer-events-none absolute z-[106] border border-[#B98567]/80"
+            style={{
+              bottom: `${(DEFAULT_BLEED_MARGIN / design.height) * 100}%`,
+              left: `${(DEFAULT_BLEED_MARGIN / design.width) * 100}%`,
+              right: `${(DEFAULT_BLEED_MARGIN / design.width) * 100}%`,
+              top: `${(DEFAULT_BLEED_MARGIN / design.height) * 100}%`,
+              boxShadow: '0 0 0 9999px rgba(185,133,103,0.05)',
+            }}
+          >
+            <span className="absolute left-2 top-2 rounded-full bg-[#B98567] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
+              Bleed
+            </span>
+          </div>
+        )}
+        {guides.safeArea && (
+          <div
+            data-design-guide="true"
+            aria-hidden="true"
+            className="pointer-events-none absolute z-[107] border-2 border-dashed border-[#142334]/60"
+            style={{
+              bottom: `${(DEFAULT_SAFE_AREA_MARGIN / design.height) * 100}%`,
+              left: `${(DEFAULT_SAFE_AREA_MARGIN / design.width) * 100}%`,
+              right: `${(DEFAULT_SAFE_AREA_MARGIN / design.width) * 100}%`,
+              top: `${(DEFAULT_SAFE_AREA_MARGIN / design.height) * 100}%`,
+            }}
+          />
+        )}
+        {snapGuide?.x !== undefined && (
+          <div
+            data-design-guide="true"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 z-[118] border-l-2 border-[#0284FF]"
+            style={{ left: `${(snapGuide.x / design.width) * 100}%` }}
+          />
+        )}
+        {snapGuide?.y !== undefined && (
+          <div
+            data-design-guide="true"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 z-[118] border-t-2 border-[#0284FF]"
+            style={{ top: `${(snapGuide.y / design.height) * 100}%` }}
+          />
+        )}
         {multiSelectionBounds && (
           <div
             data-design-control="true"
@@ -5567,6 +5590,7 @@ export default function DesignStudioPanel({
   const selectedLayerIdRef = useRef(selectedLayerId);
   const selectedLayerIdsRef = useRef(selectedLayerIds);
   const handledImportRequestRef = useRef<number | null>(null);
+  const layerClipboardRef = useRef<DesignLayerClipboard | null>(null);
   const activePage = getActivePage(design, activePageId);
   const selectedLayers = useMemo(
     () => selectedLayerIds
@@ -6004,6 +6028,86 @@ export default function DesignStudioPanel({
     return true;
   }, []);
 
+  const copySelectedLayersToClipboard = useCallback(() => {
+    const current = designRef.current;
+    const page = getActivePage(current, activePageIdRef.current);
+    if (!page) return false;
+    const selectedIdSet = new Set(selectedLayerIdsRef.current);
+    const layersToCopy = page.layers.filter((layer) => selectedIdSet.has(layer.id) && !layer.locked);
+    if (!layersToCopy.length) return false;
+
+    layerClipboardRef.current = {
+      layers: layersToCopy.map(cloneDesignLayer),
+      sourceDesignId: current.id,
+      sourcePageId: page.id,
+    };
+    setAssetLibraryMessage(`${layersToCopy.length} layer${layersToCopy.length === 1 ? '' : 's'} copied. Switch pages or templates, then paste.`);
+    return true;
+  }, []);
+
+  const pasteCopiedLayersIntoActivePage = useCallback(() => {
+    const clipboard = layerClipboardRef.current;
+    if (!clipboard?.layers.length) return false;
+
+    const current = designRef.current;
+    const targetPage = getActivePage(current, activePageIdRef.current);
+    if (!targetPage) return false;
+    const pasteOffset = clipboard.sourceDesignId === current.id && clipboard.sourcePageId === targetPage.id ? 32 : 0;
+    const pastedLayers = clipboard.layers.map((layer) => createPastedDesignLayer(layer, current, pasteOffset));
+    const pastedLayerIds = pastedLayers.map((layer) => layer.id);
+
+    const previous: DesignHistoryEntry = {
+      design: current,
+      activePageId: activePageIdRef.current,
+      selectedLayerId: selectedLayerIdRef.current,
+      selectedLayerIds: selectedLayerIdsRef.current,
+    };
+    const history = designHistoryRef.current;
+    const nextHistory = {
+      past: [...history.past.slice(-(MAX_DESIGN_HISTORY_ENTRIES - 1)), previous],
+      future: [],
+    };
+    const nextDesign = {
+      ...current,
+      pages: current.pages.map((page) => (
+        page.id === targetPage.id
+          ? { ...page, layers: [...page.layers, ...pastedLayers] }
+          : page
+      )),
+    };
+
+    layerClipboardRef.current = {
+      layers: pastedLayers.map(cloneDesignLayer),
+      sourceDesignId: nextDesign.id,
+      sourcePageId: targetPage.id,
+    };
+    designHistoryRef.current = nextHistory;
+    designRef.current = nextDesign;
+    selectedLayerIdsRef.current = pastedLayerIds;
+    selectedLayerIdRef.current = pastedLayerIds.at(-1) || null;
+    setDesignHistory(nextHistory);
+    setDesign(nextDesign);
+    setSelectedLayerIds(pastedLayerIds);
+    setSelectedLayerIdState(selectedLayerIdRef.current);
+    setAssetLibraryMessage(`${pastedLayers.length} layer${pastedLayers.length === 1 ? '' : 's'} pasted.`);
+    setSaveMessage('');
+    return true;
+  }, []);
+
+  useEffect(() => {
+    function onCopy(event: ClipboardEvent) {
+      if (isEditableKeyboardTarget(event.target)) return;
+      const handled = copySelectedLayersToClipboard();
+      if (!handled) return;
+
+      event.clipboardData?.setData('text/plain', DESIGN_LAYER_CLIPBOARD_TEXT);
+      event.preventDefault();
+    }
+
+    window.addEventListener('copy', onCopy);
+    return () => window.removeEventListener('copy', onCopy);
+  }, [copySelectedLayersToClipboard]);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const isModifierKey = event.ctrlKey || event.metaKey;
@@ -6080,8 +6184,12 @@ export default function DesignStudioPanel({
       if (isEditableKeyboardTarget(event.target)) return;
 
       const pastedText = event.clipboardData?.getData('text/plain');
-      if (!pastedText) return;
-      const handled = pasteTextIntoSelectedTextLayer(pastedText);
+      const shouldPasteLayerSelection = pastedText === DESIGN_LAYER_CLIPBOARD_TEXT && Boolean(layerClipboardRef.current?.layers.length);
+      const handled = shouldPasteLayerSelection
+        ? pasteCopiedLayersIntoActivePage()
+        : pastedText
+          ? pasteTextIntoSelectedTextLayer(pastedText) || pasteCopiedLayersIntoActivePage()
+        : pasteCopiedLayersIntoActivePage();
       if (!handled) return;
 
       event.preventDefault();
@@ -6089,7 +6197,7 @@ export default function DesignStudioPanel({
 
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [pasteTextIntoSelectedTextLayer]);
+  }, [pasteCopiedLayersIntoActivePage, pasteTextIntoSelectedTextLayer]);
 
   function updateDesign(updater: (current: DesignDocument) => DesignDocument, options: DesignPatchOptions = {}) {
     const current = designRef.current;
