@@ -22,6 +22,7 @@ import { ContourField, FlowRibbon, GeoArchPattern } from '@/components/Decorativ
 type Service = {
   title: string;
   price: string;
+  sessionLine?: string;
   tagline: string;
   body: string | string[];
   items: string[];
@@ -204,6 +205,7 @@ const tracks: Track[] = [
       {
         title: 'Saturday Masterclass',
         price: 'R450 early bird · R500 from Monday 8 June Early bird closes Sunday 7 June at 21:00',
+        sessionLine: 'Saturday 4 July · 10:00 to 12:00 SAST',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
         body: [
           'Live group coaching every second Saturday morning. We work through one career theme per session — in depth, in a small room, with real application to your situation.',
@@ -352,6 +354,11 @@ export default function WorkWithMePage() {
                                 {service.price}
                               </span>
                             </div>
+                            {service.sessionLine && (
+                              <p className={`mt-4 text-[16px] leading-relaxed ${isDark ? 'text-white/66' : 'text-[#142334]/72'}`}>
+                                {service.sessionLine}
+                              </p>
+                            )}
                             <p className={`mt-4 font-serif text-[22px] italic leading-snug ${isDark ? 'text-white/76' : 'text-[#142334]/72'}`}>
                               {service.tagline}
                             </p>
