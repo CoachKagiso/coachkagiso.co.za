@@ -46,12 +46,12 @@ export default async function BookPage({ params }: BookPageProps) {
   if (!page) notFound();
 
   const calUrl = getBookingUrl(booking as BookingSlug);
-  const faqEyebrow = page.mode === 'reservation' ? 'Before booking opens' : 'Before you book';
+  const faqEyebrow = page.mode === 'reservation' ? 'Before you register' : 'Before you book';
   const faqTitle = page.mode === 'reservation'
-    ? 'A few things worth knowing before booking opens.'
+    ? 'The questions people usually ask before registering.'
     : 'A few things worth knowing first.';
   const faqDescription = page.mode === 'reservation'
-    ? 'These are the questions that usually come up right before someone joins the reserve list.'
+    ? 'These are the questions that usually come up right before someone secures their spot.'
     : 'These are the questions that usually come up right before someone books a session.';
   const faqCtaLabel = page.mode === 'reservation' ? 'Ask about the masterclass' : 'Ask before booking';
 

@@ -44,7 +44,7 @@ export default function MasterclassReserveForm({ source }: MasterclassReserveFor
       }
 
       setState('success');
-      setMessage('You are on the reserve list. We will email the booking link when the next date is confirmed.');
+      setMessage('Your registration has been submitted. Check your email for payment instructions.');
       form.reset();
     } catch (error) {
       setState('error');
@@ -97,11 +97,11 @@ export default function MasterclassReserveForm({ source }: MasterclassReserveFor
       >
         {state === 'submitting' ? (
           <>
-            Reserving <Loader2 className="h-4 w-4 animate-spin" />
+            Securing <Loader2 className="h-4 w-4 animate-spin" />
           </>
         ) : (
           <>
-            Reserve my seat <ArrowUpRight className="h-4 w-4" />
+            Secure my spot <ArrowUpRight className="h-4 w-4" />
           </>
         )}
       </button>
@@ -117,7 +117,7 @@ export default function MasterclassReserveForm({ source }: MasterclassReserveFor
         </div>
       )}
       <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/50">
-        This reserves your interest only. You will get the booking and payment link when July dates are live.
+        Spots are capped at 12. Your spot is confirmed once payment reflects.
       </p>
     </form>
   );
