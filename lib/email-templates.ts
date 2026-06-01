@@ -831,7 +831,6 @@ If you have any questions before your payment goes through, reply to this email 
 Your career matters. See you on 4 July.
 
 Kagiso Shabangu
-Coach Kagiso
 hello@coachkagiso.co.za
 coachkagiso.co.za`,
   },
@@ -870,7 +869,6 @@ If you have any questions, reply to this email directly.
 Your career matters. See you on 4 July.
 
 Kagiso Shabangu
-Coach Kagiso
 hello@coachkagiso.co.za
 coachkagiso.co.za`,
   },
