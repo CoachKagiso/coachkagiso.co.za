@@ -48,7 +48,7 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
         <div className="relative z-10 mx-auto max-w-[1120px] px-6 lg:px-8">
           <Reveal className="max-w-4xl">
             <p className="inline-flex rounded-full border border-[#142334]/25 px-4 py-1 text-[12px] font-semibold uppercase tracking-[0.24em] text-[#142334]/70">
-              {isReservationMode ? 'Reserve your seat' : page.ctaLabel || 'Book your session'}
+              {isReservationMode ? 'July 2026 · Registration open' : 'Cal.com booking'}
             </p>
             <h1 className="mt-7 font-serif text-[52px] leading-[0.94] md:text-[82px]">
               {page.title}
@@ -67,19 +67,21 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
               <div className="grid gap-8 border border-[#D8C8BB] bg-white p-8 shadow-[0_24px_80px_rgba(20,35,52,0.08)] lg:grid-cols-[1.08fr_0.92fr] lg:p-10">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C9AD98]">
-                    July 2026 session
+                    July 2026 · From Stuck to Strategic
                   </p>
                   <h2 className="mt-4 font-serif text-[38px] leading-tight text-[#142334] md:text-[52px]">
-                    Reserve now. Book later when dates go live.
+                    Two hours to get unstuck. One plan you leave with.
                   </h2>
                   <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-[#142334]/74">
                     {page.availabilityNote || 'Join the reserve list and we will email you when the booking link is ready.'}
                   </p>
                   <div className="mt-8 grid gap-3 border-y border-[#D8C8BB] py-6">
                     {[
-                      'Session date: To be confirmed',
-                      'Booking window: Opens when the date is confirmed',
-                      'No payment is taken on this form',
+                      'Session date: Saturday 4 July 2026',
+                      'Time: 10:00 to 12:00 SAST',
+                      'Platform: Microsoft Teams',
+                      'Price: R450 early bird, closes Sunday 7 June at 21:00',
+                      'Standard price from Monday 8 June: R500',
                     ].map((item) => (
                       <div key={item} className="text-[15px] leading-relaxed text-[#142334]/72">
                         {item}
@@ -87,19 +89,19 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
                     ))}
                   </div>
                   <p className="mt-6 text-[14px] leading-relaxed text-[#142334]/58">
-                    Once booking opens, everyone on this list gets the live booking and payment link first.
+                    What you get: a 2-hour live session, a take-home pack of four practical PDFs, a 14-day email follow-up, and R100 off any CV Revamp or LinkedIn Package valid for 48 hours after the session.
                   </p>
                 </div>
 
                 <div className="border border-[#D8C8BB] bg-[#FCFBFA] p-6 md:p-8">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C9AD98]">
-                    Reserve list
+                    Register now
                   </p>
                   <h3 className="mt-4 font-serif text-[32px] leading-tight text-[#142334]">
                     {page.ctaLabel || 'Reserve my seat'}
                   </h3>
                   <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/68">
-                    Leave your details below and Coach Kagiso will email you when the next booking window opens.
+                    Fill in your details below. Payment instructions will be sent to you immediately after you submit.
                   </p>
                   <MasterclassReserveForm source={`booking-page:${booking}`} />
                 </div>
