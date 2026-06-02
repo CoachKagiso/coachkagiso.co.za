@@ -5409,13 +5409,14 @@ function DesignLayerView({
                 : handle === 'nw' || handle === 'se'
                   ? 'nwse-resize'
                   : 'nesw-resize';
-            const handleShapeClass = isSideHandle
+            const handleSizeStyle = isSideHandle
               ? handle === 'n' || handle === 's'
-                ? 'h-2.5 w-7 rounded-full'
-                : 'h-7 w-2.5 rounded-full'
+                ? { height: 7, width: 18 }
+                : { height: 18, width: 7 }
               : compactHandle
-                ? 'h-3.5 w-3.5 rounded-full'
-                : 'h-4 w-4 rounded-full';
+                ? { height: 9, width: 9 }
+                : { height: 10, width: 10 };
+            const handleShapeClass = isSideHandle ? 'rounded-full' : 'rounded-full';
             const positionClass = (() => {
               switch (handle) {
                 case 'n':
@@ -5427,14 +5428,14 @@ function DesignLayerView({
                 case 'w':
                   return '-left-1.5 top-1/2 -translate-y-1/2';
                 case 'nw':
-                  return '-left-2 -top-2';
+                  return 'left-0 top-0 -translate-x-1/2 -translate-y-1/2';
                 case 'ne':
-                  return '-right-2 -top-2';
+                  return 'right-0 top-0 -translate-y-1/2 translate-x-1/2';
                 case 'sw':
-                  return '-bottom-2 -left-2';
+                  return 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2';
                 case 'se':
                 default:
-                  return '-bottom-2 -right-2';
+                  return 'bottom-0 right-0 translate-x-1/2 translate-y-1/2';
               }
             })();
             return (
@@ -5447,6 +5448,7 @@ function DesignLayerView({
                 onPointerDown={(event) => onResizeStart(event, layer, handle)}
                 className={`design-selection-handle absolute z-[125] border bg-white transition hover:scale-110 ${handleShapeClass} ${positionClass}`}
                 style={{
+                  ...handleSizeStyle,
                   borderColor: '#8B5CF6',
                   boxShadow: '0 2px 7px rgba(20,35,52,0.22)',
                   cursor: cursorValue,
