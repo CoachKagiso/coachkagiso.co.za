@@ -5223,7 +5223,7 @@ function DesignLayerView({
   const layerZIndex = selected && !shouldPreserveStackWhenSelected ? 90 : baseLayerZIndex;
   const layerAsset = layer.type === 'asset' ? assetLibrary[layer.assetId] : null;
   const assetBorderRadius = layer.type === 'asset' ? getLayerCornerRadiusCss(layer, design) : undefined;
-  const canSelectTextContent = selected && layer.type === 'text' && !layer.locked && !isTextEditing;
+  const isTextContentEditing = layer.type === 'text' && !layer.locked && isTextEditing;
 
   return (
     <div
@@ -5244,7 +5244,7 @@ function DesignLayerView({
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect(event.shiftKey || event.metaKey || event.ctrlKey);
       }}
-      className={`absolute ${canSelectTextContent ? 'select-text' : 'select-none'} ${isTextEditing || canSelectTextContent ? 'cursor-text' : layer.locked ? 'cursor-default' : 'cursor-move'}`}
+      className={`absolute ${isTextContentEditing ? 'select-text cursor-text' : layer.locked ? 'select-none cursor-default' : 'select-none cursor-move'}`}
       style={{
         ...getLayerBoundsStyle(layer, design),
         pointerEvents: layer.locked && !selected ? 'none' : undefined,
@@ -5712,15 +5712,6 @@ function DesignCanvas({
   function startDrag(event: React.PointerEvent<HTMLDivElement>, layer: DesignLayer) {
     event.stopPropagation();
     if (activeEditingTextLayerId === layer.id) return;
-    const target = event.target as HTMLElement | null;
-    if (
-      layer.type === 'text' &&
-      selectedLayerIdSet.has(layer.id) &&
-      target?.closest('[data-design-text-content="true"]')
-    ) {
-      suppressClickSelectionRef.current = true;
-      return;
-    }
     if (event.shiftKey || event.metaKey || event.ctrlKey) {
       suppressClickSelectionRef.current = true;
       onSelectLayer(layer.id, true);
