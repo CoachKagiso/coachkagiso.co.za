@@ -132,7 +132,7 @@ type DesignTextRun = {
   textDecoration?: DesignTextDecoration;
   textTransform?: 'none' | 'uppercase';
 };
-type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se';
+type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 type ColorInputMode = 'hex' | 'rgb';
 type DesignSnapGuide = {
   x?: number;
@@ -3590,7 +3590,7 @@ function isInlineTextFormatActive(layer: DesignTextLayer, format: DesignTextInli
 }
 
 function getInlineFormatPatch(format: DesignTextInlineFormat, active: boolean) {
-  if (format === 'bold') return { fontWeight: active ? 500 : 800 };
+  if (format === 'bold') return { fontWeight: active ? 500 : 700 };
   if (format === 'italic') return { fontStyle: active ? 'normal' : 'italic' } as const;
   if (format === 'underline') return { textDecoration: active ? 'none' : 'underline' } as const;
   return { textTransform: active ? 'none' : 'uppercase' } as const;
@@ -3602,6 +3602,37 @@ function applyInlineTextFormat(layer: DesignTextLayer, format: DesignTextInlineF
   if (end <= start) return layer.richTextRuns || [];
   const active = isInlineTextFormatActive(layer, format, { start, end });
   const patch = getInlineFormatPatch(format, active);
+  const boundaries = new Set<number>([0, layer.text.length, start, end]);
+  getNormalizedTextRuns(layer).forEach((run) => {
+    boundaries.add(run.start);
+    boundaries.add(run.end);
+  });
+
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+  const nextRuns = sortedBoundaries.slice(0, -1).reduce<DesignTextRun[]>((runs, segmentStart, index) => {
+    const segmentEnd = sortedBoundaries[index + 1];
+    if (segmentEnd <= segmentStart) return runs;
+    const style = getInlineTextStyleAt(layer, segmentStart);
+    if (segmentStart >= start && segmentEnd <= end) {
+      Object.assign(style, patch);
+    }
+    const run = getInlineTextRunFromStyle(layer, segmentStart, segmentEnd, style);
+    if (run) runs.push(run);
+    return runs;
+  }, []);
+
+  return mergeTextRuns(nextRuns);
+}
+
+function applyInlineTextStyle(
+  layer: DesignTextLayer,
+  range: Omit<DesignTextSelectionRange, 'layerId'>,
+  patch: Partial<ReturnType<typeof getBaseTextRunStyle>>,
+) {
+  const start = clamp(Math.min(range.start, range.end), 0, layer.text.length);
+  const end = clamp(Math.max(range.start, range.end), 0, layer.text.length);
+  if (end <= start) return layer.richTextRuns || [];
+
   const boundaries = new Set<number>([0, layer.text.length, start, end]);
   getNormalizedTextRuns(layer).forEach((run) => {
     boundaries.add(run.start);
@@ -5213,9 +5244,7 @@ function DesignLayerView({
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect(event.shiftKey || event.metaKey || event.ctrlKey);
       }}
-      className={`absolute ${canSelectTextContent ? 'select-text' : 'select-none'} ${isTextEditing || canSelectTextContent ? 'cursor-text' : layer.locked ? 'cursor-default' : 'cursor-move'} ${
-        selected ? 'ring-2 ring-[#0284FF] ring-offset-2 ring-offset-transparent' : ''
-      }`}
+      className={`absolute ${canSelectTextContent ? 'select-text' : 'select-none'} ${isTextEditing || canSelectTextContent ? 'cursor-text' : layer.locked ? 'cursor-default' : 'cursor-move'}`}
       style={{
         ...getLayerBoundsStyle(layer, design),
         pointerEvents: layer.locked && !selected ? 'none' : undefined,
@@ -5276,6 +5305,17 @@ function DesignLayerView({
           </>
         )}
       </div>
+      {showControls && !isTextEditing && (
+        <div
+          aria-hidden="true"
+          data-design-control="true"
+          className="design-selection-frame pointer-events-none absolute inset-0 z-[115] rounded-[2px] border"
+          style={{
+            borderColor: '#8B5CF6',
+            boxShadow: '0 0 0 1px rgba(139,92,246,0.18)',
+          }}
+        />
+      )}
       {showControls && !isTextEditing && (
         <div
           data-design-control="true"
@@ -5356,19 +5396,61 @@ function DesignLayerView({
 
       {showControls && !layer.locked && (
         <>
-          {(layer.width < 72 || layer.height < 48 ? (['se'] as const) : (['nw', 'ne', 'sw', 'se'] as const)).map((handle) => {
+          {(layer.width < 72 || layer.height < 48
+            ? (['nw', 'ne', 'sw', 'se'] as const)
+            : (['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const)
+          ).map((handle) => {
             const compactHandle = layer.width < 72 || layer.height < 48;
-            const verticalClass = compactHandle ? '-bottom-1.5' : handle.startsWith('n') ? '-top-1.5' : '-bottom-1.5';
-            const horizontalClass = compactHandle ? '-right-1.5' : handle.endsWith('w') ? '-left-1.5' : '-right-1.5';
-            const cursorClass = handle === 'nw' || handle === 'se' ? 'cursor-nwse-resize' : 'cursor-nesw-resize';
+            const isSideHandle = handle.length === 1;
+            const cursorValue = handle === 'n' || handle === 's'
+              ? 'ns-resize'
+              : handle === 'e' || handle === 'w'
+                ? 'ew-resize'
+                : handle === 'nw' || handle === 'se'
+                  ? 'nwse-resize'
+                  : 'nesw-resize';
+            const handleShapeClass = isSideHandle
+              ? handle === 'n' || handle === 's'
+                ? 'h-2.5 w-7 rounded-full'
+                : 'h-7 w-2.5 rounded-full'
+              : compactHandle
+                ? 'h-3.5 w-3.5 rounded-full'
+                : 'h-4 w-4 rounded-full';
+            const positionClass = (() => {
+              switch (handle) {
+                case 'n':
+                  return '-top-1.5 left-1/2 -translate-x-1/2';
+                case 'e':
+                  return '-right-1.5 top-1/2 -translate-y-1/2';
+                case 's':
+                  return '-bottom-1.5 left-1/2 -translate-x-1/2';
+                case 'w':
+                  return '-left-1.5 top-1/2 -translate-y-1/2';
+                case 'nw':
+                  return '-left-2 -top-2';
+                case 'ne':
+                  return '-right-2 -top-2';
+                case 'sw':
+                  return '-bottom-2 -left-2';
+                case 'se':
+                default:
+                  return '-bottom-2 -right-2';
+              }
+            })();
             return (
               <button
                 key={handle}
                 type="button"
                 aria-label={`Resize ${handle}`}
                 data-design-control="true"
+                data-design-resize-cursor={cursorValue}
                 onPointerDown={(event) => onResizeStart(event, layer, handle)}
-                className={`absolute z-[120] ${compactHandle ? 'h-3 w-3' : 'h-2.5 w-2.5'} rounded-full border border-white bg-[#0284FF] shadow-sm transition hover:scale-125 ${verticalClass} ${horizontalClass} ${cursorClass}`}
+                className={`design-selection-handle absolute z-[125] border bg-white transition hover:scale-110 ${handleShapeClass} ${positionClass}`}
+                style={{
+                  borderColor: '#8B5CF6',
+                  boxShadow: '0 2px 7px rgba(20,35,52,0.22)',
+                  cursor: cursorValue,
+                }}
               />
             );
           })}
@@ -5587,8 +5669,8 @@ function DesignCanvas({
 
       setSnapGuide(null);
       const handle = drag.handle || 'se';
-      const nextWidth = handle.endsWith('w') ? drag.width - deltaX : drag.width + deltaX;
-      const nextHeight = handle.startsWith('n') ? drag.height - deltaY : drag.height + deltaY;
+      const nextWidth = handle.includes('w') ? drag.width - deltaX : handle.includes('e') ? drag.width + deltaX : drag.width;
+      const nextHeight = handle.includes('n') ? drag.height - deltaY : handle.includes('s') ? drag.height + deltaY : drag.height;
       const width = clamp(nextWidth, 24, design.width * 1.5);
       const height = clamp(nextHeight, 24, design.height * 1.5);
       if (drag.lockAspectRatio) {
@@ -5596,8 +5678,8 @@ function DesignCanvas({
         onPatchLayer(drag.id, {
           width: size,
           height: size,
-          x: handle.endsWith('w') ? drag.startX + (drag.width - size) : drag.startX,
-          y: handle.startsWith('n') ? drag.startY + (drag.height - size) : drag.startY,
+          x: handle.includes('w') ? drag.startX + (drag.width - size) : drag.startX,
+          y: handle.includes('n') ? drag.startY + (drag.height - size) : drag.startY,
         } as Partial<DesignLayer>);
         return;
       }
@@ -5605,8 +5687,8 @@ function DesignCanvas({
       onPatchLayer(drag.id, {
         width,
         height,
-        x: handle.endsWith('w') ? drag.startX + (drag.width - width) : drag.startX,
-        y: handle.startsWith('n') ? drag.startY + (drag.height - height) : drag.startY,
+        x: handle.includes('w') ? drag.startX + (drag.width - width) : drag.startX,
+        y: handle.includes('n') ? drag.startY + (drag.height - height) : drag.startY,
       } as Partial<DesignLayer>);
     }
 
@@ -5853,15 +5935,21 @@ function DesignCanvas({
         {multiSelectionBounds && (
           <div
             data-design-control="true"
-            className="pointer-events-none absolute z-[115] rounded-[6px] border-2 border-[#0284FF] bg-[#0284FF]/5 ring-4 ring-[#0284FF]/10"
+            className="design-selection-group pointer-events-none absolute z-[115] rounded-[6px] border ring-4"
             style={{
               left: `${(multiSelectionBounds.x / design.width) * 100}%`,
               top: `${(multiSelectionBounds.y / design.height) * 100}%`,
               width: `${(multiSelectionBounds.width / design.width) * 100}%`,
               height: `${(multiSelectionBounds.height / design.height) * 100}%`,
+              backgroundColor: 'rgba(139,92,246,0.05)',
+              borderColor: '#8B5CF6',
+              boxShadow: '0 0 0 4px rgba(139,92,246,0.1)',
             }}
           >
-            <span className="absolute -top-8 left-0 rounded-full bg-[#0284FF] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-sm">
+            <span
+              className="design-selection-group-label absolute -top-8 left-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-sm"
+              style={{ backgroundColor: '#8B5CF6' }}
+            >
               {selectedLayers.length} selected
             </span>
           </div>
@@ -5956,6 +6044,12 @@ export default function DesignStudioPanel({
   const selectedShadowTransparency = Math.round((selectedLayer?.shadowOpacity ?? 0.28) * 100);
   const selectedOutlineWidth = selectedLayer?.outlineWidth ?? 4;
   const selectedBlurAmount = selectedLayer?.blurAmount ?? 6;
+  const selectedTextFontWeight =
+    selectedLayer?.type === 'text' && selectedTextFormatRange
+      ? getInlineTextStyleAt(selectedLayer, selectedTextFormatRange.start).fontWeight
+      : selectedLayer?.type === 'text'
+        ? selectedLayer.fontWeight
+        : 500;
   const activeBackgroundEffects = getPageBackgroundEffects(activePage.backgroundEffects);
   const activePageHasPaperTexture = activePage.layers.some((layer) => layer.type === 'asset' && layer.assetId === 'paper_texture');
   const canUndo = designHistory.past.length > 0;
@@ -7456,7 +7550,7 @@ export default function DesignStudioPanel({
     }
 
     if (format === 'bold') {
-      patchLayer(layer.id, { fontWeight: layer.fontWeight >= 700 ? 500 : 800 } as Partial<DesignLayer>);
+      patchLayer(layer.id, { fontWeight: layer.fontWeight >= 700 ? 500 : 700 } as Partial<DesignLayer>);
       return;
     }
     if (format === 'italic') {
@@ -7468,6 +7562,18 @@ export default function DesignStudioPanel({
       return;
     }
     patchLayer(layer.id, { textTransform: layer.textTransform === 'uppercase' ? 'none' : 'uppercase' } as Partial<DesignLayer>);
+  }
+
+  function patchTextLayerFontWeight(layer: DesignTextLayer, fontWeight: number) {
+    if (layer.locked) return;
+    const range = getActiveTextFormattingRange(layer);
+    if (range && range.end > range.start) {
+      const richTextRuns = applyInlineTextStyle(layer, range, { fontWeight });
+      patchLayer(layer.id, { richTextRuns } as Partial<DesignLayer>);
+      setTextSelectionRange({ layerId: layer.id, ...range });
+      return;
+    }
+    patchLayer(layer.id, { fontWeight } as Partial<DesignLayer>);
   }
 
   function alignLayerOnCanvas(layer: DesignLayer, alignment: DesignLayerAlignment) {
@@ -8789,7 +8895,7 @@ export default function DesignStudioPanel({
                           </div>
 
                           <NumberControl label="Font size" value={selectedLayer.fontSize} min={10} max={120} onChange={(value) => patchLayer(selectedLayer.id, { fontSize: value } as Partial<DesignLayer>)} />
-                          <NumberControl label="Font weight" value={selectedLayer.fontWeight} min={300} max={900} step={100} onChange={(value) => patchLayer(selectedLayer.id, { fontWeight: value } as Partial<DesignLayer>)} />
+                          <NumberControl label="Font weight" value={selectedTextFontWeight} min={300} max={900} step={100} onChange={(value) => patchTextLayerFontWeight(selectedLayer, value)} />
                           <NumberControl label="Line height" value={selectedLayer.lineHeight} min={0.8} max={1.8} step={0.02} onChange={(value) => patchLayer(selectedLayer.id, { lineHeight: value } as Partial<DesignLayer>)} />
                           <NumberControl label="Letter spacing" value={selectedLayer.letterSpacing || 0} min={0} max={12} step={0.5} onChange={(value) => patchLayer(selectedLayer.id, { letterSpacing: value } as Partial<DesignLayer>)} />
                           <CornerRadiusControl
