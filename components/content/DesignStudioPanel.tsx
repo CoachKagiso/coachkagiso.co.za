@@ -12,8 +12,10 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
+  ArrowDown,
   ArrowUp,
   Bold,
+  BringToFront,
   Circle,
   ChevronDown,
   ChevronUp,
@@ -22,6 +24,7 @@ import {
   Download,
   FlipHorizontal,
   FlipVertical,
+  GripVertical,
   Hexagon,
   Image as ImageIcon,
   Italic,
@@ -29,12 +32,14 @@ import {
   Lock,
   Loader2,
   Minus,
+  Pencil,
   Plus,
   Redo2,
   RefreshCcw,
   RotateCw,
   Save,
   Search,
+  SendToBack,
   SlidersHorizontal,
   Sparkles,
   Square,
@@ -44,6 +49,7 @@ import {
   Type,
   Undo2,
   Ungroup,
+  Underline,
   Unlock,
   Upload,
   X,
@@ -107,8 +113,25 @@ type DesignFontFamily =
   | 'mibrush'
   | 'walesiaSignatureBrush'
   | 'walkingDream'
+  | 'sweetBulky'
+  | 'simpleNotes'
   | 'kaliebLuxury';
 type DesignTextAlign = 'left' | 'center' | 'right';
+type DesignTextDecoration = 'none' | 'underline';
+type DesignTextInlineFormat = 'bold' | 'italic' | 'underline' | 'uppercase';
+type DesignTextSelectionRange = {
+  layerId: string;
+  start: number;
+  end: number;
+};
+type DesignTextRun = {
+  start: number;
+  end: number;
+  fontWeight?: number;
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: DesignTextDecoration;
+  textTransform?: 'none' | 'uppercase';
+};
 type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se';
 type ColorInputMode = 'hex' | 'rgb';
 type DesignSnapGuide = {
@@ -194,8 +217,10 @@ type DesignTextLayer = BaseDesignLayer & {
   borderRadius?: number;
   padding?: number;
   fontStyle?: 'normal' | 'italic';
+  textDecoration?: DesignTextDecoration;
   textTransform?: 'none' | 'uppercase';
   letterSpacing?: number;
+  richTextRuns?: DesignTextRun[];
 };
 
 type DesignAssetLayer = BaseDesignLayer & {
@@ -1767,6 +1792,8 @@ const designFontOptions: Array<{ value: DesignFontFamily; label: string; fontFam
     fontFamily: '"Walesia Signature Brush", "Segoe Print", cursive',
   },
   { value: 'walkingDream', label: 'Walking Dream', fontFamily: '"Walking Dream", "Segoe Print", cursive' },
+  { value: 'sweetBulky', label: 'Sweet Bulky', fontFamily: '"Sweet Bulky", "Segoe Print", cursive' },
+  { value: 'simpleNotes', label: 'Simple Notes', fontFamily: '"Simple Notes", "Segoe Print", cursive' },
   { value: 'kaliebLuxury', label: 'Kalieb Luxury', fontFamily: '"Kalieb Luxury", "Times New Roman", serif' },
 ];
 
@@ -2023,21 +2050,48 @@ function createBlankDesignDocument(
   width: number = DEFAULT_DESIGN_WIDTH,
   height: number = DEFAULT_DESIGN_HEIGHT,
 ): DesignDocument {
+  const page = createBlankDesignPage('Page 1', width, height, '#FBFAF8');
   return {
     id: createDesignId('blank-design'),
     title: format === 'carousel' ? 'Untitled carousel template' : format === 'presentation' ? 'Untitled presentation template' : 'Untitled design',
     format,
     width,
     height,
-    pages: [
-      {
-        id: createDesignId('page'),
-        name: 'Page 1',
-        background: '#FBFAF8',
-        backgroundEffects: getDefaultBackgroundEffects(),
-        layers: [],
-      },
-    ],
+    pages: [page],
+  };
+}
+
+function createBlankDesignPage(
+  name: string,
+  width: number,
+  height: number,
+  background: string = '#F5F2ED',
+  includePaperTexture: boolean = false,
+): DesignPage {
+  return {
+    id: createDesignId('page'),
+    name,
+    background,
+    backgroundEffects: getDefaultBackgroundEffects(),
+    layers: includePaperTexture
+      ? [
+          {
+            id: createDesignId('asset'),
+            type: 'asset',
+            name: 'Paper texture',
+            assetId: 'paper_texture',
+            x: 0,
+            y: 0,
+            width,
+            height,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: true,
+            fit: 'cover',
+          },
+        ]
+      : [],
   };
 }
 
@@ -3409,6 +3463,7 @@ function getTextLayerStyle(layer: DesignTextLayer, design: DesignDocument) {
     fontSize: sizeToCqw(layer.fontSize, design.width),
     fontWeight: layer.fontWeight,
     fontStyle: layer.fontStyle || 'normal',
+    textDecorationLine: layer.textDecoration === 'underline' ? 'underline' : 'none',
     lineHeight: layer.lineHeight,
     textAlign: layer.textAlign,
     letterSpacing: layer.letterSpacing ? sizeToCqw(layer.letterSpacing, design.width) : 0,
@@ -3417,6 +3472,213 @@ function getTextLayerStyle(layer: DesignTextLayer, design: DesignDocument) {
     border: layer.borderColor ? `${sizeToCqw(1.5, design.width)} solid ${layer.borderColor}` : undefined,
     borderRadius: getLayerCornerRadiusCss(layer, design),
     padding: layer.padding ? sizeToCqw(layer.padding, design.width) : undefined,
+  };
+}
+
+function getBaseTextRunStyle(layer: DesignTextLayer) {
+  return {
+    fontWeight: layer.fontWeight,
+    fontStyle: layer.fontStyle || 'normal',
+    textDecoration: layer.textDecoration || 'none',
+    textTransform: layer.textTransform || 'none',
+  };
+}
+
+function normalizeTextRunRange(run: DesignTextRun, textLength: number): DesignTextRun | null {
+  const start = clamp(Math.floor(run.start), 0, textLength);
+  const end = clamp(Math.floor(run.end), 0, textLength);
+  if (end <= start) return null;
+  return { ...run, start, end };
+}
+
+function getNormalizedTextRuns(layer: DesignTextLayer) {
+  return (layer.richTextRuns || [])
+    .map((run) => normalizeTextRunRange(run, layer.text.length))
+    .filter((run): run is DesignTextRun => Boolean(run))
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+function textRunStyleEquals(a: Omit<DesignTextRun, 'start' | 'end'>, b: Omit<DesignTextRun, 'start' | 'end'>) {
+  return (
+    a.fontWeight === b.fontWeight &&
+    a.fontStyle === b.fontStyle &&
+    a.textDecoration === b.textDecoration &&
+    a.textTransform === b.textTransform
+  );
+}
+
+function mergeTextRuns(runs: DesignTextRun[]) {
+  return runs.reduce<DesignTextRun[]>((merged, run) => {
+    const previous = merged.at(-1);
+    if (previous && previous.end === run.start && textRunStyleEquals(previous, run)) {
+      previous.end = run.end;
+      return merged;
+    }
+    merged.push({ ...run });
+    return merged;
+  }, []);
+}
+
+function getInlineTextStyleAt(layer: DesignTextLayer, index: number) {
+  const style = getBaseTextRunStyle(layer);
+  getNormalizedTextRuns(layer).forEach((run) => {
+    if (index < run.start || index >= run.end) return;
+    if (run.fontWeight !== undefined) style.fontWeight = run.fontWeight;
+    if (run.fontStyle !== undefined) style.fontStyle = run.fontStyle;
+    if (run.textDecoration !== undefined) style.textDecoration = run.textDecoration;
+    if (run.textTransform !== undefined) style.textTransform = run.textTransform;
+  });
+  return style;
+}
+
+function getInlineTextRunFromStyle(layer: DesignTextLayer, start: number, end: number, style: ReturnType<typeof getBaseTextRunStyle>) {
+  const base = getBaseTextRunStyle(layer);
+  const run: DesignTextRun = { start, end };
+  if (style.fontWeight !== base.fontWeight) run.fontWeight = style.fontWeight;
+  if (style.fontStyle !== base.fontStyle) run.fontStyle = style.fontStyle;
+  if (style.textDecoration !== base.textDecoration) run.textDecoration = style.textDecoration;
+  if (style.textTransform !== base.textTransform) run.textTransform = style.textTransform;
+  return Object.keys(run).length > 2 ? run : null;
+}
+
+function getTextLayerSegments(layer: DesignTextLayer) {
+  const text = layer.text || ' ';
+  if (!layer.text) return [{ text, style: getBaseTextRunStyle(layer) }];
+  const boundaries = new Set<number>([0, layer.text.length]);
+  getNormalizedTextRuns(layer).forEach((run) => {
+    boundaries.add(run.start);
+    boundaries.add(run.end);
+  });
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+  return sortedBoundaries.slice(0, -1).map((start, index) => {
+    const end = sortedBoundaries[index + 1];
+    return {
+      text: layer.text.slice(start, end),
+      style: getInlineTextStyleAt(layer, start),
+    };
+  }).filter((segment) => segment.text.length > 0);
+}
+
+function getTextSegmentStyle(style: ReturnType<typeof getBaseTextRunStyle>): CSSProperties {
+  return {
+    fontWeight: style.fontWeight,
+    fontStyle: style.fontStyle,
+    textDecorationLine: style.textDecoration === 'underline' ? 'underline' : 'none',
+    textTransform: style.textTransform,
+  };
+}
+
+function isInlineTextFormatActive(layer: DesignTextLayer, format: DesignTextInlineFormat, range?: Omit<DesignTextSelectionRange, 'layerId'> | null) {
+  if (!range || range.end <= range.start) {
+    if (format === 'bold') return layer.fontWeight >= 700;
+    if (format === 'italic') return layer.fontStyle === 'italic';
+    if (format === 'underline') return layer.textDecoration === 'underline';
+    return layer.textTransform === 'uppercase';
+  }
+
+  const start = clamp(range.start, 0, layer.text.length);
+  const end = clamp(range.end, 0, layer.text.length);
+  if (end <= start) return false;
+  for (let index = start; index < end; index += 1) {
+    const style = getInlineTextStyleAt(layer, index);
+    if (format === 'bold' && style.fontWeight < 700) return false;
+    if (format === 'italic' && style.fontStyle !== 'italic') return false;
+    if (format === 'underline' && style.textDecoration !== 'underline') return false;
+    if (format === 'uppercase' && style.textTransform !== 'uppercase') return false;
+  }
+  return true;
+}
+
+function getInlineFormatPatch(format: DesignTextInlineFormat, active: boolean) {
+  if (format === 'bold') return { fontWeight: active ? 500 : 800 };
+  if (format === 'italic') return { fontStyle: active ? 'normal' : 'italic' } as const;
+  if (format === 'underline') return { textDecoration: active ? 'none' : 'underline' } as const;
+  return { textTransform: active ? 'none' : 'uppercase' } as const;
+}
+
+function applyInlineTextFormat(layer: DesignTextLayer, format: DesignTextInlineFormat, range: Omit<DesignTextSelectionRange, 'layerId'>) {
+  const start = clamp(Math.min(range.start, range.end), 0, layer.text.length);
+  const end = clamp(Math.max(range.start, range.end), 0, layer.text.length);
+  if (end <= start) return layer.richTextRuns || [];
+  const active = isInlineTextFormatActive(layer, format, { start, end });
+  const patch = getInlineFormatPatch(format, active);
+  const boundaries = new Set<number>([0, layer.text.length, start, end]);
+  getNormalizedTextRuns(layer).forEach((run) => {
+    boundaries.add(run.start);
+    boundaries.add(run.end);
+  });
+
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+  const nextRuns = sortedBoundaries.slice(0, -1).reduce<DesignTextRun[]>((runs, segmentStart, index) => {
+    const segmentEnd = sortedBoundaries[index + 1];
+    if (segmentEnd <= segmentStart) return runs;
+    const style = getInlineTextStyleAt(layer, segmentStart);
+    if (segmentStart >= start && segmentEnd <= end) {
+      Object.assign(style, patch);
+    }
+    const run = getInlineTextRunFromStyle(layer, segmentStart, segmentEnd, style);
+    if (run) runs.push(run);
+    return runs;
+  }, []);
+
+  return mergeTextRuns(nextRuns);
+}
+
+function clampInlineTextRuns(runs: DesignTextRun[] | undefined, textLength: number) {
+  return mergeTextRuns(
+    (runs || [])
+      .map((run) => normalizeTextRunRange(run, textLength))
+      .filter((run): run is DesignTextRun => Boolean(run)),
+  );
+}
+
+function shiftInlineTextRunsForReplacement(layer: DesignTextLayer, start: number, end: number, insertedLength: number) {
+  const delta = insertedLength - (end - start);
+  const nextRuns = getNormalizedTextRuns(layer).reduce<DesignTextRun[]>((runs, run) => {
+    if (run.end <= start) {
+      runs.push(run);
+      return runs;
+    }
+    if (run.start >= end) {
+      runs.push({ ...run, start: run.start + delta, end: run.end + delta });
+      return runs;
+    }
+    if (run.start < start && run.end > end) {
+      runs.push({ ...run, end: Math.max(start, run.end + delta) });
+      return runs;
+    }
+    if (run.start < start) {
+      runs.push({ ...run, end: start });
+      return runs;
+    }
+    if (run.end > end) {
+      runs.push({ ...run, start: start + insertedLength, end: run.end + delta });
+    }
+    return runs;
+  }, []);
+  return clampInlineTextRuns(nextRuns, layer.text.length + delta);
+}
+
+function getTextSelectionOffset(root: HTMLElement, node: Node, offset: number) {
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.setEnd(node, offset);
+  return range.toString().length;
+}
+
+function getCanvasTextSelectionRange(layerId: string, textLength: number): Omit<DesignTextSelectionRange, 'layerId'> | null {
+  if (typeof window === 'undefined') return null;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const root = document.querySelector<HTMLElement>(`[data-design-layer-id="${layerId}"] [data-design-text-content="true"]`);
+  const anchorNode = selection.anchorNode;
+  const focusNode = selection.focusNode;
+  if (!root || !anchorNode || !focusNode || !root.contains(anchorNode) || !root.contains(focusNode)) return null;
+  const start = getTextSelectionOffset(root, anchorNode, selection.anchorOffset);
+  const end = getTextSelectionOffset(root, focusNode, selection.focusOffset);
+  return {
+    start: clamp(Math.min(start, end), 0, textLength),
+    end: clamp(Math.max(start, end), 0, textLength),
   };
 }
 
@@ -4831,6 +5093,18 @@ function InlineTextLayerEditor({
   );
 }
 
+function RichTextLayerContent({ layer }: { layer: DesignTextLayer }) {
+  return (
+    <>
+      {getTextLayerSegments(layer).map((segment, index) => (
+        <span key={`${index}-${segment.text}`} style={getTextSegmentStyle(segment.style)}>
+          {segment.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function DesignLayerView({
   layer,
   design,
@@ -4911,6 +5185,7 @@ function DesignLayerView({
   const layerZIndex = selected && !shouldPreserveStackWhenSelected ? 90 : baseLayerZIndex;
   const layerAsset = layer.type === 'asset' ? assetLibrary[layer.assetId] : null;
   const assetBorderRadius = layer.type === 'asset' ? getLayerCornerRadiusCss(layer, design) : undefined;
+  const canSelectTextContent = selected && layer.type === 'text' && !layer.locked && !isTextEditing;
 
   return (
     <div
@@ -4931,7 +5206,7 @@ function DesignLayerView({
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect(event.shiftKey || event.metaKey || event.ctrlKey);
       }}
-      className={`absolute select-none ${isTextEditing ? 'cursor-text' : layer.locked ? 'cursor-default' : 'cursor-move'} ${
+      className={`absolute ${canSelectTextContent ? 'select-text' : 'select-none'} ${isTextEditing || canSelectTextContent ? 'cursor-text' : layer.locked ? 'cursor-default' : 'cursor-move'} ${
         selected ? 'ring-2 ring-[#0284FF] ring-offset-2 ring-offset-transparent' : ''
       }`}
       style={{
@@ -4967,7 +5242,7 @@ function DesignLayerView({
           <InlineTextLayerEditor
             layer={layer}
             design={design}
-            onCommit={(text) => onPatchLayer(layer.id, { text } as Partial<DesignLayer>)}
+            onCommit={(text) => onPatchLayer(layer.id, { text, richTextRuns: clampInlineTextRuns(layer.richTextRuns, text.length) } as Partial<DesignLayer>)}
             onCancel={onStopTextEdit}
           />
         ) : (
@@ -4978,9 +5253,10 @@ function DesignLayerView({
               className="pointer-events-none invisible absolute left-0 top-0 h-auto w-full whitespace-pre-wrap break-words"
               style={getTextLayerStyle(layer, design)}
             >
-              {layer.text || ' '}
+              <RichTextLayerContent layer={layer} />
             </div>
             <div
+              data-design-text-content="true"
               className="flex h-full w-full whitespace-pre-wrap break-words"
               style={{
                 ...getTextLayerStyle(layer, design),
@@ -4988,7 +5264,7 @@ function DesignLayerView({
                 justifyContent: layer.textAlign === 'center' ? 'center' : layer.textAlign === 'right' ? 'flex-end' : 'flex-start',
               }}
             >
-              {layer.text}
+              <RichTextLayerContent layer={layer} />
             </div>
           </>
         )}
@@ -5073,9 +5349,10 @@ function DesignLayerView({
 
       {showControls && !layer.locked && (
         <>
-          {(['nw', 'ne', 'sw', 'se'] as const).map((handle) => {
-            const verticalClass = handle.startsWith('n') ? '-top-2' : '-bottom-2';
-            const horizontalClass = handle.endsWith('w') ? '-left-2' : '-right-2';
+          {(layer.width < 72 || layer.height < 48 ? (['se'] as const) : (['nw', 'ne', 'sw', 'se'] as const)).map((handle) => {
+            const compactHandle = layer.width < 72 || layer.height < 48;
+            const verticalClass = compactHandle ? '-bottom-1.5' : handle.startsWith('n') ? '-top-1.5' : '-bottom-1.5';
+            const horizontalClass = compactHandle ? '-right-1.5' : handle.endsWith('w') ? '-left-1.5' : '-right-1.5';
             const cursorClass = handle === 'nw' || handle === 'se' ? 'cursor-nwse-resize' : 'cursor-nesw-resize';
             return (
               <button
@@ -5084,7 +5361,7 @@ function DesignLayerView({
                 aria-label={`Resize ${handle}`}
                 data-design-control="true"
                 onPointerDown={(event) => onResizeStart(event, layer, handle)}
-                className={`absolute z-[120] h-4 w-4 rounded-full border-2 border-white bg-[#0284FF] shadow-sm ${verticalClass} ${horizontalClass} ${cursorClass}`}
+                className={`absolute z-[120] ${compactHandle ? 'h-3 w-3' : 'h-2.5 w-2.5'} rounded-full border border-white bg-[#0284FF] shadow-sm transition hover:scale-125 ${verticalClass} ${horizontalClass} ${cursorClass}`}
               />
             );
           })}
@@ -5344,6 +5621,15 @@ function DesignCanvas({
   function startDrag(event: React.PointerEvent<HTMLDivElement>, layer: DesignLayer) {
     event.stopPropagation();
     if (activeEditingTextLayerId === layer.id) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      layer.type === 'text' &&
+      selectedLayerIdSet.has(layer.id) &&
+      target?.closest('[data-design-text-content="true"]')
+    ) {
+      suppressClickSelectionRef.current = true;
+      return;
+    }
     if (event.shiftKey || event.metaKey || event.ctrlKey) {
       suppressClickSelectionRef.current = true;
       onSelectLayer(layer.id, true);
@@ -5607,6 +5893,11 @@ export default function DesignStudioPanel({
   const [vaultMessage, setVaultMessage] = useState('');
   const [isVaultPanelCollapsed, setIsVaultPanelCollapsed] = useState(false);
   const [vaultPanelPreferenceLoaded, setVaultPanelPreferenceLoaded] = useState(false);
+  const [draggingPageId, setDraggingPageId] = useState<string | null>(null);
+  const [pageDropTargetId, setPageDropTargetId] = useState<string | null>(null);
+  const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null);
+  const [layerDropTargetId, setLayerDropTargetId] = useState<string | null>(null);
+  const [textSelectionRange, setTextSelectionRange] = useState<DesignTextSelectionRange | null>(null);
   const [textInsertOpen, setTextInsertOpen] = useState(false);
   const [brandAssets, setBrandAssets] = useState<DesignAsset[]>([]);
   const [brandAssetsLoaded, setBrandAssetsLoaded] = useState(false);
@@ -5641,6 +5932,12 @@ export default function DesignStudioPanel({
     [activePage.layers, selectedLayerIds],
   );
   const selectedLayer = selectedLayers.length === 1 ? selectedLayers[0] : null;
+  const selectedTextFormatRange = selectedLayer?.type === 'text' && textSelectionRange?.layerId === selectedLayer.id && textSelectionRange.end > textSelectionRange.start
+    ? {
+        start: clamp(textSelectionRange.start, 0, selectedLayer.text.length),
+        end: clamp(textSelectionRange.end, 0, selectedLayer.text.length),
+      }
+    : null;
   const hasMultiSelection = selectedLayers.length > 1;
   const selectedGroupableLayers = selectedLayers.filter((layer) => layer.visible && !layer.locked);
   const visibleLayerCount = activePage.layers.filter((layer) => layer.visible).length;
@@ -5712,6 +6009,18 @@ export default function DesignStudioPanel({
   useEffect(() => {
     selectedLayerIdsRef.current = selectedLayerIds;
   }, [selectedLayerIds]);
+
+  useEffect(() => {
+    if (selectedLayer?.type !== 'text') return;
+    function onSelectionChange() {
+      if (selectedLayer?.type !== 'text') return;
+      const range = getCanvasTextSelectionRange(selectedLayer.id, selectedLayer.text.length);
+      if (!range || range.end <= range.start) return;
+      setTextSelectionRange({ layerId: selectedLayer.id, ...range });
+    }
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, [selectedLayer]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(DESIGN_STORAGE_KEY);
@@ -6094,7 +6403,7 @@ export default function DesignStudioPanel({
         if (layer.id !== selectedId) return layer;
         if (layer.type !== 'text' || layer.locked || layer.text === pastedText) return layer;
         changed = true;
-        return { ...layer, text: pastedText } as DesignLayer;
+        return { ...layer, text: pastedText, richTextRuns: [] } as DesignLayer;
       });
       return changed ? { ...page, layers } : page;
     });
@@ -6802,30 +7111,64 @@ export default function DesignStudioPanel({
     selectSingleLayer(nextPage.layers.find((layer) => !layer.locked)?.id || null);
   }
 
+  function renamePage(pageId: string) {
+    const page = design.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    const nextName = window.prompt('Page name', page.name);
+    if (!nextName?.trim() || nextName.trim() === page.name) return;
+    updateDesign((current) => ({
+      ...current,
+      pages: current.pages.map((item) => (
+        item.id === pageId ? { ...item, name: nextName.trim() } : item
+      )),
+    }));
+  }
+
+  function deletePage(pageId: string) {
+    const page = design.pages.find((item) => item.id === pageId);
+    if (!page) return;
+    const confirmed = window.confirm(`Delete "${page.name}"? This removes the page and all layers on it.`);
+    if (!confirmed) return;
+
+    let nextActivePageId = activePageIdRef.current;
+    let nextSelectedLayerId: string | null = selectedLayerIdRef.current;
+    updateDesign((current) => {
+      const deleteIndex = current.pages.findIndex((item) => item.id === pageId);
+      if (deleteIndex < 0) return current;
+      let nextPages = current.pages.filter((item) => item.id !== pageId);
+      if (!nextPages.length) {
+        nextPages = [createBlankDesignPage('Page 1', current.width, current.height)];
+      }
+      if (activePageIdRef.current === pageId || !nextPages.some((item) => item.id === activePageIdRef.current)) {
+        const nextPage = nextPages[Math.min(deleteIndex, nextPages.length - 1)] || nextPages[0];
+        nextActivePageId = nextPage.id;
+        nextSelectedLayerId = nextPage.layers.find((layer) => !layer.locked)?.id || null;
+      }
+      return { ...current, pages: nextPages };
+    });
+    activePageIdRef.current = nextActivePageId;
+    selectedLayerIdRef.current = nextSelectedLayerId;
+    selectedLayerIdsRef.current = nextSelectedLayerId ? [nextSelectedLayerId] : [];
+    setActivePageId(nextActivePageId);
+    setSelectedLayerIdState(nextSelectedLayerId);
+    setSelectedLayerIds(selectedLayerIdsRef.current);
+  }
+
+  function reorderPage(id: string, targetId: string) {
+    if (id === targetId) return;
+    updateDesign((current) => {
+      const sourceIndex = current.pages.findIndex((page) => page.id === id);
+      const targetIndex = current.pages.findIndex((page) => page.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return current;
+      const nextPages = [...current.pages];
+      const [page] = nextPages.splice(sourceIndex, 1);
+      nextPages.splice(targetIndex, 0, page);
+      return { ...current, pages: nextPages };
+    });
+  }
+
   function addBlankPage() {
-    const nextPage: DesignPage = {
-      id: createDesignId('page'),
-      name: `Page ${design.pages.length + 1}`,
-      background: '#F5F2ED',
-      backgroundEffects: getDefaultBackgroundEffects(),
-      layers: [
-        {
-          id: createDesignId('asset'),
-          type: 'asset',
-          name: 'Paper texture',
-          assetId: 'paper_texture',
-          x: 0,
-          y: 0,
-          width: design.width,
-          height: design.height,
-          rotation: 0,
-          opacity: 1,
-          visible: true,
-          locked: true,
-          fit: 'cover',
-        },
-      ],
-    };
+    const nextPage = createBlankDesignPage(`Page ${design.pages.length + 1}`, design.width, design.height, '#F5F2ED', true);
     updateDesign((current) => ({ ...current, pages: [...current.pages, nextPage] }));
     activePageIdRef.current = nextPage.id;
     setActivePageId(nextPage.id);
@@ -6841,6 +7184,32 @@ export default function DesignStudioPanel({
       const nextLayers = [...page.layers];
       const [layer] = nextLayers.splice(index, 1);
       nextLayers.splice(nextIndex, 0, layer);
+      return { ...page, layers: nextLayers };
+    });
+  }
+
+  function moveLayerToEdge(id: string, edge: 'front' | 'back') {
+    updateActivePage((page) => {
+      const index = page.layers.findIndex((layer) => layer.id === id);
+      if (index < 0) return page;
+      const nextIndex = edge === 'front' ? page.layers.length - 1 : 0;
+      if (index === nextIndex) return page;
+      const nextLayers = [...page.layers];
+      const [layer] = nextLayers.splice(index, 1);
+      nextLayers.splice(nextIndex, 0, layer);
+      return { ...page, layers: nextLayers };
+    });
+  }
+
+  function reorderLayer(id: string, targetId: string) {
+    if (id === targetId) return;
+    updateActivePage((page) => {
+      const sourceIndex = page.layers.findIndex((layer) => layer.id === id);
+      const targetIndex = page.layers.findIndex((layer) => layer.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return page;
+      const nextLayers = [...page.layers];
+      const [layer] = nextLayers.splice(sourceIndex, 1);
+      nextLayers.splice(targetIndex, 0, layer);
       return { ...page, layers: nextLayers };
     });
   }
@@ -7029,12 +7398,69 @@ export default function DesignStudioPanel({
     const end = textarea?.selectionEnd ?? layer.text.length;
     const insertion = text.startsWith('\n') ? text : text.length <= 2 ? `${text} ` : text;
     const nextText = `${layer.text.slice(0, start)}${insertion}${layer.text.slice(end)}`;
-    patchLayer(layer.id, { text: nextText } as Partial<DesignLayer>);
+    patchLayer(layer.id, {
+      text: nextText,
+      richTextRuns: shiftInlineTextRunsForReplacement(layer, start, end, insertion.length),
+    } as Partial<DesignLayer>);
     window.requestAnimationFrame(() => {
       const cursor = start + insertion.length;
       textLayerTextareaRef.current?.focus();
       textLayerTextareaRef.current?.setSelectionRange(cursor, cursor);
+      setTextSelectionRange({ layerId: layer.id, start: cursor, end: cursor });
     });
+  }
+
+  function rememberTextSelection(layer: DesignTextLayer, element: HTMLTextAreaElement) {
+    setTextSelectionRange({
+      layerId: layer.id,
+      start: element.selectionStart,
+      end: element.selectionEnd,
+    });
+  }
+
+  function getInspectorTextSelectionRange(layer: DesignTextLayer) {
+    const textarea = textLayerTextareaRef.current;
+    if (textarea && textarea.value === layer.text) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      if (end > start) return { start, end };
+    }
+    if (textSelectionRange?.layerId !== layer.id || textSelectionRange.end <= textSelectionRange.start) return null;
+    return {
+      start: clamp(textSelectionRange.start, 0, layer.text.length),
+      end: clamp(textSelectionRange.end, 0, layer.text.length),
+    };
+  }
+
+  function getActiveTextFormattingRange(layer: DesignTextLayer) {
+    const canvasRange = getCanvasTextSelectionRange(layer.id, layer.text.length);
+    if (canvasRange && canvasRange.end > canvasRange.start) return canvasRange;
+    return getInspectorTextSelectionRange(layer);
+  }
+
+  function patchTextLayerFormat(layer: DesignTextLayer, format: DesignTextInlineFormat) {
+    if (layer.locked) return;
+    const range = getActiveTextFormattingRange(layer);
+    if (range && range.end > range.start) {
+      const richTextRuns = applyInlineTextFormat(layer, format, range);
+      patchLayer(layer.id, { richTextRuns } as Partial<DesignLayer>);
+      setTextSelectionRange({ layerId: layer.id, ...range });
+      return;
+    }
+
+    if (format === 'bold') {
+      patchLayer(layer.id, { fontWeight: layer.fontWeight >= 700 ? 500 : 800 } as Partial<DesignLayer>);
+      return;
+    }
+    if (format === 'italic') {
+      patchLayer(layer.id, { fontStyle: layer.fontStyle === 'italic' ? 'normal' : 'italic' } as Partial<DesignLayer>);
+      return;
+    }
+    if (format === 'underline') {
+      patchLayer(layer.id, { textDecoration: layer.textDecoration === 'underline' ? 'none' : 'underline' } as Partial<DesignLayer>);
+      return;
+    }
+    patchLayer(layer.id, { textTransform: layer.textTransform === 'uppercase' ? 'none' : 'uppercase' } as Partial<DesignLayer>);
   }
 
   function alignLayerOnCanvas(layer: DesignLayer, alignment: DesignLayerAlignment) {
@@ -7410,25 +7836,110 @@ export default function DesignStudioPanel({
                 </button>
               </div>
               <div className="mt-3 grid gap-2">
-                {design.pages.map((page, index) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    onClick={() => {
-                      activePageIdRef.current = page.id;
-                      setActivePageId(page.id);
-                      selectSingleLayer(page.layers.find((layer) => !layer.locked)?.id || null);
-                    }}
-                  className={`min-w-0 rounded-[8px] border px-3 py-3 text-left transition ${
-                      activePage.id === page.id
-                        ? 'border-[#142334] bg-[#142334] text-white'
-                        : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
-                    }`}
-                  >
-                    <span className="block text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">Page {index + 1}</span>
-                    <span className="mt-1 block truncate text-[13px] font-semibold">{page.name}</span>
-                  </button>
-                ))}
+                {design.pages.map((page, index) => {
+                  const pageIsActive = activePage.id === page.id;
+                  return (
+                    <div
+                      key={page.id}
+                      onDragEnter={(event) => {
+                        event.preventDefault();
+                        if (draggingPageId && draggingPageId !== page.id) setPageDropTargetId(page.id);
+                      }}
+                      onDragOver={(event) => {
+                        if (!draggingPageId || draggingPageId === page.id) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                        if (pageDropTargetId !== page.id) setPageDropTargetId(page.id);
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (draggingPageId) reorderPage(draggingPageId, page.id);
+                        setDraggingPageId(null);
+                        setPageDropTargetId(null);
+                      }}
+                      className={`group/page relative rounded-[8px] border transition ${
+                        pageIsActive
+                          ? 'border-[#142334] bg-[#142334] text-white'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                      } ${
+                        draggingPageId === page.id ? 'opacity-45' : ''
+                      } ${
+                        pageDropTargetId === page.id && draggingPageId !== page.id ? 'ring-2 ring-[#C9AD98] ring-offset-2 ring-offset-[#F8F6F4]' : ''
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          activePageIdRef.current = page.id;
+                          setActivePageId(page.id);
+                          selectSingleLayer(page.layers.find((layer) => !layer.locked)?.id || null);
+                        }}
+                        className="min-w-0 w-full px-3 py-3 pr-28 text-left"
+                      >
+                        <span className="block text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">Page {index + 1}</span>
+                        <span className="mt-1 block truncate text-[13px] font-semibold">{page.name}</span>
+                      </button>
+                      <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition group-hover/page:pointer-events-auto group-hover/page:opacity-100 group-focus-within/page:pointer-events-auto group-focus-within/page:opacity-100">
+                        <span
+                          draggable
+                          title={`Drag ${page.name}`}
+                          aria-label={`Drag ${page.name}`}
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onDragStart={(event) => {
+                            event.stopPropagation();
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', page.id);
+                            setDraggingPageId(page.id);
+                            setPageDropTargetId(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingPageId(null);
+                            setPageDropTargetId(null);
+                          }}
+                          className={`grid h-7 w-7 cursor-grab place-items-center rounded-full border shadow-sm transition active:cursor-grabbing ${
+                            pageIsActive
+                              ? 'border-white/20 bg-white/10 text-white hover:bg-white/18'
+                              : 'border-[#E4D8CB] bg-white/95 text-[#142334] hover:border-[#C9AD98] hover:bg-[#F8F6F4]'
+                          }`}
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </span>
+                        <button
+                          type="button"
+                          title="Rename page"
+                          aria-label={`Rename ${page.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            renamePage(page.id);
+                          }}
+                          className={`grid h-7 w-7 place-items-center rounded-full border shadow-sm transition ${
+                            pageIsActive
+                              ? 'border-white/20 bg-white/10 text-white hover:bg-white/18'
+                              : 'border-[#E4D8CB] bg-white/95 text-[#142334] hover:border-[#C9AD98] hover:bg-[#F8F6F4]'
+                          }`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete page"
+                          aria-label={`Delete ${page.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deletePage(page.id);
+                          }}
+                          className={`grid h-7 w-7 place-items-center rounded-full border shadow-sm transition ${
+                            pageIsActive
+                              ? 'border-white/20 bg-white/10 text-red-100 hover:bg-white/18'
+                              : 'border-red-100 bg-white/95 text-red-600 hover:border-red-200 hover:bg-red-50'
+                          }`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <button type="button" onClick={duplicatePage} className="studio-ghost-button mt-3 w-full justify-center whitespace-normal text-center">
                 <Layers3 className="h-4 w-4" />
@@ -7455,33 +7966,105 @@ export default function DesignStudioPanel({
                     Shift-click or Ctrl-click layers to select more than one.
                   </p>
                   <div className="design-studio-scroll-area mt-3 grid max-h-[520px] gap-2 overflow-y-auto overflow-x-hidden pr-2 xl:max-h-[calc(100vh-500px)]" onWheel={trapDesignWheel}>
-                    {[...activePage.layers].reverse().map((layer) => (
+                    {[...activePage.layers].reverse().map((layer) => {
+                      const layerStackIndex = activePage.layers.findIndex((item) => item.id === layer.id);
+                      const canMoveLayerUp = layerStackIndex >= 0 && layerStackIndex < activePage.layers.length - 1;
+                      const canMoveLayerDown = layerStackIndex > 0;
+                      const layerIsSelected = selectedLayerIds.includes(layer.id);
+                      const layerPreviewLabel = getLayerPreviewLabel(layer, assetLibrary);
+                      return (
                       <div
                         key={layer.id}
-                        className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center rounded-[8px] border transition ${
-                          selectedLayerIds.includes(layer.id)
+                        onDragEnter={(event) => {
+                          event.preventDefault();
+                          if (draggingLayerId && draggingLayerId !== layer.id) setLayerDropTargetId(layer.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (!draggingLayerId || draggingLayerId === layer.id) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'move';
+                          if (layerDropTargetId !== layer.id) setLayerDropTargetId(layer.id);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggingLayerId) reorderLayer(draggingLayerId, layer.id);
+                          setDraggingLayerId(null);
+                          setLayerDropTargetId(null);
+                        }}
+                        className={`group/layer relative grid min-w-0 grid-cols-1 items-center rounded-[8px] border transition ${
+                          layerIsSelected
                             ? 'border-[#142334] bg-[#142334] text-white'
                             : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                        } ${
+                          draggingLayerId === layer.id ? 'opacity-45' : ''
+                        } ${
+                          layerDropTargetId === layer.id && draggingLayerId !== layer.id ? 'ring-2 ring-[#C9AD98] ring-offset-2 ring-offset-[#F8F6F4]' : ''
                         }`}
                       >
                         <button
                           type="button"
                           onClick={(event) => selectLayer(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)}
-                          className="min-w-0 px-3 py-2 text-left"
+                          className="min-w-0 px-3 py-2 text-left transition-[padding] group-hover/layer:pr-48 group-focus-within/layer:pr-48"
                         >
                           <span className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] opacity-60" title={layer.templateSlot ? getDesignTemplateSlotLabel(layer.templateSlot) : undefined}>
                             {layer.type === 'text' ? <Type className="h-3.5 w-3.5 shrink-0" /> : layer.type === 'shape' ? <Square className="h-3.5 w-3.5 shrink-0" /> : <ImageIcon className="h-3.5 w-3.5 shrink-0" />}
                             {layer.locked ? 'Locked' : layer.type}
                           </span>
-                          <span className="mt-1 block truncate text-[12px] font-semibold" title={getLayerPreviewLabel(layer, assetLibrary)}>
+                          <span className="mt-1 block truncate text-[12px] font-semibold" title={layerPreviewLabel}>
                             {getLayerCompactPreviewLabel(layer, assetLibrary)}
                           </span>
                         </button>
-                        <div className="flex shrink-0 items-center gap-1 pr-2">
+                        <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition group-hover/layer:pointer-events-auto group-hover/layer:opacity-100 group-focus-within/layer:pointer-events-auto group-focus-within/layer:opacity-100">
+                          <span
+                            draggable
+                            title={`Drag ${layerPreviewLabel}`}
+                            aria-label={`Drag ${layerPreviewLabel}`}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onDragStart={(event) => {
+                              event.stopPropagation();
+                              event.dataTransfer.effectAllowed = 'move';
+                              event.dataTransfer.setData('text/plain', layer.id);
+                              setDraggingLayerId(layer.id);
+                              setLayerDropTargetId(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingLayerId(null);
+                              setLayerDropTargetId(null);
+                            }}
+                            className="grid h-7 w-7 cursor-grab place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334] shadow-sm transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] active:cursor-grabbing"
+                          >
+                            <GripVertical className="h-3.5 w-3.5" />
+                          </span>
+                          <button
+                            type="button"
+                            title="Bring layer forward"
+                            aria-label={`Bring ${layerPreviewLabel} forward`}
+                            disabled={!canMoveLayerUp}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              moveLayer(layer.id, 'up');
+                            }}
+                            className="grid h-7 w-7 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334] shadow-sm transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-35"
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Send layer back"
+                            aria-label={`Send ${layerPreviewLabel} back`}
+                            disabled={!canMoveLayerDown}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              moveLayer(layer.id, 'down');
+                            }}
+                            className="grid h-7 w-7 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334] shadow-sm transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-35"
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             type="button"
                             title={layer.locked ? 'Unlock layer' : 'Lock layer'}
-                            aria-label={layer.locked ? `Unlock ${getLayerPreviewLabel(layer, assetLibrary)}` : `Lock ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                            aria-label={layer.locked ? `Unlock ${layerPreviewLabel}` : `Lock ${layerPreviewLabel}`}
                             onClick={(event) => {
                               event.stopPropagation();
                               toggleLayerLock(layer.id);
@@ -7495,7 +8078,7 @@ export default function DesignStudioPanel({
                               <button
                                 type="button"
                                 title="Duplicate layer"
-                                aria-label={`Duplicate ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                                aria-label={`Duplicate ${layerPreviewLabel}`}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   duplicateLayer(layer.id);
@@ -7507,7 +8090,7 @@ export default function DesignStudioPanel({
                               <button
                                 type="button"
                                 title="Delete layer"
-                                aria-label={`Delete ${getLayerPreviewLabel(layer, assetLibrary)}`}
+                                aria-label={`Delete ${layerPreviewLabel}`}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   deleteLayer(layer.id);
@@ -7520,7 +8103,8 @@ export default function DesignStudioPanel({
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -7603,11 +8187,41 @@ export default function DesignStudioPanel({
                         onAlign={(alignment) => alignLayerOnCanvas(selectedLayer, alignment)}
                       />
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <button type="button" onClick={() => moveLayer(selectedLayer.id, 'up')} className="studio-ghost-button justify-center">
-                          Bring forward
+                        <button
+                          type="button"
+                          onClick={() => moveLayer(selectedLayer.id, 'up')}
+                          disabled={selectedLayer.locked || activePage.layers.findIndex((layer) => layer.id === selectedLayer.id) >= activePage.layers.length - 1}
+                          className="studio-ghost-button justify-center disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                          Forward
                         </button>
-                        <button type="button" onClick={() => moveLayer(selectedLayer.id, 'down')} className="studio-ghost-button justify-center">
-                          Send back
+                        <button
+                          type="button"
+                          onClick={() => moveLayer(selectedLayer.id, 'down')}
+                          disabled={selectedLayer.locked || activePage.layers.findIndex((layer) => layer.id === selectedLayer.id) <= 0}
+                          className="studio-ghost-button justify-center disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                          Backward
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveLayerToEdge(selectedLayer.id, 'front')}
+                          disabled={selectedLayer.locked || activePage.layers.findIndex((layer) => layer.id === selectedLayer.id) >= activePage.layers.length - 1}
+                          className="studio-ghost-button justify-center disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <BringToFront className="h-4 w-4" />
+                          To front
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveLayerToEdge(selectedLayer.id, 'back')}
+                          disabled={selectedLayer.locked || activePage.layers.findIndex((layer) => layer.id === selectedLayer.id) <= 0}
+                          className="studio-ghost-button justify-center disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <SendToBack className="h-4 w-4" />
+                          To back
                         </button>
                       </div>
                       {selectedLayer.type === 'asset' && selectedAsset?.groupedLayers?.length ? (
@@ -7966,7 +8580,16 @@ export default function DesignStudioPanel({
                             <textarea
                               ref={textLayerTextareaRef}
                               value={selectedLayer.text}
-                              onChange={(event) => patchLayer(selectedLayer.id, { text: event.target.value } as Partial<DesignLayer>)}
+                              onChange={(event) => {
+                                patchLayer(selectedLayer.id, {
+                                  text: event.target.value,
+                                  richTextRuns: clampInlineTextRuns(selectedLayer.richTextRuns, event.target.value.length),
+                                } as Partial<DesignLayer>);
+                                rememberTextSelection(selectedLayer, event.currentTarget);
+                              }}
+                              onSelect={(event) => rememberTextSelection(selectedLayer, event.currentTarget)}
+                              onKeyUp={(event) => rememberTextSelection(selectedLayer, event.currentTarget)}
+                              onMouseUp={(event) => rememberTextSelection(selectedLayer, event.currentTarget)}
                               rows={5}
                               className="studio-input resize-y"
                             />
@@ -8082,15 +8705,15 @@ export default function DesignStudioPanel({
 
                           <div className="grid gap-2">
                             <FieldLabel>Format</FieldLabel>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-4 gap-2">
                               <button
                                 type="button"
                                 title="Bold"
                                 aria-label="Bold"
-                                aria-pressed={selectedLayer.fontWeight >= 700}
-                                onClick={() => patchLayer(selectedLayer.id, { fontWeight: selectedLayer.fontWeight >= 700 ? 500 : 800 } as Partial<DesignLayer>)}
+                                aria-pressed={isInlineTextFormatActive(selectedLayer, 'bold', selectedTextFormatRange)}
+                                onClick={() => patchTextLayerFormat(selectedLayer, 'bold')}
                                 className={`grid min-h-10 place-items-center rounded-[8px] border transition ${
-                                  selectedLayer.fontWeight >= 700
+                                  isInlineTextFormatActive(selectedLayer, 'bold', selectedTextFormatRange)
                                     ? 'border-[#142334] bg-[#142334] text-white'
                                     : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
                                 }`}
@@ -8101,10 +8724,10 @@ export default function DesignStudioPanel({
                                 type="button"
                                 title="Italic"
                                 aria-label="Italic"
-                                aria-pressed={selectedLayer.fontStyle === 'italic'}
-                                onClick={() => patchLayer(selectedLayer.id, { fontStyle: selectedLayer.fontStyle === 'italic' ? 'normal' : 'italic' } as Partial<DesignLayer>)}
+                                aria-pressed={isInlineTextFormatActive(selectedLayer, 'italic', selectedTextFormatRange)}
+                                onClick={() => patchTextLayerFormat(selectedLayer, 'italic')}
                                 className={`grid min-h-10 place-items-center rounded-[8px] border transition ${
-                                  selectedLayer.fontStyle === 'italic'
+                                  isInlineTextFormatActive(selectedLayer, 'italic', selectedTextFormatRange)
                                     ? 'border-[#142334] bg-[#142334] text-white'
                                     : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
                                 }`}
@@ -8113,12 +8736,26 @@ export default function DesignStudioPanel({
                               </button>
                               <button
                                 type="button"
+                                title="Underline"
+                                aria-label="Underline"
+                                aria-pressed={isInlineTextFormatActive(selectedLayer, 'underline', selectedTextFormatRange)}
+                                onClick={() => patchTextLayerFormat(selectedLayer, 'underline')}
+                                className={`grid min-h-10 place-items-center rounded-[8px] border transition ${
+                                  isInlineTextFormatActive(selectedLayer, 'underline', selectedTextFormatRange)
+                                    ? 'border-[#142334] bg-[#142334] text-white'
+                                    : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                                }`}
+                              >
+                                <Underline className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
                                 title="Uppercase"
                                 aria-label="Uppercase"
-                                aria-pressed={selectedLayer.textTransform === 'uppercase'}
-                                onClick={() => patchLayer(selectedLayer.id, { textTransform: selectedLayer.textTransform === 'uppercase' ? 'none' : 'uppercase' } as Partial<DesignLayer>)}
+                                aria-pressed={isInlineTextFormatActive(selectedLayer, 'uppercase', selectedTextFormatRange)}
+                                onClick={() => patchTextLayerFormat(selectedLayer, 'uppercase')}
                                 className={`grid min-h-10 place-items-center rounded-[8px] border transition ${
-                                  selectedLayer.textTransform === 'uppercase'
+                                  isInlineTextFormatActive(selectedLayer, 'uppercase', selectedTextFormatRange)
                                     ? 'border-[#142334] bg-[#142334] text-white'
                                     : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
                                 }`}
