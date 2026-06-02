@@ -75,6 +75,12 @@ type DesignCanvasGuides = {
   safeArea: boolean;
   bleed: boolean;
 };
+
+const EMPTY_DESIGN_CANVAS_GUIDES: DesignCanvasGuides = {
+  grid: false,
+  safeArea: false,
+  bleed: false,
+};
 type DesignBackgroundEffects = {
   grain: boolean;
   noise: boolean;
@@ -3824,34 +3830,44 @@ async function prepareSvgMaskNodesForExport(element: HTMLElement) {
       const naturalWidth = Number.parseFloat(node.dataset.designSvgMaskNaturalWidth || '');
       const naturalHeight = Number.parseFloat(node.dataset.designSvgMaskNaturalHeight || '');
       const imageSrc = await getExportableRecoloredSvgDataUrl(src, color);
-      const child = node.ownerDocument.createElement('div');
-      const childStyle = getAssetImageFrameStyle(
-        imageSrc,
-        fit,
-        node.offsetWidth || 1,
-        node.offsetHeight || 1,
-        Number.isFinite(naturalWidth) ? naturalWidth : undefined,
-        Number.isFinite(naturalHeight) ? naturalHeight : undefined,
-      );
-
-      node.replaceChildren();
-      node.style.background = 'transparent';
-      node.style.backgroundColor = 'transparent';
-      node.style.backgroundImage = 'none';
-      node.style.maskImage = 'none';
-      node.style.maskPosition = 'initial';
-      node.style.maskRepeat = 'initial';
-      node.style.maskSize = 'initial';
-      node.style.webkitMaskImage = 'none';
-      node.style.webkitMaskPosition = 'initial';
-      node.style.webkitMaskRepeat = 'initial';
-      node.style.webkitMaskSize = 'initial';
-      node.style.position = node.style.position || 'relative';
-      node.style.overflow = 'hidden';
-      Object.assign(child.style, childStyle);
-      node.append(child);
+      applySvgMaskExportToNode(node, imageSrc, fit, naturalWidth, naturalHeight);
     }),
   );
+}
+
+function applySvgMaskExportToNode(
+  node: HTMLElement,
+  imageSrc: string,
+  fit: 'contain' | 'cover',
+  naturalWidth: number | undefined,
+  naturalHeight: number | undefined,
+) {
+  const child = node.ownerDocument.createElement('div');
+  const childStyle = getAssetImageFrameStyle(
+    imageSrc,
+    fit,
+    node.offsetWidth || 1,
+    node.offsetHeight || 1,
+    Number.isFinite(naturalWidth) ? naturalWidth : undefined,
+    Number.isFinite(naturalHeight) ? naturalHeight : undefined,
+  );
+
+  node.replaceChildren();
+  node.style.background = 'transparent';
+  node.style.backgroundColor = 'transparent';
+  node.style.backgroundImage = 'none';
+  node.style.maskImage = 'none';
+  node.style.maskPosition = 'initial';
+  node.style.maskRepeat = 'initial';
+  node.style.maskSize = 'initial';
+  node.style.webkitMaskImage = 'none';
+  node.style.webkitMaskPosition = 'initial';
+  node.style.webkitMaskRepeat = 'initial';
+  node.style.webkitMaskSize = 'initial';
+  node.style.position = node.style.position || 'relative';
+  node.style.overflow = 'hidden';
+  Object.assign(child.style, childStyle);
+  node.append(child);
 }
 
 async function waitForDesignImages(element: HTMLElement) {
@@ -3969,13 +3985,15 @@ async function captureDesignCanvas(
 
   exportHost.setAttribute('aria-hidden', 'true');
   exportHost.style.position = 'fixed';
-  exportHost.style.left = '-10000px';
+  exportHost.style.left = '0';
   exportHost.style.top = '0';
   exportHost.style.width = `${design.width}px`;
   exportHost.style.height = `${design.height}px`;
   exportHost.style.overflow = 'hidden';
   exportHost.style.pointerEvents = 'none';
   exportHost.style.zIndex = '-1';
+  exportHost.style.opacity = '0';
+  exportHost.style.visibility = 'visible';
 
   exportElement.dataset.designExportCaptureId = captureId;
   exportElement.style.width = `${design.width}px`;
@@ -3995,9 +4013,9 @@ async function captureDesignCanvas(
   document.body.append(exportHost);
 
   try {
-    await prepareSvgMaskNodesForExport(exportElement);
     await waitForDesignImages(exportElement);
     await waitForDesignFonts(exportElement);
+    await prepareSvgMaskNodesForExport(exportElement);
     const rootStyles = getComputedStyle(document.documentElement);
     const fontSans = rootStyles.getPropertyValue('--font-sans').trim() || 'Raleway, Arial, sans-serif';
     const fontSerif = rootStyles.getPropertyValue('--font-serif').trim() || 'Georgia, "Times New Roman", serif';
@@ -4008,8 +4026,10 @@ async function captureDesignCanvas(
       width: design.width,
       height: design.height,
       useCORS: true,
-      windowWidth: document.documentElement.scrollWidth,
-      windowHeight: document.documentElement.scrollHeight,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight,
+      scrollX: 0,
+      scrollY: 0,
       onclone: (clonedDocument) => {
         clonedDocument.documentElement.className = document.documentElement.className;
         clonedDocument.documentElement.style.setProperty('--font-sans', fontSans);
@@ -4037,15 +4057,16 @@ async function captureDesignCanvas(
         const fontStyle = clonedDocument.createElement('style');
         fontStyle.textContent = `
           [data-design-export-capture-id] {
-            font-family: ${fontSans} !important;
             -webkit-font-smoothing: antialiased;
-            text-rendering: geometricPrecision;
           }
         `;
         clonedDocument.head.append(fontStyle);
 
         clonedDocument.querySelectorAll<HTMLElement>('[data-design-guide="true"], [data-design-control="true"]').forEach((node) => {
           node.remove();
+        });
+        clonedDocument.querySelectorAll<HTMLElement>('[data-design-text-measure="true"]').forEach((node) => {
+          node.style.display = 'none';
         });
         if (options?.transparentBackground) {
           clonedDocument.querySelectorAll<HTMLElement>('[data-design-background-effects="true"]').forEach((node) => {
@@ -5377,6 +5398,7 @@ function DesignLayerView({
           <>
             <div
               ref={textMeasureRef}
+              data-design-text-measure="true"
               aria-hidden="true"
               className="pointer-events-none invisible absolute left-0 top-0 h-auto w-full whitespace-pre-wrap break-words"
               style={getTextLayerStyle(layer, design)}
@@ -5669,6 +5691,7 @@ function DesignCanvas({
   onDuplicateLayer,
   onToggleLayerLock,
   onRememberTextSelection,
+  exportMode = false,
 }: {
   design: DesignDocument;
   page: DesignPage;
@@ -5677,7 +5700,8 @@ function DesignCanvas({
   selectedLayerIds: string[];
   guides: DesignCanvasGuides;
   zoom: number;
-  canvasRef: React.RefObject<HTMLDivElement | null>;
+  canvasRef?: React.RefObject<HTMLDivElement | null>;
+  exportMode?: boolean;
   onSelectLayer: (id: string | null, additive?: boolean) => void;
   onPatchLayer: (id: string, patch: Partial<DesignLayer>, options?: DesignPatchOptions) => void;
   onPatchLayers: (patches: Array<{ id: string; patch: Partial<DesignLayer> }>, options?: DesignPatchOptions) => void;
@@ -5723,9 +5747,10 @@ function DesignCanvas({
   } | null>(null);
 
   useEffect(() => {
+    if (exportMode) return;
     function onMove(event: PointerEvent) {
       const drag = dragRef.current;
-      const element = canvasRef.current;
+      const element = canvasRef?.current;
       if (!drag || !element) return;
       const rect = element.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
@@ -5814,7 +5839,7 @@ function DesignCanvas({
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [canvasRef, design.height, design.width, onPatchLayer, onPatchLayers]);
+  }, [canvasRef, design.height, design.width, exportMode, onPatchLayer, onPatchLayers]);
 
   function startDrag(event: React.PointerEvent<HTMLDivElement>, layer: DesignLayer) {
     event.stopPropagation();
@@ -5898,7 +5923,7 @@ function DesignCanvas({
     onSelectLayer(layer.id);
     if (layer.locked) return;
     setSnapGuide(null);
-    const rect = canvasRef.current?.getBoundingClientRect();
+    const rect = canvasRef?.current?.getBoundingClientRect();
     if (!rect) return;
     const centerClientX = rect.left + ((layer.x + layer.width / 2) / design.width) * rect.width;
     const centerClientY = rect.top + ((layer.y + layer.height / 2) / design.height) * rect.height;
@@ -5922,40 +5947,28 @@ function DesignCanvas({
   const editorDisplayWidth = Math.round(design.width * editorScale);
   const editorDisplayHeight = Math.round(design.height * editorScale);
 
-  return (
+  const canvasInner = (
     <div
-      className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-1.5"
-      data-design-canvas-viewport="true"
-      onClick={(event) => {
-        if (event.target !== event.currentTarget) return;
+      ref={canvasRef ?? undefined}
+      data-design-export-canvas="true"
+      data-page-id={page.id}
+      onClick={exportMode ? undefined : () => {
         setEditingTextLayerId(null);
         setTextSelectionLayerId(null);
         onSelectLayer(null);
       }}
+      className={
+        exportMode
+          ? 'absolute left-0 top-0 overflow-hidden'
+          : 'absolute left-0 top-0 origin-top-left overflow-hidden rounded-[8px] border border-[#D8C8BB] shadow-[0_20px_60px_rgba(20,35,52,0.15)]'
+      }
+      style={{
+        width: `${design.width}px`,
+        height: `${design.height}px`,
+        backgroundColor: page.background,
+        ...(exportMode ? {} : { transform: `scale(${editorScale})` }),
+      }}
     >
-      <div
-        className="relative mx-auto"
-        style={{
-          width: `${editorDisplayWidth}px`,
-          height: `${editorDisplayHeight}px`,
-        }}
-      >
-        <div
-          ref={canvasRef}
-          data-design-export-canvas="true"
-          onClick={() => {
-            setEditingTextLayerId(null);
-            setTextSelectionLayerId(null);
-            onSelectLayer(null);
-          }}
-          className="absolute left-0 top-0 origin-top-left overflow-hidden rounded-[8px] border border-[#D8C8BB] shadow-[0_20px_60px_rgba(20,35,52,0.15)]"
-          style={{
-            width: `${design.width}px`,
-            height: `${design.height}px`,
-            backgroundColor: page.background,
-            transform: `scale(${editorScale})`,
-          }}
-        >
         <BackgroundEffectsLayer design={design} effects={backgroundEffects} />
         {page.layers.map((layer, index) => (
           <DesignLayerView
@@ -5965,9 +5978,10 @@ function DesignCanvas({
             assetLibrary={assetLibrary}
             stackIndex={index}
             selected={selectedLayerIdSet.has(layer.id)}
-            showControls={selectedLayerIds.length === 1 && selectedLayerId === layer.id}
+            showControls={!exportMode && selectedLayerIds.length === 1 && selectedLayerId === layer.id}
             canSelectTextContent={activeTextSelectionLayerId === layer.id && activeEditingTextLayerId !== layer.id}
             onSelect={(additive) => {
+              if (exportMode) return;
               if (suppressClickSelectionRef.current) {
                 suppressClickSelectionRef.current = false;
                 return;
@@ -6000,7 +6014,7 @@ function DesignCanvas({
             isTextEditing={activeEditingTextLayerId === layer.id}
           />
         ))}
-        {guides.grid && (
+        {!exportMode && guides.grid && (
           <div
             data-design-guide="true"
             aria-hidden="true"
@@ -6016,7 +6030,7 @@ function DesignCanvas({
             }}
           />
         )}
-        {guides.bleed && (
+        {!exportMode && guides.bleed && (
           <div
             data-design-guide="true"
             aria-hidden="true"
@@ -6034,7 +6048,7 @@ function DesignCanvas({
             </span>
           </div>
         )}
-        {guides.safeArea && (
+        {!exportMode && guides.safeArea && (
           <div
             data-design-guide="true"
             aria-hidden="true"
@@ -6047,7 +6061,7 @@ function DesignCanvas({
             }}
           />
         )}
-        {snapGuide?.x !== undefined && (
+        {!exportMode && snapGuide?.x !== undefined && (
           <div
             data-design-guide="true"
             aria-hidden="true"
@@ -6055,7 +6069,7 @@ function DesignCanvas({
             style={{ left: `${(snapGuide.x / design.width) * 100}%` }}
           />
         )}
-        {snapGuide?.y !== undefined && (
+        {!exportMode && snapGuide?.y !== undefined && (
           <div
             data-design-guide="true"
             aria-hidden="true"
@@ -6063,7 +6077,7 @@ function DesignCanvas({
             style={{ top: `${(snapGuide.y / design.height) * 100}%` }}
           />
         )}
-        {multiSelectionBounds && (
+        {!exportMode && multiSelectionBounds && (
           <div
             data-design-control="true"
             className="design-selection-group pointer-events-none absolute z-[115] rounded-[6px] border ring-4"
@@ -6085,7 +6099,32 @@ function DesignCanvas({
             </span>
           </div>
         )}
-        </div>
+    </div>
+  );
+
+  if (exportMode) {
+    return canvasInner;
+  }
+
+  return (
+    <div
+      className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-1.5"
+      data-design-canvas-viewport="true"
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        setEditingTextLayerId(null);
+        setTextSelectionLayerId(null);
+        onSelectLayer(null);
+      }}
+    >
+      <div
+        className="relative mx-auto"
+        style={{
+          width: `${editorDisplayWidth}px`,
+          height: `${editorDisplayHeight}px`,
+        }}
+      >
+        {canvasInner}
       </div>
     </div>
   );
@@ -7778,16 +7817,30 @@ export default function DesignStudioPanel({
     updateDesign((current) => resizeDesignCanvas(current, current.height, current.width));
   }
 
+  function findExportCanvasForPage(pageId: string) {
+    if (typeof document === 'undefined') return null;
+    const stage = document.querySelector('[data-design-export-stage="true"]');
+    if (!stage) return null;
+    return stage.querySelector<HTMLDivElement>(`[data-page-id="${pageId}"]`);
+  }
+
   async function exportPng() {
-    if (!canvasRef.current) return;
     setExportState({ busy: true, message: 'Preparing PNG export...', tone: 'info' });
     try {
+      const exportDesign = designRef.current;
+      const targetPage = getActivePage(exportDesign, activePageIdRef.current);
+      const exportElement = findExportCanvasForPage(targetPage.id);
+      if (!exportElement) throw new Error('Could not find the design canvas for export.');
+
+      await waitForNextDesignPaint();
       await preloadAllDesignFonts();
+      await waitForNextDesignPaint();
       await new Promise((resolve) => window.setTimeout(resolve, 350));
+
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await captureDesignCanvas(canvasRef.current, design, html2canvas);
+      const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
       const blob = await canvasToPngBlob(canvas);
-      downloadBlob(blob, `${slugifyFileName(`${design.title}-${activePage.name}`)}.png`);
+      downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}.png`);
       setExportState({ busy: false, message: 'PNG exported.', tone: 'info' });
     } catch (error) {
       setExportState({
@@ -7799,13 +7852,12 @@ export default function DesignStudioPanel({
   }
 
   async function exportPdf() {
-    if (!canvasRef.current) return;
     const exportDesign = designRef.current;
-    if (!exportDesign.pages.length) return;
+    if (!exportDesign.pages.length) {
+      setExportState({ busy: false, message: 'Add at least one page before exporting.', tone: 'error' });
+      return;
+    }
 
-    const previousPageId = activePageIdRef.current;
-    const previousSelectedLayerId = selectedLayerIdRef.current;
-    const previousSelectedLayerIds = selectedLayerIdsRef.current;
     setExportState({
       busy: true,
       message: `Preparing ${exportDesign.pages.length}-page PDF export...`,
@@ -7813,8 +7865,11 @@ export default function DesignStudioPanel({
     });
 
     try {
+      await waitForNextDesignPaint();
       await preloadAllDesignFonts();
+      await waitForNextDesignPaint();
       await new Promise((resolve) => window.setTimeout(resolve, 350));
+
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
       const orientation = exportDesign.width > exportDesign.height ? 'landscape' : 'portrait';
@@ -7828,19 +7883,13 @@ export default function DesignStudioPanel({
 
       for (let index = 0; index < exportDesign.pages.length; index += 1) {
         const page = exportDesign.pages[index];
-        activePageIdRef.current = page.id;
-        selectedLayerIdRef.current = null;
-        selectedLayerIdsRef.current = [];
-        setActivePageId(page.id);
-        setSelectedLayerIdState(null);
-        setSelectedLayerIds([]);
+        const exportElement = findExportCanvasForPage(page.id);
+        if (!exportElement) throw new Error(`Could not find the design canvas for page ${page.name}.`);
+
         await waitForNextDesignPaint();
         await new Promise((resolve) => window.setTimeout(resolve, 200));
 
-        const activeCanvasElement = canvasRef.current;
-        if (!activeCanvasElement) throw new Error('Could not find the design canvas for PDF export.');
-
-        const canvas = await captureDesignCanvas(activeCanvasElement, exportDesign, html2canvas);
+        const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
         if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
@@ -7859,13 +7908,6 @@ export default function DesignStudioPanel({
         message: error instanceof Error ? error.message : 'Could not export this design as a PDF.',
         tone: 'error',
       });
-    } finally {
-      activePageIdRef.current = previousPageId;
-      selectedLayerIdRef.current = previousSelectedLayerId;
-      selectedLayerIdsRef.current = previousSelectedLayerIds;
-      setActivePageId(previousPageId);
-      setSelectedLayerIdState(previousSelectedLayerId);
-      setSelectedLayerIds(previousSelectedLayerIds);
     }
   }
 
@@ -8669,6 +8711,43 @@ export default function DesignStudioPanel({
               onToggleLayerLock={toggleLayerLock}
               onRememberTextSelection={rememberCanvasTextSelection}
             />
+            <div
+              aria-hidden="true"
+              data-design-export-stage="true"
+              style={{
+                position: 'fixed',
+                left: '0',
+                top: '0',
+                width: '1px',
+                height: '1px',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                opacity: 0,
+                zIndex: -1,
+                visibility: 'hidden',
+              }}
+            >
+              {design.pages.map((page) => (
+                <DesignCanvas
+                  key={page.id}
+                  design={design}
+                  page={page}
+                  assetLibrary={assetLibrary}
+                  selectedLayerId={null}
+                  selectedLayerIds={[]}
+                  guides={EMPTY_DESIGN_CANVAS_GUIDES}
+                  zoom={100}
+                  exportMode
+                  onSelectLayer={() => {}}
+                  onPatchLayer={() => {}}
+                  onPatchLayers={() => {}}
+                  onDeleteLayer={() => {}}
+                  onDuplicateLayer={() => {}}
+                  onToggleLayerLock={() => {}}
+                  onRememberTextSelection={() => {}}
+                />
+              ))}
+            </div>
           </main>
 
           <aside
