@@ -48,6 +48,7 @@ import DesignStudioPanel, {
   type DesignStudioCarouselImport,
   type DesignStudioImportRequest,
   type DesignStudioTextImport,
+  type DesignStudioVaultImport,
 } from '@/components/content/DesignStudioPanel';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
@@ -4127,6 +4128,29 @@ export default function ContentStudio({
       },
     ];
   }, [generatedCarouselDraft, generatedPost, topic]);
+  const designVaultImports = useMemo<DesignStudioVaultImport[]>(() => {
+    return backlogRecords
+      .map<DesignStudioVaultImport | null>((item) => {
+        if (getCarouselDraftFromBacklogItem(item)) return null;
+        const body = getBacklogDraftBody(item) || extractPreview(item.content || item.notes || item.title, 1400);
+        const text = body.trim();
+        if (!text) return null;
+        const title = extractCleanTitle(item.title, item.content || text);
+        return {
+          id: item.id,
+          label: title,
+          sourceLabel: getBacklogSourceLabel(item),
+          title,
+          text,
+          statusLabel: contentStatusLabels[item.status],
+          platformLabel: item.platform ? platformLabels[item.platform] : undefined,
+          updatedAt: item.updatedAt,
+        } satisfies DesignStudioVaultImport;
+      })
+      .filter((item): item is DesignStudioVaultImport => Boolean(item))
+      .sort((a, b) => new Date(b.updatedAt || '').getTime() - new Date(a.updatedAt || '').getTime())
+      .slice(0, 24);
+  }, [backlogRecords]);
   const canGenerateCreate = isCreateSelectionReady(createSelection);
 
   function resetSmartSuggestSession() {
@@ -5830,6 +5854,7 @@ export default function ContentStudio({
           <DesignStudioPanel
             carouselImports={designCarouselImports}
             textImports={designTextImports}
+            vaultImports={designVaultImports}
             importRequest={designImportRequest}
             onImportRequestHandled={() => setDesignImportRequest(null)}
           />

@@ -16,9 +16,10 @@ type FilterDropdownProps = {
   options: FilterDropdownOption[];
   ariaLabel: string;
   className?: string;
+  wrapLabels?: boolean;
 };
 
-export default function FilterDropdown({ name, value, onChange, options, ariaLabel, className = '' }: FilterDropdownProps) {
+export default function FilterDropdown({ name, value, onChange, options, ariaLabel, className = '', wrapLabels = false }: FilterDropdownProps) {
   const [uncontrolledValue, setUncontrolledValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -55,9 +56,13 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
         aria-label={ariaLabel}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
-        className="dashboard-filter-dropdown-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
+        className={`dashboard-filter-dropdown-trigger flex w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30 ${
+          wrapLabels ? 'min-h-11 py-3' : 'h-11'
+        }`}
       >
-        <span className="truncate">{selectedOption?.label || 'Select...'}</span>
+        <span className={wrapLabels ? 'min-w-0 whitespace-normal break-words leading-snug' : 'truncate'}>
+          {selectedOption?.label || 'Select...'}
+        </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-[#A09086] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -86,6 +91,8 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                     setIsOpen(false);
                   }}
                   className={`w-full border-b border-[#F0E8E0] px-4 py-3 text-left text-[13px] font-semibold text-[#142334] transition-all duration-200 ease-out last:border-0 hover:bg-[#F5F0EA] hover:pl-5 ${
+                    wrapLabels ? 'whitespace-normal break-words leading-snug' : ''
+                  } ${
                     isSelected ? 'bg-[#F2ECE7]' : ''
                   }`}
                 >
