@@ -5150,6 +5150,7 @@ function DesignLayerView({
   stackIndex,
   selected,
   showControls,
+  canSelectTextContent,
   onSelect,
   onDragStart,
   onResizeStart,
@@ -5158,8 +5159,10 @@ function DesignLayerView({
   onDeleteLayer,
   onToggleLock,
   onPatchLayer,
+  onStartTextSelection,
   onStartTextEdit,
   onStopTextEdit,
+  onRememberTextSelection,
   isTextEditing,
 }: {
   layer: DesignLayer;
@@ -5168,6 +5171,7 @@ function DesignLayerView({
   stackIndex: number;
   selected: boolean;
   showControls: boolean;
+  canSelectTextContent: boolean;
   onSelect: (additive?: boolean) => void;
   onDragStart: (event: React.PointerEvent<HTMLDivElement>, layer: DesignLayer) => void;
   onResizeStart: (event: React.PointerEvent<HTMLButtonElement>, layer: DesignLayer, handle: ResizeHandle) => void;
@@ -5176,8 +5180,10 @@ function DesignLayerView({
   onDeleteLayer: (id: string) => void;
   onToggleLock: (id: string) => void;
   onPatchLayer: (id: string, patch: Partial<DesignLayer>, options?: DesignPatchOptions) => void;
+  onStartTextSelection: (id: string) => void;
   onStartTextEdit: (id: string) => void;
   onStopTextEdit: () => void;
+  onRememberTextSelection: (id: string, textLength: number) => void;
   isTextEditing: boolean;
 }) {
   const textMeasureRef = useRef<HTMLDivElement | null>(null);
@@ -5223,7 +5229,7 @@ function DesignLayerView({
   const layerZIndex = selected && !shouldPreserveStackWhenSelected ? 90 : baseLayerZIndex;
   const layerAsset = layer.type === 'asset' ? assetLibrary[layer.assetId] : null;
   const assetBorderRadius = layer.type === 'asset' ? getLayerCornerRadiusCss(layer, design) : undefined;
-  const isTextContentEditing = layer.type === 'text' && !layer.locked && isTextEditing;
+  const isTextContentEditing = layer.type === 'text' && !layer.locked && (isTextEditing || canSelectTextContent);
 
   return (
     <div
@@ -5239,7 +5245,7 @@ function DesignLayerView({
         if (layer.type !== 'text' || layer.locked) return;
         event.stopPropagation();
         onSelect(false);
-        onStartTextEdit(layer.id);
+        onStartTextSelection(layer.id);
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect(event.shiftKey || event.metaKey || event.ctrlKey);
@@ -5293,6 +5299,12 @@ function DesignLayerView({
             </div>
             <div
               data-design-text-content="true"
+              onMouseUp={() => {
+                if (canSelectTextContent) onRememberTextSelection(layer.id, layer.text.length);
+              }}
+              onPointerUp={() => {
+                if (canSelectTextContent) onRememberTextSelection(layer.id, layer.text.length);
+              }}
               className="flex h-full w-full whitespace-pre-wrap break-words"
               style={{
                 ...getTextLayerStyle(layer, design),
@@ -5342,15 +5354,15 @@ function DesignLayerView({
               {layer.type === 'text' && (
                 <button
                   type="button"
-                  title="Edit text"
-                  aria-label="Edit text"
+                  title="Select words"
+                  aria-label="Select words"
                   onPointerDown={(event) => {
                     event.stopPropagation();
                     event.preventDefault();
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
-                    onStartTextEdit(layer.id);
+                    onStartTextSelection(layer.id);
                   }}
                   className="grid h-7 w-7 place-items-center rounded-full text-[#142334] transition hover:bg-[#F8F6F4]"
                 >
@@ -5570,6 +5582,7 @@ function DesignCanvas({
   onDeleteLayer,
   onDuplicateLayer,
   onToggleLayerLock,
+  onRememberTextSelection,
 }: {
   design: DesignDocument;
   page: DesignPage;
@@ -5585,15 +5598,23 @@ function DesignCanvas({
   onDeleteLayer: (id: string) => void;
   onDuplicateLayer: (id: string) => void;
   onToggleLayerLock: (id: string) => void;
+  onRememberTextSelection: (id: string, textLength: number) => void;
 }) {
   const [snapGuide, setSnapGuide] = useState<DesignSnapGuide | null>(null);
   const [editingTextLayerId, setEditingTextLayerId] = useState<string | null>(null);
+  const [textSelectionLayerId, setTextSelectionLayerId] = useState<string | null>(null);
   const backgroundEffects = getPageBackgroundEffects(page.backgroundEffects);
   const selectedLayerIdSet = useMemo(() => new Set(selectedLayerIds), [selectedLayerIds]);
   const selectedLayers = page.layers.filter((layer) => selectedLayerIdSet.has(layer.id));
   const multiSelectionBounds = selectedLayers.length > 1 ? getLayerSelectionBounds(selectedLayers) : null;
   const activeEditingTextLayerId = page.layers.some((layer) => layer.id === editingTextLayerId && layer.type === 'text')
     ? editingTextLayerId
+    : null;
+  const textSelectionCandidateId = page.layers.some((layer) => layer.id === textSelectionLayerId && layer.type === 'text')
+    ? textSelectionLayerId
+    : null;
+  const activeTextSelectionLayerId = textSelectionCandidateId && selectedLayerIdSet.has(textSelectionCandidateId)
+    ? textSelectionCandidateId
     : null;
   const suppressClickSelectionRef = useRef(false);
   const dragRef = useRef<{
@@ -5712,6 +5733,15 @@ function DesignCanvas({
   function startDrag(event: React.PointerEvent<HTMLDivElement>, layer: DesignLayer) {
     event.stopPropagation();
     if (activeEditingTextLayerId === layer.id) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      layer.type === 'text' &&
+      activeTextSelectionLayerId === layer.id &&
+      target?.closest('[data-design-text-content="true"]')
+    ) {
+      suppressClickSelectionRef.current = true;
+      return;
+    }
     if (event.shiftKey || event.metaKey || event.ctrlKey) {
       suppressClickSelectionRef.current = true;
       onSelectLayer(layer.id, true);
@@ -5729,6 +5759,10 @@ function DesignCanvas({
       suppressClickSelectionRef.current = true;
     } else {
       onSelectLayer(layer.id);
+    }
+
+    if (activeTextSelectionLayerId && activeTextSelectionLayerId !== layer.id) {
+      setTextSelectionLayerId(null);
     }
 
     setSnapGuide(null);
@@ -5805,6 +5839,7 @@ function DesignCanvas({
       onClick={(event) => {
         if (event.target !== event.currentTarget) return;
         setEditingTextLayerId(null);
+        setTextSelectionLayerId(null);
         onSelectLayer(null);
       }}
     >
@@ -5821,6 +5856,7 @@ function DesignCanvas({
           data-design-export-canvas="true"
           onClick={() => {
             setEditingTextLayerId(null);
+            setTextSelectionLayerId(null);
             onSelectLayer(null);
           }}
           className="relative w-full overflow-hidden rounded-[8px] border border-[#D8C8BB] shadow-[0_20px_60px_rgba(20,35,52,0.15)]"
@@ -5840,6 +5876,7 @@ function DesignCanvas({
             stackIndex={index}
             selected={selectedLayerIdSet.has(layer.id)}
             showControls={selectedLayerIds.length === 1 && selectedLayerId === layer.id}
+            canSelectTextContent={activeTextSelectionLayerId === layer.id && activeEditingTextLayerId !== layer.id}
             onSelect={(additive) => {
               if (suppressClickSelectionRef.current) {
                 suppressClickSelectionRef.current = false;
@@ -5854,11 +5891,22 @@ function DesignCanvas({
             onDeleteLayer={onDeleteLayer}
             onToggleLock={onToggleLayerLock}
             onPatchLayer={onPatchLayer}
+            onStartTextSelection={(id) => {
+              setEditingTextLayerId(null);
+              setTextSelectionLayerId(id);
+              onSelectLayer(id);
+              window.requestAnimationFrame(() => {
+                const selection = window.getSelection();
+                selection?.removeAllRanges();
+              });
+            }}
             onStartTextEdit={(id) => {
+              setTextSelectionLayerId(null);
               setEditingTextLayerId(id);
               onSelectLayer(id);
             }}
             onStopTextEdit={() => setEditingTextLayerId(null)}
+            onRememberTextSelection={onRememberTextSelection}
             isTextEditing={activeEditingTextLayerId === layer.id}
           />
         ))}
@@ -7512,6 +7560,12 @@ export default function DesignStudioPanel({
     });
   }
 
+  function rememberCanvasTextSelection(layerId: string, textLength: number) {
+    const range = getCanvasTextSelectionRange(layerId, textLength);
+    if (!range || range.end <= range.start) return;
+    setTextSelectionRange({ layerId, ...range });
+  }
+
   function getInspectorTextSelectionRange(layer: DesignTextLayer) {
     const textarea = textLayerTextareaRef.current;
     if (textarea && textarea.value === layer.text) {
@@ -8511,6 +8565,7 @@ export default function DesignStudioPanel({
               onDeleteLayer={deleteLayer}
               onDuplicateLayer={duplicateLayer}
               onToggleLayerLock={toggleLayerLock}
+              onRememberTextSelection={rememberCanvasTextSelection}
             />
           </main>
 
