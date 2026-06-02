@@ -167,7 +167,7 @@ const archetypes: Record<OptionKey, Archetype> = {
       'Do not confuse being trusted with still being challenged. Reliability without stretch becomes invisibility over time.',
     service: 'Saturday Masterclass',
     href: '/book/masterclass',
-    cta: 'Book my seat',
+    cta: 'Reserve my seat',
     nextStepTitle: 'You need a strategic stretch, not another motivation post.',
     nextStepBody:
       'A live masterclass gives you structure, reflection, and practical prompts so you can stop waiting for growth to appear and start creating a sharper next chapter.',
@@ -311,7 +311,7 @@ const archetypes: Record<OptionKey, Archetype> = {
       'Do not let good momentum become private momentum. Unspoken goals drift. Named goals tend to gather support and accountability.',
     service: 'Saturday Masterclass series',
     href: '/book/masterclass',
-    cta: 'Book my seat',
+    cta: 'Reserve my seat',
     nextStepTitle: 'You are ready for sharper rooms and cleaner accountability.',
     nextStepBody:
       'The masterclass series gives you focused support around visibility, strategy, and career moves so your existing momentum becomes more deliberate.',
