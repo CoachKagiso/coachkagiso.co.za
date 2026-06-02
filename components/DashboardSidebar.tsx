@@ -74,7 +74,7 @@ export default function DashboardSidebar({
   const studioActive = activeTab === 'content';
 
   return (
-    <div className="hidden shrink-0 self-start lg:sticky lg:top-3 lg:block xl:top-4">
+    <div className="dashboard-sidebar-shell hidden shrink-0 self-start overflow-hidden transition-[width] duration-300 lg:sticky lg:top-3 lg:block xl:top-4">
       <input
         id="coach-kagiso-dashboard-sidebar-toggle"
         type="checkbox"

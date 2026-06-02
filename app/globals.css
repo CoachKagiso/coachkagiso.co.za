@@ -108,8 +108,18 @@ body {
   scrollbar-width: thin;
 }
 
-.dashboard-sidebar-panel {
+.dashboard-sidebar-shell {
   width: 238px;
+  flex-basis: 238px;
+}
+
+.dashboard-sidebar-shell:has(.dashboard-sidebar-checkbox:checked) {
+  width: 78px;
+  flex-basis: 78px;
+}
+
+.dashboard-sidebar-panel {
+  width: 100%;
   min-height: calc(100vh - 32px);
   padding: 16px;
   transition: width 300ms ease, padding 300ms ease;
@@ -126,8 +136,12 @@ body {
 }
 
 .dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel {
-  width: 78px;
-  padding: 12px;
+  width: 100% !important;
+  padding: 12px !important;
+}
+
+.dashboard-sidebar-shell:has(.dashboard-sidebar-checkbox:checked) .dashboard-sidebar-panel {
+  padding: 12px !important;
 }
 
 .dashboard-sidebar-checkbox:checked + .dashboard-sidebar-panel .dashboard-sidebar-header {

@@ -7608,8 +7608,8 @@ export default function DesignStudioPanel({
   }
 
   return (
-    <section data-hide-custom-cursor className="pb-10">
-      <div className="grid gap-4">
+    <section data-hide-custom-cursor className="w-full min-w-0 pb-10">
+      <div className="grid w-full min-w-0 gap-4">
         <div className="rounded-[8px] bg-white p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
@@ -7820,9 +7820,9 @@ export default function DesignStudioPanel({
           )}
         </div>
 
-        <div className="grid gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[350px_minmax(0,750px)_420px] xl:items-start xl:justify-center 2xl:grid-cols-[380px_minmax(0,750px)_480px]">
+        <div className="grid w-full min-w-0 gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[minmax(300px,0.9fr)_minmax(0,1.1fr)] xl:items-start 2xl:grid-cols-[minmax(330px,0.95fr)_minmax(520px,1.2fr)_minmax(360px,1.05fr)]">
           <aside
-            className="grid min-w-0 gap-4 overflow-visible xl:sticky xl:top-4 xl:self-start"
+            className="grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:self-start"
             onWheel={trapDesignWheel}
           >
             <section className="rounded-[8px] bg-white p-4">
@@ -8410,7 +8410,7 @@ export default function DesignStudioPanel({
 
           <aside
             ref={rightPanelRef}
-            className="design-studio-scroll-area grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 [scrollbar-gutter:stable]"
+            className="design-studio-scroll-area grid min-w-0 gap-4 overflow-x-hidden xl:col-span-2 xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 2xl:col-span-1 [scrollbar-gutter:stable]"
             onWheel={trapDesignWheel}
           >
             <section className="rounded-[8px] bg-white p-4">
