@@ -3930,16 +3930,22 @@ async function captureDesignCanvas(
     await prepareSvgMaskNodesForExport(exportElement);
     await waitForDesignImages(exportElement);
     await waitForDesignFonts(exportElement);
+    const rootStyles = getComputedStyle(document.documentElement);
+    const fontSans = rootStyles.getPropertyValue('--font-sans').trim() || 'Raleway, Arial, sans-serif';
+    const fontSerif = rootStyles.getPropertyValue('--font-serif').trim() || 'Georgia, "Times New Roman", serif';
     return await html2canvas(exportElement, {
       backgroundColor: null,
       logging: false,
-      scale: 1,
+      scale: 2,
       width: design.width,
       height: design.height,
       useCORS: true,
-      windowWidth: design.width,
-      windowHeight: design.height,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight,
       onclone: (clonedDocument) => {
+        clonedDocument.documentElement.className = document.documentElement.className;
+        clonedDocument.documentElement.style.setProperty('--font-sans', fontSans);
+        clonedDocument.documentElement.style.setProperty('--font-serif', fontSerif);
         const clonedCanvas = clonedDocument.querySelector<HTMLElement>(`[data-design-export-capture-id="${captureId}"]`);
         if (clonedCanvas) {
           clonedCanvas.style.width = `${design.width}px`;
@@ -3957,6 +3963,16 @@ async function captureDesignCanvas(
             clonedCanvas.style.backgroundColor = 'transparent';
           }
         }
+
+        const fontStyle = clonedDocument.createElement('style');
+        fontStyle.textContent = `
+          [data-design-export-capture-id] {
+            font-family: ${fontSans} !important;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: geometricPrecision;
+          }
+        `;
+        clonedDocument.head.append(fontStyle);
 
         clonedDocument.querySelectorAll<HTMLElement>('[data-design-guide="true"], [data-design-control="true"]').forEach((node) => {
           node.remove();
@@ -7725,6 +7741,7 @@ export default function DesignStudioPanel({
         unit: 'px',
         format: [exportDesign.width, exportDesign.height],
         compress: true,
+        hotfixes: ['px_scaling'],
       });
 
       for (let index = 0; index < exportDesign.pages.length; index += 1) {
@@ -7741,8 +7758,10 @@ export default function DesignStudioPanel({
         if (!activeCanvasElement) throw new Error('Could not find the design canvas for PDF export.');
 
         const canvas = await captureDesignCanvas(activeCanvasElement, exportDesign, html2canvas);
-        if (index > 0) pdf.addPage([exportDesign.width, exportDesign.height], orientation);
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, exportDesign.width, exportDesign.height);
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvasWidth, canvasHeight);
       }
 
       downloadBlob(pdf.output('blob'), `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
