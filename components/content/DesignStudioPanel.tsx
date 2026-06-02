@@ -3328,8 +3328,8 @@ function isEditableKeyboardTarget(target: EventTarget | null) {
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
-function sizeToCqw(value: number, designWidth: number) {
-  return `${(value / designWidth) * 100}cqw`;
+function sizeToDesignPx(value: number) {
+  return `${value}px`;
 }
 
 function getDesignFontFamily(layer: DesignTextLayer) {
@@ -3338,12 +3338,11 @@ function getDesignFontFamily(layer: DesignTextLayer) {
 
 function getLayerShadowFilter(layer: DesignLayer, design: DesignDocument) {
   if (!layer.shadowEnabled) return undefined;
-  const color = hexToRgb(layer.shadowColor || '#142334') || { r: 20, g: 35, b: 52 };
+  const color = hexToRgb(layer.shadowColor || '#142334') || { r: 20, g: 35, g: 52 };
   const opacity = clamp(layer.shadowOpacity ?? 0.28, 0, 1);
-  return `drop-shadow(${sizeToCqw(layer.shadowOffsetX ?? 10, design.width)} ${sizeToCqw(
+  return `drop-shadow(${sizeToDesignPx(layer.shadowOffsetX ?? 10)} ${sizeToDesignPx(
     layer.shadowOffsetY ?? 14,
-    design.width,
-  )} ${sizeToCqw(layer.shadowBlur ?? 22, design.width)} rgba(${color.r}, ${color.g}, ${color.b}, ${opacity}))`;
+  )} ${sizeToDesignPx(layer.shadowBlur ?? 22)} rgba(${color.r}, ${color.g}, ${color.b}, ${opacity}))`;
 }
 
 function getLayerOutlineFilters(layer: DesignLayer, design: DesignDocument) {
@@ -3363,13 +3362,13 @@ function getLayerOutlineFilters(layer: DesignLayer, design: DesignDocument) {
   ];
 
   return directions.map(([x, y]) => (
-    `drop-shadow(${sizeToCqw(x * width, design.width)} ${sizeToCqw(y * width, design.width)} 0 ${color})`
+    `drop-shadow(${sizeToDesignPx(x * width)} ${sizeToDesignPx(y * width)} 0 ${color})`
   ));
 }
 
 function getLayerEffectFilter(layer: DesignLayer, design: DesignDocument) {
   const filters = layer.blurEnabled && (layer.blurAmount ?? 0) > 0
-    ? [`blur(${sizeToCqw(layer.blurAmount ?? 0, design.width)})`, ...getLayerOutlineFilters(layer, design)]
+    ? [`blur(${sizeToDesignPx(layer.blurAmount ?? 0)})`, ...getLayerOutlineFilters(layer, design)]
     : [...getLayerOutlineFilters(layer, design)];
   const shadowFilter = getLayerShadowFilter(layer, design);
   if (shadowFilter) filters.push(shadowFilter);
@@ -3378,10 +3377,10 @@ function getLayerEffectFilter(layer: DesignLayer, design: DesignDocument) {
 
 function getLayerBoundsStyle(layer: DesignLayer, design: DesignDocument) {
   return {
-    left: `${(layer.x / design.width) * 100}%`,
-    top: `${(layer.y / design.height) * 100}%`,
-    width: `${(layer.width / design.width) * 100}%`,
-    height: `${(layer.height / design.height) * 100}%`,
+    left: `${layer.x}px`,
+    top: `${layer.y}px`,
+    width: `${layer.width}px`,
+    height: `${layer.height}px`,
     opacity: layer.opacity,
     transform: `rotate(${layer.rotation}deg)`,
     transformOrigin: 'center',
@@ -3449,10 +3448,10 @@ function getLayerCornerRadiusCss(layer: DesignLayer, design: DesignDocument) {
   const radii = getLayerCornerRadii(layer);
   if (!radii.topLeft && !radii.topRight && !radii.bottomRight && !radii.bottomLeft) return undefined;
   return [
-    sizeToCqw(radii.topLeft, design.width),
-    sizeToCqw(radii.topRight, design.width),
-    sizeToCqw(radii.bottomRight, design.width),
-    sizeToCqw(radii.bottomLeft, design.width),
+    sizeToDesignPx(radii.topLeft),
+    sizeToDesignPx(radii.topRight),
+    sizeToDesignPx(radii.bottomRight),
+    sizeToDesignPx(radii.bottomLeft),
   ].join(' ');
 }
 
@@ -3460,18 +3459,18 @@ function getTextLayerStyle(layer: DesignTextLayer, design: DesignDocument) {
   return {
     color: layer.color,
     fontFamily: getDesignFontFamily(layer),
-    fontSize: sizeToCqw(layer.fontSize, design.width),
+    fontSize: sizeToDesignPx(layer.fontSize),
     fontWeight: layer.fontWeight,
     fontStyle: layer.fontStyle || 'normal',
     textDecorationLine: layer.textDecoration === 'underline' ? 'underline' : 'none',
     lineHeight: layer.lineHeight,
     textAlign: layer.textAlign,
-    letterSpacing: layer.letterSpacing ? sizeToCqw(layer.letterSpacing, design.width) : 0,
+    letterSpacing: layer.letterSpacing ? sizeToDesignPx(layer.letterSpacing) : 0,
     textTransform: layer.textTransform || 'none',
     backgroundColor: layer.backgroundColor || 'transparent',
-    border: layer.borderColor ? `${sizeToCqw(1.5, design.width)} solid ${layer.borderColor}` : undefined,
+    border: layer.borderColor ? `${sizeToDesignPx(1.5)} solid ${layer.borderColor}` : undefined,
     borderRadius: getLayerCornerRadiusCss(layer, design),
-    padding: layer.padding ? sizeToCqw(layer.padding, design.width) : undefined,
+    padding: layer.padding ? sizeToDesignPx(layer.padding) : undefined,
   };
 }
 
@@ -3768,13 +3767,25 @@ async function waitForDesignFonts(element: HTMLElement) {
   if (!('fonts' in document)) return;
   await document.fonts.ready;
   const nodes = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
-  const requests = new Set<string>();
+  const families = new Set<string>();
   nodes.forEach((node) => {
     const style = getComputedStyle(node);
-    if (!style.fontFamily || !style.fontSize) return;
-    requests.add(`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`);
+    if (!style.fontFamily) return;
+    style.fontFamily.split(',').forEach((part) => {
+      const cleaned = part.trim().replace(/^["']|["']$/g, '');
+      if (cleaned) families.add(cleaned);
+    });
   });
-  await Promise.all(Array.from(requests).slice(0, 40).map((request) => document.fonts.load(request).catch(() => null)));
+  await Promise.all(
+    Array.from(families).map((family) =>
+      document.fonts.load(`16px "${family}"`).catch(() => null),
+    ),
+  );
+  await Promise.all(
+    Array.from(families).map((family) =>
+      document.fonts.load(`700 16px "${family}"`).catch(() => null),
+    ),
+  );
   await document.fonts.ready;
 }
 
@@ -3866,6 +3877,45 @@ async function waitForDesignImages(element: HTMLElement) {
       });
     }),
   );
+
+  const backgroundUrls = new Set<string>();
+  const allElements = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
+  allElements.forEach((node) => {
+    const style = getComputedStyle(node);
+    const collectFromValue = (value: string) => {
+      const matches = value.matchAll(/url\((['"]?)([^'")]+)\1\)/g);
+      for (const match of matches) {
+        const url = match[2];
+        if (url && !url.startsWith('data:') && !url.startsWith('#')) {
+          backgroundUrls.add(url);
+        }
+      }
+    };
+    collectFromValue(style.backgroundImage);
+    collectFromValue(style.maskImage);
+    collectFromValue(style.webkitMaskImage);
+  });
+
+  await Promise.all(
+    Array.from(backgroundUrls).map(
+      (url) =>
+        new Promise<null>((resolve) => {
+          const probe = new Image();
+          let timeoutId: number | undefined;
+          const done = () => {
+            probe.removeEventListener('load', done);
+            probe.removeEventListener('error', done);
+            if (timeoutId) window.clearTimeout(timeoutId);
+            resolve(null);
+          };
+          probe.crossOrigin = 'anonymous';
+          probe.addEventListener('load', done, { once: true });
+          probe.addEventListener('error', done, { once: true });
+          timeoutId = window.setTimeout(done, 2500);
+          probe.src = url;
+        }),
+    ),
+  );
 }
 
 function downloadBlob(blob: Blob, fileName: string) {
@@ -3877,6 +3927,22 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function preloadAllDesignFonts() {
+  if (!('fonts' in document)) return Promise.resolve();
+  const families = new Set<string>();
+  designFontOptions.forEach((option) => {
+    option.fontFamily.split(',').forEach((part) => {
+      const cleaned = part.trim().replace(/^["']|["']$/g, '');
+      if (cleaned) families.add(cleaned);
+    });
+  });
+  return Promise.all(
+    Array.from(families).map((family) =>
+      document.fonts.load(`16px "${family}"`).catch(() => null),
+    ),
+  ).then(() => document.fonts.ready);
 }
 
 function waitForNextDesignPaint() {
@@ -3922,6 +3988,8 @@ async function captureDesignCanvas(
   exportElement.style.border = '0';
   exportElement.style.borderRadius = '0';
   exportElement.style.boxShadow = 'none';
+  exportElement.style.transform = 'none';
+  exportElement.style.transformOrigin = 'top left';
 
   exportHost.append(exportElement);
   document.body.append(exportHost);
@@ -3958,6 +4026,8 @@ async function captureDesignCanvas(
           clonedCanvas.style.border = '0';
           clonedCanvas.style.borderRadius = '0';
           clonedCanvas.style.boxShadow = 'none';
+          clonedCanvas.style.transform = 'none';
+          clonedCanvas.style.transformOrigin = 'top left';
           if (options?.transparentBackground) {
             clonedCanvas.style.background = 'transparent';
             clonedCanvas.style.backgroundColor = 'transparent';
@@ -5512,7 +5582,7 @@ function BackgroundEffectsLayer({ design, effects }: { design: DesignDocument; e
           'radial-gradient(circle, rgba(185,133,103,0.13) 0 0.6px, transparent 0.7px)',
         ].join(', '),
         backgroundPosition: '0 0, 4px 5px',
-        backgroundSize: `${sizeToCqw(10, design.width)} ${sizeToCqw(10, design.width)}, ${sizeToCqw(13, design.width)} ${sizeToCqw(13, design.width)}`,
+        backgroundSize: `${sizeToDesignPx(10)} ${sizeToDesignPx(10)}, ${sizeToDesignPx(13)} ${sizeToDesignPx(13)}`,
         mixBlendMode: 'multiply',
         opacity: 0.28,
       },
@@ -5527,7 +5597,7 @@ function BackgroundEffectsLayer({ design, effects }: { design: DesignDocument; e
           'repeating-linear-gradient(0deg, rgba(20,35,52,0.04) 0 1px, transparent 1px 2px)',
           'repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px)',
         ].join(', '),
-        backgroundSize: `${sizeToCqw(7, design.width)} ${sizeToCqw(7, design.width)}`,
+        backgroundSize: `${sizeToDesignPx(7)} ${sizeToDesignPx(7)}`,
         mixBlendMode: 'soft-light',
         opacity: 0.32,
       },
@@ -5539,7 +5609,7 @@ function BackgroundEffectsLayer({ design, effects }: { design: DesignDocument; e
       key: 'notebook-lines',
       style: {
         backgroundImage: [
-          `repeating-linear-gradient(to bottom, transparent 0 ${sizeToCqw(46, design.width)}, rgba(72,102,135,0.2) ${sizeToCqw(46, design.width)} ${sizeToCqw(48, design.width)})`,
+          `repeating-linear-gradient(to bottom, transparent 0 ${sizeToDesignPx(46)}, rgba(72,102,135,0.2) ${sizeToDesignPx(46)} ${sizeToDesignPx(48)})`,
           'linear-gradient(to right, transparent 0 12%, rgba(185,92,92,0.24) 12% calc(12% + 1px), transparent calc(12% + 1px))',
         ].join(', '),
         opacity: 0.62,
@@ -5551,14 +5621,14 @@ function BackgroundEffectsLayer({ design, effects }: { design: DesignDocument; e
     overlays.push({
       key: 'ruled-lines',
       style: {
-        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${sizeToCqw(58, design.width)}, rgba(20,35,52,0.14) ${sizeToCqw(58, design.width)} ${sizeToCqw(60, design.width)})`,
+        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${sizeToDesignPx(58)}, rgba(20,35,52,0.14) ${sizeToDesignPx(58)} ${sizeToDesignPx(60)})`,
         opacity: 0.5,
       },
     });
   }
 
   if (effects.gridLines) {
-    const gridSize = sizeToCqw(effects.gridSize, design.width);
+    const gridSize = sizeToDesignPx(effects.gridSize);
     overlays.push({
       key: 'grid-lines',
       style: {
@@ -5848,6 +5918,10 @@ function DesignCanvas({
     };
   }
 
+  const editorScale = zoom / 100;
+  const editorDisplayWidth = Math.round(design.width * editorScale);
+  const editorDisplayHeight = Math.round(design.height * editorScale);
+
   return (
     <div
       className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-1.5"
@@ -5860,11 +5934,10 @@ function DesignCanvas({
       }}
     >
       <div
-        className="mx-auto"
+        className="relative mx-auto"
         style={{
-          width: `${zoom}%`,
-          maxWidth: zoom <= 100 ? `${CANVAS_FIT_WIDTH}px` : `${Math.round((CANVAS_FIT_WIDTH * zoom) / 100)}px`,
-          minWidth: zoom > 100 ? `${Math.round((CANVAS_FIT_WIDTH * zoom) / 100)}px` : undefined,
+          width: `${editorDisplayWidth}px`,
+          height: `${editorDisplayHeight}px`,
         }}
       >
         <div
@@ -5875,11 +5948,12 @@ function DesignCanvas({
             setTextSelectionLayerId(null);
             onSelectLayer(null);
           }}
-          className="relative w-full overflow-hidden rounded-[8px] border border-[#D8C8BB] shadow-[0_20px_60px_rgba(20,35,52,0.15)]"
+          className="absolute left-0 top-0 origin-top-left overflow-hidden rounded-[8px] border border-[#D8C8BB] shadow-[0_20px_60px_rgba(20,35,52,0.15)]"
           style={{
-            aspectRatio: `${design.width} / ${design.height}`,
+            width: `${design.width}px`,
+            height: `${design.height}px`,
             backgroundColor: page.background,
-            containerType: 'inline-size',
+            transform: `scale(${editorScale})`,
           }}
         >
         <BackgroundEffectsLayer design={design} effects={backgroundEffects} />
@@ -6167,6 +6241,10 @@ export default function DesignStudioPanel({
   useEffect(() => {
     selectedLayerIdsRef.current = selectedLayerIds;
   }, [selectedLayerIds]);
+
+  useEffect(() => {
+    void preloadAllDesignFonts();
+  }, []);
 
   useEffect(() => {
     if (selectedLayer?.type !== 'text') return;
@@ -7704,6 +7782,8 @@ export default function DesignStudioPanel({
     if (!canvasRef.current) return;
     setExportState({ busy: true, message: 'Preparing PNG export...', tone: 'info' });
     try {
+      await preloadAllDesignFonts();
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await captureDesignCanvas(canvasRef.current, design, html2canvas);
       const blob = await canvasToPngBlob(canvas);
@@ -7733,6 +7813,8 @@ export default function DesignStudioPanel({
     });
 
     try {
+      await preloadAllDesignFonts();
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
       const orientation = exportDesign.width > exportDesign.height ? 'landscape' : 'portrait';
@@ -7753,6 +7835,7 @@ export default function DesignStudioPanel({
         setSelectedLayerIdState(null);
         setSelectedLayerIds([]);
         await waitForNextDesignPaint();
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
 
         const activeCanvasElement = canvasRef.current;
         if (!activeCanvasElement) throw new Error('Could not find the design canvas for PDF export.');

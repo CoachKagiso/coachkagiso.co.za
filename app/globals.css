@@ -5,7 +5,7 @@
 @font-face {
   font-family: "Aloha Lover";
   src: url("/fonts/brand/aloha-lover.woff2") format("woff2");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 100 900;
 }
@@ -13,7 +13,7 @@
 @font-face {
   font-family: "Daughter Hand";
   src: url("/fonts/brand/daughter-hand.woff2") format("woff2");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 100 900;
 }
@@ -21,7 +21,7 @@
 @font-face {
   font-family: "Hero In";
   src: url("/fonts/brand/hero-in-regular.woff2") format("woff2");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 100 900;
 }
@@ -29,7 +29,7 @@
 @font-face {
   font-family: "Bableya";
   src: url("/fonts/brand/bableya-regular.woff2") format("woff2");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -37,7 +37,7 @@
 @font-face {
   font-family: "Linebrush";
   src: url("/fonts/brand/linebrush.otf") format("opentype");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -45,7 +45,7 @@
 @font-face {
   font-family: "Mibrush";
   src: url("/fonts/brand/mibrush-regular.otf") format("opentype");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -53,7 +53,7 @@
 @font-face {
   font-family: "Walesia Signature Brush";
   src: url("/fonts/brand/walesia-signature-brush.otf") format("opentype");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -61,7 +61,7 @@
 @font-face {
   font-family: "Walking Dream";
   src: url("/fonts/brand/walking-dream.otf") format("opentype");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -69,7 +69,7 @@
 @font-face {
   font-family: "Simple Notes";
   src: url("/fonts/brand/simple-notes-regular.otf") format("opentype");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -77,7 +77,7 @@
 @font-face {
   font-family: "Kalieb Luxury";
   src: url("/fonts/brand/kalieb-luxury-regular.woff") format("woff");
-  font-display: swap;
+  font-display: block;
   font-style: normal;
   font-weight: 400;
 }
@@ -85,7 +85,7 @@
 @font-face {
   font-family: "Kalieb Luxury";
   src: url("/fonts/brand/kalieb-luxury-italic.woff") format("woff");
-  font-display: swap;
+  font-display: block;
   font-style: italic;
   font-weight: 400;
 }
