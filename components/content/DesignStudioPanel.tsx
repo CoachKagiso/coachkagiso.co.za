@@ -12,8 +12,11 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
+  ArrowUp,
   Bold,
   Circle,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Diamond,
   Download,
@@ -56,6 +59,8 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import FilterDropdown from '@/components/FilterDropdown';
 
 type DesignFormat = 'social_graphic' | 'carousel' | 'presentation';
 type DesignLayerType = 'text' | 'asset' | 'shape';
@@ -268,6 +273,12 @@ export type DesignStudioTextImport = {
   text: string;
 };
 
+export type DesignStudioVaultImport = DesignStudioTextImport & {
+  statusLabel: string;
+  platformLabel?: string;
+  updatedAt?: string;
+};
+
 export type DesignStudioImportRequest = {
   id: string;
   kind: 'carousel' | 'text';
@@ -327,8 +338,10 @@ type DesignPatchOptions = {
 
 const DESIGN_STORAGE_KEY = 'coach-kagiso-design-studio-v3-manifesto';
 const BRAND_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-brand-assets';
-const HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
+const DELETED_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-deleted-assets';
+const LEGACY_HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
 const DESIGN_TEMPLATES_STORAGE_KEY = 'coach-kagiso-design-studio-v1-templates';
+const CONTENT_VAULT_COLLAPSED_STORAGE_KEY = 'coach-kagiso-design-studio-v1-content-vault-collapsed';
 const DESIGN_LAYER_CLIPBOARD_TEXT = 'Coach Kagiso Design Studio layer selection';
 export const DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY = 'coach-kagiso-design-studio-v1-pending-import';
 const DEFAULT_DESIGN_WIDTH = 1080;
@@ -342,7 +355,7 @@ const DEFAULT_BACKGROUND_GRID_SIZE = 84;
 const MIN_CANVAS_ZOOM = 50;
 const MAX_CANVAS_ZOOM = 200;
 const CANVAS_ZOOM_STEP = 25;
-const CANVAS_FIT_WIDTH = 660;
+const CANVAS_FIT_WIDTH = 680;
 const SAVED_GROUP_PADDING = 24;
 const MAX_DESIGN_HISTORY_ENTRIES = 80;
 const designAspectRatioPresets = [
@@ -3413,6 +3426,14 @@ function getLayerPreviewLabel(layer: DesignLayer, assetLibrary: Record<string, D
   return layer.text.replace(/\s+/g, ' ').trim().slice(0, 48) || layer.name;
 }
 
+function getLayerCompactPreviewLabel(layer: DesignLayer, assetLibrary: Record<string, DesignAsset>) {
+  const label = getLayerPreviewLabel(layer, assetLibrary);
+  if (layer.type !== 'text') return label;
+  const words = label.split(/\s+/).filter(Boolean);
+  const compact = words.slice(0, 5).join(' ');
+  return compact || layer.name;
+}
+
 function getStarPoints(width: number, height: number, strokeWidth: number) {
   const centerX = width / 2;
   const centerY = height / 2;
@@ -3443,6 +3464,11 @@ function slugifyFileName(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'design-studio-export';
+}
+
+function getCompactVaultHeading(value: string) {
+  const cleaned = value.replace(/\s+/g, ' ').trim();
+  return cleaned.length > 130 ? `${cleaned.slice(0, 127)}...` : cleaned;
 }
 
 async function waitForDesignFonts(element: HTMLElement) {
@@ -3558,6 +3584,14 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function waitForNextDesignPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 async function captureDesignCanvas(
@@ -5398,7 +5432,7 @@ function DesignCanvas({
 
   return (
     <div
-      className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-3"
+      className="w-full overflow-auto rounded-[10px] bg-[#F8F6F4]/70 p-1.5"
       data-design-canvas-viewport="true"
       onClick={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -5548,11 +5582,13 @@ function DesignCanvas({
 export default function DesignStudioPanel({
   carouselImports = [],
   textImports = [],
+  vaultImports = [],
   importRequest = null,
   onImportRequestHandled,
 }: {
   carouselImports?: DesignStudioCarouselImport[];
   textImports?: DesignStudioTextImport[];
+  vaultImports?: DesignStudioVaultImport[];
   importRequest?: DesignStudioImportRequest | null;
   onImportRequestHandled?: () => void;
 }) {
@@ -5566,11 +5602,16 @@ export default function DesignStudioPanel({
   const [saveMessage, setSaveMessage] = useState('');
   const [assetLibraryMessage, setAssetLibraryMessage] = useState('');
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
+  const [vaultSearchQuery, setVaultSearchQuery] = useState('');
+  const [selectedVaultImportId, setSelectedVaultImportId] = useState('');
+  const [vaultMessage, setVaultMessage] = useState('');
+  const [isVaultPanelCollapsed, setIsVaultPanelCollapsed] = useState(false);
+  const [vaultPanelPreferenceLoaded, setVaultPanelPreferenceLoaded] = useState(false);
   const [textInsertOpen, setTextInsertOpen] = useState(false);
   const [brandAssets, setBrandAssets] = useState<DesignAsset[]>([]);
   const [brandAssetsLoaded, setBrandAssetsLoaded] = useState(false);
-  const [hiddenAssetIds, setHiddenAssetIds] = useState<string[]>([]);
-  const [hiddenAssetsLoaded, setHiddenAssetsLoaded] = useState(false);
+  const [deletedAssetIds, setDeletedAssetIds] = useState<string[]>([]);
+  const [deletedAssetsLoaded, setDeletedAssetsLoaded] = useState(false);
   const [exportState, setExportState] = useState<ExportState | null>(null);
   const [designTemplates, setDesignTemplates] = useState<DesignTemplateRecord[]>([]);
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
@@ -5583,6 +5624,7 @@ export default function DesignStudioPanel({
   });
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const brandAssetInputRef = useRef<HTMLInputElement | null>(null);
+  const rightPanelRef = useRef<HTMLElement | null>(null);
   const textLayerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const designRef = useRef(design);
   const designHistoryRef = useRef(designHistory);
@@ -5619,6 +5661,37 @@ export default function DesignStudioPanel({
     : null;
   const carouselImportCount = carouselImports.length;
   const textImportCount = textImports.length;
+  const vaultImportCount = vaultImports.length;
+  const normalizedVaultSearchQuery = vaultSearchQuery.trim().toLowerCase();
+  const filteredVaultImports = useMemo(() => {
+    if (!normalizedVaultSearchQuery) return vaultImports.slice(0, 8);
+    return vaultImports
+      .filter((item) =>
+        [
+          item.label,
+          item.title,
+          item.sourceLabel,
+          item.statusLabel,
+          item.platformLabel,
+          item.text,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedVaultSearchQuery),
+      )
+      .slice(0, 8);
+  }, [normalizedVaultSearchQuery, vaultImports]);
+  const vaultDropdownOptions = useMemo(() => (
+    filteredVaultImports.length
+      ? filteredVaultImports.map((source) => ({ value: source.id, label: getCompactVaultHeading(source.label) }))
+      : [{ value: '', label: vaultImportCount === 0 ? 'No saved Vault copy yet' : 'No matching Vault headings' }]
+  ), [filteredVaultImports, vaultImportCount]);
+  const selectedVaultImport =
+    filteredVaultImports.find((source) => source.id === selectedVaultImportId) ||
+    filteredVaultImports[0] ||
+    vaultImports.find((source) => source.id === selectedVaultImportId) ||
+    null;
 
   useEffect(() => {
     designRef.current = design;
@@ -5697,27 +5770,33 @@ export default function DesignStudioPanel({
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      const raw = window.localStorage.getItem(HIDDEN_ASSETS_STORAGE_KEY);
+      const raw =
+        window.localStorage.getItem(DELETED_ASSETS_STORAGE_KEY) ||
+        window.localStorage.getItem(LEGACY_HIDDEN_ASSETS_STORAGE_KEY);
       if (!raw) {
-        setHiddenAssetsLoaded(true);
+        setDeletedAssetsLoaded(true);
         return;
       }
       try {
         const parsed = JSON.parse(raw) as unknown;
-        setHiddenAssetIds(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+        const ids = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+        setDeletedAssetIds(ids);
+        window.localStorage.setItem(DELETED_ASSETS_STORAGE_KEY, JSON.stringify(ids));
+        window.localStorage.removeItem(LEGACY_HIDDEN_ASSETS_STORAGE_KEY);
       } catch {
-        window.localStorage.removeItem(HIDDEN_ASSETS_STORAGE_KEY);
+        window.localStorage.removeItem(DELETED_ASSETS_STORAGE_KEY);
+        window.localStorage.removeItem(LEGACY_HIDDEN_ASSETS_STORAGE_KEY);
       } finally {
-        setHiddenAssetsLoaded(true);
+        setDeletedAssetsLoaded(true);
       }
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
-    if (!hiddenAssetsLoaded) return;
-    window.localStorage.setItem(HIDDEN_ASSETS_STORAGE_KEY, JSON.stringify(hiddenAssetIds));
-  }, [hiddenAssetIds, hiddenAssetsLoaded]);
+    if (!deletedAssetsLoaded) return;
+    window.localStorage.setItem(DELETED_ASSETS_STORAGE_KEY, JSON.stringify(deletedAssetIds));
+  }, [deletedAssetIds, deletedAssetsLoaded]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -5748,6 +5827,20 @@ export default function DesignStudioPanel({
       }, 0);
     }
   }, [designTemplates, designTemplatesLoaded]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const raw = window.localStorage.getItem(CONTENT_VAULT_COLLAPSED_STORAGE_KEY);
+      setIsVaultPanelCollapsed(raw === 'true');
+      setVaultPanelPreferenceLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (!vaultPanelPreferenceLoaded) return;
+    window.localStorage.setItem(CONTENT_VAULT_COLLAPSED_STORAGE_KEY, String(isVaultPanelCollapsed));
+  }, [isVaultPanelCollapsed, vaultPanelPreferenceLoaded]);
 
   const replaceImportedDesignDocument = useCallback((nextDesign: DesignDocument, message: string) => {
     const nextPage = nextDesign.pages[0];
@@ -5896,13 +5989,13 @@ export default function DesignStudioPanel({
 
   const groupedAssets = useMemo(() => {
     return [...brandAssets, ...Object.values(designAssetLibrary)].reduce<Record<string, DesignAsset[]>>((acc, asset) => {
-      if (hiddenAssetIds.includes(asset.id)) return acc;
+      if (deletedAssetIds.includes(asset.id)) return acc;
       const haystack = `${asset.name} ${asset.category} ${asset.id}`.toLowerCase();
       if (assetSearchTerms.length && !assetSearchTerms.every((term) => haystack.includes(term))) return acc;
       acc[asset.category] = [...(acc[asset.category] || []), asset];
       return acc;
     }, {});
-  }, [assetSearchTerms, brandAssets, hiddenAssetIds]);
+  }, [assetSearchTerms, brandAssets, deletedAssetIds]);
 
   function selectSingleLayer(id: string | null) {
     selectedLayerIdRef.current = id;
@@ -6027,6 +6120,33 @@ export default function DesignStudioPanel({
     setSaveMessage('');
     return true;
   }, []);
+
+  async function copyVaultImportText(source: DesignStudioVaultImport) {
+    const copied = await copyTextToClipboard(source.text);
+    setVaultMessage(copied ? `Copied "${source.label}".` : 'Could not copy this Vault item.');
+  }
+
+  function placeVaultImportText(source: DesignStudioVaultImport) {
+    if (!selectedLayer) {
+      setVaultMessage('Select one text layer, then place the Vault copy.');
+      return;
+    }
+    if (selectedLayer.type !== 'text') {
+      setVaultMessage('Select a text layer before placing Vault copy.');
+      return;
+    }
+    if (selectedLayer.locked) {
+      setVaultMessage('Unlock the selected text layer before placing Vault copy.');
+      return;
+    }
+
+    const placed = pasteTextIntoSelectedTextLayer(source.text);
+    setVaultMessage(placed ? `Placed "${source.label}" into the selected text layer.` : 'That text is already on the selected layer.');
+  }
+
+  function scrollRightPanelToTop() {
+    rightPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   const copySelectedLayersToClipboard = useCallback(() => {
     const current = designRef.current;
@@ -6299,6 +6419,16 @@ export default function DesignStudioPanel({
     replaceDesignDocument(createBlankDesignDocument(design.format, design.width, design.height), 'Blank design started.');
   }
 
+  function persistDesignTemplates(records: DesignTemplateRecord[]) {
+    try {
+      window.localStorage.setItem(DESIGN_TEMPLATES_STORAGE_KEY, JSON.stringify(records));
+      return true;
+    } catch {
+      setTemplateMessage('Template storage is full. Delete an older template, then save again.');
+      return false;
+    }
+  }
+
   function saveCurrentDesignAsTemplate() {
     const fallbackName = design.templateSourceName || design.title || 'Design template';
     const name = window.prompt('Template name', fallbackName);
@@ -6327,14 +6457,16 @@ export default function DesignStudioPanel({
       updatedAt: now,
     };
 
-    setDesignTemplates((current) => [record, ...current]);
+    const nextTemplates = [record, ...designTemplates];
+    if (!persistDesignTemplates(nextTemplates)) return;
+    setDesignTemplates(nextTemplates);
     updateDesign((current) => ({
       ...current,
       templateSourceId: id,
       templateSourceName: record.name,
       templateUpdatedAt: now,
     }), { recordHistory: false });
-    setTemplateMessage(`"${record.name}" saved as a reusable template.`);
+    setTemplateMessage(`"${record.name}" saved and will stay in Saved templates on this browser.`);
   }
 
   function updateCurrentTemplate() {
@@ -6350,7 +6482,7 @@ export default function DesignStudioPanel({
       templateSourceName: activeTemplateRecord.name,
       templateUpdatedAt: now,
     };
-    setDesignTemplates((current) => current.map((template) => (
+    const nextTemplates = designTemplates.map((template) => (
       template.id === activeTemplateRecord.id
         ? {
             ...template,
@@ -6363,9 +6495,11 @@ export default function DesignStudioPanel({
             updatedAt: now,
           }
         : template
-    )));
+    ));
+    if (!persistDesignTemplates(nextTemplates)) return;
+    setDesignTemplates(nextTemplates);
     updateDesign((current) => ({ ...current, templateUpdatedAt: now }), { recordHistory: false });
-    setTemplateMessage(`"${activeTemplateRecord.name}" updated.`);
+    setTemplateMessage(`"${activeTemplateRecord.name}" updated and saved.`);
   }
 
   function loadTemplateRecord(template: DesignTemplateRecord) {
@@ -6382,7 +6516,9 @@ export default function DesignStudioPanel({
   function deleteTemplateRecord(template: DesignTemplateRecord) {
     const confirmed = window.confirm(`Delete "${template.name}" from saved templates?`);
     if (!confirmed) return;
-    setDesignTemplates((current) => current.filter((item) => item.id !== template.id));
+    const nextTemplates = designTemplates.filter((item) => item.id !== template.id);
+    if (!persistDesignTemplates(nextTemplates)) return;
+    setDesignTemplates(nextTemplates);
     if (design.templateSourceId === template.id) {
       updateDesign((current) => ({
         ...current,
@@ -6563,13 +6699,27 @@ export default function DesignStudioPanel({
     const shouldRemove = window.confirm(
       asset.custom
         ? `Remove "${asset.name}" from Brand assets? Any canvas layers using it will be removed too.`
-        : `Hide "${asset.name}" from the Asset library? Any canvas layers using it will be removed too.`,
+        : `Delete "${asset.name}" from the Asset library? Any canvas layers using it will be removed too.`,
     );
     if (!shouldRemove) return;
     if (asset.custom) {
-      setBrandAssets((current) => current.filter((item) => item.id !== assetId));
+      const nextBrandAssets = brandAssets.filter((item) => item.id !== assetId);
+      try {
+        window.localStorage.setItem(BRAND_ASSETS_STORAGE_KEY, JSON.stringify(nextBrandAssets));
+      } catch {
+        setAssetLibraryMessage('Could not save the asset deletion. Try deleting another large asset first.');
+        return;
+      }
+      setBrandAssets(nextBrandAssets);
     } else {
-      setHiddenAssetIds((current) => (current.includes(assetId) ? current : [...current, assetId]));
+      const nextDeletedAssetIds = deletedAssetIds.includes(assetId) ? deletedAssetIds : [...deletedAssetIds, assetId];
+      try {
+        window.localStorage.setItem(DELETED_ASSETS_STORAGE_KEY, JSON.stringify(nextDeletedAssetIds));
+      } catch {
+        setAssetLibraryMessage('Could not save the asset deletion. Try again after deleting another saved asset.');
+        return;
+      }
+      setDeletedAssetIds(nextDeletedAssetIds);
     }
     updateDesign((current) => ({
       ...current,
@@ -6579,12 +6729,7 @@ export default function DesignStudioPanel({
       })),
     }));
     if (selectedLayer?.type === 'asset' && selectedLayer.assetId === assetId) selectSingleLayer(null);
-    setAssetLibraryMessage(asset.custom ? 'Brand asset removed.' : `${asset.name} hidden from the Asset library.`);
-  }
-
-  function restoreHiddenAssets() {
-    setHiddenAssetIds([]);
-    setAssetLibraryMessage('Built-in assets restored to the Asset library.');
+    setAssetLibraryMessage(`${asset.name} deleted from the Asset library.`);
   }
 
   function addShapeLayer(shape: DesignShapeKind) {
@@ -6971,6 +7116,71 @@ export default function DesignStudioPanel({
     }
   }
 
+  async function exportPdf() {
+    if (!canvasRef.current) return;
+    const exportDesign = designRef.current;
+    if (!exportDesign.pages.length) return;
+
+    const previousPageId = activePageIdRef.current;
+    const previousSelectedLayerId = selectedLayerIdRef.current;
+    const previousSelectedLayerIds = selectedLayerIdsRef.current;
+    setExportState({
+      busy: true,
+      message: `Preparing ${exportDesign.pages.length}-page PDF export...`,
+      tone: 'info',
+    });
+
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const orientation = exportDesign.width > exportDesign.height ? 'landscape' : 'portrait';
+      const pdf = new jsPDF({
+        orientation,
+        unit: 'px',
+        format: [exportDesign.width, exportDesign.height],
+        compress: true,
+      });
+
+      for (let index = 0; index < exportDesign.pages.length; index += 1) {
+        const page = exportDesign.pages[index];
+        activePageIdRef.current = page.id;
+        selectedLayerIdRef.current = null;
+        selectedLayerIdsRef.current = [];
+        setActivePageId(page.id);
+        setSelectedLayerIdState(null);
+        setSelectedLayerIds([]);
+        await waitForNextDesignPaint();
+
+        const activeCanvasElement = canvasRef.current;
+        if (!activeCanvasElement) throw new Error('Could not find the design canvas for PDF export.');
+
+        const canvas = await captureDesignCanvas(activeCanvasElement, exportDesign, html2canvas);
+        if (index > 0) pdf.addPage([exportDesign.width, exportDesign.height], orientation);
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, exportDesign.width, exportDesign.height);
+      }
+
+      downloadBlob(pdf.output('blob'), `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
+      setExportState({
+        busy: false,
+        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}.`,
+        tone: 'info',
+      });
+    } catch (error) {
+      setExportState({
+        busy: false,
+        message: error instanceof Error ? error.message : 'Could not export this design as a PDF.',
+        tone: 'error',
+      });
+    } finally {
+      activePageIdRef.current = previousPageId;
+      selectedLayerIdRef.current = previousSelectedLayerId;
+      selectedLayerIdsRef.current = previousSelectedLayerIds;
+      setActivePageId(previousPageId);
+      setSelectedLayerIdState(previousSelectedLayerId);
+      setSelectedLayerIds(previousSelectedLayerIds);
+    }
+  }
+
   return (
     <section data-hide-custom-cursor className="pb-10">
       <div className="grid gap-4">
@@ -6987,6 +7197,10 @@ export default function DesignStudioPanel({
               <button type="button" onClick={saveDesign} className="studio-secondary-button">
                 <Save className="h-4 w-4" />
                 Save design
+              </button>
+              <button type="button" onClick={() => void exportPdf()} disabled={exportState?.busy} className="studio-secondary-button">
+                {exportState?.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Export PDF
               </button>
               <button type="button" onClick={() => void exportPng()} disabled={exportState?.busy} className="studio-primary-button">
                 {exportState?.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -7142,15 +7356,23 @@ export default function DesignStudioPanel({
                             : template.format.replace(/_/g, ' ')}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteTemplateRecord(template)}
-                        title={`Delete ${template.name}`}
-                        aria-label={`Delete ${template.name}`}
-                        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334]/55 opacity-100 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadTemplateRecord(template)}
+                          className="min-h-8 rounded-[8px] border border-[#E4D8CB] bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#FBFAF8]"
+                        >
+                          Load
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteTemplateRecord(template)}
+                          className="flex min-h-8 items-center justify-center gap-1 rounded-[8px] border border-red-100 bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -7172,9 +7394,9 @@ export default function DesignStudioPanel({
           )}
         </div>
 
-        <div className="grid gap-4 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[310px_minmax(0,1fr)_360px] xl:items-start">
+        <div className="grid gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[350px_minmax(0,750px)_420px] xl:items-start xl:justify-center 2xl:grid-cols-[380px_minmax(0,750px)_480px]">
           <aside
-            className="design-studio-scroll-area grid min-w-0 gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 [scrollbar-gutter:stable]"
+            className="grid min-w-0 gap-4 overflow-visible xl:sticky xl:top-4 xl:self-start"
             onWheel={trapDesignWheel}
           >
             <section className="rounded-[8px] bg-white p-4">
@@ -7214,7 +7436,7 @@ export default function DesignStudioPanel({
               </button>
             </section>
 
-            <section className="rounded-[8px] bg-white p-4">
+            <section className="rounded-[8px] bg-white p-4 xl:min-h-[calc(100vh-360px)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Layers</p>
@@ -7232,29 +7454,30 @@ export default function DesignStudioPanel({
                   <p className="mt-3 rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[11px] leading-relaxed text-[#142334]/58">
                     Shift-click or Ctrl-click layers to select more than one.
                   </p>
-                  <div className="design-studio-scroll-area mt-3 grid max-h-[360px] gap-2 overflow-y-auto pr-2" onWheel={trapDesignWheel}>
+                  <div className="design-studio-scroll-area mt-3 grid max-h-[520px] gap-2 overflow-y-auto overflow-x-hidden pr-2 xl:max-h-[calc(100vh-500px)]" onWheel={trapDesignWheel}>
                     {[...activePage.layers].reverse().map((layer) => (
                       <div
                         key={layer.id}
-                        className="group relative"
+                        className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center rounded-[8px] border transition ${
+                          selectedLayerIds.includes(layer.id)
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                        }`}
                       >
                         <button
                           type="button"
                           onClick={(event) => selectLayer(layer.id, event.shiftKey || event.metaKey || event.ctrlKey)}
-                          className={`min-w-0 w-full rounded-[8px] border px-3 py-2 pr-28 text-left transition ${
-                            selectedLayerIds.includes(layer.id)
-                              ? 'border-[#142334] bg-[#142334] text-white'
-                              : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
-                          }`}
+                          className="min-w-0 px-3 py-2 text-left"
                         >
-                          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">
-                            {layer.type === 'text' ? <Type className="h-3.5 w-3.5" /> : layer.type === 'shape' ? <Square className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                          <span className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] opacity-60" title={layer.templateSlot ? getDesignTemplateSlotLabel(layer.templateSlot) : undefined}>
+                            {layer.type === 'text' ? <Type className="h-3.5 w-3.5 shrink-0" /> : layer.type === 'shape' ? <Square className="h-3.5 w-3.5 shrink-0" /> : <ImageIcon className="h-3.5 w-3.5 shrink-0" />}
                             {layer.locked ? 'Locked' : layer.type}
-                            {layer.templateSlot ? `- ${getDesignTemplateSlotLabel(layer.templateSlot)}` : ''}
                           </span>
-                          <span className="mt-1 block truncate text-[12px] font-semibold">{getLayerPreviewLabel(layer, assetLibrary)}</span>
+                          <span className="mt-1 block truncate text-[12px] font-semibold" title={getLayerPreviewLabel(layer, assetLibrary)}>
+                            {getLayerCompactPreviewLabel(layer, assetLibrary)}
+                          </span>
                         </button>
-                        <div className="absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                        <div className="flex shrink-0 items-center gap-1 pr-2">
                           <button
                             type="button"
                             title={layer.locked ? 'Unlock layer' : 'Lock layer'}
@@ -7423,129 +7646,133 @@ export default function DesignStudioPanel({
           </aside>
 
           <main
-            className="design-studio-scroll-area min-w-0 rounded-[8px] bg-[#F8F6F4] p-4 md:p-5 xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-3 [scrollbar-gutter:stable]"
+            className="design-studio-scroll-area min-w-0 rounded-[8px] bg-[#F8F6F4] p-1.5 xl:sticky xl:top-4 xl:self-start xl:overflow-x-hidden"
             onWheel={trapDesignWheel}
           >
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-3 flex flex-col items-center gap-3 text-center">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Canvas</p>
                 <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{activePage.name}</h3>
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1">
-                  {designAspectRatioPresets.map((preset) => {
-                    const active = activeAspectRatioLabel === preset.label;
-                    const ratio = preset.height / preset.width;
-                    const isSquare = Math.abs(ratio - 1) < 0.01;
-                    const isTall = ratio > 1.5;
+              <div className="grid w-full justify-items-center gap-2">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1">
+                    {designAspectRatioPresets.map((preset) => {
+                      const active = activeAspectRatioLabel === preset.label;
+                      const ratio = preset.height / preset.width;
+                      const isSquare = Math.abs(ratio - 1) < 0.01;
+                      const isTall = ratio > 1.5;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setCanvasAspectRatio(preset.width, preset.height)}
+                          aria-pressed={active}
+                          title={`Set canvas to ${preset.label}`}
+                          className={`flex min-h-8 items-center gap-2 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                            active ? 'bg-[#142334] text-white' : 'text-[#142334]/62 hover:bg-[#F8F6F4] hover:text-[#142334]'
+                          }`}
+                        >
+                          <span className="grid h-5 w-4 place-items-center" aria-hidden="true">
+                            <span
+                              className="block rounded-[2px] border border-current"
+                              style={{ width: isSquare ? 14 : isTall ? 8 : 11, height: isSquare ? 14 : isTall ? 16 : 14 }}
+                            />
+                          </span>
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={invertCanvasAspectRatio}
+                      title="Invert canvas aspect ratio"
+                      aria-label="Invert canvas aspect ratio"
+                      className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1" aria-label="Canvas zoom controls">
+                    <button
+                      type="button"
+                      onClick={() => changeCanvasZoom(-CANVAS_ZOOM_STEP)}
+                      disabled={canvasZoom <= MIN_CANVAS_ZOOM}
+                      title="Zoom out"
+                      aria-label="Zoom out"
+                      className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="min-w-12 text-center text-[11px] font-bold tabular-nums tracking-[0.08em] text-[#142334]">{canvasZoom}%</span>
+                    <button
+                      type="button"
+                      onClick={() => changeCanvasZoom(CANVAS_ZOOM_STEP)}
+                      disabled={canvasZoom >= MAX_CANVAS_ZOOM}
+                      title="Zoom in"
+                      aria-label="Zoom in"
+                      className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={fitCanvasZoom}
+                      className="min-h-8 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
+                    >
+                      Fit
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {[
+                    { key: 'grid' as const, label: 'Grid' },
+                    { key: 'safeArea' as const, label: 'Safe area' },
+                    { key: 'bleed' as const, label: 'Bleed' },
+                  ].map((guide) => {
+                    const active = canvasGuides[guide.key];
                     return (
                       <button
-                        key={preset.label}
+                        key={guide.key}
                         type="button"
-                        onClick={() => setCanvasAspectRatio(preset.width, preset.height)}
+                        onClick={() => toggleCanvasGuide(guide.key)}
                         aria-pressed={active}
-                        title={`Set canvas to ${preset.label}`}
-                        className={`flex min-h-8 items-center gap-2 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
-                          active ? 'bg-[#142334] text-white' : 'text-[#142334]/62 hover:bg-[#F8F6F4] hover:text-[#142334]'
+                        className={`rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                          active
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-white text-[#142334]/58 hover:border-[#C9AD98] hover:text-[#142334]'
                         }`}
                       >
-                        <span className="grid h-5 w-4 place-items-center" aria-hidden="true">
-                          <span
-                            className="block rounded-[2px] border border-current"
-                            style={{ width: isSquare ? 14 : isTall ? 8 : 11, height: isSquare ? 14 : isTall ? 16 : 14 }}
-                          />
-                        </span>
-                        {preset.label}
+                        {guide.label}
                       </button>
                     );
                   })}
-                  <button
-                    type="button"
-                    onClick={invertCanvasAspectRatio}
-                    title="Invert canvas aspect ratio"
-                    aria-label="Invert canvas aspect ratio"
-                    className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
-                  >
-                    <RefreshCcw className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1" aria-label="Canvas zoom controls">
-                  <button
-                    type="button"
-                    onClick={() => changeCanvasZoom(-CANVAS_ZOOM_STEP)}
-                    disabled={canvasZoom <= MIN_CANVAS_ZOOM}
-                    title="Zoom out"
-                    aria-label="Zoom out"
-                    className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="min-w-12 text-center text-[11px] font-bold tabular-nums tracking-[0.08em] text-[#142334]">{canvasZoom}%</span>
-                  <button
-                    type="button"
-                    onClick={() => changeCanvasZoom(CANVAS_ZOOM_STEP)}
-                    disabled={canvasZoom >= MAX_CANVAS_ZOOM}
-                    title="Zoom in"
-                    aria-label="Zoom in"
-                    className="grid min-h-8 min-w-8 place-items-center rounded-full text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={fitCanvasZoom}
-                    className="min-h-8 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
-                  >
-                    Fit
-                  </button>
-                </div>
-                {[
-                  { key: 'grid' as const, label: 'Grid' },
-                  { key: 'safeArea' as const, label: 'Safe area' },
-                  { key: 'bleed' as const, label: 'Bleed' },
-                ].map((guide) => {
-                  const active = canvasGuides[guide.key];
-                  return (
+                  <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1" aria-label="Design history controls">
                     <button
-                      key={guide.key}
                       type="button"
-                      onClick={() => toggleCanvasGuide(guide.key)}
-                      aria-pressed={active}
-                      className={`rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
-                        active
-                          ? 'border-[#142334] bg-[#142334] text-white'
-                          : 'border-[#E4D8CB] bg-white text-[#142334]/58 hover:border-[#C9AD98] hover:text-[#142334]'
+                      onClick={undoDesignChange}
+                      disabled={!canUndo}
+                      title="Undo"
+                      aria-label="Undo"
+                      className={`grid min-h-8 min-w-8 place-items-center rounded-full transition ${
+                        canUndo ? 'text-[#142334]/70 hover:bg-[#F8F6F4] hover:text-[#142334]' : 'cursor-not-allowed text-[#142334]/26'
                       }`}
                     >
-                      {guide.label}
+                      <Undo2 className="h-3.5 w-3.5" />
                     </button>
-                  );
-                })}
-                <div className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-white p-1" aria-label="Design history controls">
-                  <button
-                    type="button"
-                    onClick={undoDesignChange}
-                    disabled={!canUndo}
-                    title="Undo"
-                    aria-label="Undo"
-                    className={`grid min-h-8 min-w-8 place-items-center rounded-full transition ${
-                      canUndo ? 'text-[#142334]/70 hover:bg-[#F8F6F4] hover:text-[#142334]' : 'cursor-not-allowed text-[#142334]/26'
-                    }`}
-                  >
-                    <Undo2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={redoDesignChange}
-                    disabled={!canRedo}
-                    title="Redo"
-                    aria-label="Redo"
-                    className={`grid min-h-8 min-w-8 place-items-center rounded-full transition ${
-                      canRedo ? 'text-[#142334]/70 hover:bg-[#F8F6F4] hover:text-[#142334]' : 'cursor-not-allowed text-[#142334]/26'
-                    }`}
-                  >
-                    <Redo2 className="h-3.5 w-3.5" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={redoDesignChange}
+                      disabled={!canRedo}
+                      title="Redo"
+                      aria-label="Redo"
+                      className={`grid min-h-8 min-w-8 place-items-center rounded-full transition ${
+                        canRedo ? 'text-[#142334]/70 hover:bg-[#F8F6F4] hover:text-[#142334]' : 'cursor-not-allowed text-[#142334]/26'
+                      }`}
+                    >
+                      <Redo2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7568,9 +7795,111 @@ export default function DesignStudioPanel({
           </main>
 
           <aside
-            className="design-studio-scroll-area grid min-w-0 gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 [scrollbar-gutter:stable]"
+            ref={rightPanelRef}
+            className="design-studio-scroll-area grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 [scrollbar-gutter:stable]"
             onWheel={trapDesignWheel}
           >
+            <section className="rounded-[8px] bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Content Vault</p>
+                  <p className="mt-1 text-[12px] font-semibold text-[#142334]/58">
+                    {vaultImportCount} saved source{vaultImportCount === 1 ? '' : 's'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Copy className="h-4 w-4 text-[#C9AD98]" />
+                  <button
+                    type="button"
+                    onClick={() => setIsVaultPanelCollapsed((current) => !current)}
+                    aria-expanded={!isVaultPanelCollapsed}
+                    aria-controls="design-studio-content-vault-panel"
+                    title={isVaultPanelCollapsed ? 'Expand Content Vault' : 'Collapse Content Vault'}
+                    aria-label={isVaultPanelCollapsed ? 'Expand Content Vault' : 'Collapse Content Vault'}
+                    className="grid h-8 w-8 place-items-center rounded-full border border-[#E4D8CB] bg-white text-[#142334]/62 transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] hover:text-[#142334]"
+                  >
+                    {isVaultPanelCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {!isVaultPanelCollapsed && (
+                <div id="design-studio-content-vault-panel">
+                  <div className="relative mt-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8C7466]" />
+                    <input
+                      value={vaultSearchQuery}
+                      onChange={(event) => setVaultSearchQuery(event.target.value)}
+                      placeholder="Search Vault copy"
+                      className="studio-input pl-9 pr-9"
+                    />
+                    {vaultSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setVaultSearchQuery('')}
+                        title="Clear Vault search"
+                        aria-label="Clear Vault search"
+                        className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[#142334]/45 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <FieldLabel>Select heading</FieldLabel>
+                    <FilterDropdown
+                      name="designVaultSource"
+                      value={selectedVaultImport?.id || ''}
+                      onChange={setSelectedVaultImportId}
+                      ariaLabel="Select Vault content heading"
+                      options={vaultDropdownOptions}
+                      className="mt-2"
+                      wrapLabels
+                    />
+                  </div>
+
+                  {vaultMessage && (
+                    <p className="mt-3 rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/62">
+                      {vaultMessage}
+                    </p>
+                  )}
+
+                  <div className="mt-3" onWheel={trapDesignWheel}>
+                    {!selectedVaultImport ? (
+                      <p className="rounded-[8px] border border-dashed border-[#E4D8CB] bg-[#F8F6F4] px-3 py-4 text-center text-[12px] leading-relaxed text-[#142334]/56">
+                        {vaultImportCount === 0 ? 'No saved Vault copy yet.' : 'No Vault copy matches this search.'}
+                      </p>
+                    ) : (
+                      <article className="min-w-0 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3">
+                        <div className="min-w-0">
+                          <p className="break-words text-[12px] font-bold leading-snug text-[#142334]" title={selectedVaultImport.label}>
+                            {getCompactVaultHeading(selectedVaultImport.label)}
+                          </p>
+                          <p className="mt-1 break-words text-[11px] leading-relaxed text-[#142334]/55">
+                            {[selectedVaultImport.sourceLabel, selectedVaultImport.statusLabel, selectedVaultImport.platformLabel].filter(Boolean).join(' - ')}
+                          </p>
+                        </div>
+                        <div className="design-studio-scroll-area mt-3 max-h-[calc(100vh-430px)] min-h-48 overflow-y-auto overflow-x-hidden rounded-[8px] bg-white px-3 py-3 text-[12px] leading-relaxed text-[#142334]/72 [scrollbar-gutter:stable]">
+                          <p className="whitespace-pre-wrap break-words">{selectedVaultImport.text}</p>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => void copyVaultImportText(selectedVaultImport)} className="studio-ghost-button justify-center">
+                              <Copy className="h-4 w-4" />
+                              Copy
+                          </button>
+                          <button type="button" onClick={() => placeVaultImportText(selectedVaultImport)} className="studio-secondary-button justify-center">
+                              <Type className="h-4 w-4" />
+                              Place
+                          </button>
+                        </div>
+                      </article>
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+
             <section className="rounded-[8px] bg-white p-4">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-[#C9AD98]" />
@@ -8177,16 +8506,6 @@ export default function DesignStudioPanel({
                 <Upload className="h-4 w-4" />
                 Import brand assets
               </button>
-              {hiddenAssetIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={restoreHiddenAssets}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334]/62 transition hover:border-[#C9AD98] hover:bg-[#F8F6F4] hover:text-[#142334]"
-                >
-                  <RefreshCcw className="h-3.5 w-3.5" />
-                  Restore hidden assets
-                </button>
-              )}
               <label className="mt-3 block">
                 <span className="sr-only">Search asset library</span>
                 <span className="flex min-h-11 items-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-3 transition focus-within:border-[#C9AD98] focus-within:bg-white">
@@ -8234,8 +8553,8 @@ export default function DesignStudioPanel({
                           <button
                             type="button"
                             onClick={() => removeAssetFromLibrary(asset.id)}
-                            title={`Remove ${asset.name}`}
-                            aria-label={`Remove ${asset.name}`}
+                            title={`Delete ${asset.name}`}
+                            aria-label={`Delete ${asset.name}`}
                             className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-[#E4D8CB] bg-white/95 text-[#142334]/62 opacity-100 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#C9AD98] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -8246,6 +8565,15 @@ export default function DesignStudioPanel({
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={scrollRightPanelToTop}
+                data-design-right-rail-back-to-top="true"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-3 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-white"
+              >
+                <ArrowUp className="h-4 w-4" />
+                Back to top
+              </button>
             </section>
           </aside>
         </div>
