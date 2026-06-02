@@ -5095,13 +5095,20 @@ function InlineTextLayerEditor({
 
 function RichTextLayerContent({ layer }: { layer: DesignTextLayer }) {
   return (
-    <>
+    <span
+      className="block w-full min-w-0"
+      style={{
+        whiteSpace: 'inherit',
+        overflowWrap: 'inherit',
+        wordBreak: 'inherit',
+      }}
+    >
       {getTextLayerSegments(layer).map((segment, index) => (
         <span key={`${index}-${segment.text}`} style={getTextSegmentStyle(segment.style)}>
           {segment.text}
         </span>
       ))}
-    </>
+    </span>
   );
 }
 
