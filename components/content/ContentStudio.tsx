@@ -5472,8 +5472,8 @@ export default function ContentStudio({
   ];
 
   return (
-    <section id="content-studio" className="pb-10">
-      <div className="space-y-3">
+    <section id="content-studio" className="w-full min-w-0 pb-10">
+      <div className="w-full min-w-0 space-y-3">
         <ContentTopBar
           adminKey={adminKey}
           profilePhotoUrl={profilePhotoUrl}

@@ -1508,7 +1508,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
 
   return (
     <main className="coach-dashboard-clean min-h-screen overflow-x-clip bg-[#EDEBE8] text-[#142334]">
-      <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3 xl:p-4">
+      <div
+        className={`flex min-h-screen w-full p-2 ${
+          activeTab === 'content'
+            ? 'gap-2 md:gap-3 md:p-2 xl:p-2'
+            : 'gap-3 md:gap-4 md:p-3 xl:p-4'
+        }`}
+      >
         <DashboardSidebar
           activeTab={activeTab}
           activeStudioWorkspace={activeStudioWorkspace}
