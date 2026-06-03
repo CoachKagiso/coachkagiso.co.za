@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { EMAIL_TEMPLATES, type EmailTemplate } from '@/lib/email-templates';
+import { ZAI_TEST_MODEL } from '@/lib/ai-models';
 import {
   DEFAULT_ASSISTANT_CONVERSATIONS,
   DEFAULT_ASSISTANT_PREFERENCES,
@@ -149,8 +150,8 @@ export const DEFAULT_SETTINGS = {
     sunday: null,
   } satisfies BusinessHoursSettings,
   ai_config: {
-    primary_model: 'glm-5.1',
-    secondary_model: 'glm-5.1',
+    primary_model: ZAI_TEST_MODEL,
+    secondary_model: ZAI_TEST_MODEL,
     model_provider: 'zai',
     zai_api_key: '',
     openrouter_api_key: '',

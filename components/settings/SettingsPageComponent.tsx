@@ -34,6 +34,13 @@ import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvata
 import FilterDropdown from '@/components/FilterDropdown';
 import DashboardTimePicker from '@/components/DashboardTimePicker';
 import { normalizeBusinessGoalsSettings } from '@/lib/settings';
+import {
+  DEFAULT_OPENROUTER_PRIMARY_MODEL,
+  DEFAULT_OPENROUTER_SECONDARY_MODEL,
+  normalizeOpenRouterModel,
+  OPENROUTER_MODEL_OPTIONS,
+  ZAI_TEST_MODEL,
+} from '@/lib/ai-models';
 import type {
   AiConfigSettings,
   AssistantPreferences,
@@ -141,8 +148,8 @@ const sectionDefaults = {
     sunday: null,
   },
   ai_config: {
-    primary_model: 'glm-5.1',
-    secondary_model: 'glm-5.1',
+    primary_model: ZAI_TEST_MODEL,
+    secondary_model: ZAI_TEST_MODEL,
     model_provider: 'zai',
     test_mode: true,
     zai_api_key: '',
@@ -173,13 +180,6 @@ const notificationRows = [
   ['cal_booking', 'Cal.com booking', 'New session booked via Cal.com'],
   ['sent_email_log', 'Sent email log', 'Record added to sent_emails'],
 ] as const;
-
-const openRouterModelOptions = [
-  { value: 'google/gemini-pro-3.1', label: 'google/gemini-pro-3.1' },
-  { value: 'google/gemini-flash-3.1', label: 'google/gemini-flash-3.1' },
-  { value: 'google/gemini-3.5-flash', label: 'google/gemini-3.5-flash' },
-  { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro' },
-];
 
 const goalHorizonOptions: { value: GoalHorizon; label: string }[] = [
   { value: 'short_term', label: 'Short term' },
@@ -421,6 +421,11 @@ export default function SettingsPageComponent({
       highestPriority,
     };
   }, [businessGoals]);
+  const productionPrimaryModel = normalizeOpenRouterModel(aiConfig.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL);
+  const productionSecondaryModel = normalizeOpenRouterModel(aiConfig.secondary_model, DEFAULT_OPENROUTER_SECONDARY_MODEL);
+  const activeAiModelLabel = aiConfig.test_mode === false
+    ? `${productionPrimaryModel} via OpenRouter`
+    : `${ZAI_TEST_MODEL} via Z.ai`;
 
   async function saveSetting(key: string, value: unknown) {
     setSaveStates((current) => ({ ...current, [key]: 'saving' }));
@@ -524,16 +529,18 @@ export default function SettingsPageComponent({
   async function testAiConnection(provider: 'zai' | 'openrouter') {
     setTestStatus(null);
     setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'saving' }));
+    const testModel = provider === 'zai' ? ZAI_TEST_MODEL : productionPrimaryModel;
+
     try {
       await postJson('/api/settings/ai-test', {
         adminKey,
         provider,
         apiKey: provider === 'zai' ? aiConfig.zai_api_key : aiConfig.openrouter_api_key,
-        model: provider === 'zai' ? aiConfig.primary_model || 'glm-5.1' : aiConfig.primary_model || 'google/gemini-pro-3.1',
+        model: testModel,
       });
       setTestStatus({
         tone: 'success',
-        message: provider === 'zai' ? 'Connected to GLM 5.1' : 'Connected to production model',
+        message: provider === 'zai' ? 'Connected to GLM 5.1' : `Connected to ${testModel}`,
       });
       setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'idle' }));
     } catch (error) {
@@ -1123,7 +1130,7 @@ export default function SettingsPageComponent({
               )}
               <div className="grid gap-4 rounded-[8px] bg-[#F8F6F4] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Current model</p>
-                <p className="font-serif text-[28px] leading-tight text-[#142334]">GLM 5.1 via Z.ai {aiConfig.test_mode !== false ? '(Test mode)' : ''}</p>
+                <p className="font-serif text-[28px] leading-tight text-[#142334]">{activeAiModelLabel} {aiConfig.test_mode !== false ? '(Test mode)' : '(Production)'}</p>
                 <label className="grid gap-2">
                   <span className="studio-label">Z.ai API key</span>
                   <span className="relative">
@@ -1176,10 +1183,10 @@ export default function SettingsPageComponent({
                       <span className="studio-label">Primary model</span>
                       <FilterDropdown
                         name="primary_model"
-                        value={aiConfig.primary_model || 'google/gemini-pro-3.1'}
+                        value={productionPrimaryModel}
                         onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value })}
                         ariaLabel="Choose primary AI model"
-                        options={openRouterModelOptions}
+                        options={OPENROUTER_MODEL_OPTIONS}
                       />
                       <span className="text-[12px] text-[#6B6B6B]">Used for content generation, brand voice, and Transform mode guardrail.</span>
                     </div>
@@ -1187,10 +1194,10 @@ export default function SettingsPageComponent({
                       <span className="studio-label">Secondary model</span>
                       <FilterDropdown
                         name="secondary_model"
-                        value={aiConfig.secondary_model || 'google/gemini-flash-3.1'}
+                        value={productionSecondaryModel}
                         onChange={(value) => setAiConfig({ ...aiConfig, secondary_model: value })}
                         ariaLabel="Choose secondary AI model"
-                        options={openRouterModelOptions}
+                        options={OPENROUTER_MODEL_OPTIONS}
                       />
                       <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. Faster and cheaper.</span>
                     </div>
@@ -1207,8 +1214,8 @@ export default function SettingsPageComponent({
                         }
                         const nextConfig = {
                           ...aiConfig,
-                          primary_model: aiConfig.primary_model || 'google/gemini-pro-3.1',
-                          secondary_model: aiConfig.secondary_model || 'google/gemini-flash-3.1',
+                          primary_model: productionPrimaryModel,
+                          secondary_model: productionSecondaryModel,
                           model_provider: 'openrouter' as const,
                           test_mode: false,
                         };

@@ -1,5 +1,11 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { DEFAULT_SETTINGS, type AiConfigSettings } from '@/lib/settings';
+import {
+  DEFAULT_OPENROUTER_PRIMARY_MODEL,
+  DEFAULT_OPENROUTER_SECONDARY_MODEL,
+  normalizeOpenRouterModel,
+  ZAI_TEST_MODEL,
+} from '@/lib/ai-models';
 
 export type AiProvider = 'zai' | 'openrouter';
 
@@ -44,7 +50,7 @@ export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } =
     return {
       provider: 'zai',
       baseUrl: 'https://api.z.ai/api/coding/paas/v4',
-      model: config.primary_model || 'glm-5.1',
+      model: config.primary_model || ZAI_TEST_MODEL,
       apiKey,
       isTestMode: true,
       headers: {
@@ -61,8 +67,8 @@ export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } =
     provider: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
     model: options.simpleMode
-      ? config.secondary_model || 'google/gemini-flash-3.1'
-      : config.primary_model || 'google/gemini-pro-3.1',
+      ? normalizeOpenRouterModel(config.secondary_model, DEFAULT_OPENROUTER_SECONDARY_MODEL)
+      : normalizeOpenRouterModel(config.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL),
     apiKey,
     isTestMode: false,
     headers: {
