@@ -3344,7 +3344,7 @@ function getDesignFontFamily(layer: DesignTextLayer) {
 
 function getLayerShadowFilter(layer: DesignLayer, design: DesignDocument) {
   if (!layer.shadowEnabled) return undefined;
-  const color = hexToRgb(layer.shadowColor || '#142334') || { r: 20, g: 35, g: 52 };
+  const color = hexToRgb(layer.shadowColor || '#142334') || { r: 20, g: 35, b: 52 };
   const opacity = clamp(layer.shadowOpacity ?? 0.28, 0, 1);
   return `drop-shadow(${sizeToDesignPx(layer.shadowOffsetX ?? 10)} ${sizeToDesignPx(
     layer.shadowOffsetY ?? 14,
