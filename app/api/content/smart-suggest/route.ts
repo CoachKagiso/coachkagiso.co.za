@@ -22,6 +22,7 @@ const VALID_REGISTERS = [
 const VALID_SOURCES = [
   'pillar_gap', 'platform_gap', 'insights_repurpose', 'vault_draft',
   'service_demand', 'lead_signal', 'content_variety', 'trend_signal',
+  'from_research', 'original_ideation',
 ] as const;
 const VALID_ANGLES = [
   'contrarian_take', 'hot_observation', 'thought_provoking_question', 'quick_lesson',
@@ -46,11 +47,61 @@ const VALID_ANGLES = [
   'day_in_the_life', 'warm_checkin', 'raw_honest_moment', 'value_first_offer',
   'story_then_offer', 'one_thing_ive_been_thinking',
 ] as const;
+const MAX_HEADLINE_LENGTH = 80;
 const MAX_TEXT_LENGTH = 300;
 
 function clamp(value: unknown, maxLen: number): string {
   if (typeof value !== 'string') return '';
   return value.length > maxLen ? value.slice(0, maxLen) : value;
+}
+
+/**
+ * Strip em dashes, en dashes, and double-hyphen dash tricks from a text
+ * field. This is a defense-in-depth pass: the Smart Suggest system prompt
+ * bans em dashes, but the model still leaks them on some prompts. Rather
+ * than ship them to the UI, we replace them at the boundary.
+ *
+ *   "Why X is invisible — and the one fix"
+ *     -> "Why X is invisible, and the one fix"
+ *
+ *   "From X — to Y"  (false range using em dash)
+ *     -> "From X to Y"
+ *
+ *   "No X — no Y"    (tailing negation)
+ *     -> "No X. No Y."
+ */
+function stripDashes(value: string): string {
+  return value
+    .replace(/\s*—\s*/g, '. ')        // spaced em dash -> sentence break
+    .replace(/—/g, '-')                // any leftover em dash -> hyphen
+    .replace(/\s*–\s*/g, ', ')         // en dash with spaces -> comma
+    .replace(/–/g, '-')                // leftover en dash -> hyphen
+    .replace(/\s+--\s+/g, '. ')        // double-hyphen trick
+    .replace(/--/g, '-')               // any leftover double-hyphen
+    .replace(/\.\s*\./g, '.')          // collapse double periods
+    .replace(/\s+\./g, '.')            // tighten " ." -> "."
+    .trim();
+}
+
+function sanitizeSuggestionTextFields(raw: Record<string, unknown>): Record<string, unknown> {
+  const textKeys = ['angleDisplayName', 'headline', 'topic', 'assignment', 'whatItDoes', 'whyNow'];
+  const out: Record<string, unknown> = { ...raw };
+  for (const key of textKeys) {
+    if (typeof out[key] === 'string') {
+      out[key] = stripDashes(out[key] as string);
+    }
+  }
+  return out;
+}
+
+function fallbackHeadline(value: string): string {
+  const cleaned = stripDashes(value)
+    .replace(/^write\s+(a|an|one)?\s*/i, '')
+    .replace(/^(post|script|caption|email|piece)\s+(about|that|on)?\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const firstThought = cleaned.split(/[.!?]/)[0]?.trim() || 'One Strong Career Idea';
+  return firstThought.split(/\s+/).filter(Boolean).slice(0, 8).join(' ') || 'One Strong Career Idea';
 }
 
 function validateSuggestion(raw: unknown): SmartSuggestion | null {
@@ -92,6 +143,7 @@ function validateSuggestion(raw: unknown): SmartSuggestion | null {
     angle,
     angleRegister,
     angleDisplayName: clamp(obj.angleDisplayName, MAX_TEXT_LENGTH) || angle,
+    headline: clamp(obj.headline, MAX_HEADLINE_LENGTH) || fallbackHeadline(clamp(obj.topic, MAX_TEXT_LENGTH) || clamp(obj.assignment, MAX_TEXT_LENGTH)),
     topic: clamp(obj.topic, MAX_TEXT_LENGTH) || 'One thing worth sharing this week',
     assignment: clamp(obj.assignment, MAX_TEXT_LENGTH) || 'Write one post grounded in your audience signal.',
     whatItDoes: clamp(obj.whatItDoes, MAX_TEXT_LENGTH) || 'Provides value to the audience.',
@@ -117,6 +169,10 @@ function verifySources(suggestion: SmartSuggestion, sources: SmartSuggestSources
     if (src === 'vault_draft' && !hasVault) continue;
     if (src === 'service_demand' && !hasServiceDemand) continue;
     if (src === 'trend_signal' && !hasTrend) continue;
+    if (src === 'original_ideation' || src === 'from_research' || src === 'content_variety' || src === 'lead_signal') {
+      verified.push(src);
+      continue;
+    }
     verified.push(src);
   }
 
@@ -134,6 +190,7 @@ function buildFallbackSuggestion(sources: SmartSuggestSources): SmartSuggestion 
       angle: 'quick_lesson',
       angleRegister: 'tactical_teacher',
       angleDisplayName: 'Quick Lesson',
+      headline: 'The Career Move You Keep Delaying',
       contentType: 'linkedin_post',
       subType: 'text_post',
       topic: sources.strongestTheme
@@ -150,6 +207,7 @@ function buildFallbackSuggestion(sources: SmartSuggestSources): SmartSuggestion 
       angle: 'thought_leadership',
       angleRegister: 'reflective_leader',
       angleDisplayName: 'Thought Leadership',
+      headline: 'The Lesson No MBA Taught',
       contentType: 'linkedin_post',
       subType: 'long_form_post',
       topic: sources.topService
@@ -164,11 +222,12 @@ function buildFallbackSuggestion(sources: SmartSuggestSources): SmartSuggestion 
       angle: 'contrarian_take',
       angleRegister: 'conviction_reframe',
       angleDisplayName: 'Contrarian Take',
+      headline: 'Your LinkedIn Profile Is Lying',
       contentType: 'short_script',
       subType: null,
       topic: sources.topArchetype
-        ? `Why most ${sources.topArchetype} professionals are invisible on LinkedIn — and the one fix`
-        : "Your LinkedIn profile is lying about where you want to go — here's how to fix it",
+        ? `Why most ${sources.topArchetype} professionals are invisible on LinkedIn, and the one fix`
+        : "Your LinkedIn profile is lying about where you want to go. Here is how to fix it.",
       assignment:
         `Record a TikTok script about why ${sources.topArchetype ?? 'SA professionals'} struggle to stand out and give them one immediate fix.`,
       whatItDoes: 'Challenges a common mistake and immediately offers a solution.',
@@ -178,12 +237,13 @@ function buildFallbackSuggestion(sources: SmartSuggestSources): SmartSuggestion 
       angle: 'reflection_friday',
       angleRegister: 'reflection_friday',
       angleDisplayName: 'Reflection Friday',
+      headline: 'The Mentor I Needed Earlier',
       contentType: 'linkedin_post',
       subType: 'text_post',
       topic:
         sources.strongestTheme
           ? `What I wish someone had told me about ${sources.strongestTheme} in my first corporate role`
-          : 'The mentor I never had — and what I wish someone had told me in my first corporate role',
+          : 'The mentor I never had, and what I wish someone had told me in my first corporate role',
       assignment:
         `Write a Reflection Friday post about what you wish a mentor had told you about ${sources.strongestTheme ?? 'navigating corporate SA'}, and turn it into a gift for your audience.`,
       whatItDoes: 'Creates intimacy with the audience through honest personal disclosure.',
@@ -200,6 +260,7 @@ function buildFallbackSuggestion(sources: SmartSuggestSources): SmartSuggestion 
     angle: idea.angle ?? 'quick_lesson',
     angleRegister: idea.angleRegister ?? 'tactical_teacher',
     angleDisplayName: idea.angleDisplayName ?? 'Quick Lesson',
+    headline: idea.headline ?? fallbackHeadline(idea.topic ?? 'One thing worth saying this week'),
     topic: idea.topic ?? 'One thing worth saying this week',
     assignment: idea.assignment ?? 'Write one post this week grounded in your audience signal.',
     whatItDoes: idea.whatItDoes ?? 'Provides value to the audience.',
@@ -292,12 +353,16 @@ export async function POST(request: Request) {
           max_results: 3,
           include_answer: false,
           include_domains: [
-            'businesstech.co.za',
-            'dailymaverick.co.za',
-            'businesslive.co.za',
             'linkedin.com',
             'forbes.com',
             'hbr.org',
+            'businesstech.co.za',
+            'dailymaverick.co.za',
+            'businesslive.co.za',
+            'inc.com',
+            'fastcompany.com',
+            'theguardian.com',
+            'bbc.com',
           ],
         }),
       });
@@ -372,7 +437,13 @@ export async function POST(request: Request) {
         return null;
       }
 
-      const validated = validateSuggestion(parsed);
+      // Strip em/en dashes from text fields before validation so the UI
+      // never sees them, regardless of what the model produced.
+      const sanitized = (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        ? sanitizeSuggestionTextFields(parsed as Record<string, unknown>)
+        : parsed;
+
+      const validated = validateSuggestion(sanitized);
       if (!validated) return null;
 
       const verified = verifySources(validated, enrichedSources);

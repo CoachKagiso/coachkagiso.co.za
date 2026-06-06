@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAsyncService } from '@/lib/buying-flow';
+import { getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
 import { createPeachCheckout, createPeachMerchantTransactionId } from '@/lib/peach';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid upgrade credit' }, { status: 400 });
   }
 
-  const amount = upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : service.amount;
+  const amount = upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : getServiceCheckoutAmount(service);
   const merchantTransactionId = createPeachMerchantTransactionId();
   const supabase = createSupabaseServiceClient();
   const pendingPayload = {

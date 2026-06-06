@@ -63,7 +63,7 @@ export type EmailTemplate = {
 
 export const bookingLinks: Record<string, string> = {
   'Glow Up VIP Package': process.env.NEXT_PUBLIC_CAL_GLOW_UP_URL ?? `${publicSiteUrl}/book/glow-up`,
-  'Saturday Masterclass': process.env.NEXT_PUBLIC_CAL_MASTERCLASS_URL ?? `${publicSiteUrl}/book/masterclass`,
+  'Saturday Masterclass': `${publicSiteUrl}/buy/masterclass`,
   'CV + LinkedIn Bundle': `${publicSiteUrl}/buy/bundle`,
   'Career Clarity Session': process.env.NEXT_PUBLIC_CAL_CLARITY_URL ?? `${publicSiteUrl}/book/clarity`,
   'CV Revamp': `${publicSiteUrl}/buy/cv-revamp`,
@@ -857,7 +857,7 @@ Here is what you need to know:
 - Standard price from Monday 8 June: R500
 - Spots are capped at 12
 
-To register and receive your payment instructions, go here:
+To secure your spot through PayFast, go here:
 [REGISTRATION PAGE LINK]
 
 What you will leave with: a clear picture of what is actually holding your career back and a map of your next 90 days to change it. Plus a take-home pack, a 14-day email follow-up, and R100 off any CV Revamp or LinkedIn Package for 48 hours after the session.

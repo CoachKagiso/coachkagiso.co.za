@@ -34,6 +34,12 @@ export const DELIVERY_MILESTONES: Record<string, MilestoneTemplate[]> = {
     { stageName: 'Loom recorded', stageOrder: 4 },
     { stageName: 'Delivered', stageOrder: 5 },
   ],
+  masterclass: [
+    { stageName: 'Seat paid', stageOrder: 1 },
+    { stageName: 'Prep notes received', stageOrder: 2 },
+    { stageName: 'Session link sent', stageOrder: 3 },
+    { stageName: 'Follow-up pack sent', stageOrder: 4 },
+  ],
 };
 
 type ClientDeliveryInsert = {

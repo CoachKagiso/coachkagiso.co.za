@@ -18,6 +18,7 @@ import ParallaxWord from '@/components/ParallaxWord';
 import WorkTrackNav from '@/components/WorkTrackNav';
 import LinkedInHeadlineBuilderForm from '@/components/LinkedInHeadlineBuilderForm';
 import { ContourField, FlowRibbon, GeoArchPattern } from '@/components/DecorativeMotifs';
+import { getMasterclassPriceLabel, getMasterclassPriceNote } from '@/lib/buying-flow';
 
 type Service = {
   title: string;
@@ -41,7 +42,7 @@ function getServiceRoute(title: string) {
     'CV + LinkedIn Bundle': '/buy/bundle',
     'Career Clarity Session': '/book/clarity',
     'Glow Up VIP Package': '/book/glow-up',
-    'Saturday Masterclass': '/book/masterclass',
+    'Saturday Masterclass': '/buy/masterclass',
   };
 
   return routes[title] || '/contact';
@@ -70,6 +71,8 @@ export const metadata: Metadata = {
     url: '/work-with-me',
   },
 };
+
+export const dynamic = 'force-dynamic';
 
 const tracks: Track[] = [
   {
@@ -204,7 +207,7 @@ const tracks: Track[] = [
     services: [
       {
         title: 'Saturday Masterclass',
-        price: 'R450 early bird · R500 from Monday 8 June Early bird closes Sunday 7 June at 21:00',
+        price: 'R450 early bird · R500 after Sunday 7 June at 21:00',
         sessionLine: 'Saturday 4 July · 10:00 to 12:00 SAST',
         tagline: 'Two hours, twelve people, one real plan you leave with.',
         body: [
@@ -219,6 +222,7 @@ const tracks: Track[] = [
           'R100 off CV Revamp or LinkedIn Package for 48 hours after class',
         ],
         cta: 'Secure my spot',
+        note: 'Early bird closes Sunday 7 June at 21:00. After that, the standard price is R500.',
       },
     ],
   },
@@ -240,6 +244,23 @@ const workWithMeFaqs = [
 ];
 
 export default function WorkWithMePage() {
+  const visibleTracks = tracks.map((track) =>
+    track.id === 'masterclass'
+      ? {
+          ...track,
+          services: track.services.map((service) =>
+            service.title === 'Saturday Masterclass'
+              ? {
+                  ...service,
+                  price: getMasterclassPriceLabel(),
+                  note: getMasterclassPriceNote(),
+                }
+              : service,
+          ),
+        }
+      : track,
+  );
+
   return (
     <main className="min-h-screen overflow-x-clip bg-[#FCFBFA] text-[#142334]">
       <FaqJsonLd items={workWithMeFaqs.map((item) => ({ question: item.question, answer: item.answer }))} />
@@ -282,9 +303,9 @@ export default function WorkWithMePage() {
         </div>
       </section>
 
-      <WorkTrackNav items={tracks.map(({ id, title }) => ({ id, title }))} />
+      <WorkTrackNav items={visibleTracks.map(({ id, title }) => ({ id, title }))} />
 
-      {tracks.map((track, trackIndex) => {
+      {visibleTracks.map((track, trackIndex) => {
         const Icon = track.icon;
         const isDark = trackIndex === 2;
 

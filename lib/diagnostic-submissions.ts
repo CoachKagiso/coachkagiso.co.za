@@ -513,7 +513,7 @@ const sourceLeadProfiles: Record<
     archetypeKey: 'E',
     archetypeName: 'Masterclass Waitlist',
     service: 'Saturday Masterclass',
-    href: '/book/masterclass',
+    href: '/buy/masterclass',
     tagline: 'Joined the Saturday Masterclass waitlist.',
     diagnosis: 'Waitlist lead waiting for bookings to open.',
     action: 'Send confirmation now, then manually send the bookings-open email when dates are live.',
