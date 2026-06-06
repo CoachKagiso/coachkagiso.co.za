@@ -336,7 +336,7 @@ export const insights: Insight[] = [
         body: [
           'If these three steps make sense but you cannot yet see how they apply to your situation, that is exactly what the [Career Clarity Session](/book/clarity) is for. One focused conversation, and you leave with a practical plan for the next ninety days.',
           'If you would rather start on your own, the [Personal Brand Audit](/resources/personal-brand-audit) helps you check whether the version of you showing up at work and online matches the direction you are trying to move toward.',
-          'If you want to keep building your thinking in community, the [Saturday Masterclass](/book/masterclass) is another good next step.',
+          'If you want to keep building your thinking in community, the [Saturday Masterclass](/buy/masterclass) is another good next step.',
           'Your career matters. The plan is yours. The decision is yours. When you are ready, Coach Kagiso is here.',
         ],
       },

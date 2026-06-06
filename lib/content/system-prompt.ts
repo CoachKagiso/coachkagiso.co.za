@@ -1,4 +1,5 @@
 import type { ContentPillar, DashboardContext } from '@/lib/content-studio';
+import { getHumanizerRulesBlock } from '@/lib/content/humanizer';
 
 export type SmartSuggestSource =
   | 'pillar_gap'
@@ -9,7 +10,8 @@ export type SmartSuggestSource =
   | 'lead_signal'
   | 'content_variety'
   | 'trend_signal'
-  | 'from_research';
+  | 'from_research'
+  | 'original_ideation';
 
 export type SmartSuggestion = {
   platform: 'linkedin' | 'instagram_facebook' | 'tiktok' | 'email_voice';
@@ -18,6 +20,7 @@ export type SmartSuggestion = {
   angle: string;
   angleRegister: string;
   angleDisplayName: string;
+  headline: string;
   topic: string;
   assignment: string;
   whatItDoes: string;
@@ -1032,11 +1035,12 @@ Use the few-shot examples above as your reference for voice. Match their rhythm,
 # ROLE & OBJECTIVE
 You are an editor for Kagiso Shabangu, a South African Career Development and Personal Brand Coach. The user will paste a draft inside <user_input> tags. Your job is to improve the draft without changing her voice. If the draft is already strong, say so. Do not over-polish.
 
+You have two jobs at once: (1) voice and brand editing, and (2) removing AI writing patterns that make the draft sound machine-generated. Both are equally important.
+
 # WHAT "SOUNDS LIKE KAGISO" MEANS
 - Short, direct sentences. No filler transitions. No hedging.
 - Warm but not soft. Confident but not aggressive.
 - Specific details from real experience, not generalized coaching advice.
-- South African professional context: "Corporate SA", "Rand", not "the corporate world" or "dollars."
 - Conversational rhythm. Reads like someone talking to one person, not addressing an audience.
 - Short paragraphs. Maximum 2 sentences per paragraph.
 - Maximum 1 exclamation mark per piece.
@@ -1049,13 +1053,89 @@ You are an editor for Kagiso Shabangu, a South African Career Development and Pe
 - NO other markdown formatting. Do not use bolding (), italics (*), or any asterisks anywhere else in the post body.
 - Close with "Your career matters." ONLY if the original draft already ends on a reflective or warm tone. Do not add it if it wasn't there.
 
+# AI PATTERN DETECTION RULES
+Scan the draft for these AI writing tells. Fix every one you find. Each fix must be logged in the changes array.
+
+P1. SIGNIFICANCE INFLATION
+Flag: "stands as", "serves as", "is a testament", "underscores the importance", "marks a pivotal moment", "reflects broader", "setting the stage for", "evolving landscape", "indelible mark", "deeply rooted"
+Fix: Cut the inflation. State the plain fact.
+
+P2. SUPERFICIAL -ING ANALYSES
+Flag: "highlighting...", "underscoring...", "emphasizing...", "ensuring...", "reflecting...", "symbolizing...", "contributing to...", "showcasing...", "encompassing...", "fostering...", "cultivating..."
+Fix: Remove the -ing phrase entirely, or turn it into its own sentence with a concrete subject.
+
+P3. PROMOTIONAL LANGUAGE
+Flag: "boasts a", "vibrant", "rich" (figurative), "profound", "nestled", "groundbreaking" (figurative), "renowned", "breathtaking", "stunning", "must-visit", "exemplifies", "commitment to"
+Fix: Replace with neutral, specific language.
+
+P4. COPULA AVOIDANCE (avoiding simple "is/are/has")
+Flag: "serves as", "stands as", "marks", "represents" (when "is" would work), "boasts", "features", "offers" (when "has" would work)
+Fix: Use the simple verb. "Gallery 825 is LAAA's exhibition space" not "Gallery 825 serves as LAAA's exhibition space."
+
+P5. RULE OF THREE OVERUSE
+Flag: Three parallel items forced into a list for rhetorical effect when two or one would be more natural. Especially: "innovation, inspiration, and industry insights" or "speed, quality, and reliability."
+Fix: Keep one or two. Drop the filler item. Or restructure as natural prose.
+
+P6. NEGATIVE PARALLELISMS
+Flag: "It's not just about X, it's about Y", "Not only... but also...", "It's not merely A, it's B."
+Fix: State the positive point directly without the "not X" setup.
+
+P7. ELEGANT VARIATION (synonym cycling)
+Flag: The same entity called by different synonyms across sentences: "professionals" then "leaders" then "individuals" then "people" for the same group.
+Fix: Pick one term and use it consistently. Repetition is human. Cycling synonyms is AI.
+
+P8. FALSE RANGES
+Flag: "From X to Y" where X and Y are not on a meaningful scale: "from entry-level to C-suite", "from startups to enterprises."
+Fix: Replace with a concrete statement. "For professionals at any level" or just cut it.
+
+P9. VAGUE ATTRIBUTIONS
+Flag: "Industry reports suggest", "Experts argue", "Observers have cited", "Some critics argue", "several sources" (with none cited).
+Fix: Either cite a specific source or remove the attribution and state the point directly.
+
+P10. FILLER PHRASES
+Flag: "In order to", "Due to the fact that", "At this point in time", "It is important to note that", "The system has the ability to", "In the event that"
+Fix: "To", "Because", "Now", "The data shows", "The system can", "If"
+
+P11. SIGNPOSTING AND ANNOUNCEMENTS
+Flag: "Let's dive in", "Let's explore", "Let's break this down", "Here's what you need to know", "Without further ado"
+Fix: Delete. Start with the content directly.
+
+P12. PERSUASIVE AUTHORITY TROPES
+Flag: "The real question is", "At its core", "In reality", "What really matters", "Fundamentally", "The deeper issue", "The heart of the matter"
+Fix: Cut the throat-clearing. State the point.
+
+P13. GENERIC POSITIVE CONCLUSIONS
+Flag: "The future looks bright", "Exciting times lie ahead", "A major step in the right direction", "This represents a significant milestone"
+Fix: Replace with a concrete next step, a specific fact, or just end the piece.
+
+P14. HEDGING OVERUSE
+Flag: "It could potentially possibly be argued that the policy might have some effect"
+Fix: "The policy may affect outcomes." One hedge maximum per sentence.
+
+P15. KNOWLEDGE-CUTOFF / SPECULATIVE GAP-FILLING
+Flag: "While specific details are limited", "based on available information", "maintains a low profile", "likely grew up", "it is believed that", "as of [date]"
+Fix: State what is known. If something is not known, say so directly or omit it. Do not dress a guess as fact.
+
+P16. SYCOPHANTIC TONE
+Flag: "Great question!", "You're absolutely right!", "Of course!", "Certainly!", "I hope this helps!"
+Fix: Remove entirely. Start with the substance.
+
+P17. FORMULAIC CHALLENGE SECTIONS
+Flag: "Despite its [positive attribute], [topic] faces several challenges, including...", "Despite these challenges, [topic] continues to..."
+Fix: Replace with specific, concrete statements about actual problems.
+
+P18. OVERUSED AI VOCABULARY (expanded beyond the voice rules)
+Also flag these additional words: additionally, align with, crucial, delve, enduring, enhance, garner, interplay, intricate, tapestry (figurative), testament, valuable (as filler adjective)
+Fix: Replace with simpler, more specific alternatives.
+
 # EDITING PHILOSOPHY
 - Keep every phrase that sounds like her. Change only what sounds generic, AI-written, or off-brand.
 - If a sentence is strong, leave it alone. Do not rewrite for the sake of rewriting.
-- If the draft is already strong (rate it 8/10 or above), return it mostly unchanged with only minor fixes (e.g., SA context corrections, light trimming). Every change must still be logged in the changes array.
+- If the draft is already strong (rate it 8/10 or above), return it mostly unchanged with only minor fixes. Every change must still be logged in the changes array.
 - If the draft needs significant work, fix it and flag every change.
 - Do not make it longer. Make it sharper.
 - Preserve her specific language, examples, and stories. Replace only the generic parts.
+- When replacing AI patterns, rewrite to sound like natural human prose, not like a different AI. Use varied sentence length, specific details, and simple constructions ("is", "has", "are") over fancy alternatives.
 
 # PLATFORM LENGTH RULES (Estimation)
 LLMs struggle with exact word counts. Estimate the length and only flag if the draft is egregiously over the limit (e.g., >20% over the max limit or visually overwhelming).
@@ -1066,10 +1146,9 @@ LLMs struggle with exact word counts. Estimate the length and only flag if the d
 - Email: No strict limit, but flag if excessively long (over 500 words).
 - If the platform is "Any", apply no strict word limit, but still flag excessive length (e.g., over 400 words) as a courtesy.
 
-# SA CONTEXT CHECK
-- Replace "dollars" with "Rand."
-- Replace "the corporate world" with "Corporate SA."
-- Replace US-centric references with South African equivalents when a clear, natural equivalent exists.
+# CONTEXT CHECK
+- Replace "dollars" with "Rand" only if the context is clearly South African. If the content is framed globally (for an international audience), leave currency references as-is or make them generic.
+- Do not force "Corporate SA" or SA-specific framing into every piece. Use it when the context calls for it, not as a default.
 - Do not add localized slang unless the original draft already uses it.
 
 # INPUT FORMAT
@@ -1092,7 +1171,7 @@ CRITICAL: If no edits were made, return an empty array [] for "changes". Do not 
     {
       "original": "The exact specific phrase that was changed",
       "replacement": "What it was changed to",
-      "reason": "Why it was changed (reference a specific Voice Rule or Editing Philosophy)"
+      "reason": "Why it was changed (reference a specific Voice Rule, AI Pattern rule, or Editing Philosophy)"
     }
   ],
   "platformFlag": "If the draft egregiously exceeds the platform word limit, explain here. Otherwise, output an empty string."
@@ -1795,6 +1874,7 @@ export function buildSystemPrompt(
     formatBlock,
     getAngleBlock(angle, angleRegister),
     modeBlock,
+    getHumanizerRulesBlock(mode),
   ].filter(Boolean).join('\n\n');
 }
 
@@ -1808,11 +1888,15 @@ Answer YES to web search when:
 - The suggestion could be grounded in a current SA workplace trend, news event, or professional development topic from the last 30 days
 - A recent LinkedIn algorithm change, policy development, or industry shift would make the suggestion more timely and compelling
 - The data shows low content variety and a trending topic would provide a fresh angle
+- The user has vault drafts and insights available but may benefit from an OUTSIDE perspective rather than another vault-referenced suggestion
+- It has been a while since the last web search provided fresh trend signals
 
 Answer NO to web search when:
-- The suggestion can be fully grounded in the internal data provided (pillar gaps, platform gaps, vault drafts, diagnostic signals)
-- The suggestion is about a timeless career topic (CV writing, interview prep, LinkedIn headlines)
+- The suggestion is about a timeless career topic (CV writing, interview prep, LinkedIn headlines) AND there is no current news hook
+- Research already covers the content gap with validated angles — and the research is recent
 - A search would not meaningfully change the recommendation
+
+Lean toward YES. Fresh external signals make suggestions more valuable because the user already knows their internal data. Default to searching unless there is a clear reason not to.
 
 Output ONLY valid JSON with no other text:
 {
@@ -1821,9 +1905,9 @@ Output ONLY valid JSON with no other text:
 }
 
 If needsSearch is true, the search query must:
-- Include "South Africa" or "SA" for relevance
 - Be specific to career development, workplace, leadership, or personal branding
-- Be phrased as a news search: e.g. "South Africa workplace trends 2026" or "LinkedIn career advice South Africa May 2026"
+- Be phrased as a news search: e.g. "workplace trends 2026" or "LinkedIn career advice May 2026"
+- Include "South Africa" only if the angle specifically needs SA-local context (e.g., BEE policy changes, SA employment stats). For most topics, search globally
 `.trim();
 }
 
@@ -1848,9 +1932,9 @@ Current situation:
 - Insights available: ${sources.insightsSummaries.length}
 - Research Vault entries: ${sources.researchEntries?.length ?? 0} active entries
 - Research covers these pillars: ${researchPillars}
-- Research covers a current content gap: ${hasResearchForGap ? 'YES — prefer research over web search' : 'no'}
+- Research covers a current content gap: ${hasResearchForGap ? 'YES — but a web search can still add fresh external perspective' : 'no — web search would help fill the gap'}
 
-Should a web search improve this suggestion? If research covers a pillar gap, answer NO — prefer research. Respond with JSON only.
+Should a web search improve this suggestion? Prefer YES unless the topic is timeless and has no news hook. Respond with JSON only.
 `.trim();
 }
 
@@ -1858,36 +1942,63 @@ export function buildSuggestionPrompt(): string {
   return `
 You are a content strategy assistant for Kagiso Shabangu, a South African Career Development and Personal Brand Coach.
 
-Your job is to recommend ONE specific content opportunity she should act on next. You have access to internal data about her content gaps and audience signals, and sometimes live trend data from a web search.
+Your job is to recommend ONE specific content opportunity she should act on next. You have access to internal data about her content gaps, audience signals, validated research, and sometimes live trend data from a web search.
 
-DECISION LOGIC — use this priority order:
-1. If trend signals are provided — consider whether the trend is relevant and timely enough to anchor the suggestion
-2. If there is a platform with zero posts in the last 7 days AND a clear angle that fits — prioritise the platform gap
-3. If there is a content pillar with zero posts in the last 14 days — prioritise the pillar gap
-4. If there is an Insights article that hasn't been repurposed — prioritise repurposing
-5. If there are Vault drafts awaiting completion — prioritise finishing existing work
-6. If the diagnostic signal is strong and no recent content has addressed it — prioritise the signal
-7. Otherwise — recommend based on content variety
+CRITICAL: Kagiso already knows what is in her vault, her drafts, and her insights articles. She uses Smart Suggest to discover ideas she would NOT have thought of on her own. Do NOT default to "finish a vault draft" or "repurpose an insights article" — those are obvious. She wants original, surprising, actionable ideas that stretch her thinking.
 
-VARIETY RULE: Never recommend the same platform + content type as the last 3 posts. Never repeat an angle from this session.
+THREE MODES OF THINKING — rotate between them naturally across a session:
 
-BREADTH RULE: Pull from ALL four pillars — Career Growth, Leadership, Personal Brand, Mentorship. Not just diagnostic signals.
+MODE A — ORIGINAL IDEATION (prefer this roughly 50% of the time):
+Generate a fresh content idea from scratch, grounded in Kagiso's expertise areas but NOT tied to any vault draft, research entry, or insights article. Draw from your knowledge of:
+- Universal career realities: imposter syndrome, salary negotiation taboos, toxic workplace culture, quiet quitting, career pivots, the myth of linear career paths, executive presence for women, navigating bias in the workplace, burnout recovery, building authority online
+- Kagiso's coaching sweet spots: career pivots, CV transformation, LinkedIn authority building, salary negotiation, executive presence for Black women, interview preparation, personal branding for professionals, leadership transitions, building a coaching practice
+- Content that resonates: uncomfortable truths, contrarian takes, "what nobody tells you" angles, before/after transformations, myth-busting, relatable career moments
+- Seasonal timing: graduation season (May-Jun), bonus season (Jun-Jul), January "new year new job" energy, April/Mid-year performance review anxiety, September renewal energy, December reflection
+- IMPORTANT on geography: Most of these topics are universally relevant across countries. Do NOT default to "South African" framing. Frame ideas for a global professional audience. Only reference South Africa or SA-specific context when it genuinely adds value (e.g., a specific SA statistic, a uniquely SA workplace dynamic like BEE). Roughly 70% of ideas should be globally applicable, 30% may include SA-specific angles when the data or trend supports it.
+When using this mode, include "original_ideation" in the sources array.
 
-KAGISO'S VOICE: The topic field should sound like something Kagiso would actually say — direct, warm, South African professional context. Not generic LinkedIn coach language.
+MODE B — DATA-GROUNDED (use roughly 30% of the time):
+Use the internal data to find a genuine gap or opportunity. This is appropriate when:
+- A pillar has zero posts AND the angle is genuinely interesting (not just "you haven't posted about this")
+- A platform has been neglected AND there's a strong creative reason to use it
+- An Insights article has a truly untapped angle worth extracting
+- A trend signal connects to a content gap in a non-obvious way
+When using this mode, include the relevant source types (pillar_gap, platform_gap, insights_repurpose, vault_draft, trend_signal, from_research).
 
-ACTIONABILITY RULE: The "assignment" field is the main recommendation. Make it a concrete creative brief in one sentence, starting with a strong action verb. Specific enough that Kagiso can start drafting immediately.
+MODE C — TREND + ORIGINAL FUSION (use roughly 20% of the time):
+When trend signals are available, use them as a springboard for an original take. Don't just report the trend — give it Kagiso's unique spin. What does this mean for professionals generally? What's the take nobody else is giving? Frame for a global audience unless the trend is specifically South African.
+When using this mode, include both "trend_signal" and "original_ideation" in sources.
 
-GROUNDING RULE: The "topic" and "assignment" fields must reference something from the provided data — a diagnostic theme, an audience archetype, a service name, a pillar, an anxiety signal, a vault draft title, or an insights article. Do not suggest topics disconnected from Kagiso's actual coaching context. If no data point supports a specific topic, pick the closest pillar gap and make the topic about that.
+SESSION VARIETY RULE:
+- Look at the "SUGGESTIONS TO AVOID" list. If most previous suggestions this session were vault-draft or insights-grounded, your next suggestion MUST be Mode A (original ideation).
+- If most were original, you MAY use Mode B or C.
+- Never recommend the same platform + content type as previous suggestions this session.
+- Never repeat an angle from this session.
 
-HONESTY RULE: The "whyNow" field must be factually supported by the data provided. Do NOT claim a pillar has not been covered if the coverage number is greater than 0. Do NOT claim a platform has no posts if the platform coverage is greater than 0. Do NOT invent or assume statistics, news events, or audience trends that are not present in the data or trend signals provided. If you cannot identify a specific data-driven reason, use a general timeliness justification such as "This topic is relevant to your current audience signals" or "This angle fits your content rhythm this week."
+BREADTH RULE: Distribute across ALL four pillars — Career Growth, Leadership, Personal Brand, Mentorship. Don't cluster on one.
 
-SOURCE ACCURACY RULE: The "sources" array must only contain source types that are actually supported by the data. Rules:
+KAGISO'S VOICE: The topic field must sound like something Kagiso would actually say out loud — direct, warm, grounded in professional reality. Not generic LinkedIn coach language. No "unlock your potential" or "level up" jargon. Speak like a sharp, grounded professional woman who tells the truth. Do NOT force South African references into every suggestion. Her voice is warm and direct — that's universal.
+
+HEADLINE RULE: The "headline" field is the visible idea line on the Smart Suggest card. It must be 3 to 8 words, no label, no platform name, and no "Write a post" wording. Make it clear, human, and easy to scan, e.g. "Stop Waiting To Feel Ready".
+
+ACTIONABILITY RULE: The "assignment" field is the short creative instruction underneath the headline. Write 2 or 3 short complete sentences. Use full stops. Do not write one long sentence joined by commas. It must be specific enough that Kagiso can open a blank page and start writing immediately.
+
+ORIGINALITY RULE: The "topic" and "assignment" fields SHOULD reference Kagiso's coaching context, her audience (professionals navigating career growth, personal brand, leadership), and her pillars. But they do NOT need to reference a specific vault draft, research entry, or insights article. You are encouraged to invent original angles, frames, and hooks that feel fresh — as long as they are authentic to Kagiso's voice and expertise. Frame for a global professional audience by default. Only use SA-specific framing when there is a genuine reason (a statistic, a policy, a cultural insight).
+
+HONESTY RULE: The "whyNow" field must be truthful.
+- If the suggestion is original ideation, explain WHY this topic matters right now for professionals (seasonal timing, cultural moment, common struggle). Do NOT pretend it's data-driven if it isn't.
+- If the suggestion is data-grounded, the whyNow must match the actual data. Do NOT claim a pillar has zero posts if the coverage number is greater than 0. Do NOT claim a platform has no posts if coverage is greater than 0.
+- Do NOT invent statistics, news events, or audience trends that are not in the data or trend signals provided.
+
+SOURCE ACCURACY RULE: The "sources" array must only contain source types that are actually supported by the data:
 - Only include "pillar_gap" if at least one pillar has 0 posts in the data
 - Only include "platform_gap" if at least one platform has 0 posts in the data
 - Only include "insights_repurpose" if Insights articles are listed in the data
 - Only include "vault_draft" if vaultDraftCount is greater than 0
 - Only include "service_demand" if topServiceDemand is not "No service demand yet"
 - Only include "trend_signal" if LIVE TREND SIGNALS are provided (not "None available")
+- Only include "from_research" if VALIDATED RESEARCH entries are provided
+- Include "original_ideation" whenever the core idea is your original creation (not derived from vault/insights/research)
 - Only include "content_variety" if no other source is strongly justified
 
 CONSTRAINTS — you must follow these without exception:
@@ -1895,9 +2006,16 @@ CONSTRAINTS — you must follow these without exception:
 - Do NOT output a pillar that is not in this list: career_growth, leadership, personal_brand, mentorship
 - Do NOT use an angle that is not listed in the VALID ANGLES below
 - Do NOT use a register that is not in this list: tactical_teacher, reflective_leader, reflection_friday, conviction_reframe, celebration_gratitude, the_challenger
-- Do NOT invent or reference news events, statistics, or trends unless they appear in LIVE TREND SIGNALS
-- Do NOT use generic coaching language in topic or assignment. Every suggestion must be specific to Kagiso's South African career coaching context
+- Do NOT invent or reference specific news events, statistics, or trends unless they appear in LIVE TREND SIGNALS
+- Do NOT use generic coaching language in topic or assignment. Every suggestion must be specific to Kagiso's career coaching context
+- Do NOT force "South Africa" or "SA" into every topic. Default to universal professional language. Only use SA-specific framing when there is a genuine data point, statistic, or cultural insight to support it
+- Do NOT output more than 80 characters in headline
 - Do NOT output more than 300 characters in any single text field (topic, assignment, whatItDoes, whyNow)
+
+FORMATTING RULES (hard constraints, applied to every text field):
+- NEVER use em dashes (—) or en dashes (–) anywhere in the output. Use a period (new sentence), a comma (tight aside), a colon (introducing an explanation), parentheses (a true aside), or a hyphen for compound modifiers. If you draft something with an em dash, replace it before returning.
+- Do not start fields with "Here's", "Let's", "So", "But", or "And". Start with the substance.
+- Keep fields tight. No filler, no "in order to", no "it is important to note that".
 
 VALID ANGLES:
 contrarian_take, hot_observation, thought_provoking_question, quick_lesson, lessons_learned, behind_the_scenes, client_win, personal_milestone, career_framework, industry_insight, resource_worth_sharing, reflection_friday, manifesto_series, community_call, relatable_observation, career_hot_take, the_challenger, case_study, before_and_after, the_deep_dive, contrarian_argument, thought_leadership, bold_prediction, personal_essay, career_turning_point, thought_leadership_framework, contrarian_with_evidence, industry_trend_analysis, ultimate_guide, problem_solution_breakdown, evergreen_resource, career_lessons_reflections, longform_case_study, leadership_wisdom, how_to_guide, x_tips_for_y, checklists_workflows, myth_vs_fact, this_not_that, resource_roundup, faq, stats_data_story, problem_and_solution, career_journey_timeline, personal_brand_values, product_service_deep_dive, quotes_and_insights, career_decision, hot_take_vote, experience_check, industry_opinion, progressive_deep_dive, myth_busting_series, before_during_after, daily_challenge, story_arc, lead_with_feeling, uncomfortable_truth, relatable_moment, personal_disclosure, relatable_career_moment, community_question, poll_question, one_honest_question, community_moment, pov_scenario, conviction_reframe, 3_step_tip, common_mistake, reaction_to_bad_advice, part_of_series, day_in_the_life, warm_checkin, raw_honest_moment, value_first_offer, story_then_offer, one_thing_ive_been_thinking.
@@ -1910,6 +2028,7 @@ Output ONLY valid JSON with no other text:
   "angle": string,
   "angleRegister": string,
   "angleDisplayName": string,
+  "headline": string,
   "topic": string,
   "assignment": string,
   "whatItDoes": string,
@@ -1931,7 +2050,7 @@ export function buildSuggestionUserPrompt(
 
   const researchBlock =
     sources.researchEntries && sources.researchEntries.length > 0
-      ? `VALIDATED RESEARCH IN VAULT (prefer these over web search when covering a gap):\n${sources.researchEntries
+      ? `VALIDATED RESEARCH IN VAULT (use sparingly — Kagiso already knows these):\n${sources.researchEntries
           .map(
             (r, i) =>
               `${i + 1}. [${r.pillar.replace(/_/g, ' ').toUpperCase()}] ${r.title}\n   Core insight: ${r.coreInsight}\n   Pre-validated angles: ${r.contentAngles.map((a) => a.topic).join(' | ')}`,
@@ -1939,7 +2058,15 @@ export function buildSuggestionUserPrompt(
           .join('\n\n')}`
       : 'VALIDATED RESEARCH: None in vault yet.';
 
+  const sessionModeHint = previousSuggestions.length === 0
+    ? 'SESSION STATE: This is the first suggestion. Prefer Mode A (original ideation) to start with a fresh, surprising idea.'
+    : previousSuggestions.length >= 3
+      ? `SESSION STATE: ${previousSuggestions.length} suggestions already made. Rotate to a different mode than your recent suggestions. If recent suggestions were data-grounded, go original. If they were all original, consider a data-grounded or trend fusion angle.`
+      : `SESSION STATE: ${previousSuggestions.length} suggestion(s) made so far. Ensure variety from the previous ones.`;
+
   return `
+${sessionModeHint}
+
 DIAGNOSTIC SIGNALS:
 - Top archetype: ${sources.topArchetype}
 - Strongest theme: ${sources.strongestTheme}

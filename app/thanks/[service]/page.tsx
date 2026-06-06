@@ -110,6 +110,51 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
     valid = true;
   }
   if (!service) notFound();
+  const isEventService = service.kind === 'event';
+  const handoffItems = isEventService
+    ? [
+        { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your checkout reference is attached to this seat.' },
+        { icon: FileText, label: 'Prep form submitted here', detail: 'Share the context Kagiso needs to shape the live room.' },
+        { icon: Clock3, label: 'Session access follows', detail: `Live session: ${service.turnaround}.` },
+      ]
+    : [
+        { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your checkout reference is attached to this order.' },
+        { icon: FileText, label: 'Brief submitted here', detail: 'Share the role context, links, and file Kagiso needs.' },
+        { icon: Clock3, label: 'Delivery window begins', detail: `Expected turnaround: ${service.turnaround}.` },
+      ];
+  const beforeSubmitFaqs = isEventService
+    ? [
+        {
+          question: 'Why do I need to complete this?',
+          answer: 'Your prep notes help Kagiso shape the session around real patterns in the room, not generic career advice.',
+        },
+        {
+          question: 'When do I get the session link?',
+          answer: 'You will receive the Microsoft Teams link and prep details before the session.',
+        },
+        {
+          question: 'What if I need to add something later?',
+          answer: 'Reply to your confirmation email or WhatsApp Kagiso with your payment reference.',
+        },
+      ]
+    : [
+        {
+          question: 'When does my turnaround start?',
+          answer: 'As soon as this brief and any required file are in, your delivery window starts.',
+        },
+        {
+          question: 'What if I remember something later?',
+          answer: 'Reply to your confirmation email or WhatsApp Kagiso with the extra detail and your order reference.',
+        },
+        {
+          question: 'How should I send my CV?',
+          answer: 'Upload it here now, or choose the email option in the form and send it after you submit.',
+        },
+        {
+          question: 'How will I receive the finished work?',
+          answer: 'Kagiso will send your completed work back by email within the turnaround window.',
+        },
+      ];
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
@@ -128,10 +173,12 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
               Payment secured
             </p>
             <h1 className="mt-7 font-serif text-[50px] leading-[0.98] md:text-[76px]">
-              Your order is in. Let&apos;s make the brief count.
+              {isEventService ? 'Your seat is secured. Let&apos;s shape the room.' : 'Your order is in. Let&apos;s make the brief count.'}
             </h1>
             <p className="mt-7 max-w-2xl text-[18px] leading-relaxed text-[#142334]/76">
-              I&apos;ve received your payment for {service.title}. The short intake below gives Kagiso the context she needs to deliver sharp, tailored work within {service.turnaround}.
+              {isEventService
+                ? `I've received your payment for ${service.title}. The short prep form below gives Kagiso the context she needs before the live session.`
+                : `I've received your payment for ${service.title}. The short intake below gives Kagiso the context she needs to deliver sharp, tailored work within ${service.turnaround}.`}
             </p>
           </Reveal>
         </div>
@@ -143,18 +190,16 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
             <div className="lg:sticky lg:top-28">
               <div className="border border-[#D8C8BB] bg-white p-6 md:p-7">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
-                  Order handoff
+                  {isEventService ? 'Seat handoff' : 'Order handoff'}
                 </p>
                 <h2 className="mt-4 font-serif text-[38px] leading-tight">{service.turnaround}</h2>
                 <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
-                  Your delivery clock starts once the intake form and required file are received.
+                  {isEventService
+                    ? 'Your seat is confirmed. These prep notes help Kagiso make the session more specific and useful.'
+                    : 'Your delivery clock starts once the intake form and required file are received.'}
                 </p>
                 <div className="mt-6 space-y-4 border-t border-[#142334]/10 pt-5">
-                  {[
-                    { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your checkout reference is attached to this order.' },
-                    { icon: FileText, label: 'Brief submitted here', detail: 'Share the role context, links, and file Kagiso needs.' },
-                    { icon: Clock3, label: 'Delivery window begins', detail: `Expected turnaround: ${service.turnaround}.` },
-                  ].map((item) => {
+                  {handoffItems.map((item) => {
                     const Icon = item.icon;
                     return (
                       <div key={item.label} className="flex gap-3">
@@ -175,24 +220,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
                   Before you submit
                 </p>
                 <div className="mt-5 space-y-4">
-                  {[
-                    {
-                      question: 'When does my turnaround start?',
-                      answer: 'As soon as this brief and any required file are in, your delivery window starts.',
-                    },
-                    {
-                      question: 'What if I remember something later?',
-                      answer: 'Reply to your confirmation email or WhatsApp Kagiso with the extra detail and your order reference.',
-                    },
-                    {
-                      question: 'How should I send my CV?',
-                      answer: 'Upload it here now, or choose the email option in the form and send it after you submit.',
-                    },
-                    {
-                      question: 'How will I receive the finished work?',
-                      answer: 'Kagiso will send your completed work back by email within the turnaround window.',
-                    },
-                  ].map((item) => (
+                  {beforeSubmitFaqs.map((item) => (
                     <div key={item.question} className="border-t border-[#142334]/10 pt-4 first:border-t-0 first:pt-0">
                       <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#142334]">{item.question}</p>
                       <p className="mt-2 text-[14px] leading-relaxed text-[#142334]/62">{item.answer}</p>

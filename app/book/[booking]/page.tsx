@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { FaqJsonLd } from '@/app/JsonLd';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -17,6 +17,16 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: BookPageProps): Promise<Metadata> {
   const { booking } = await params;
+  if (booking === 'masterclass') {
+    return {
+      title: 'Saturday Masterclass — Secure Your Spot',
+      description: 'Pay securely for the July Saturday Masterclass, then complete the short prep form.',
+      alternates: {
+        canonical: '/buy/masterclass',
+      },
+    };
+  }
+
   const page = bookingPages[booking as BookingSlug];
   if (!page) return {};
   const titleSuffix = page.mode === 'reservation' ? 'Reserve Your Seat' : 'Book Now';
@@ -42,6 +52,8 @@ function getBookingUrl(slug: BookingSlug) {
 
 export default async function BookPage({ params }: BookPageProps) {
   const { booking } = await params;
+  if (booking === 'masterclass') redirect('/buy/masterclass');
+
   const page = bookingPages[booking as BookingSlug];
   if (!page) notFound();
 

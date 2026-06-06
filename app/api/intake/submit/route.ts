@@ -92,6 +92,7 @@ export async function POST(request: Request) {
   const fullName = values.fullName;
   const email = values.email;
   const whatsapp = values.whatsapp;
+  const isEventService = service.kind === 'event';
   const briefAcknowledgement = String(formData.get('brief_acknowledgement') || '') === 'yes';
 
   if (!briefAcknowledgement) {
@@ -197,6 +198,17 @@ export async function POST(request: Request) {
   ]);
 
   const isWaitingForCv = cvDeliveryMethod === 'email_after_submit';
+
+  if (isEventService) {
+    return NextResponse.json({
+      success: true,
+      heading: 'Your prep notes are in.',
+      message:
+        'Your seat is secured and your prep notes have been received. Kagiso will use them to shape the session around the real work people are bringing.',
+      detail:
+        'Keep an eye on your inbox for the Microsoft Teams link, prep details, and anything you need before the masterclass.',
+    });
+  }
 
   return NextResponse.json({
     success: true,

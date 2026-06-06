@@ -30,6 +30,7 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
   const [message, setMessage] = useState('');
   const [successHeading, setSuccessHeading] = useState('');
   const [successDetail, setSuccessDetail] = useState('');
+  const isEventService = service.kind === 'event';
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,25 +92,29 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
     <form onSubmit={handleSubmit} className="border border-[#D8C8BB] bg-white p-6 shadow-[0_24px_70px_rgba(20,35,52,0.08)] md:p-8">
       <div className="border-b border-[#142334]/10 pb-6">
         <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#C9AD98]">
-          Client brief
+          {isEventService ? 'Session prep' : 'Client brief'}
         </p>
         <h2 className="mt-3 font-serif text-[34px] leading-tight text-[#142334]">
-          Give Kagiso the useful context.
+          {isEventService ? 'Share what you want the room to work through.' : 'Give Kagiso the useful context.'}
         </h2>
         <p className="mt-3 text-[15px] leading-relaxed text-[#142334]/65">
-          The better the brief, the sharper the delivery. Clear answers are more useful than perfect answers.
+          {isEventService
+            ? 'Clear notes help Kagiso shape the masterclass around real questions, not generic career advice.'
+            : 'The better the brief, the sharper the delivery. Clear answers are more useful than perfect answers.'}
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
             <p className="text-[13px] leading-relaxed text-[#142334]/65">
-              Your details stay private and are handled in line with POPIA for this order.
+              Your details stay private and are handled in line with POPIA for this {isEventService ? 'session' : 'order'}.
             </p>
           </div>
           <div className="flex gap-3 border border-[#E5D8CE] bg-[#FCFBFA] p-4">
             <FileCheck2 className="mt-0.5 h-5 w-5 shrink-0 text-[#C9AD98]" />
             <p className="text-[13px] leading-relaxed text-[#142334]/65">
-              PDF or Word uploads are accepted where your service needs a CV.
+              {isEventService
+                ? 'Your answers help Kagiso spot patterns before the live session begins.'
+                : 'PDF or Word uploads are accepted where your service needs a CV.'}
             </p>
           </div>
         </div>
@@ -227,7 +232,7 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
           />
           <span>
             I confirm that the information and files I&apos;m sharing are true and accurate to the best of my
-            knowledge, and I understand Kagiso will rely on this brief to complete the work.
+            knowledge, and I understand Kagiso will rely on this {isEventService ? 'prep form to shape the session' : 'brief to complete the work'}.
           </span>
         </label>
 
@@ -236,7 +241,9 @@ export default function IntakeForm({ service, paymentId }: IntakeFormProps) {
           disabled={status === 'submitting'}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#142334] px-8 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-white shadow-[0_14px_30px_rgba(20,35,52,0.18)] transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === 'submitting' ? 'Securing your brief...' : 'Submit my brief'} <ArrowUpRight className="h-4 w-4" />
+          {status === 'submitting'
+            ? isEventService ? 'Saving your prep notes...' : 'Securing your brief...'
+            : isEventService ? 'Submit my prep notes' : 'Submit my brief'} <ArrowUpRight className="h-4 w-4" />
         </button>
       </div>
     </form>

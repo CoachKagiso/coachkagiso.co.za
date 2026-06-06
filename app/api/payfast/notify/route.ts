@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { asyncServices, formatCurrency } from '@/lib/buying-flow';
+import {
+  MASTERCLASS_EARLY_BIRD_AMOUNT,
+  MASTERCLASS_STANDARD_AMOUNT,
+  asyncServices,
+  formatCurrency,
+  getServiceCheckoutAmount,
+} from '@/lib/buying-flow';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { ensureClientDeliveryMilestones } from '@/lib/delivery-milestones';
 import { validatePayFastSignature } from '@/lib/payfast';
@@ -48,7 +54,14 @@ export async function POST(request: Request) {
     service.slug === 'cv-revamp' && upgradeToken
       ? await getUpgradeOfferByToken(upgradeToken, 'cv-revamp')
       : null;
-  const expectedAmount = upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : service.amount;
+  const signedCheckoutAmount = Number(fields.custom_str3 || '');
+  const expectedAmount =
+    upgradeOffer?.valid
+      ? upgradeOffer.credit.discounted_amount
+      : service.slug === 'masterclass' &&
+          (signedCheckoutAmount === MASTERCLASS_EARLY_BIRD_AMOUNT || signedCheckoutAmount === MASTERCLASS_STANDARD_AMOUNT)
+        ? signedCheckoutAmount
+        : getServiceCheckoutAmount(service);
 
   if (service.slug === 'cv-revamp' && upgradeToken && !upgradeOffer?.valid) {
     console.warn('PayFast ITN rejected: invalid upgrade credit', {
@@ -108,6 +121,7 @@ export async function POST(request: Request) {
       service,
       name: buyerName,
       email: buyerEmail,
+      amount,
       timestamp: new Date(now),
     });
 

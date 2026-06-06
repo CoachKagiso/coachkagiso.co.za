@@ -70,38 +70,41 @@ export async function notifyKagisoPayment(input: {
   service: AsyncService;
   name?: string;
   email?: string;
+  amount?: number;
   timestamp?: Date;
 }) {
   const timestamp = input.timestamp ?? new Date();
-  const deadline = formatDeadline(input.service, timestamp);
+  const amount = input.amount ?? input.service.amount;
+  const isEventService = input.service.kind === 'event';
+  const deadline = isEventService ? '' : formatDeadline(input.service, timestamp);
 
   await sendTransactionalEmail({
     to: [
       { email: getContactEmail(), name: 'Coach Kagiso' },
       { email: 'accounts@coachkagiso.co.za', name: 'Coach Kagiso Accounts' },
     ],
-    subject: `New payment - ${input.service.title} - ${formatCurrency(input.service.amount)}`,
+    subject: `New payment - ${input.service.title} - ${formatCurrency(amount)}`,
     text: `New payment received.
 
 Name: ${input.name || 'Not supplied'}
 Email: ${input.email || 'Not supplied'}
 Service: ${input.service.title}
-Amount: ${formatCurrency(input.service.amount)}
+Amount: ${formatCurrency(amount)}
 Date: ${timestamp.toISOString()}
-Delivery due: ${deadline}
+${isEventService ? `Session: ${input.service.turnaround}` : `Delivery due: ${deadline}`}
 
-Watch for the intake form before starting delivery.
+${isEventService ? 'Watch for the prep form before sending final session details.' : 'Watch for the intake form before starting delivery.'}
 `,
     html: emailShell(
       `New payment received for ${input.service.title}.`,
       `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New payment received.</h1>
-      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">The order is paid. Watch for the intake form before starting delivery.</p>
+      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">${isEventService ? 'The seat is paid. Watch for the prep form before sending final session details.' : 'The order is paid. Watch for the intake form before starting delivery.'}</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
         ${detailRow('Client', input.name || 'Not supplied')}
         ${detailRow('Email', input.email || 'Not supplied')}
         ${detailRow('Service', input.service.title)}
-        ${detailRow('Amount', formatCurrency(input.service.amount))}
-        ${detailRow('Delivery due', deadline)}
+        ${detailRow('Amount', formatCurrency(amount))}
+        ${detailRow(isEventService ? 'Session' : 'Delivery due', isEventService ? input.service.turnaround : deadline)}
       </table>`,
     ),
   });
@@ -117,22 +120,29 @@ export async function notifyKagisoIntake(input: {
   cvDeliveryMethod: CvDeliveryMethod;
 }) {
   const isWaitingForCv = input.cvDeliveryMethod === 'email_after_submit';
-  const deadline = isWaitingForCv ? '' : formatDeadline(input.service);
+  const isEventService = input.service.kind === 'event';
+  const deadline = isWaitingForCv || isEventService ? '' : formatDeadline(input.service);
   const responses = Object.entries(input.formData)
     .map(([key, value]) => `${key}: ${value || 'Not supplied'}`)
     .join('\n');
   const responseRows = Object.entries(input.formData)
     .map(([key, value]) => detailRow(key, value || 'Not supplied'))
     .join('');
-  const readinessLine = isWaitingForCv
+  const readinessLine = isEventService
+    ? `Status: Prep notes received for ${input.service.turnaround}.`
+    : isWaitingForCv
     ? 'Status: Waiting for CV by email before work can begin.'
     : 'Status: Ready for review.';
-  const cvStatusText = isWaitingForCv
+  const cvStatusText = isEventService
+    ? 'No CV required for this session.'
+    : isWaitingForCv
     ? 'Client chose to email the CV after submitting.'
     : input.signedCvUrl
       ? 'CV uploaded with the brief.'
       : 'No CV required for this service.';
-  const cvStatusHtml = isWaitingForCv
+  const cvStatusHtml = isEventService
+    ? 'Prep notes are in. Use these responses to shape the live masterclass.'
+    : isWaitingForCv
     ? 'Client chose to email the CV after submitting. Turnaround starts once it arrives.'
     : input.signedCvUrl
       ? 'CV uploaded with the brief.'
@@ -140,8 +150,8 @@ export async function notifyKagisoIntake(input: {
 
   await sendTransactionalEmail({
     to: [{ email: getContactEmail(), name: 'Coach Kagiso' }],
-    subject: `New intake - ${input.service.title} - ${input.name}`,
-    text: `A client has submitted their intake form.
+    subject: `${isEventService ? 'Masterclass prep' : 'New intake'} - ${input.service.title} - ${input.name}`,
+    text: `A client has submitted their ${isEventService ? 'masterclass prep notes' : 'intake form'}.
 
 Name: ${input.name}
 Email: ${input.email}
@@ -154,14 +164,15 @@ CV status: ${cvStatusText}
 Their responses:
 ${responses}
 
-CV download link (valid 7 days):
-${input.signedCvUrl || 'No file uploaded'}
+${isEventService ? `Session: ${input.service.turnaround}` : `CV download link (valid 7 days):\n${input.signedCvUrl || 'No file uploaded'}`}
 `,
     html: emailShell(
-      `${input.name} submitted their ${input.service.title} intake brief.`,
-      `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New client brief submitted.</h1>
+      `${input.name} submitted their ${input.service.title} ${isEventService ? 'prep notes' : 'intake brief'}.`,
+      `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">${isEventService ? 'Masterclass prep submitted.' : 'New client brief submitted.'}</h1>
       <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">${escapeHtml(
-        isWaitingForCv
+        isEventService
+          ? 'The attendee has shared what they want the masterclass to help them think through.'
+          : isWaitingForCv
           ? 'The brief is in, but the client still needs to email their CV before work can begin.'
           : 'This is ready for review. The delivery due date below uses the service turnaround from today.',
       )}</p>
@@ -170,14 +181,14 @@ ${input.signedCvUrl || 'No file uploaded'}
         ${detailRow('Email', input.email)}
         ${detailRow('WhatsApp', input.whatsapp || 'Not supplied')}
         ${detailRow('Service', input.service.title)}
-        ${detailRow('Status', isWaitingForCv ? 'Waiting for CV by email' : 'Ready for review')}
-        ${detailRow('CV status', cvStatusText)}
+        ${detailRow('Status', isEventService ? 'Prep notes received' : isWaitingForCv ? 'Waiting for CV by email' : 'Ready for review')}
+        ${isEventService ? detailRow('Session', input.service.turnaround) : detailRow('CV status', cvStatusText)}
         ${deadline ? detailRow('Delivery due', deadline) : ''}
       </table>
-      <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">Brief responses</h2>
+      <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">${isEventService ? 'Prep responses' : 'Brief responses'}</h2>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">${responseRows}</table>
       <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">${escapeHtml(cvStatusHtml)}</p>
-      <p style="margin:12px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">CV download link: ${input.signedCvUrl ? `<a href="${escapeHtml(input.signedCvUrl)}" style="color:#142334;">Open file</a>` : 'No file uploaded'}</p>`,
+      ${isEventService ? '' : `<p style="margin:12px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">CV download link: ${input.signedCvUrl ? `<a href="${escapeHtml(input.signedCvUrl)}" style="color:#142334;">Open file</a>` : 'No file uploaded'}</p>`}`,
     ),
   });
 }
@@ -191,7 +202,8 @@ export async function sendClientIntakeConfirmation(input: {
 }) {
   const firstName = input.fullName.trim().split(/\s+/)[0] || 'there';
   const isWaitingForCv = input.cvDeliveryMethod === 'email_after_submit';
-  const deadline = isWaitingForCv ? '' : formatDeadline(input.service);
+  const isEventService = input.service.kind === 'event';
+  const deadline = isWaitingForCv || isEventService ? '' : formatDeadline(input.service);
   const reviewUpgradeCredit = input.service.slug === 'cv-review'
     ? (await getCvReviewUpgradeCreditByPaymentId(input.paymentId)) ||
       (await ensureCvReviewUpgradeCredit({
@@ -201,7 +213,15 @@ export async function sendClientIntakeConfirmation(input: {
       }))
     : null;
   const upgradeLink = reviewUpgradeCredit ? getCvRevampUpgradeUrl(reviewUpgradeCredit.token) : '';
-  const text = isWaitingForCv
+  const text = isEventService
+    ? `${input.service.confirmationBody(firstName)}
+
+Quick recap:
+- Service: ${input.service.title}
+- Session: ${input.service.turnaround}
+
+Thank you for securing your spot.`
+    : isWaitingForCv
     ? `Hi ${firstName},
 
 Your brief has been received for ${input.service.title}, but your CV is still needed before Kagiso can begin.
@@ -237,7 +257,9 @@ Thank you for trusting Coach Kagiso with this work.`;
     html: emailShell(
       isWaitingForCv
         ? `Your ${input.service.title} brief is in. CV still needed.`
-        : `Your ${input.service.title} brief is safely submitted.`,
+        : isEventService
+          ? `Your ${input.service.title} prep notes are in.`
+          : `Your ${input.service.title} brief is safely submitted.`,
       isWaitingForCv
         ? `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your brief is in, ${escapeHtml(firstName)}. CV still needed.</h1>
       <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Thank you for submitting your brief for ${escapeHtml(input.service.title)}. Kagiso can begin as soon as your CV arrives.</p>
@@ -253,6 +275,21 @@ Thank you for trusting Coach Kagiso with this work.`;
         <li>Your ${escapeHtml(input.service.turnaround)} turnaround starts once the CV arrives.</li>
       </ol>
       <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">Once your CV is in, there is nothing else you need to resend unless Kagiso asks for one quick clarification.</p>`
+        : isEventService
+          ? `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">You're in, ${escapeHtml(firstName)}.</h1>
+      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Your prep notes for ${escapeHtml(input.service.title)} are safely submitted.</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
+        ${detailRow('Service', input.service.title)}
+        ${detailRow('Session', input.service.turnaround)}
+        ${detailRow('Status', 'Seat secured and prep notes received')}
+      </table>
+      <h2 style="margin:28px 0 12px;color:#142334;font-size:22px;font-weight:400;">What happens next</h2>
+      <ol style="margin:0;padding-left:20px;color:#4f5b66;font:15px/1.8 Arial,sans-serif;">
+        <li>Your Microsoft Teams link and prep details will arrive before the session.</li>
+        <li>Bring a notebook and the honest version of what feels stuck.</li>
+        <li>After the masterclass, you will receive the take-home pack and follow-up material.</li>
+      </ol>
+      <p style="margin:24px 0 0;color:#4f5b66;font:15px/1.7 Arial,sans-serif;">If anything changes before the session, reply to this email or WhatsApp Kagiso with your payment reference.</p>`
         : `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">Your brief is safely in, ${escapeHtml(firstName)}.</h1>
       <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">Thank you for trusting Coach Kagiso with your ${escapeHtml(input.service.title)}. Your delivery window starts now that the brief is submitted.</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">

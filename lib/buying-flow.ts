@@ -1,5 +1,5 @@
-export type AsyncServiceSlug = 'cv-review' | 'cv-revamp' | 'cover-letter' | 'linkedin' | 'bundle';
-export type BookingSlug = 'discovery' | 'clarity' | 'glow-up' | 'masterclass';
+export type AsyncServiceSlug = 'cv-review' | 'cv-revamp' | 'cover-letter' | 'linkedin' | 'bundle' | 'masterclass';
+export type BookingSlug = 'discovery' | 'clarity' | 'glow-up';
 
 export type IntakeField = {
   name: string;
@@ -20,6 +20,7 @@ export type AsyncService = {
   slug: AsyncServiceSlug;
   title: string;
   amount: number;
+  kind?: 'delivery' | 'event';
   turnaround: string;
   deliveryDays: number;
   summary: string;
@@ -32,6 +33,36 @@ export type AsyncService = {
   confirmationSubject: string;
   confirmationBody: (firstName: string) => string;
 };
+
+export const MASTERCLASS_SESSION_LABEL = 'Saturday 4 July 2026, 10:00 to 12:00 SAST';
+export const MASTERCLASS_EARLY_BIRD_AMOUNT = 450;
+export const MASTERCLASS_STANDARD_AMOUNT = 500;
+export const MASTERCLASS_EARLY_BIRD_ENDS_AT = '2026-06-07T21:00:00+02:00';
+export const MASTERCLASS_EARLY_BIRD_ENDS_LABEL = 'Sunday 7 June at 21:00';
+
+export function isMasterclassEarlyBirdOpen(now = new Date()) {
+  return now.getTime() < new Date(MASTERCLASS_EARLY_BIRD_ENDS_AT).getTime();
+}
+
+export function getMasterclassCheckoutAmount(now = new Date()) {
+  return isMasterclassEarlyBirdOpen(now) ? MASTERCLASS_EARLY_BIRD_AMOUNT : MASTERCLASS_STANDARD_AMOUNT;
+}
+
+export function getMasterclassPriceLabel(now = new Date()) {
+  return isMasterclassEarlyBirdOpen(now)
+    ? `R${MASTERCLASS_EARLY_BIRD_AMOUNT} early bird · R${MASTERCLASS_STANDARD_AMOUNT} after ${MASTERCLASS_EARLY_BIRD_ENDS_LABEL}`
+    : `R${MASTERCLASS_STANDARD_AMOUNT} standard price`;
+}
+
+export function getMasterclassPriceNote(now = new Date()) {
+  return isMasterclassEarlyBirdOpen(now)
+    ? `Early bird closes ${MASTERCLASS_EARLY_BIRD_ENDS_LABEL}. After that, the standard price is R${MASTERCLASS_STANDARD_AMOUNT}.`
+    : `The early bird window has closed. Standard price is R${MASTERCLASS_STANDARD_AMOUNT}.`;
+}
+
+export function getServiceCheckoutAmount(service: Pick<AsyncService, 'slug' | 'amount'>, now = new Date()) {
+  return service.slug === 'masterclass' ? getMasterclassCheckoutAmount(now) : service.amount;
+}
 
 export type BookingPageConfig = {
   title: string;
@@ -356,6 +387,77 @@ If anything important changes about the roles you are targeting, reply to this e
 Talk soon,
 Kagiso`,
   },
+  masterclass: {
+    slug: 'masterclass',
+    title: 'Saturday Masterclass',
+    amount: MASTERCLASS_EARLY_BIRD_AMOUNT,
+    kind: 'event',
+    turnaround: MASTERCLASS_SESSION_LABEL,
+    deliveryDays: 30,
+    buyCta: 'Secure my spot',
+    folder: 'masterclass',
+    requiresCvUpload: false,
+    summary:
+      'A live, small-group coaching session for professionals who feel stuck and need a clear next 90-day move.',
+    fields: [
+      { name: 'fullName', label: 'Full name', type: 'text', required: true, maxLength: 80 },
+      { name: 'email', label: 'Email address', type: 'email', required: true, maxLength: 120 },
+      { name: 'whatsapp', label: 'WhatsApp number', type: 'tel', maxLength: 30 },
+      {
+        name: 'careerStage',
+        label: 'Where are you right now?',
+        type: 'radio',
+        required: true,
+        options: ['Graduate or early-career', 'Employed but stuck', 'Changing direction', 'Building visibility'],
+      },
+      {
+        name: 'mainFocus',
+        label: 'What do you want this masterclass to help you think through?',
+        type: 'textarea',
+        required: true,
+        maxLength: 900,
+      },
+      {
+        name: 'next90Days',
+        label: 'If the next 90 days went well, what would be different?',
+        type: 'textarea',
+        required: true,
+        maxLength: 900,
+      },
+    ],
+    faqs: [
+      {
+        question: 'Who is the masterclass for?',
+        answer: 'Anyone who feels like their career has stalled and cannot pinpoint why. Graduates who are not getting traction, professionals who have not been promoted in over a year, and career changers who are not sure what to pivot into.',
+      },
+      {
+        question: 'Is it interactive or just teaching?',
+        answer: 'This is not a webinar. It is a live, interactive session capped at 12 people. You will work through the material as it applies to your own situation.',
+      },
+      {
+        question: 'What happens after I pay?',
+        answer: 'You will return to a short prep form. Once that is in, Kagiso can shape the room around the real patterns people are bringing to the session.',
+      },
+      {
+        question: 'What if I cannot attend?',
+        answer: 'You may transfer to a future session up to 24 hours before the masterclass. No refunds are available within 24 hours of the session.',
+      },
+    ],
+    confirmationSubject: "You're in for the July Saturday Masterclass",
+    confirmationBody: (firstName) => `Hi ${firstName},
+
+Your prep notes are in for the July Saturday Masterclass.
+
+You are confirmed for ${MASTERCLASS_SESSION_LABEL}. Kagiso will use what you shared to shape the room around the real questions people are bringing, not generic career advice.
+
+What happens next:
+1. Your Microsoft Teams link and prep notes will arrive before the session.
+2. Bring a notebook and the honest version of what feels stuck.
+3. After the session, you will receive the take-home pack and follow-up material.
+
+See you on 4 July,
+Kagiso`,
+  },
 };
 
 export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
@@ -416,29 +518,6 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
       {
         question: 'What happens after I book?',
         answer: 'You will get the kick-off session booked first, then the rest of the support flows from that starting point.',
-      },
-    ],
-  },
-  masterclass: {
-    title: 'Saturday Masterclass',
-    envKey: 'NEXT_PUBLIC_CAL_MASTERCLASS_URL',
-    fallbackUrl: 'https://cal.com/coachkagiso/saturday-masterclass',
-    description: 'Registration is open for the July session. Secure your spot now before the early bird price closes on Sunday 7 June at 21:00.',
-    mode: 'reservation',
-    ctaLabel: 'Secure my spot',
-    availabilityNote: 'This is a live, small-group coaching session built around one career theme. In July, we are working through what is actually keeping your career stuck and mapping your next 90 days to change it. Twelve people in the room. Real work, not a lecture.',
-    faqs: [
-      {
-        question: 'Who is the masterclass for?',
-        answer: 'Anyone who feels like their career has stalled and cannot pinpoint why. Graduates who are not getting traction, professionals who have not been promoted in over a year, and career changers who are not sure what to pivot into. If you are stuck and want clarity on your next 90 days, this session is for you.',
-      },
-      {
-        question: 'Is it interactive or just teaching?',
-        answer: 'This is not a webinar. It is a live, interactive session capped at 12 people. You will work through the material as it applies to your own situation. Come ready to engage.',
-      },
-      {
-        question: 'What happens after I register?',
-        answer: 'Payment instructions are sent to you immediately after you submit the form. Once your payment reflects, you will receive a confirmation email. Two days before the session, you will receive your Microsoft Teams link and everything you need to prepare.',
       },
     ],
   },

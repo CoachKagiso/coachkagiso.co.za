@@ -27,7 +27,7 @@ export type EmailTemplate = {
 
 export const bookingLinks: Record<string, string> = {
   'Glow Up VIP Package': process.env.NEXT_PUBLIC_CAL_GLOW_UP_URL ?? `${publicSiteUrl}/book/glow-up`,
-  'Saturday Masterclass': process.env.NEXT_PUBLIC_CAL_MASTERCLASS_URL ?? `${publicSiteUrl}/book/masterclass`,
+  'Saturday Masterclass': `${publicSiteUrl}/buy/masterclass`,
   'CV + LinkedIn Bundle': `${publicSiteUrl}/buy/bundle`,
   'Career Clarity Session': process.env.NEXT_PUBLIC_CAL_CLARITY_URL ?? `${publicSiteUrl}/book/clarity`,
   'CV Revamp': `${publicSiteUrl}/buy/cv-revamp`,

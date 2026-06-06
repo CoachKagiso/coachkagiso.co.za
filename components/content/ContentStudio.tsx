@@ -1062,6 +1062,7 @@ const smartSourceLabels: Record<SmartSuggestSource, string> = {
   content_variety: 'Content variety',
   trend_signal: 'Trending now',
   from_research: 'From Research',
+  original_ideation: 'Original Idea',
 };
 
 const alchemyDirectionPillarOptions: Array<{ value: ContentPillar | 'auto'; label: string }> = [
@@ -3052,6 +3053,7 @@ function normalizeSmartSuggestion(raw: SmartSuggestion): SmartSuggestion {
     angle: requestedAngle?.id || raw.angle || 'quick_lesson',
     angleRegister: requestedAngle?.register || raw.angleRegister || 'tactical_teacher',
     angleDisplayName: requestedAngle?.label || raw.angleDisplayName || raw.angle || 'Quick Lesson',
+    headline: raw.headline?.trim() || titleFromText(raw.topic || raw.assignment, raw.angleDisplayName || 'Post idea'),
     topic: raw.topic?.trim() || 'Turn the current dashboard signal into one useful content idea.',
     assignment: raw.assignment?.trim() || raw.topic?.trim() || raw.whatItDoes?.trim() || 'Write one specific post from the current dashboard signal.',
     whatItDoes: raw.whatItDoes?.trim() || 'Create one focused piece that helps the right audience take the next step.',
@@ -3070,6 +3072,7 @@ function getSmartSuggestionKey(suggestion: SmartSuggestion) {
     suggestion.contentType,
     suggestion.subType || 'none',
     suggestion.angle,
+    suggestion.headline,
     suggestion.assignment || suggestion.topic,
   ]
     .join(':')
@@ -3097,6 +3100,15 @@ function getSmartSuggestionContentLabel(suggestion: SmartSuggestion) {
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === suggestion.subType);
   return contentType ? `${contentType.label}${subType ? ` / ${subType.label}` : ''}` : suggestion.contentType;
+}
+
+function buildSmartSuggestionCreatePrompt(suggestion: SmartSuggestion) {
+  return [
+    suggestion.headline,
+    suggestion.assignment,
+    suggestion.whatItDoes,
+    suggestion.whyNow,
+  ].filter(Boolean).join('\n');
 }
 
 function inferRecentFormat(item: ContentCalendarItem) {
@@ -4732,7 +4744,7 @@ export default function ContentStudio({
       ].join('\n');
       const data = await requestJson<{ item: ContentBacklogItem }>('/api/content/backlog', 'POST', {
         key: adminKey,
-        title: titleFromText(normalized.assignment, normalized.topic || normalized.angleDisplayName),
+        title: normalized.headline || titleFromText(normalized.assignment, normalized.topic || normalized.angleDisplayName),
         pillar: normalized.pillar,
         platform: getSmartSuggestionVaultPlatform(normalized.platform),
         source: 'manual',
@@ -4741,6 +4753,7 @@ export default function ContentStudio({
         notes: JSON.stringify(
           {
             kind: 'smart_suggest',
+            headline: normalized.headline,
             topic: normalized.topic,
             whatItDoes: normalized.whatItDoes,
             whyNow: normalized.whyNow,
@@ -4872,6 +4885,7 @@ export default function ContentStudio({
         ...current,
         `${suggestion.platform}:${suggestion.contentType}:${suggestion.angle}`,
         suggestion.angleDisplayName,
+        suggestion.headline,
         suggestion.assignment,
       ]);
     } catch (error) {
@@ -4938,7 +4952,7 @@ export default function ContentStudio({
       angle: normalized.angle,
       angleRegister: normalized.angleRegister,
     }));
-    setTopic(normalized.assignment);
+    setTopic(buildSmartSuggestionCreatePrompt(normalized));
     setTopicSource('manual');
     setSmartPrepopulateNotice(
       `Pre-populated from Smart Suggest - ${normalized.angleDisplayName} - ${createPlatformLabels[normalized.platform]}`,
@@ -4952,7 +4966,7 @@ export default function ContentStudio({
     setSmartPulseKey(null);
 
     if (options?.generateAfter) {
-      await generatePost(nextSelection, normalized.topic, normalized.pillar);
+      await generatePost(nextSelection, buildSmartSuggestionCreatePrompt(normalized), normalized.pillar);
     }
   }
 
@@ -6843,7 +6857,8 @@ function SmartSuggestPanel({
 
           <div className="mt-5 grid gap-3">
             <p className="font-serif text-[22px] leading-tight text-[#C9AD98]">{state.data.angleDisplayName}</p>
-            <p className="text-[15px] font-semibold leading-relaxed text-[#142334]">{state.data.assignment}</p>
+            <p className="font-serif text-[28px] leading-tight text-[#142334]">{state.data.headline}</p>
+            <p className="text-[15px] font-medium leading-relaxed text-[#142334]">{state.data.assignment}</p>
             <p className="text-[13px] leading-relaxed text-[#6B6B6B]">{state.data.whyNow}</p>
             {state.data.citation && (
               <p className="flex items-start gap-1 text-[11px] text-[#6B6B6B]">
