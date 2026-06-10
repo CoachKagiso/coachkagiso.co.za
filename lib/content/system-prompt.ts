@@ -1981,7 +1981,7 @@ KAGISO'S VOICE: The topic field must sound like something Kagiso would actually 
 
 HEADLINE RULE: The "headline" field is the visible idea line on the Smart Suggest card. It must be 3 to 8 words, no label, no platform name, and no "Write a post" wording. Make it clear, human, and easy to scan, e.g. "Stop Waiting To Feel Ready".
 
-ACTIONABILITY RULE: The "assignment" field is the short creative instruction underneath the headline. Write 2 or 3 short complete sentences. Use full stops. Do not write one long sentence joined by commas. It must be specific enough that Kagiso can open a blank page and start writing immediately.
+ACTIONABILITY RULE: The "assignment" field is the short creative instruction underneath the headline. Write 2 or 3 complete sentences. Use full stops. Do not write one long sentence joined by commas. It must be specific enough that Kagiso can open a blank page and start writing immediately, and it must not end mid-example, mid-list, or mid-thought.
 
 ORIGINALITY RULE: The "topic" and "assignment" fields SHOULD reference Kagiso's coaching context, her audience (professionals navigating career growth, personal brand, leadership), and her pillars. But they do NOT need to reference a specific vault draft, research entry, or insights article. You are encouraged to invent original angles, frames, and hooks that feel fresh — as long as they are authentic to Kagiso's voice and expertise. Frame for a global professional audience by default. Only use SA-specific framing when there is a genuine reason (a statistic, a policy, a cultural insight).
 
@@ -2010,7 +2010,10 @@ CONSTRAINTS — you must follow these without exception:
 - Do NOT use generic coaching language in topic or assignment. Every suggestion must be specific to Kagiso's career coaching context
 - Do NOT force "South Africa" or "SA" into every topic. Default to universal professional language. Only use SA-specific framing when there is a genuine data point, statistic, or cultural insight to support it
 - Do NOT output more than 80 characters in headline
-- Do NOT output more than 300 characters in any single text field (topic, assignment, whatItDoes, whyNow)
+- Keep angleDisplayName under 120 characters
+- Keep topic under 500 characters
+- Keep assignment under 900 characters. Complete every sentence and every example list.
+- Keep whatItDoes and whyNow under 700 characters each
 
 FORMATTING RULES (hard constraints, applied to every text field):
 - NEVER use em dashes (—) or en dashes (–) anywhere in the output. Use a period (new sentence), a comma (tight aside), a colon (introducing an explanation), parentheses (a true aside), or a hyphen for compound modifiers. If you draft something with an em dash, replace it before returning.

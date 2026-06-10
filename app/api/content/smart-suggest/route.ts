@@ -48,11 +48,29 @@ const VALID_ANGLES = [
   'story_then_offer', 'one_thing_ive_been_thinking',
 ] as const;
 const MAX_HEADLINE_LENGTH = 80;
-const MAX_TEXT_LENGTH = 300;
+const MAX_LABEL_LENGTH = 120;
+const MAX_TOPIC_LENGTH = 500;
+const MAX_ASSIGNMENT_LENGTH = 1000;
+const MAX_REASON_LENGTH = 700;
 
-function clamp(value: unknown, maxLen: number): string {
+function clampCompleteText(value: unknown, maxLen: number): string {
   if (typeof value !== 'string') return '';
-  return value.length > maxLen ? value.slice(0, maxLen) : value;
+  const clean = value.trim();
+  if (clean.length <= maxLen) return clean;
+
+  const clipped = clean.slice(0, maxLen).trim();
+  const sentenceBoundary = Math.max(
+    clipped.lastIndexOf('.'),
+    clipped.lastIndexOf('!'),
+    clipped.lastIndexOf('?'),
+  );
+
+  if (sentenceBoundary >= Math.floor(maxLen * 0.55)) {
+    return clipped.slice(0, sentenceBoundary + 1).trim();
+  }
+
+  const wordBoundary = clipped.lastIndexOf(' ');
+  return `${clipped.slice(0, wordBoundary > 0 ? wordBoundary : maxLen).trim()}...`;
 }
 
 /**
@@ -142,12 +160,12 @@ function validateSuggestion(raw: unknown): SmartSuggestion | null {
     subType: typeof obj.subType === 'string' ? obj.subType : null,
     angle,
     angleRegister,
-    angleDisplayName: clamp(obj.angleDisplayName, MAX_TEXT_LENGTH) || angle,
-    headline: clamp(obj.headline, MAX_HEADLINE_LENGTH) || fallbackHeadline(clamp(obj.topic, MAX_TEXT_LENGTH) || clamp(obj.assignment, MAX_TEXT_LENGTH)),
-    topic: clamp(obj.topic, MAX_TEXT_LENGTH) || 'One thing worth sharing this week',
-    assignment: clamp(obj.assignment, MAX_TEXT_LENGTH) || 'Write one post grounded in your audience signal.',
-    whatItDoes: clamp(obj.whatItDoes, MAX_TEXT_LENGTH) || 'Provides value to the audience.',
-    whyNow: clamp(obj.whyNow, MAX_TEXT_LENGTH) || 'Based on your content gaps.',
+    angleDisplayName: clampCompleteText(obj.angleDisplayName, MAX_LABEL_LENGTH) || angle,
+    headline: clampCompleteText(obj.headline, MAX_HEADLINE_LENGTH) || fallbackHeadline(clampCompleteText(obj.topic, MAX_TOPIC_LENGTH) || clampCompleteText(obj.assignment, MAX_ASSIGNMENT_LENGTH)),
+    topic: clampCompleteText(obj.topic, MAX_TOPIC_LENGTH) || 'One thing worth sharing this week',
+    assignment: clampCompleteText(obj.assignment, MAX_ASSIGNMENT_LENGTH) || 'Write one post grounded in your audience signal.',
+    whatItDoes: clampCompleteText(obj.whatItDoes, MAX_REASON_LENGTH) || 'Provides value to the audience.',
+    whyNow: clampCompleteText(obj.whyNow, MAX_REASON_LENGTH) || 'Based on your content gaps.',
     sources,
     pillar: pillar as SmartSuggestion['pillar'],
   };
@@ -412,7 +430,7 @@ export async function POST(request: Request) {
               content: buildSuggestionUserPrompt(enrichedSources, previousSuggestions),
             },
           ],
-          max_tokens: 600,
+          max_tokens: 900,
           temperature: temp,
           response_format: { type: 'json_object' },
           thinking: { type: 'disabled' },
