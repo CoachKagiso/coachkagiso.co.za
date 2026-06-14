@@ -33,7 +33,7 @@ export default function AiConfigurationPanel({ adminKey }: AiConfigurationPanelP
       if (!response.ok) throw new Error(data.error || 'Connection failed.');
       const connected = String(data.result || '').trim().toUpperCase().includes('CONNECTED');
       if (!connected) throw new Error('AI service responded, but not with the expected test word.');
-      setStatus({ tone: 'success', message: 'Connected to GLM 5.1' });
+      setStatus({ tone: 'success', message: 'Connected to GLM 5.2' });
     } catch (error) {
       setStatus({
         tone: 'error',
@@ -58,14 +58,14 @@ export default function AiConfigurationPanel({ adminKey }: AiConfigurationPanelP
         <div className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-4 py-3 text-[#92400E]">
           <p className="text-[13px] font-bold">Test configuration active</p>
           <p className="mt-1 text-[13px] leading-relaxed">
-            Currently routing to GLM 5.1 via Z.ai for testing. Do not use with real lead data during this phase. Switch to production models once testing is complete.
+            Currently routing to GLM 5.2 via Z.ai for testing. Do not use with real lead data during this phase. Switch to production models once testing is complete.
           </p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-[8px] bg-[#F5F3EE] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Primary model</p>
-            <p className="mt-2 font-serif text-[25px] leading-tight text-[#142334]">GLM 5.1 via Z.ai</p>
+            <p className="mt-2 font-serif text-[25px] leading-tight text-[#142334]">GLM 5.2 via Z.ai</p>
             <p className="mt-1 text-[12px] text-[#142334]/58">Test</p>
             <button type="button" onClick={() => setShowProduction((value) => !value)} className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#142334]">
               Switch to production
@@ -73,7 +73,7 @@ export default function AiConfigurationPanel({ adminKey }: AiConfigurationPanelP
           </div>
           <div className="rounded-[8px] bg-[#F5F3EE] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Secondary model</p>
-            <p className="mt-2 font-serif text-[25px] leading-tight text-[#142334]">GLM 5.1 via Z.ai</p>
+            <p className="mt-2 font-serif text-[25px] leading-tight text-[#142334]">GLM 5.2 via Z.ai</p>
             <p className="mt-1 text-[12px] text-[#142334]/58">Test, same model</p>
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function AiConfigurationPanel({ adminKey }: AiConfigurationPanelP
               <input className="studio-input h-11" value={OPENROUTER_KIMI_K2_6_FREE_MODEL} readOnly />
             </label>
             <p className="text-[12px] leading-relaxed text-[#142334]/62 md:col-span-2">
-              Production switch is intentionally code-gated. When GLM testing is complete, update the provider constants in the AI route and add the OpenRouter headers.
+              Production switch is intentionally code-gated. When GLM 5.2 testing is complete, update the provider constants in the AI route and add the OpenRouter headers.
             </p>
           </div>
         )}

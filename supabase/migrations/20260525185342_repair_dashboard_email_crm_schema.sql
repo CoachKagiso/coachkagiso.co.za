@@ -92,7 +92,7 @@ insert into public.settings (key, value) values
     {"name": "Leadership Launchpad", "slug": "leadership-launchpad", "price": 2000, "turnaround": "Session-based", "active": true}
   ]'::jsonb),
   ('business_hours', '{"weekdays": {"start": "17:30", "end": "19:00"}, "saturday": {"start": "09:00", "end": "12:00"}, "sunday": null}'::jsonb),
-  ('ai_config', '{"primary_model": "glm-5.1", "secondary_model": "glm-5.1", "model_provider": "zai", "zai_api_key": "", "openrouter_api_key": "", "test_mode": true}'::jsonb),
+  ('ai_config', '{"primary_model": "glm-5.2", "secondary_model": "glm-5.2", "model_provider": "zai", "zai_api_key": "", "openrouter_api_key": "", "test_mode": true}'::jsonb),
   ('notifications', '{"new_lead": true, "follow_up_due": true, "overdue_delivery": true, "payment_confirmed": true, "cal_booking": true, "sent_email_log": false, "lead_magnet_download": true, "masterclass_reservation": true, "intake_submitted": true}'::jsonb)
 on conflict (key) do nothing;
 
