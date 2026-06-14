@@ -3,7 +3,7 @@ export type AiModelOption = {
   label: string;
 };
 
-export const ZAI_TEST_MODEL = 'glm-5.1';
+export const ZAI_TEST_MODEL = 'glm-5.2';
 export const OPENROUTER_KIMI_K2_6_FREE_MODEL = 'moonshotai/kimi-k2.6:free';
 export const OPENROUTER_NEMOTRON_3_ULTRA_FREE_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 export const DEFAULT_OPENROUTER_PRIMARY_MODEL = OPENROUTER_KIMI_K2_6_FREE_MODEL;

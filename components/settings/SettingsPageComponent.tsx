@@ -540,7 +540,7 @@ export default function SettingsPageComponent({
       });
       setTestStatus({
         tone: 'success',
-        message: provider === 'zai' ? 'Connected to GLM 5.1' : `Connected to ${testModel}`,
+        message: provider === 'zai' ? 'Connected to GLM 5.2' : `Connected to ${testModel}`,
       });
       setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'idle' }));
     } catch (error) {
@@ -1125,7 +1125,7 @@ export default function SettingsPageComponent({
               {aiConfig.test_mode !== false && (
                 <div className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-4 py-3 text-[#92400E]">
                   <p className="text-[13px] font-bold">Test configuration active</p>
-                  <p className="mt-1 text-[13px] leading-relaxed">Currently routing to GLM 5.1 via Z.ai for testing. Do not use with real lead data during this phase. Switch to production models below when testing is complete.</p>
+                  <p className="mt-1 text-[13px] leading-relaxed">Currently routing to GLM 5.2 via Z.ai for testing. Do not use with real lead data during this phase. Switch to production models below when testing is complete.</p>
                 </div>
               )}
               <div className="grid gap-4 rounded-[8px] bg-[#F8F6F4] p-4">

@@ -6,7 +6,7 @@ import { isContentPillar } from '@/lib/content-studio';
 export const dynamic = 'force-dynamic';
 
 const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.1';
+const AI_MODEL = 'glm-5.2';
 
 const RESEARCH_PROCESSING_PROMPT = `
 You are a research analyst for Kagiso Shabangu, a South African Career Development and Personal Brand Coach.

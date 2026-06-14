@@ -11,7 +11,7 @@ import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 export const dynamic = 'force-dynamic';
 
 const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.1';
+const AI_MODEL = 'glm-5.2';
 
 const VALID_PLATFORMS = ['linkedin', 'instagram_facebook', 'tiktok', 'email_voice'] as const;
 const VALID_PILLARS = ['career_growth', 'leadership', 'personal_brand', 'mentorship'] as const;

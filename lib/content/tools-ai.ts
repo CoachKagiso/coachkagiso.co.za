@@ -1,5 +1,5 @@
 const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_TEXT_MODEL = 'glm-5.1';
+const AI_TEXT_MODEL = 'glm-5.2';
 const AI_VISION_MODEL = 'GLM-4.6V-Flash';
 const AI_VISION_FALLBACK_MODEL = 'glm-4.5v';
 
