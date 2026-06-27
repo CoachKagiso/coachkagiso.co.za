@@ -83,6 +83,12 @@ const availableNow = [
     note: 'A headline rewrite guide with formulas, examples, and keyword cues.',
     href: '/resources/downloads#linkedin-headline-builder',
   },
+  {
+    label: 'Download',
+    title: 'The South African CV Checklist',
+    note: 'A fifteen-check self-audit that scores whether your CV gets seen.',
+    href: '/resources/downloads#sa-cv-checklist',
+  },
 ];
 
 export default function ResourcesPage() {

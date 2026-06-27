@@ -41,7 +41,12 @@ function asEmailTemplateId(value?: string | null): EmailTemplateId | null {
 export function getLeadEmailSequenceTemplateIds(lead: EmailTemplateGuardrailLead): EmailTemplateId[] {
   const source = normalizeLeadSource(lead.source);
 
-  if (source === 'first_90_days' || source === 'linkedin_headline' || source === 'masterclass_waitlist') {
+  if (
+    source === 'first_90_days' ||
+    source === 'linkedin_headline' ||
+    source === 'cv_checklist' ||
+    source === 'masterclass_waitlist'
+  ) {
     return EMAIL_TEMPLATES
       .filter((template) => template.source === source)
       .sort((a, b) => a.sequenceIndex - b.sequenceIndex)

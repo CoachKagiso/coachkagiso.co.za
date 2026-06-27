@@ -51,7 +51,7 @@ export function getFollowUpScheduleAfterSend(
       follow_up_count: 1,
       next_follow_up_at: addDaysAsDateString(
         now,
-        source === 'first_90_days' || source === 'linkedin_headline' ? 5 : 6
+        source === 'first_90_days' || source === 'linkedin_headline' || source === 'cv_checklist' ? 5 : 6
       ),
     };
   }
@@ -65,7 +65,7 @@ export function getFollowUpScheduleAfterSend(
           ? null
           : addDaysAsDateString(
               now,
-              source === 'first_90_days' || source === 'linkedin_headline'
+              source === 'first_90_days' || source === 'linkedin_headline' || source === 'cv_checklist'
                 ? 5
                 : nextFollowUpCount === 1
                   ? 6
@@ -78,7 +78,7 @@ export function getFollowUpScheduleAfterSend(
     follow_up_count: currentFollowUpCount,
     next_follow_up_at: addDaysAsDateString(
       now,
-      source === 'first_90_days' || source === 'linkedin_headline' ? 5 : 4
+      source === 'first_90_days' || source === 'linkedin_headline' || source === 'cv_checklist' ? 5 : 4
     ),
   };
 }

@@ -509,6 +509,15 @@ const sourceLeadProfiles: Record<
     diagnosis: 'Lead magnet download from a professional interested in LinkedIn positioning.',
     action: 'Send the LinkedIn sequence and offer a profile/CV positioning upgrade.',
   },
+  cv_checklist: {
+    archetypeKey: 'B',
+    archetypeName: 'SA CV Checklist',
+    service: 'CV Revamp',
+    href: '/buy/cv-revamp',
+    tagline: 'Downloaded the South African CV Checklist.',
+    diagnosis: 'Lead magnet download from a professional auditing their CV before applying.',
+    action: 'Send the CV checklist sequence and offer a CV review or full revamp.',
+  },
   masterclass_waitlist: {
     archetypeKey: 'E',
     archetypeName: 'Masterclass Waitlist',
