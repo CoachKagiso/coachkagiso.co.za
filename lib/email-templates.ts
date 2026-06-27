@@ -25,7 +25,10 @@ export type LeadMagnetEmailTemplateId =
   | 'first_90_days_newsletter_bridge'
   | 'linkedin_headline_first_contact'
   | 'linkedin_headline_follow_up_1'
-  | 'linkedin_headline_newsletter_bridge';
+  | 'linkedin_headline_newsletter_bridge'
+  | 'cv_checklist_first_contact'
+  | 'cv_checklist_follow_up_1'
+  | 'cv_checklist_newsletter_bridge';
 
 export type MasterclassWaitlistEmailTemplateId =
   | 'masterclass_waitlist_confirmation'
@@ -73,6 +76,7 @@ export const bookingLinks: Record<string, string> = {
 export const downloadLinks: Record<string, string> = {
   'First 90 Days Checklist': `${publicSiteUrl}/api/lead-magnets/first-90-days-checklist/pdf`,
   'SA LinkedIn Headline Builder': `${publicSiteUrl}/api/lead-magnets/linkedin-headline-builder/pdf`,
+  'SA CV Checklist': `${publicSiteUrl}/lead-magnets/the-south-african-cv-checklist.pdf`,
 };
 
 export const EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -788,6 +792,88 @@ hello@coachkagiso.co.za`,
   },
 
   // ============================================================================
+  // SA CV CHECKLIST
+  // ============================================================================
+  {
+    id: 'cv_checklist_first_contact',
+    archetypeName: 'SA CV Checklist',
+    recommendedService: 'CV Revamp',
+    bookingKey: 'CV Revamp',
+    downloadKey: 'SA CV Checklist',
+    source: 'cv_checklist',
+    variant: 1,
+    sequenceIndex: 1,
+    stageLabel: 'First contact',
+    subject: 'Your South African CV Checklist, {{firstName}}',
+    body: `Hi {{firstName}},
+
+Here's your South African CV Checklist: [DOWNLOAD LINK]
+
+It's a self-audit, not a rewrite. Work through the fifteen checks, tick a green, amber, or red light for each, and then count your reds at the end. That number tells you how much work your CV actually needs.
+
+So I'll ask you the same thing the checklist does at the end: how many reds did you land on?
+
+Reply and tell me your score. I read those myself.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'cv_checklist_follow_up_1',
+    archetypeName: 'SA CV Checklist',
+    recommendedService: 'CV Revamp',
+    bookingKey: 'CV Revamp',
+    downloadKey: 'SA CV Checklist',
+    source: 'cv_checklist',
+    variant: 2,
+    sequenceIndex: 2,
+    stageLabel: 'Second contact',
+    subject: 'The checks that quietly cost you, {{firstName}}',
+    body: `Hi {{firstName}},
+
+I sent you the CV Checklist a few days ago and wanted to follow up.
+
+Here's what I see most often. A CV rarely gets thrown out. The risk is quieter than that. If it can't be read cleanly, or it doesn't speak to the role, it ranks low and a recruiter never reaches it. The person was good enough. The CV just got in the way.
+
+The checklist shows you where that's happening. The fixing is the next part, and it's the fastest win available to you. A clear, well-built CV changes the response you get.
+
+If you'd like a professional set of eyes on yours, that's what I do. I offer CV reviews and full revamps, built for the South African market and the way recruiters here actually read.
+
+You can see how that works here: [BOOKING LINK]
+
+Or just reply and tell me which checks tripped you up. I'm here.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'cv_checklist_newsletter_bridge',
+    archetypeName: 'SA CV Checklist',
+    recommendedService: 'CV Revamp',
+    bookingKey: 'CV Revamp',
+    downloadKey: 'SA CV Checklist',
+    source: 'cv_checklist',
+    variant: 3,
+    sequenceIndex: 3,
+    stageLabel: 'Newsletter bridge',
+    subject: 'Last one from me for now, {{firstName}}',
+    body: `Hi {{firstName}},
+
+This is the last email in this sequence. I don't want to fill your inbox beyond what's useful.
+
+I'm adding you to my upcoming newsletter. When it launches, it'll cover careers, visibility, and personal branding for professionals navigating the South African market. Real examples, real patterns, no generic advice.
+
+You're on the early-access list, and you can opt out anytime with the link at the bottom of the first email.
+
+And if you ever want a professional set of eyes on your CV, just reply to any email. I'll make time.
+
+Show up. Stand out. Level up. Your career matters, {{firstName}}.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+
+  // ============================================================================
   // MASTERCLASS WAITLIST
   // ============================================================================
   {
@@ -934,6 +1020,14 @@ export function getTemplateIdForLeadStage({
     if (leadStatus !== 'contacted') return 'linkedin_headline_first_contact';
     if (count === 0) return 'linkedin_headline_follow_up_1';
     return 'linkedin_headline_newsletter_bridge';
+  }
+
+  if (source === 'cv_checklist') {
+    const count = Math.max(0, followUpCount ?? 0);
+    if (leadStatus === 'new' || !lastContactedAt) return 'cv_checklist_first_contact';
+    if (leadStatus !== 'contacted') return 'cv_checklist_first_contact';
+    if (count === 0) return 'cv_checklist_follow_up_1';
+    return 'cv_checklist_newsletter_bridge';
   }
 
   if (source === 'masterclass_waitlist') {

@@ -154,6 +154,7 @@ function getFirstContactTitle(submission: DiagnosticSubmission, clientName: stri
   const source = normalizeLeadSource(submission.source);
   if (source === 'first_90_days') return `${clientName} - Send First 90 Days checklist email`;
   if (source === 'linkedin_headline') return `${clientName} - Send LinkedIn Builder email`;
+  if (source === 'cv_checklist') return `${clientName} - Send CV Checklist email`;
   if (source === 'masterclass_waitlist') return `${clientName} - Send waitlist confirmation`;
   return `${clientName} - Send first result follow-up`;
 }
@@ -174,6 +175,14 @@ function getFollowUpOneTask(submission: DiagnosticSubmission, clientName: string
       title: `${clientName} - Send LinkedIn headline follow-up`,
       subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Why the headline is costing them`,
       tags: ['FOLLOW-UP', 'LINKEDIN', 'DAY 4'],
+    };
+  }
+  if (source === 'cv_checklist') {
+    return {
+      id: `cv-checklist-followup-${submission.id}`,
+      title: `${clientName} - Send CV Checklist follow-up`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - The checks that quietly cost them`,
+      tags: ['FOLLOW-UP', 'CV CHECKLIST', 'DAY 4'],
     };
   }
   if (source === 'masterclass_waitlist') {
@@ -208,6 +217,14 @@ function getFollowUpTwoTask(submission: DiagnosticSubmission, clientName: string
       title: `${clientName} - Send LinkedIn newsletter bridge`,
       subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
       tags: ['NEWSLETTER', 'LINKEDIN', 'DAY 10'],
+    };
+  }
+  if (source === 'cv_checklist') {
+    return {
+      id: `cv-checklist-newsletter-${submission.id}`,
+      title: `${clientName} - Send CV Checklist newsletter bridge`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
+      tags: ['NEWSLETTER', 'CV CHECKLIST', 'DAY 10'],
     };
   }
   return {

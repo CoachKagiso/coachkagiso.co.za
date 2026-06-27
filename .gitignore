@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 .claude/worktrees/
 /handy-arrows/
 test-results/
+scratch/

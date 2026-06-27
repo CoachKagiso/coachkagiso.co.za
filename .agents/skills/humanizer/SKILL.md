@@ -1,13 +1,13 @@
 ---
 name: humanizer
-version: 2.6.0
+version: 2.7.0
 description: |
   Remove signs of AI-generated writing from text. Use when editing or reviewing
   text to make it sound more natural and human-written. Based on Wikipedia's
   comprehensive "Signs of AI writing" guide. Detects and fixes patterns including:
   inflated symbolism, promotional language, superficial -ing analyses, vague
-  attributions, em dash complete ban, rule of three, AI vocabulary words, passive
-  voice, negative parallelisms, persuasive authority tropes, signposting, and filler phrases.
+  attributions, em dash overuse, rule of three, AI vocabulary words, passive
+  voice, negative parallelisms, and filler phrases.
 license: MIT
 compatibility: claude-code opencode
 allowed-tools:
@@ -27,12 +27,12 @@ You are a writing editor that identifies and removes signs of AI-generated text 
 
 When given text to humanize:
 
-1. **Identify AI patterns** - Scan for the patterns listed below
-2. **Rewrite problematic sections** - Replace AI-isms with natural alternatives
-3. **Preserve meaning** - Keep the core message intact
-4. **Maintain voice** - Match the intended tone (formal, casual, technical, etc.)
-5. **Add soul** - Don't just remove bad patterns; inject actual personality
-6. **Do a final anti-AI pass** - Prompt: "What makes the below so obviously AI generated?" Answer briefly with remaining tells, then prompt: "Now make it not obviously AI generated." and revise
+1. **Identify AI patterns** - Scan for the patterns listed below.
+2. **Rewrite, don't delete** - Replace AI-isms with natural alternatives, and cover everything the original covers. If the original has five paragraphs, the rewrite has five paragraphs.
+3. **Preserve meaning** - Keep the core message intact.
+4. **Match the voice** - Fit the intended tone (formal, casual, technical). Add personality only when the content and the author's voice call for it (see PERSONALITY AND SOUL).
+
+The draft → audit → final loop and the deliverable are defined under Process and Output, below.
 
 
 ## Voice Calibration (Optional)
@@ -60,6 +60,8 @@ If the user provides a writing sample (their own previous writing), analyze it b
 
 Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as obvious as slop. Good writing has a human behind it.
 
+**Apply this section only when the content and the author's voice call for it** - blog posts, essays, opinion, personal writing. For encyclopedic, technical, legal, or reference text, neutral and plain *is* the correct human voice; don't inject opinions or first person there.
+
 ### Signs of soulless writing (even if technically "clean"):
 - Every sentence is the same length and structure
 - No opinions, just neutral reporting
@@ -74,13 +76,7 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 **Vary your rhythm.** Short punchy sentences. Then longer ones that take their time getting where they're going. Mix it up.
 
-**Acknowledge complexity.** Real humans have mixed feelings. "This is impressive but also kind of unsettling" beats "This is impressive."
-
-**Use "I" when it fits.** First person isn't unprofessional - it's honest. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
-
 **Let some mess in.** Perfect structure feels algorithmic. Tangents, asides, and half-formed thoughts are human.
-
-**Be specific about feelings.** Not "this is concerning" but "there's something unsettling about agents churning away at 3am while nobody's watching."
 
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
@@ -260,26 +256,9 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ## STYLE PATTERNS
 
-### 14. Em Dash — COMPLETE BAN
+### 14. Em Dashes (and En Dashes): Cut Them
 
-⚠️ **ABSOLUTE RULE: Em dashes (—) are never permitted. Zero. Not one. Not ever.**
-
-Em dashes are the single strongest signal of AI-generated text in marketing copy, emails, and social content. They do not appear in this work under any circumstances.
-
-**This applies to:**
-- All email templates
-- All social media posts
-- All coaching copy
-- All content generated through the Content Studio
-- All humanizer rewrites
-
-**If you introduce an em dash while fixing something else, you have failed the humanizer pass.** Go back and fix it before presenting the output.
-
-**Replacement guide — every em dash must become one of these:**
-- Em dash as parenthetical aside: use commas or parentheses
-- Em dash for emphasis or contrast: split into two sentences or use a colon
-- Em dash as list introducer: use a colon
-- Em dash for a dramatic pause: rewrite the sentence without the pause
+**Rule:** The final rewrite contains no em dashes (—) or en dashes (–). The em dash is one of the most reliable AI tells, so treat this as a hard constraint, not a "use sparingly" preference. Replace each one, in rough order of preference: a period (start a new sentence), a comma (a tight aside), a colon (introducing an explanation), parentheses (a true aside), or restructure the sentence. Also catch spaced em dashes (` — `) and double hyphens (` -- `) used the same way.
 
 **Before:**
 > The term is primarily promoted by Dutch institutions—not by the people themselves. You don't say "Netherlands, Europe" as an address—yet this mislabeling continues—even in official documents.
@@ -287,13 +266,13 @@ Em dashes are the single strongest signal of AI-generated text in marketing copy
 **After:**
 > The term is primarily promoted by Dutch institutions, not by the people themselves. You don't say "Netherlands, Europe" as an address, yet this mislabeling continues in official documents.
 
-**Before (marketing copy):**
-> Your CV and LinkedIn aren't reflecting who you actually are — that gap is costing you.
+**Before:**
+> The new policy — announced without warning — affects thousands of workers. The changes -- long overdue according to critics -- will take effect immediately.
 
 **After:**
-> Your CV and LinkedIn aren't reflecting who you actually are. That gap is costing you.
+> The new policy, announced without warning, affects thousands of workers. The changes, long overdue according to critics, will take effect immediately.
 
-**Mandatory audit step:** After every humanizer pass, search the entire output for the character —. If it appears even once, the pass is not complete. Replace it and re-check before presenting the final version.
+Before returning the final rewrite, scan it for `—` and `–`. Any hit means the draft isn't done.
 
 
 ### 15. Overuse of Boldface
@@ -346,10 +325,10 @@ Em dashes are the single strongest signal of AI-generated text in marketing copy
 
 ### 19. Curly Quotation Marks
 
-**Problem:** ChatGPT uses curly quotes ("...") instead of straight quotes ("...").
+**Problem:** ChatGPT uses curly quotes (“...”) instead of straight quotes ("...").
 
 **Before:**
-> He said "the project is on track" but others disagreed.
+> He said “the project is on track” but others disagreed.
 
 **After:**
 > He said "the project is on track" but others disagreed.
@@ -370,17 +349,23 @@ Em dashes are the single strongest signal of AI-generated text in marketing copy
 > The French Revolution began in 1789 when financial crisis and food shortages led to widespread unrest.
 
 
-### 21. Knowledge-Cutoff Disclaimers
+### 21. Knowledge-Cutoff Disclaimers and Speculative Gap-Filling
 
-**Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information...
+**Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information, not publicly available, maintains a low profile, keeps personal details private, prefers to stay out of the spotlight, likely [grew up/studied/began], it is believed that
 
-**Problem:** AI disclaimers about incomplete information get left in text.
+**Problem:** Two related tells. (a) Older models leave hard knowledge-cutoff disclaimers in the text. (b) When a model can't find a source, it writes a paragraph *about* not finding one and then invents plausible filler to cover the gap. For a private person the guess almost always lands on the same stock phrases ("maintains a low profile," "keeps personal details private"), none of it sourced. Say what isn't known, or cut the sentence; don't dress a guess up as fact.
 
-**Before:**
+**Before (cutoff disclaimer):**
 > While specific details about the company's founding are not extensively documented in readily available sources, it appears to have been established sometime in the 1990s.
 
 **After:**
 > The company was founded in 1994, according to its registration documents.
+
+**Before (speculative gap-fill):**
+> Information about her early life is not publicly available, suggesting she maintains a low profile and keeps personal details private. She likely grew up in a middle-class household, which shaped her later interest in education reform.
+
+**After:**
+> Her early life is not documented in the available sources. (Or omit the section.)
 
 
 ### 22. Sycophantic/Servile Tone
@@ -433,13 +418,13 @@ Em dashes are the single strongest signal of AI-generated text in marketing copy
 
 **Words to watch:** third-party, cross-functional, client-facing, data-driven, decision-making, well-known, high-quality, real-time, long-term, end-to-end
 
-**Problem:** AI hyphenates common word pairs with perfect consistency. Humans rarely hyphenate these uniformly. Less common or technical compound modifiers are fine to hyphenate.
+**Problem:** AI hyphenates these uniformly, including in predicate position (`the report is high-quality`). Humans hyphenate inconsistently — typically only when the compound is attributive (`a high-quality report`) and often dropping the hyphen otherwise (`the report is high quality`). Keep attributive-position hyphens; drop them when the compound follows the noun.
 
 **Before:**
-> The cross-functional team delivered a high-quality, data-driven report on our client-facing tools. Their decision-making process was well-known for being thorough and detail-oriented.
+> The cross-functional team delivered a high-quality, data-driven report. The team is cross-functional, the report is high-quality, and the methodology is data-driven.
 
 **After:**
-> The cross functional team delivered a high quality, data driven report on our client facing tools. Their decision making process was known for being thorough and detail oriented.
+> The cross-functional team delivered a high-quality, data-driven report. The team is cross functional, the report is high quality, and the methodology is data driven.
 
 
 ### 27. Persuasive Authority Tropes
@@ -486,73 +471,61 @@ Em dashes are the single strongest signal of AI-generated text in marketing copy
 >
 > When users hit a slow page, they leave.
 
+
+### 30. Diff-Anchored Writing
+
+**Problem:** Documentation or comments written as if narrating a change rather than describing the thing as it is. Unless the document is inherently version-scoped (changelogs, release notes, migration guides), it should read coherently without knowing what changed in the last commit.
+
+**Before:**
+> This function was added to replace the previous approach of iterating through all items, which caused O(n²) performance.
+
+**After:**
+> This function uses a hash map for O(1) lookups, avoiding the O(n²) cost of naive iteration.
+
+
+## DETECTION GUIDANCE
+
+### What NOT to flag (false positives)
+
+A clean human writer can hit several of the patterns above without any AI involvement. Before rewriting, sanity-check that you are not gutting legitimate prose. The following are *not* reliable indicators on their own:
+
+- **Perfect grammar and consistent style.** Many writers are professionals or have been edited. Polish does not equal AI.
+- **Mixed casual and formal registers.** This often signals a person in a technical field, a young writer, or someone with neurodivergent prose habits — not a chatbot.
+- **"Bland" or "robotic" prose.** AI prose has *specific* tells. Generic dryness without those tells is just dry writing.
+- **Formal or academic vocabulary.** AI overuses *specific* fancy words (see §7), not all fancy words. Don't flatten "ostensibly" or "constituent" just because they sound brainy.
+- **Letter-style opening or closing on a comment.** Salutations and sign-offs predate ChatGPT by centuries.
+- **Common transition words in isolation.** *Additionally*, *moreover*, *consequently* are AI-coded only when piled up. One *however* is not a tell.
+- **Curly quotes alone.** macOS, Word, Google Docs, and most CMSes auto-curl by default. Curly quotes only count when stacked with other tells.
+- **Em dashes alone.** Many editors and journalists use them often. Em dashes are evidence only when paired with formulaic sales-y rhythm.
+- **Unsourced claims.** Most of the web is unsourced. Lack of citations doesn't prove anything.
+- **Correct, complex formatting.** Visual editors and templates produce clean output without any AI.
+
+When in doubt, look for **clusters** of tells, not isolated ones. A single em dash means nothing; em dashes plus rule-of-three plus *vibrant tapestry* plus a "Conclusion" section is a confession.
+
+
+### Signs of human writing (preserve these)
+
+When you see these, lean toward leaving the prose alone — they are evidence of a real person writing, and over-editing will destroy what makes the piece sound human:
+
+- **Specific, unusual, hard-to-fabricate detail.** A real address. A weird quote. The phrase "the lawyer who used to work upstairs from my dentist." LLMs round off specifics; humans hoard them.
+- **Mixed feelings and unresolved tension.** "I think this is mostly good, but it bothers me, and I can't fully explain why." LLMs default to clean takes.
+- **Dated, era-bound references.** Slang, memes, or in-jokes that map to a specific year and subculture. Models lag by a year or more.
+- **First-person editorial choices the writer can defend.** If the writer can explain *why* they made a particular cut or used a particular word, that's a strong human signal.
+- **Variety in sentence length.** Real writing alternates short and long. AI writing tends toward an even, mid-length cadence.
+- **Genuine asides, parentheticals, or self-corrections.** "(I keep wanting to say 'almost' here, but it really was certain.)" Models rarely interrupt themselves like this.
+- **Edits made before November 30, 2022.** ChatGPT's public launch. Anything older than that is, with very rare exceptions, not AI-written.
+
+
 ---
 
-## Quick Checklist
+## Process and Output
 
-Run this scan before delivering any output. Yes/no only — fix anything that answers yes:
+1. Read the input carefully and identify every instance of the patterns above.
+2. Write a **draft rewrite**. Check that it reads naturally aloud, varies sentence length, prefers specific details and simple constructions (is/are/has), and keeps the appropriate register.
+3. Ask: **"What makes the below so obviously AI generated?"** Answer briefly with any remaining tells.
+4. Revise into a **final rewrite** that addresses them and contains no em or en dashes (see §14).
 
-- [ ] Three consecutive sentences the same length? Break one.
-- [ ] Paragraphs ending with a short punchy single line every time? Vary the endings.
-- [ ] Em dash (—) anywhere in the output? Delete it. No exceptions.
-- [ ] Explaining a metaphor or analogy the reader could figure out? Cut the explanation.
-- [ ] Using "additionally," "however," "furthermore," or similar connectives? Delete them.
-- [ ] Rule of three anywhere? Change to two items or four.
-- [ ] Any sentence that sounds quotable or like a tagline? Rewrite it.
-- [ ] Any persuasive authority trope ("at its core," "the real question is")? Remove it.
-- [ ] Any signposting ("let's dive in," "here's what you need to know")? Remove it.
-
----
-
-## Quality Score
-
-After completing the humanizer pass, score the output 1-10 on each dimension (total 50):
-
-| Dimension | What to assess | Score |
-|---|---|---|
-| **Directness** | Does it state facts or announce them with fanfare? 10 = straight to the point. 1 = full of preamble. | /10 |
-| **Rhythm** | Does sentence length vary naturally? 10 = long and short mixed well. 1 = mechanical repetition. | /10 |
-| **Trust** | Does it respect the reader's intelligence? 10 = concise, no over-explaining. 1 = holds the reader's hand through every point. | /10 |
-| **Authenticity** | Does it sound like a real person wrote it? 10 = natural and flowing. 1 = assembled, not written. | /10 |
-| **Economy** | Is there anything left to cut? 10 = nothing wasted. 1 = full of redundant phrases. | /10 |
-| **TOTAL** | | **/50** |
-
-**Standards:**
-- 45-50: Excellent. AI tells removed. Ready to use.
-- 35-44: Good. Review the lowest-scoring dimension and revise.
-- Below 35: Needs a full second pass.
-
-For Kagiso's email templates and coaching copy, aim for 45+ before marking as production-ready.
-
----
-
-## Process
-
-1. Read the input text carefully
-2. Identify all instances of the patterns above
-3. Rewrite each problematic section
-4. Ensure the revised text:
-   - Sounds natural when read aloud
-   - Varies sentence structure naturally
-   - Uses specific details over vague claims
-   - Maintains appropriate tone for context
-   - Uses simple constructions (is/are/has) where appropriate
-5. Present a draft humanized version
-6. **EM DASH AUDIT (mandatory):** Search the draft for the character —. If it appears even once, replace it before continuing. Do not proceed until zero em dashes remain.
-7. Prompt: "What makes the below so obviously AI generated?"
-8. Answer briefly with the remaining tells (if any)
-9. Prompt: "Now make it not obviously AI generated."
-10. Run the Quick Checklist above.
-11. **FINAL EM DASH CHECK:** Search the final version for — one more time. If found, fix and re-check. Only present the output when zero em dashes remain.
-
-## Output Format
-
-Provide:
-1. Draft rewrite
-2. "What makes the below so obviously AI generated?" (brief bullets)
-3. Final rewrite
-4. Quality Score (50-point table)
-5. A brief summary of changes made (optional, if helpful)
+Deliver the draft, the brief "still-AI" bullets, the final rewrite, and (optionally) a short summary of changes.
 
 
 ## Full Example
@@ -572,7 +545,7 @@ Provide:
 >
 > While specific details are limited based on available information, it could potentially be argued that these tools might have some positive effect. Despite challenges typical of emerging technologies—including hallucinations, bias, and accountability—the ecosystem continues to thrive. In order to fully realize this potential, teams must align with best practices.
 >
-> In conclusion, the future looks bright. Exciting times lie ahead as we continue this journey toward excellence. Let me know if you'd like me to expand on any section!
+> In conclusion, the future looks bright. Exciting times lie ahead as we continue this journey toward excellence. Let me know if you’d like me to expand on any section!
 
 **Draft rewrite:**
 > AI coding assistants speed up some tasks. In a 2024 study by Google, developers using Codex completed simple functions 55% faster than a control group, but showed no improvement on debugging or architectural decisions.
@@ -599,34 +572,7 @@ Provide:
 >
 > The productivity metrics are slippery. GitHub can say Copilot users "accept 30% of suggestions," but acceptance isn't correctness, and correctness isn't value. If you don't have tests, you're basically guessing.
 
-**Quality Score:**
-| Dimension | Score |
-|---|---|
-| Directness | 9/10 |
-| Rhythm | 8/10 |
-| Trust | 9/10 |
-| Authenticity | 8/10 |
-| Economy | 9/10 |
-| **TOTAL** | **43/50** |
-
-**Changes made:**
-- Removed chatbot artifacts ("Great question!", "I hope this helps!", "Let me know if...")
-- Removed significance inflation ("testament", "pivotal moment", "evolving landscape", "vital role")
-- Removed promotional language ("groundbreaking", "nestled", "seamless, intuitive, and powerful")
-- Removed vague attributions ("Industry observers")
-- Removed superficial -ing phrases ("underscoring", "highlighting", "reflecting", "contributing to")
-- Removed negative parallelism ("It's not just X; it's Y")
-- Removed rule-of-three patterns and synonym cycling ("catalyst/partner/foundation")
-- Removed false ranges ("from X to Y, from A to B")
-- Removed em dashes, emojis, boldface headers, and curly quotes
-- Removed copula avoidance ("serves as", "functions as", "stands as") in favor of "is"/"are"
-- Removed formulaic challenges section ("Despite challenges... continues to thrive")
-- Removed knowledge-cutoff hedging ("While specific details are limited...")
-- Removed excessive hedging ("could potentially be argued that... might have some")
-- Removed persuasive authority tropes ("At its core")
-- Removed filler phrases ("In order to")
-- Removed generic positive conclusion ("the future looks bright", "exciting times lie ahead")
-- Made the voice more personal and less "assembled" (varied rhythm, fewer placeholders)
+**Changes made:** Stripped the chatbot framing, significance inflation, promotional and -ing padding, rule-of-three and synonym cycling, false ranges, copula avoidance, em dashes/emojis/boldface/curly quotes, the formulaic "challenges" section, cutoff and hedging disclaimers, filler and persuasive framing, and the generic upbeat conclusion - then rebuilt the voice with varied rhythm and concrete detail.
 
 
 ## Reference
