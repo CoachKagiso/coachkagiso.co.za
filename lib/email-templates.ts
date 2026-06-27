@@ -28,7 +28,10 @@ export type LeadMagnetEmailTemplateId =
   | 'linkedin_headline_newsletter_bridge'
   | 'cv_checklist_first_contact'
   | 'cv_checklist_follow_up_1'
-  | 'cv_checklist_newsletter_bridge';
+  | 'cv_checklist_newsletter_bridge'
+  | 'interview_prep_first_contact'
+  | 'interview_prep_follow_up_1'
+  | 'interview_prep_newsletter_bridge';
 
 export type MasterclassWaitlistEmailTemplateId =
   | 'masterclass_waitlist_confirmation'
@@ -77,6 +80,7 @@ export const downloadLinks: Record<string, string> = {
   'First 90 Days Checklist': `${publicSiteUrl}/api/lead-magnets/first-90-days-checklist/pdf`,
   'SA LinkedIn Headline Builder': `${publicSiteUrl}/api/lead-magnets/linkedin-headline-builder/pdf`,
   'SA CV Checklist': `${publicSiteUrl}/lead-magnets/the-south-african-cv-checklist.pdf`,
+  'Interview Prep Checklist': `${publicSiteUrl}/lead-magnets/the-interview-prep-checklist.pdf`,
 };
 
 export const EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -874,6 +878,88 @@ hello@coachkagiso.co.za`,
   },
 
   // ============================================================================
+  // INTERVIEW PREP CHECKLIST
+  // ============================================================================
+  {
+    id: 'interview_prep_first_contact',
+    archetypeName: 'Interview Prep Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'Interview Prep Checklist',
+    source: 'interview_prep',
+    variant: 1,
+    sequenceIndex: 1,
+    stageLabel: 'First contact',
+    subject: 'Your Interview Prep Checklist, {{firstName}}',
+    body: `Hi {{firstName}},
+
+Here's your Interview Prep Checklist: [DOWNLOAD LINK]
+
+It's a readiness self-audit, not an answer bank. Work through the fifteen checks, tick a green, amber, or red light for each, then count your reds at the end. That number tells you how ready you actually are.
+
+So I'll ask you what the checklist asks: how many reds did you land on?
+
+Reply and tell me your score. I read those myself.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'interview_prep_follow_up_1',
+    archetypeName: 'Interview Prep Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'Interview Prep Checklist',
+    source: 'interview_prep',
+    variant: 2,
+    sequenceIndex: 2,
+    stageLabel: 'Second contact',
+    subject: 'An interview is rarely lost on the day, {{firstName}}',
+    body: `Hi {{firstName}},
+
+I sent you the Interview Prep Checklist a few days ago and wanted to follow up.
+
+Here's the thing most people get wrong. An interview is rarely lost on the day. It's lost in the days before, when preparation is thin and nerves fill the gap. Preparation is what turns those nerves into confidence.
+
+The checklist shows you where you're exposed. The next part is closing those gaps, especially the hard ones: the examples you tell, the reason you're moving, the salary number you'll state, and the way you handle a question you didn't want.
+
+That's what I help people with. We work through your real examples and the answers to the questions that catch people out, so you walk in ready.
+
+You can see how that works here: [BOOKING LINK]
+
+Or just reply and tell me which checks tripped you up. I'm here.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+  {
+    id: 'interview_prep_newsletter_bridge',
+    archetypeName: 'Interview Prep Checklist',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
+    downloadKey: 'Interview Prep Checklist',
+    source: 'interview_prep',
+    variant: 3,
+    sequenceIndex: 3,
+    stageLabel: 'Newsletter bridge',
+    subject: 'Last one from me for now, {{firstName}}',
+    body: `Hi {{firstName}},
+
+This is the last email in this sequence. I don't want to fill your inbox beyond what's useful.
+
+I'm adding you to my upcoming newsletter. When it launches, it'll cover interviews, careers, and personal branding for professionals navigating the South African market. Real examples, real patterns, no generic advice.
+
+You're on the early-access list, and you can opt out anytime with the link at the bottom of the first email.
+
+And if you ever want to get properly interview-ready before a big one, just reply to any email. I'll make time.
+
+Show up. Stand out. Level up. Your career matters, {{firstName}}.
+
+Kagiso
+hello@coachkagiso.co.za`,
+  },
+
+  // ============================================================================
   // MASTERCLASS WAITLIST
   // ============================================================================
   {
@@ -1028,6 +1114,14 @@ export function getTemplateIdForLeadStage({
     if (leadStatus !== 'contacted') return 'cv_checklist_first_contact';
     if (count === 0) return 'cv_checklist_follow_up_1';
     return 'cv_checklist_newsletter_bridge';
+  }
+
+  if (source === 'interview_prep') {
+    const count = Math.max(0, followUpCount ?? 0);
+    if (leadStatus === 'new' || !lastContactedAt) return 'interview_prep_first_contact';
+    if (leadStatus !== 'contacted') return 'interview_prep_first_contact';
+    if (count === 0) return 'interview_prep_follow_up_1';
+    return 'interview_prep_newsletter_bridge';
   }
 
   if (source === 'masterclass_waitlist') {

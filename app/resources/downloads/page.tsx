@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   Bell,
+  ClipboardCheck,
   ClipboardList,
   Download,
   FileSearch,
@@ -14,6 +15,7 @@ import Reveal from '@/components/Reveal';
 import LinkedInHeadlineBuilderForm from '@/components/LinkedInHeadlineBuilderForm';
 import First90DaysChecklistForm from '@/components/First90DaysChecklistForm';
 import SaCvChecklistForm from '@/components/SaCvChecklistForm';
+import InterviewPrepChecklistForm from '@/components/InterviewPrepChecklistForm';
 import { GeoArchPattern } from '@/components/DecorativeMotifs';
 
 export const metadata: Metadata = {
@@ -82,8 +84,73 @@ export default function DownloadsPage() {
 
       <section className="bg-[#FCFBFA] py-20 lg:py-28">
         <div className="max-w-[1180px] mx-auto px-6 lg:px-8">
-          <div id="sa-cv-checklist">
+          <div id="interview-prep-checklist">
             <Reveal direction="right">
+              <div className="relative overflow-hidden border border-[#D8C8BB] bg-white p-8 md:p-10 lg:p-12 text-[#142334]">
+                <div className="absolute -right-28 -top-24 h-72 w-72 rounded-full border border-[#E4D8CB] opacity-60" />
+                <div className="grid gap-10 lg:grid-cols-[0.98fr_0.72fr] lg:items-start">
+                  <div>
+                    <ClipboardCheck className="h-9 w-9 text-[#C9AD98]" />
+                    <p className="mt-8 text-[12px] uppercase tracking-[0.24em] font-semibold text-[#C9AD98]">
+                      Available now
+                    </p>
+                    <h2 className="mt-4 max-w-3xl font-serif text-[44px] md:text-[64px] leading-[0.98]">
+                      The Interview Prep Checklist
+                    </h2>
+                    <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-[#142334]/74">
+                      Fifteen checks that tell you if you&apos;re ready before you walk in. Score your readiness in about ten minutes with a simple green, amber, and red system, then close the gaps that matter most.
+                    </p>
+
+                    <div className="mt-8 border-y border-[#D8C8BB] py-6">
+                      <p className="text-[12px] uppercase tracking-[0.2em] font-semibold text-[#C9AD98]">
+                        Inside the PDF
+                      </p>
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        {[
+                          ['15 checks', 'A readiness self-audit across logistics, what you bring to the room, and the SA specifics'],
+                          ['Traffic-light scoring', 'A green, amber, or red light for every check, so you know exactly where you stand'],
+                          ['SA specifics', 'CTC salary expectations, gaps and retrenchment, background checks, and load-shedding plans'],
+                          ['Free', 'Delivered instantly and emailed to your inbox'],
+                        ].map(([label, note]) => (
+                          <div key={label} className="border border-[#D8C8BB] bg-[#FCFBFA] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[#142334]/72">
+                              {label}
+                            </p>
+                            <p className="mt-3 text-[13px] leading-relaxed text-[#142334]/62">
+                              {note}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-5 grid gap-2 sm:grid-cols-4">
+                        {['Logistics', 'In the room', 'SA specifics', 'Your red count'].map((item) => (
+                          <div key={item} className="border border-[#C9AD98]/50 px-3 py-3 text-center">
+                            <span className="text-[11px] uppercase tracking-[0.14em] text-[#8F7462]">
+                              {item}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-[#D8C8BB] bg-[#FCFBFA] p-6 md:p-8 text-[#142334]">
+                    <Download className="h-8 w-8 text-[#C9AD98]" />
+                    <h3 className="mt-6 font-serif text-[34px] md:text-[44px] leading-tight">
+                      Send me the checklist.
+                    </h3>
+                    <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/72">
+                      We&apos;ll email the PDF and give you an instant download link after submission.
+                    </p>
+                    <InterviewPrepChecklistForm source="downloads-page" compact />
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+
+          <div id="sa-cv-checklist">
+            <Reveal direction="right" className="mt-10">
               <div className="relative overflow-hidden bg-[#142334] p-8 md:p-10 lg:p-12 text-white">
                 <div className="grid gap-10 lg:grid-cols-[0.95fr_0.78fr] lg:items-start">
                   <div>

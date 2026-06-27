@@ -114,6 +114,7 @@ function getJoinedLeadSource(row: SentEmailRow) {
   if (searchable.includes('masterclass')) return 'masterclass_waitlist';
   if (searchable.includes('linkedin')) return 'linkedin_headline';
   if (searchable.includes('cv_checklist') || searchable.includes('cv checklist')) return 'cv_checklist';
+  if (searchable.includes('interview_prep') || searchable.includes('interview prep')) return 'interview_prep';
   if (searchable.includes('first_90') || searchable.includes('first 90')) return 'first_90_days';
 
   return normalizeLeadSource(source);
