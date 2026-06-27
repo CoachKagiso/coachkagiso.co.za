@@ -518,6 +518,15 @@ const sourceLeadProfiles: Record<
     diagnosis: 'Lead magnet download from a professional auditing their CV before applying.',
     action: 'Send the CV checklist sequence and offer a CV review or full revamp.',
   },
+  interview_prep: {
+    archetypeKey: 'E',
+    archetypeName: 'Interview Prep Checklist',
+    service: 'Career Clarity Session',
+    href: '/book/clarity',
+    tagline: 'Downloaded the Interview Prep Checklist.',
+    diagnosis: 'Lead magnet download from a professional preparing for an interview.',
+    action: 'Send the interview prep sequence and offer interview-readiness coaching.',
+  },
   masterclass_waitlist: {
     archetypeKey: 'E',
     archetypeName: 'Masterclass Waitlist',

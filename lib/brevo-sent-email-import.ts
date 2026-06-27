@@ -77,6 +77,11 @@ const automatedSubjectMatches: Record<string, TemplateMatch> = {
     archetype: 'SA CV Checklist',
     serviceInterest: 'CV Revamp',
   },
+  'Your Interview Prep Checklist PDF': {
+    templateId: 'automated_interview_prep_delivery',
+    archetype: 'Interview Prep Checklist',
+    serviceInterest: 'Career Clarity Session',
+  },
   'You are on the Saturday Masterclass reserve list': {
     templateId: 'masterclass_waitlist_confirmation',
     archetype: 'Masterclass Waitlist',
@@ -188,6 +193,7 @@ function inferNotificationSource(row: DashboardNotificationCandidateRow) {
   if (row.event_type === 'masterclass_reservation' || combined.includes('masterclass')) return 'masterclass_waitlist';
   if (combined.includes('linkedin')) return 'linkedin_headline';
   if (combined.includes('cv checklist') || combined.includes('cv-checklist')) return 'cv_checklist';
+  if (combined.includes('interview prep') || combined.includes('interview-prep')) return 'interview_prep';
   if (row.event_type === 'lead_magnet_download') return 'first_90_days';
   return 'diagnostic';
 }
@@ -196,6 +202,7 @@ function getNotificationService(source: DiagnosticLeadSource) {
   if (source === 'masterclass_waitlist') return 'Saturday Masterclass';
   if (source === 'linkedin_headline') return 'CV + LinkedIn Bundle';
   if (source === 'cv_checklist') return 'CV Revamp';
+  if (source === 'interview_prep') return 'Career Clarity Session';
   if (source === 'first_90_days') return 'Career Clarity Session';
   return '';
 }
@@ -204,6 +211,7 @@ function getNotificationArchetype(source: DiagnosticLeadSource) {
   if (source === 'masterclass_waitlist') return 'Masterclass Waitlist';
   if (source === 'linkedin_headline') return 'SA LinkedIn Headline Builder';
   if (source === 'cv_checklist') return 'SA CV Checklist';
+  if (source === 'interview_prep') return 'Interview Prep Checklist';
   if (source === 'first_90_days') return 'First 90 Days Checklist';
   return 'Dashboard contact';
 }

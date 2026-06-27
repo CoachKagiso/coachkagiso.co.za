@@ -155,6 +155,7 @@ function getFirstContactTitle(submission: DiagnosticSubmission, clientName: stri
   if (source === 'first_90_days') return `${clientName} - Send First 90 Days checklist email`;
   if (source === 'linkedin_headline') return `${clientName} - Send LinkedIn Builder email`;
   if (source === 'cv_checklist') return `${clientName} - Send CV Checklist email`;
+  if (source === 'interview_prep') return `${clientName} - Send Interview Prep email`;
   if (source === 'masterclass_waitlist') return `${clientName} - Send waitlist confirmation`;
   return `${clientName} - Send first result follow-up`;
 }
@@ -183,6 +184,14 @@ function getFollowUpOneTask(submission: DiagnosticSubmission, clientName: string
       title: `${clientName} - Send CV Checklist follow-up`,
       subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - The checks that quietly cost them`,
       tags: ['FOLLOW-UP', 'CV CHECKLIST', 'DAY 4'],
+    };
+  }
+  if (source === 'interview_prep') {
+    return {
+      id: `interview-prep-followup-${submission.id}`,
+      title: `${clientName} - Send Interview Prep follow-up`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - An interview is rarely lost on the day`,
+      tags: ['FOLLOW-UP', 'INTERVIEW PREP', 'DAY 4'],
     };
   }
   if (source === 'masterclass_waitlist') {
@@ -225,6 +234,14 @@ function getFollowUpTwoTask(submission: DiagnosticSubmission, clientName: string
       title: `${clientName} - Send CV Checklist newsletter bridge`,
       subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
       tags: ['NEWSLETTER', 'CV CHECKLIST', 'DAY 10'],
+    };
+  }
+  if (source === 'interview_prep') {
+    return {
+      id: `interview-prep-newsletter-${submission.id}`,
+      title: `${clientName} - Send Interview Prep newsletter bridge`,
+      subtitle: `${submission.archetype_payload?.service || 'Recommended route'} - Move into newsletter`,
+      tags: ['NEWSLETTER', 'INTERVIEW PREP', 'DAY 10'],
     };
   }
   return {

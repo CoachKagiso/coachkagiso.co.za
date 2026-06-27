@@ -89,6 +89,12 @@ const availableNow = [
     note: 'A fifteen-check self-audit that scores whether your CV gets seen.',
     href: '/resources/downloads#sa-cv-checklist',
   },
+  {
+    label: 'Download',
+    title: 'The Interview Prep Checklist',
+    note: 'A fifteen-check self-audit that scores how ready you are to walk in.',
+    href: '/resources/downloads#interview-prep-checklist',
+  },
 ];
 
 export default function ResourcesPage() {

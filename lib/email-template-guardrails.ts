@@ -45,6 +45,7 @@ export function getLeadEmailSequenceTemplateIds(lead: EmailTemplateGuardrailLead
     source === 'first_90_days' ||
     source === 'linkedin_headline' ||
     source === 'cv_checklist' ||
+    source === 'interview_prep' ||
     source === 'masterclass_waitlist'
   ) {
     return EMAIL_TEMPLATES

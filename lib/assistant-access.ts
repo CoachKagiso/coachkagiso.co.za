@@ -144,6 +144,7 @@ function getRequestedLeadSource(request: AccessRequest): DiagnosticLeadSource | 
   if (/\bmasterclass|waitlist|saturday class|class reserve|reserve list\b/i.test(request.query)) return 'masterclass_waitlist';
   if (/\blinkedin headline|headline builder|linkedin swipe\b/i.test(request.query)) return 'linkedin_headline';
   if (/\bcv checklist|cv check|south african cv|sa cv\b/i.test(request.query)) return 'cv_checklist';
+  if (/\binterview prep|interview checklist|interview ready|interview readiness\b/i.test(request.query)) return 'interview_prep';
   if (/\bfirst 90|90 days|new manager checklist\b/i.test(request.query)) return 'first_90_days';
   if (/\bdiagnostic|career diagnostic|archetype\b/i.test(request.query)) return 'diagnostic';
   return null;

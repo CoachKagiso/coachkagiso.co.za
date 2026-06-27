@@ -86,7 +86,7 @@ export function getEffectiveNextFollowUpAt({
     if (source === 'masterclass_waitlist') return null;
 
     const daysUntilNext =
-      source === 'first_90_days' || source === 'linkedin_headline' || source === 'cv_checklist'
+      source === 'first_90_days' || source === 'linkedin_headline' || source === 'cv_checklist' || source === 'interview_prep'
         ? 5
         : count <= 0
           ? 4
