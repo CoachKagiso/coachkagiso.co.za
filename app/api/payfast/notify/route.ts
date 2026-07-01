@@ -13,32 +13,75 @@ import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditU
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { notifyKagisoPayment } from '@/lib/notifications';
 
+async function logWebhookEvent(values: {
+  payment_id: string | null;
+  service_slug: string | null;
+  payment_status: string | null;
+  result: string;
+  reason: string | null;
+  signature_valid: boolean;
+  raw_payload: Record<string, string>;
+}) {
+  const supabase = createSupabaseServiceClient();
+  await supabase.from('payment_webhook_events').insert({
+    provider: 'payfast',
+    payment_id: values.payment_id,
+    service_slug: values.service_slug,
+    payment_status: values.payment_status,
+    result: values.result,
+    reason: values.reason,
+    signature_valid: values.signature_valid,
+    raw_payload: values.raw_payload,
+  });
+}
+
 export async function POST(request: Request) {
   const body = await request.text();
   const params = new URLSearchParams(body);
   const fields = Object.fromEntries(params.entries());
 
-  if (!validatePayFastSignature(fields)) {
+  const paymentId = fields.m_payment_id || fields.pf_payment_id || null;
+  const serviceSlug = fields.custom_str1 || null;
+  const paymentStatus = fields.payment_status || null;
+
+  const signatureValid = validatePayFastSignature(fields);
+
+  if (!signatureValid) {
     console.warn('PayFast ITN rejected: invalid signature', {
       fieldNames: Object.keys(fields).sort(),
       hasSignature: Boolean(fields.signature),
-      paymentId: fields.m_payment_id || fields.pf_payment_id || null,
-      serviceSlug: fields.custom_str1 || null,
-      paymentStatus: fields.payment_status || null,
+      paymentId,
+      serviceSlug,
+      paymentStatus,
+    });
+    await logWebhookEvent({
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      payment_status: paymentStatus,
+      result: 'rejected',
+      reason: 'invalid_signature',
+      signature_valid: false,
+      raw_payload: fields,
     });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  const paymentStatus = fields.payment_status;
-  const paymentId = fields.m_payment_id || fields.pf_payment_id;
-  const serviceSlug = fields.custom_str1;
   const service = asyncServices[serviceSlug as keyof typeof asyncServices];
 
   if (!paymentId || !service) {
     console.warn('PayFast ITN rejected: missing payment data', {
       hasPaymentId: Boolean(paymentId),
-      serviceSlug: serviceSlug || null,
-      paymentStatus: paymentStatus || null,
+      serviceSlug,
+      paymentStatus,
+    });
+    await logWebhookEvent({
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      payment_status: paymentStatus,
+      result: 'rejected',
+      reason: 'missing_payment_data',
+      signature_valid: true,
+      raw_payload: fields,
     });
     return NextResponse.json({ error: 'Missing payment data' }, { status: 400 });
   }
@@ -69,6 +112,15 @@ export async function POST(request: Request) {
       upgradeToken,
       reason: upgradeOffer?.reason || 'missing',
     });
+    await logWebhookEvent({
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      payment_status: paymentStatus,
+      result: 'rejected',
+      reason: `invalid_upgrade_credit:${upgradeOffer?.reason || 'missing'}`,
+      signature_valid: true,
+      raw_payload: fields,
+    });
     return NextResponse.json({ error: 'Invalid upgrade credit' }, { status: 400 });
   }
 
@@ -78,6 +130,15 @@ export async function POST(request: Request) {
       serviceSlug: service.slug,
       receivedAmount: amount,
       expectedAmount,
+    });
+    await logWebhookEvent({
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      payment_status: paymentStatus,
+      result: 'rejected',
+      reason: `amount_mismatch:received=${amount},expected=${expectedAmount}`,
+      signature_valid: true,
+      raw_payload: fields,
     });
     return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 });
   }
@@ -98,8 +159,27 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error(error);
+    await logWebhookEvent({
+      payment_id: paymentId,
+      service_slug: service.slug,
+      payment_status: paymentStatus,
+      result: 'error',
+      reason: `db_error:${error.message}`,
+      signature_valid: true,
+      raw_payload: fields,
+    });
     return NextResponse.json({ error: 'Could not record payment' }, { status: 500 });
   }
+
+  await logWebhookEvent({
+    payment_id: paymentId,
+    service_slug: service.slug,
+    payment_status: paymentStatus,
+    result: 'accepted',
+    reason: null,
+    signature_valid: true,
+    raw_payload: fields,
+  });
 
   if (isComplete) {
     await ensureClientDeliveryMilestones(supabase, paymentId, service.slug);
