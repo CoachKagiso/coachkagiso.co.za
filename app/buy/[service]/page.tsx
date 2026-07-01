@@ -11,7 +11,6 @@ import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
 import { getContactEmail } from '@/lib/env';
 import { getPaymentProvider, getPaymentProviderName } from '@/lib/payment-provider';
-import { createPayFastCheckoutFields, getPayFastProcessUrl } from '@/lib/payfast';
 import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
 
 type BuyPageProps = {
@@ -69,17 +68,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const manualMessage = `Hi Kagiso, I want to book ${service.title} for ${formatCurrency(checkoutAmount)}. Please send me the next step while online checkout is being activated.`;
   const manualEmailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(`Purchase request: ${service.title}`)}&body=${encodeURIComponent(`${manualMessage}\n\nService: ${service.title}\nAmount: ${formatCurrency(checkoutAmount)}`)}`;
   const manualWhatsAppHref = `https://wa.me/27695124398?text=${encodeURIComponent(manualMessage)}`;
-  const payFastCustomFields = {
-    ...(appliedUpgradeCredit ? { custom_str2: appliedUpgradeCredit.token } : {}),
-    ...(service.slug === 'masterclass' ? { custom_str3: checkoutAmount.toFixed(2) } : {}),
-  };
-  const fields = isPayFastPaymentMode
-    ? createPayFastCheckoutFields(service, paymentId, {
-        amountOverride: checkoutAmount,
-        customFields: Object.keys(payFastCustomFields).length > 0 ? payFastCustomFields : undefined,
-        extraReturnParams: appliedUpgradeCredit ? { upgrade_token: appliedUpgradeCredit.token } : undefined,
-      })
-    : null;
+  const fields = isPayFastPaymentMode || null;
 
   return (
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
@@ -264,10 +253,12 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   </button>
                 </form>
               ) : fields ? (
-                <form action={getPayFastProcessUrl()} method="post" className="mt-8">
-                  {Object.entries(fields).map(([key, value]) => (
-                    <input key={key} type="hidden" name={key} value={value} />
-                  ))}
+                <form action="/api/payfast/checkout" method="post" className="mt-8">
+                  <input type="hidden" name="service_slug" value={service.slug} />
+                  <input type="hidden" name="payment_id" value={paymentId} />
+                  {appliedUpgradeCredit && (
+                    <input type="hidden" name="upgrade_token" value={appliedUpgradeCredit.token} />
+                  )}
                   <button
                     type="submit"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
