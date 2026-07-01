@@ -1,9 +1,9 @@
-export type PaymentProvider = 'manual' | 'payfast' | 'peach';
+export type PaymentProvider = 'manual' | 'payfast';
 
 export function getPaymentProvider(): PaymentProvider {
   const rawProvider = process.env.PAYMENT_PROVIDER?.trim().toLowerCase();
 
-  if (rawProvider === 'manual' || rawProvider === 'payfast' || rawProvider === 'peach') {
+  if (rawProvider === 'manual' || rawProvider === 'payfast') {
     return rawProvider;
   }
 
@@ -15,7 +15,6 @@ export function getPaymentProvider(): PaymentProvider {
 }
 
 export function getPaymentProviderName(provider = getPaymentProvider()) {
-  if (provider === 'peach') return 'Peach Payments';
   if (provider === 'payfast') return 'PayFast';
   return 'manual payment';
 }

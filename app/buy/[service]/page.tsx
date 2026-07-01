@@ -62,7 +62,6 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const paymentProvider = getPaymentProvider();
   const providerName = getPaymentProviderName(paymentProvider);
   const isManualPaymentMode = paymentProvider === 'manual';
-  const isPeachPaymentMode = paymentProvider === 'peach';
   const isPayFastPaymentMode = paymentProvider === 'payfast';
   const contactEmail = getContactEmail();
   const manualMessage = `Hi Kagiso, I want to book ${service.title} for ${formatCurrency(checkoutAmount)}. Please send me the next step while online checkout is being activated.`;
@@ -238,20 +237,6 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     Email purchase request <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </div>
-              ) : isPeachPaymentMode ? (
-                <form action="/api/peach/checkout" method="post" className="mt-8">
-                  <input type="hidden" name="service_slug" value={service.slug} />
-                  <input type="hidden" name="payment_id" value={paymentId} />
-                  {appliedUpgradeCredit && (
-                    <input type="hidden" name="upgrade_token" value={appliedUpgradeCredit.token} />
-                  )}
-                  <button
-                    type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#C9AD98] px-7 py-4 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-white"
-                  >
-                    Continue to Peach <ArrowUpRight className="h-4 w-4" />
-                  </button>
-                </form>
               ) : fields ? (
                 <form action="/api/payfast/checkout" method="post" className="mt-8">
                   <input type="hidden" name="service_slug" value={service.slug} />
@@ -275,9 +260,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               <div className="mt-7 space-y-3 border-t border-white/12 pt-6">
                 {(isManualPaymentMode
                   ? ['No failed checkout page while payment verification is pending', 'Kagiso will reply directly with the safest next step']
-                  : isPeachPaymentMode
-                    ? ['Card, Pay by Bank, Capitec Pay, PayShap, EFT, and enabled Peach options', 'Secure payment reference generated for this order']
-                    : isEventService
+                  : isEventService
                       ? ['Card, EFT, PayShap, and supported PayFast options', 'Secure seat reference generated for this masterclass']
                       : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
                 ).map((item) => (
