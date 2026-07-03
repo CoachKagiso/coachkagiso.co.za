@@ -8,7 +8,7 @@ import {
 } from '@/lib/buying-flow';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { ensureClientDeliveryMilestones } from '@/lib/delivery-milestones';
-import { validatePayFastSignature } from '@/lib/payfast';
+import { validatePayFastSignature, validatePayFastSignatureFromRawBody } from '@/lib/payfast';
 import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { notifyKagisoPayment } from '@/lib/notifications';
@@ -37,6 +37,12 @@ async function logWebhookEvent(values: {
 
 export async function POST(request: Request) {
   const body = await request.text();
+
+  // Log the raw POST body so we can reproduce the signature exactly.
+  // PayFast signs using the raw URL-encoded field values in POST body order.
+  // This log helps diagnose any signature mismatch — compare with Vercel logs.
+  console.info('PayFast ITN raw body:', body);
+
   const params = new URLSearchParams(body);
   const fields = Object.fromEntries(params.entries());
 
@@ -44,7 +50,11 @@ export async function POST(request: Request) {
   const serviceSlug = fields.custom_str1 || null;
   const paymentStatus = fields.payment_status || null;
 
-  const signatureValid = validatePayFastSignature(fields);
+  // Validate signature against the raw body first (most accurate — avoids decode/re-encode).
+  // Fall back to the re-encoded approach for safety.
+  const signatureValid =
+    validatePayFastSignatureFromRawBody(body, fields.signature || '') ||
+    validatePayFastSignature(fields);
 
   if (!signatureValid) {
     console.warn('PayFast ITN rejected: invalid signature', {
