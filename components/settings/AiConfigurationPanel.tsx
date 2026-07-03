@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
-import { OPENROUTER_KIMI_K2_6_FREE_MODEL } from '@/lib/ai-models';
+import { DEFAULT_OPENROUTER_PRIMARY_MODEL } from '@/lib/ai-models';
 
 type AiConfigurationPanelProps = {
   adminKey: string;
@@ -86,7 +86,7 @@ export default function AiConfigurationPanel({ adminKey }: AiConfigurationPanelP
             </label>
             <label className="grid gap-2">
               <span className="studio-label">Production model</span>
-              <input className="studio-input h-11" value={OPENROUTER_KIMI_K2_6_FREE_MODEL} readOnly />
+              <input className="studio-input h-11" value={DEFAULT_OPENROUTER_PRIMARY_MODEL} readOnly />
             </label>
             <p className="text-[12px] leading-relaxed text-[#142334]/62 md:col-span-2">
               Production switch is intentionally code-gated. When GLM 5.2 testing is complete, update the provider constants in the AI route and add the OpenRouter headers.
