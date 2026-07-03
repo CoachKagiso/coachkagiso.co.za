@@ -39,27 +39,91 @@ export function createPayFastSignature(fields: PayFastFields, passphrase?: strin
   return crypto.createHash('md5').update(createSignatureString(fields, passphrase)).digest('hex');
 }
 
+/**
+ * Validates a PayFast ITN signature directly from the raw POST body string.
+ *
+ * This avoids the decode→re-encode round trip (URLSearchParams.parse then
+ * encodeURIComponent) which can introduce subtle encoding mismatches.
+ * Instead, we strip the `&signature=…` pair from the raw body and append
+ * the passphrase — exactly replicating what PayFast's PHP does.
+ */
+export function validatePayFastSignatureFromRawBody(rawBody: string, receivedSignature: string): boolean {
+  if (!receivedSignature) return false;
+
+  const passphrase = process.env.PAYFAST_PASSPHRASE?.trim();
+
+  // Strip the signature field from the raw body, preserving all other fields
+  // and their original URL encoding and order.
+  const withoutSig = rawBody
+    .split('&')
+    .filter((pair) => !pair.startsWith('signature='))
+    .join('&');
+
+  const candidates = [
+    // With passphrase (primary — must match PayFast dashboard setting)
+    passphrase ? `${withoutSig}&passphrase=${encodePayFastValue(passphrase)}` : null,
+    // Without passphrase (fallback — if dashboard has no passphrase set)
+    withoutSig,
+  ].filter(Boolean) as string[];
+
+  const match = candidates.some((sigString) => {
+    const expected = crypto.createHash('md5').update(sigString).digest('hex');
+    return receivedSignature.toLowerCase() === expected.toLowerCase();
+  });
+
+  if (!match) {
+    const candidateHashes = candidates.map((sigString) => ({
+      string: sigString,
+      hash: crypto.createHash('md5').update(sigString).digest('hex'),
+    }));
+    console.info(
+      'PayFast ITN raw-body signature mismatch — received:',
+      receivedSignature,
+      '— candidates:',
+      candidateHashes,
+    );
+  }
+
+  return match;
+}
+
 export function validatePayFastSignature(fields: PayFastFields) {
   const received = fields.signature;
   if (!received) return false;
 
   const passphrase = process.env.PAYFAST_PASSPHRASE?.trim();
-  const allowUnsignedSandboxFallback = isPayFastSandboxMode();
+
+  // Always try: with passphrase (sorted + unsorted) and without passphrase (sorted + unsorted).
+  // This covers: (a) passphrase set correctly, (b) PayFast dashboard has no passphrase set.
+  // Sorted is the correct method for ITN per PayFast docs; unsorted is kept as a fallback.
   const candidates = [
-    createSignatureString(fields, passphrase),
+    // With passphrase — sorted (recommended by PayFast docs for ITN)
     createSignatureString(fields, passphrase, true),
-    ...(allowUnsignedSandboxFallback
-      ? [
-          createSignatureString(fields, undefined),
-          createSignatureString(fields, undefined, true),
-        ]
-      : []),
+    // With passphrase — unsorted (legacy fallback)
+    createSignatureString(fields, passphrase),
+    // Without passphrase — sorted (covers dashboard with no passphrase set)
+    createSignatureString(fields, undefined, true),
+    // Without passphrase — unsorted
+    createSignatureString(fields, undefined),
   ];
 
-  return candidates.some((payload) => {
-    const expected = crypto.createHash('md5').update(payload).digest('hex');
+  const match = candidates.some((sigString) => {
+    const expected = crypto.createHash('md5').update(sigString).digest('hex');
     return received.toLowerCase() === expected.toLowerCase();
   });
+
+  if (!match) {
+    // Log candidate strings to help diagnose passphrase mismatches.
+    // Compare these against the PayFast Signature Tool at:
+    // https://sandbox.payfast.co.za/eng/query/validate
+    const candidateHashes = candidates.map((sigString) => ({
+      string: sigString,
+      hash: crypto.createHash('md5').update(sigString).digest('hex'),
+    }));
+    console.info('PayFast ITN signature mismatch — received:', received, '— candidates:', candidateHashes);
+  }
+
+  return match;
 }
 
 export function getPayFastProcessUrl() {
