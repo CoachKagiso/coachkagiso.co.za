@@ -19,6 +19,7 @@ import WorkTrackNav from '@/components/WorkTrackNav';
 import LinkedInHeadlineBuilderForm from '@/components/LinkedInHeadlineBuilderForm';
 import { ContourField, FlowRibbon, GeoArchPattern } from '@/components/DecorativeMotifs';
 import { getMasterclassPriceLabel, getMasterclassPriceNote } from '@/lib/buying-flow';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 type Service = {
   title: string;
@@ -60,14 +61,14 @@ type Track = {
 export const metadata: Metadata = {
   title: 'Career Coaching & CV Services South Africa | Work With Me',
   description:
-    'Career coaching, CV reviews from R150, LinkedIn optimisation, career clarity sessions, and small-group masterclasses with Coach Kagiso. Services for South African professionals.',
+    'Career coaching, CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more with Coach Kagiso. Services for South African professionals.',
   alternates: {
     canonical: '/work-with-me',
   },
   openGraph: {
     title: 'Career Coaching & CV Services South Africa | Coach Kagiso',
     description:
-      'CV reviews, LinkedIn optimisation, career clarity sessions, and group masterclasses. Pricing from R150.',
+      'CV reviews, LinkedIn optimisation, career clarity sessions, and more. Pricing from R150.',
     url: '/work-with-me',
   },
 };
@@ -244,22 +245,24 @@ const workWithMeFaqs = [
 ];
 
 export default function WorkWithMePage() {
-  const visibleTracks = tracks.map((track) =>
-    track.id === 'masterclass'
-      ? {
-          ...track,
-          services: track.services.map((service) =>
-            service.title === 'Saturday Masterclass'
-              ? {
-                  ...service,
-                  price: getMasterclassPriceLabel(),
-                  note: getMasterclassPriceNote(),
-                }
-              : service,
-          ),
-        }
-      : track,
-  );
+  const visibleTracks = tracks
+    .filter((track) => FEATURE_FLAGS.masterclass || track.id !== 'masterclass')
+    .map((track) =>
+      track.id === 'masterclass'
+        ? {
+            ...track,
+            services: track.services.map((service) =>
+              service.title === 'Saturday Masterclass'
+                ? {
+                    ...service,
+                    price: getMasterclassPriceLabel(),
+                    note: getMasterclassPriceNote(),
+                  }
+                : service,
+            ),
+          }
+        : track,
+    );
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[#FCFBFA] text-[#142334]">

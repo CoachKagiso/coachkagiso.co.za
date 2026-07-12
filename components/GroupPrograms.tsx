@@ -7,6 +7,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import Reveal from '@/components/Reveal';
 import { GeoArchPattern } from '@/components/DecorativeMotifs';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 export default function GroupPrograms() {
   const sectionRef = useRef(null);
@@ -17,6 +18,8 @@ export default function GroupPrograms() {
 
   const parallaxX = useTransform(scrollYProgress, [0, 1], [0, -50]);
   const backgroundY = useTransform(scrollYProgress, [0, 1], ['-4%', '4%']);
+
+  if (!FEATURE_FLAGS.masterclass) return null;
 
   return (
     <section ref={sectionRef} className="relative z-10 min-h-[88vh] overflow-hidden bg-[#E8DDD1]">
