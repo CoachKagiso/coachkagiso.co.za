@@ -1,3 +1,5 @@
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
+
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 
 export type DiagnosticQuestion = {
@@ -177,17 +179,21 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
     ],
     avoidThis:
       'Do not confuse being trusted with still being challenged. Reliability without stretch becomes invisibility over time.',
-    service: 'Saturday Masterclass',
-    href: '/buy/masterclass',
-    cta: 'Reserve my seat',
+    service: FEATURE_FLAGS.masterclass ? 'Saturday Masterclass' : 'Free Discovery Call',
+    href: FEATURE_FLAGS.masterclass ? '/buy/masterclass' : '/book/discovery',
+    cta: FEATURE_FLAGS.masterclass ? 'Reserve my seat' : 'Book discovery',
     nextStepTitle: 'You need a strategic stretch, not another motivation post.',
     nextStepBody:
-      'A live masterclass gives you structure, reflection, and practical prompts so you can stop waiting for growth to appear and start creating a sharper next chapter.',
+      FEATURE_FLAGS.masterclass
+        ? 'A live masterclass gives you structure, reflection, and practical prompts so you can stop waiting for growth to appear and start creating a sharper next chapter.'
+        : 'A short discovery call helps you sense-check whether the plateau is about stretch, visibility, or role fit, then choose a sharper next chapter.',
     secondaryPath: {
-      label: 'Talk it through first',
-      href: '/book/discovery',
-      body: 'If you need to sense-check whether the plateau is about stretch, visibility, or role fit, start with a conversation before you commit.',
-      cta: 'Book discovery',
+      label: FEATURE_FLAGS.masterclass ? 'Talk it through first' : 'Want a deeper lens?',
+      href: FEATURE_FLAGS.masterclass ? '/book/discovery' : '/book/clarity',
+      body: FEATURE_FLAGS.masterclass
+        ? 'If you need to sense-check whether the plateau is about stretch, visibility, or role fit, start with a conversation before you commit.'
+        : 'If the plateau is part of a bigger question about direction, role fit, or identity, take the clarity route next.',
+      cta: FEATURE_FLAGS.masterclass ? 'Book discovery' : 'Book clarity',
     },
     readNextPath: {
       label: 'Read this next',
@@ -441,17 +447,21 @@ export const archetypes: Record<OptionKey, DiagnosticArchetype> = {
     ],
     avoidThis:
       'Do not let good momentum become private momentum. Unspoken goals drift. Named goals tend to gather support and accountability.',
-    service: 'Saturday Masterclass series',
-    href: '/buy/masterclass',
-    cta: 'Reserve my seat',
+    service: FEATURE_FLAGS.masterclass ? 'Saturday Masterclass series' : 'Career Clarity Session',
+    href: FEATURE_FLAGS.masterclass ? '/buy/masterclass' : '/book/clarity',
+    cta: FEATURE_FLAGS.masterclass ? 'Reserve my seat' : 'Book clarity',
     nextStepTitle: 'You are ready for sharper rooms and cleaner accountability.',
     nextStepBody:
-      'The masterclass series gives you focused support around visibility, strategy, and career moves so your existing momentum becomes more deliberate.',
+      FEATURE_FLAGS.masterclass
+        ? 'The masterclass series gives you focused support around visibility, strategy, and career moves so your existing momentum becomes more deliberate.'
+        : 'A clarity session helps you turn your existing momentum into a more deliberate career move, with focused strategy around what to do next.',
     secondaryPath: {
-      label: 'Want a 1:1 lens instead?',
-      href: '/book/clarity',
-      body: 'If your next move is active already and you want tailored strategy rather than a group room, take the clarity route.',
-      cta: 'Book clarity',
+      label: FEATURE_FLAGS.masterclass ? 'Want a 1:1 lens instead?' : 'Talk it through first',
+      href: FEATURE_FLAGS.masterclass ? '/book/clarity' : '/book/discovery',
+      body: FEATURE_FLAGS.masterclass
+        ? 'If your next move is active already and you want tailored strategy rather than a group room, take the clarity route.'
+        : 'If you want to sense-check the direction before booking a focused session, start with a short discovery call.',
+      cta: FEATURE_FLAGS.masterclass ? 'Book clarity' : 'Book discovery',
     },
     readNextPath: {
       label: 'Read this next',
