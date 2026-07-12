@@ -11,18 +11,19 @@ import ResourcesTeaser from '@/components/ResourcesTeaser';
 import GroupPrograms from '@/components/GroupPrograms';
 import ContactForm from '@/components/ContactForm';
 import Footer from '@/components/Footer';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 export const metadata: Metadata = {
   title: 'Coach Kagiso | Career Coach South Africa — CV Reviews, LinkedIn, Clarity Sessions',
   description:
-    'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and group masterclasses. Show up. Stand out. Level up.',
+    'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: 'Coach Kagiso | Career Coach South Africa',
     description:
-      'CV reviews, LinkedIn optimisation, career clarity sessions, and group masterclasses for South African professionals.',
+      'CV reviews, LinkedIn optimisation, career clarity sessions, and more for South African professionals.',
     url: '/',
   },
 };
@@ -37,7 +38,7 @@ export default function Home() {
       <LeadMagnet />
       <About />
       <Testimonials />
-      <GroupPrograms />
+      {FEATURE_FLAGS.masterclass && <GroupPrograms />}
       <ResourcesTeaser />
       <FAQ />
       <ContactForm />

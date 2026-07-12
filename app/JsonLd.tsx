@@ -13,7 +13,7 @@ export function OrganizationJsonLd() {
     name: 'Coach Kagiso',
     url: 'https://coachkagiso.co.za',
     description:
-      'Career development and personal brand coaching for South African professionals. CV reviews, LinkedIn optimisation, clarity sessions, and group masterclasses.',
+      'Career development and personal brand coaching for South African professionals. CV reviews, LinkedIn optimisation, clarity sessions, and more.',
     founder: {
       '@type': 'Person',
       name: 'Kagiso Shabangu',
