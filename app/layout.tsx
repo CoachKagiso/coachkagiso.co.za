@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     default: 'Coach Kagiso | Career Coach South Africa — CV Reviews, LinkedIn, Clarity Sessions',
     template: '%s | Coach Kagiso',
   },
-  description: 'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and group masterclasses. Show up. Stand out. Level up.',
+  description: 'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
   keywords: [
     'career coach south africa',
     'CV review south africa',
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     url: 'https://coachkagiso.co.za',
     siteName: 'Coach Kagiso',
     title: 'Coach Kagiso | Career Coach South Africa',
-    description: 'Career development and personal brand coaching for South African professionals. CV reviews, LinkedIn optimisation, clarity sessions, and group masterclasses.',
+    description: 'Career development and personal brand coaching for South African professionals. CV reviews, LinkedIn optimisation, clarity sessions, and more.',
     images: [
       {
         url: '/og-image.png',

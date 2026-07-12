@@ -13,7 +13,6 @@ const serviceOptions = [
   'CV + LinkedIn Bundle',
   'Career Clarity Session',
   'Glow Up VIP Package',
-  'Saturday Masterclass',
   'Personal Brand Audit or free resource',
   'I am not sure yet',
   'Something else',

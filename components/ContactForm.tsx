@@ -28,7 +28,6 @@ const quickSupportOptions = [
   'CV + LinkedIn Bundle',
   'Career Clarity Session',
   'Glow Up VIP Package',
-  'Saturday Masterclass',
   'Free audit or resources',
   'I am not sure yet',
 ];
