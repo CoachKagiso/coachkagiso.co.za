@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getSiteUrl } from '@/lib/env';
+import { orderPayFastCheckoutFields } from '@/lib/payfast-signature';
 import type { AsyncService } from '@/lib/buying-flow';
 
 type PayFastFields = Record<string, string>;
@@ -151,25 +152,25 @@ export function createPayFastCheckoutFields(
     }
   }
 
-  const fields: PayFastFields = {
+  const fields = orderPayFastCheckoutFields({
     merchant_id: process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '',
     merchant_key: process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_KEY || '',
     return_url: `${siteUrl}/thanks/${service.slug}?${returnParams.toString()}`,
     cancel_url: options.cancelUrlOverride || `${siteUrl}/buy/${service.slug}/failed`,
     notify_url: `${siteUrl}/api/payfast/notify`,
-    m_payment_id: paymentId,
-    amount: (options.amountOverride ?? service.amount).toFixed(2),
-    item_name: service.title,
-    custom_str1: service.slug,
-    ...(options.payer?.email ? { email_address: options.payer.email } : {}),
     ...(options.payer?.name
       ? {
           name_first: options.payer.name.trim().split(/\s+/)[0] || '',
           name_last: options.payer.name.trim().split(/\s+/).slice(1).join(' '),
         }
       : {}),
+    ...(options.payer?.email ? { email_address: options.payer.email } : {}),
+    m_payment_id: paymentId,
+    amount: (options.amountOverride ?? service.amount).toFixed(2),
+    item_name: service.title,
+    custom_str1: service.slug,
     ...(options.customFields || {}),
-  };
+  });
 
   return {
     ...fields,
