@@ -7,6 +7,7 @@ import { FaqJsonLd } from '@/app/JsonLd';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
+import PaymentBranding from '@/components/payment/PaymentBranding';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
 import {
@@ -301,6 +302,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   >
                     Continue to PayFast <ArrowUpRight className="h-4 w-4" />
                   </button>
+                  <PaymentBranding />
                 </form>
               ) : (
                 <div className="mt-8 border border-white/12 bg-white/[0.04] p-4 text-[13px] leading-relaxed text-white/68">
