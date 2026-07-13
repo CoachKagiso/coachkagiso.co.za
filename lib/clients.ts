@@ -295,7 +295,7 @@ export function buildClientList(
         isOverdue,
         daysOverdue: isOverdue && deadlineEnd ? countWorkingDaysAfter(deadlineEnd, new Date()) : 0,
         deadline,
-        hasIntake: Boolean(intake),
+        hasIntake: service?.kind === 'booking' || Boolean(intake),
         intake,
         archetype: diagnostic?.archetype_name || null,
         diagnosticId: diagnostic?.id || null,

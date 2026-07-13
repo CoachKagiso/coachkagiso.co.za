@@ -80,12 +80,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }));
 
   // Service buy pages
-  const buyPages: MetadataRoute.Sitemap = Object.values(asyncServices).map((service) => ({
-    url: `${BASE_URL}/buy/${service.slug}`,
-    lastModified: now,
-    changeFrequency: 'monthly' as const,
-    priority: 0.7,
-  }));
+  const buyPages: MetadataRoute.Sitemap = Object.values(asyncServices)
+    .filter((service) => service.checkoutAccess !== 'accepted_booking')
+    .map((service) => ({
+      url: `${BASE_URL}/buy/${service.slug}`,
+      lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
+    }));
 
   // Booking pages
   const bookPages: MetadataRoute.Sitemap = Object.keys(bookingPages).map(

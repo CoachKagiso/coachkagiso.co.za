@@ -1,6 +1,15 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
+import {
+  BOOKING_PAYMENT_WINDOW_HOURS,
+  createBookingPaymentToken,
+  getBookingPaymentSecret,
+  getBookingPaymentServiceSlug,
+} from '@/lib/booking-payment';
+import { sendTransactionalEmail } from '@/lib/brevo';
+import { asyncServices, formatCurrency } from '@/lib/buying-flow';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
+import { getSiteUrl } from '@/lib/env';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -17,12 +26,14 @@ type CalWebhookPayload = {
   triggerEvent?: string;
   payload?: {
     uid?: string;
+    bookingUid?: string;
     type?: string;
     eventType?: {
       slug?: string;
     };
     attendees?: {
       email?: string;
+      name?: string;
     }[];
     responses?: {
       email?: {
@@ -70,7 +81,7 @@ function getEventSlug(payload: CalWebhookPayload) {
 
 function getBookingUid(payload: CalWebhookPayload) {
   const booking = getBookingPayload(payload);
-  return booking.uid || 'unknown';
+  return booking.uid || booking.bookingUid || '';
 }
 
 function getBookerEmail(payload: CalWebhookPayload) {
@@ -78,6 +89,86 @@ function getBookerEmail(payload: CalWebhookPayload) {
   const attendeeEmail = booking.attendees?.find((attendee) => attendee.email)?.email;
   const responseEmail = booking.responses?.email?.value;
   return String(attendeeEmail || responseEmail || '').toLowerCase().trim();
+}
+
+function getBookerName(payload: CalWebhookPayload) {
+  const booking = getBookingPayload(payload);
+  return String(booking.attendees?.find((attendee) => attendee.email)?.name || '').trim();
+}
+
+async function sendAcceptedBookingPaymentLink(input: {
+  payload: CalWebhookPayload;
+  eventSlug: string;
+  bookingUid: string;
+  email: string;
+}) {
+  const serviceSlug = getBookingPaymentServiceSlug(input.eventSlug);
+  if (!serviceSlug) return null;
+
+  const service = asyncServices[serviceSlug];
+  const secret = getBookingPaymentSecret();
+  if (!secret) {
+    console.error('Accepted booking payment link could not be created: token secret is missing');
+    return { sent: false, paymentUrl: null, service };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { data: existingDelivery } = await supabase
+    .from('webhook_logs')
+    .select('id')
+    .eq('source', 'cal')
+    .eq('event_type', 'PAYMENT_LINK_SENT')
+    .eq('booking_uid', input.bookingUid)
+    .limit(1)
+    .maybeSingle();
+
+  const name = getBookerName(input.payload);
+  const token = createBookingPaymentToken(
+    {
+      serviceSlug,
+      bookingUid: input.bookingUid,
+      email: input.email,
+      name,
+    },
+    secret,
+  );
+  const paymentUrl = `${getSiteUrl()}/buy/${serviceSlug}?booking_token=${encodeURIComponent(token)}`;
+
+  if (existingDelivery) {
+    return { sent: true, paymentUrl, service, duplicate: true };
+  }
+
+  const firstName = name.split(/\s+/)[0] || 'there';
+  const delivery = await sendTransactionalEmail({
+    to: [{ email: input.email, name: name || undefined }],
+    subject: `Your ${service.title} request was accepted - payment is the final step`,
+    text: `Hi ${firstName},
+
+Kagiso has accepted your requested appointment for ${service.title}.
+
+Complete the final payment step here to confirm your appointment:
+${paymentUrl}
+
+Amount: ${formatCurrency(service.amount)}
+This private payment link is valid for ${BOOKING_PAYMENT_WINDOW_HOURS} hours.
+
+You do not need to submit your details again. The information you shared with your booking request is already connected to the appointment.
+
+Talk soon,
+Kagiso`,
+  });
+
+  await logWebhookEvent({
+    source: 'cal',
+    event_type: delivery ? 'PAYMENT_LINK_SENT' : 'PAYMENT_LINK_SEND_FAILED',
+    booking_uid: input.bookingUid,
+    email: input.email,
+    matched: true,
+    payload: input.payload,
+    error: delivery ? null : 'Brevo did not confirm payment-link email delivery',
+  });
+
+  return { sent: Boolean(delivery), paymentUrl, service, duplicate: false };
 }
 
 async function logWebhookEvent(values: WebhookLogValues) {
@@ -117,7 +208,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (payload.triggerEvent !== 'BOOKING_CREATED') {
+  if (payload.triggerEvent !== 'BOOKING_CREATED' && payload.triggerEvent !== 'BOOKING_CONFIRMED') {
     return NextResponse.json({ received: true });
   }
 
@@ -125,6 +216,20 @@ export async function POST(request: Request) {
   const bookingUid = getBookingUid(payload);
   const bookerEmail = getBookerEmail(payload);
   const serviceLabel = EVENT_SLUG_MAP[eventSlug] || eventSlug || 'unknown';
+
+  if (!bookingUid) {
+    await logWebhookEvent({
+      source: 'cal',
+      event_type: eventSlug || null,
+      booking_uid: null,
+      email: bookerEmail || null,
+      matched: false,
+      payload,
+      error: 'No booking UID in payload',
+    });
+    console.warn('Cal booking received with no booking UID', { eventSlug });
+    return NextResponse.json({ received: true });
+  }
 
   if (!bookerEmail) {
     await logWebhookEvent({
@@ -138,6 +243,32 @@ export async function POST(request: Request) {
     });
     console.warn('Cal booking received with no attendee email', { bookingUid, eventSlug });
     return NextResponse.json({ received: true });
+  }
+
+  const paymentLink = await sendAcceptedBookingPaymentLink({
+    payload,
+    eventSlug,
+    bookingUid,
+    email: bookerEmail,
+  });
+
+  if (paymentLink && !paymentLink.duplicate) {
+    await recordDashboardNotification({
+      eventType: 'cal_booking',
+      source: 'cal-webhook',
+      title: `${paymentLink.sent ? 'Payment link sent' : 'Payment link needs forwarding'} - ${paymentLink.service.title}`,
+      description: paymentLink.sent
+        ? `${bookerEmail} received the private checkout link after the booking was accepted.`
+        : `The automatic email could not be confirmed. Open this notification and forward the private checkout link to ${bookerEmail}.`,
+      contactName: getBookerName(payload) || null,
+      contactEmail: bookerEmail,
+      href: paymentLink.paymentUrl,
+      metadata: {
+        bookingUid,
+        eventSlug,
+        paymentLinkSent: paymentLink.sent,
+      },
+    });
   }
 
   const supabase = createSupabaseServiceClient();

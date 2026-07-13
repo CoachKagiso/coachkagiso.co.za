@@ -325,7 +325,7 @@ export default function FinanceTab({
   const awaitingIntake = useMemo(
     () =>
       confirmedOperations.filter(
-        (operation) => !operation.payment.intake_submitted_at && !operation.intake,
+        (operation) => operation.requiresIntake && !operation.payment.intake_submitted_at && !operation.intake,
       ),
     [confirmedOperations],
   );
@@ -334,7 +334,7 @@ export default function FinanceTab({
     () =>
       confirmedOperations.filter(
         (operation) =>
-          Boolean(operation.payment.intake_submitted_at || operation.intake) &&
+          Boolean(!operation.requiresIntake || operation.payment.intake_submitted_at || operation.intake) &&
           operation.payment.delivery_status !== 'delivered' &&
           operation.payment.delivery_status !== 'cancelled',
       ),

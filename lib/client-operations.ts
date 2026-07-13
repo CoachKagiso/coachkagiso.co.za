@@ -37,6 +37,7 @@ export type IntakeSubmissionRecord = {
 export type ClientOperation = {
   payment: PaymentRecord;
   intake: IntakeSubmissionRecord | null;
+  requiresIntake: boolean;
   serviceTitle: string;
   amountLabel: string;
   deliveryDueAt: string | null;
@@ -93,14 +94,16 @@ function addDaysIso(dateValue: string | null, days: number) {
   return getDeadlineDate(days, new Date(dateValue)).toISOString();
 }
 
-export function getDeliveryState(operation: Pick<ClientOperation, 'payment' | 'intake' | 'deliveryDueAt'>) {
-  const { payment, intake, deliveryDueAt } = operation;
+export function getDeliveryState(
+  operation: Pick<ClientOperation, 'payment' | 'intake' | 'deliveryDueAt'> & { requiresIntake?: boolean },
+) {
+  const { payment, intake, deliveryDueAt, requiresIntake = true } = operation;
 
   if (payment.status === 'failed') return 'failed';
   if (payment.delivery_status === 'cancelled') return 'cancelled';
   if (payment.delivery_status === 'delivered') return 'delivered';
   if (payment.delivery_status === 'in_progress') return 'in_progress';
-  if (payment.status === 'confirmed' && !intake) return 'waiting_for_intake';
+  if (payment.status === 'confirmed' && requiresIntake && !intake) return 'waiting_for_intake';
   if (!deliveryDueAt) return 'ready';
 
   const dueAt = new Date(deliveryDueAt).getTime();
@@ -209,12 +212,14 @@ export async function listClientOperations(filters: ClientOperationFilters = {})
     const payment = normalizePayment(row);
     const service = asyncServices[payment.service_slug];
     const intake = intakes[payment.payment_id] || null;
+    const requiresIntake = service?.kind !== 'booking';
     const deliveryDueAt = addDaysIso(payment.confirmed_at || payment.created_at, service?.deliveryDays || 0);
-    const deliveryState = getDeliveryState({ payment, intake, deliveryDueAt });
+    const deliveryState = getDeliveryState({ payment, intake, deliveryDueAt, requiresIntake });
 
     return {
       payment,
       intake,
+      requiresIntake,
       serviceTitle: service?.title || payment.service_slug,
       amountLabel: formatCurrency(payment.amount),
       deliveryDueAt,
