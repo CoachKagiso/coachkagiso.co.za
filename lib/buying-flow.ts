@@ -1,4 +1,12 @@
-export type AsyncServiceSlug = 'cv-review' | 'cv-revamp' | 'cover-letter' | 'linkedin' | 'bundle' | 'masterclass';
+export type AsyncServiceSlug =
+  | 'cv-review'
+  | 'cv-revamp'
+  | 'cover-letter'
+  | 'linkedin'
+  | 'bundle'
+  | 'masterclass'
+  | 'career-clarity'
+  | 'glow-up-vip';
 export type BookingSlug = 'discovery' | 'clarity' | 'glow-up';
 
 export type IntakeField = {
@@ -20,7 +28,8 @@ export type AsyncService = {
   slug: AsyncServiceSlug;
   title: string;
   amount: number;
-  kind?: 'delivery' | 'event';
+  kind?: 'delivery' | 'event' | 'booking';
+  checkoutAccess?: 'public' | 'accepted_booking';
   turnaround: string;
   deliveryDays: number;
   summary: string;
@@ -386,6 +395,66 @@ If anything important changes about the roles you are targeting, reply to this e
 
 Talk soon,
 Kagiso`,
+  },
+  'career-clarity': {
+    slug: 'career-clarity',
+    title: 'Career Clarity Session',
+    amount: 800,
+    kind: 'booking',
+    checkoutAccess: 'accepted_booking',
+    turnaround: '75-minute private session',
+    deliveryDays: 1,
+    buyCta: 'Pay to confirm my session',
+    folder: 'career-clarity',
+    requiresCvUpload: false,
+    summary: 'Your requested time has been accepted. Complete payment to confirm your 75-minute Career Clarity Session.',
+    fields: [],
+    faqs: [
+      {
+        question: 'Why can I only pay from my acceptance email?',
+        answer: 'The private payment link is tied to the time Kagiso accepted for you, so payment confirms the correct appointment.',
+      },
+      {
+        question: 'Do I need to send my details again?',
+        answer: 'No. The details you submitted with your Cal.com request are already connected to your appointment.',
+      },
+      {
+        question: 'When is my appointment confirmed?',
+        answer: 'Your accepted time is fully confirmed once PayFast confirms the payment.',
+      },
+    ],
+    confirmationSubject: 'Your Career Clarity Session is confirmed',
+    confirmationBody: (firstName) => `Hi ${firstName},\n\nYour Career Clarity Session is paid and confirmed. Your appointment details remain in your Cal.com confirmation.\n\nTalk soon,\nKagiso`,
+  },
+  'glow-up-vip': {
+    slug: 'glow-up-vip',
+    title: 'Glow Up VIP Package',
+    amount: 1200,
+    kind: 'booking',
+    checkoutAccess: 'accepted_booking',
+    turnaround: '30-day support package',
+    deliveryDays: 30,
+    buyCta: 'Pay to confirm my package',
+    folder: 'glow-up-vip',
+    requiresCvUpload: false,
+    summary: 'Your kick-off request has been accepted. Complete payment to confirm your Glow Up VIP Package.',
+    fields: [],
+    faqs: [
+      {
+        question: 'Why can I only pay from my acceptance email?',
+        answer: 'The private payment link is tied to the kick-off time Kagiso accepted for you.',
+      },
+      {
+        question: 'Do I need to send my details again?',
+        answer: 'No. The details you submitted with your Cal.com request are already connected to your package.',
+      },
+      {
+        question: 'When does the package start?',
+        answer: 'Payment confirms the accepted kick-off appointment. The 30-day support journey starts from that agreed handoff.',
+      },
+    ],
+    confirmationSubject: 'Your Glow Up VIP Package is confirmed',
+    confirmationBody: (firstName) => `Hi ${firstName},\n\nYour Glow Up VIP Package is paid and confirmed. Your kick-off appointment details remain in your Cal.com confirmation.\n\nTalk soon,\nKagiso`,
   },
   masterclass: {
     slug: 'masterclass',

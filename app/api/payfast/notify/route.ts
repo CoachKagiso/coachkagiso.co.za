@@ -219,7 +219,9 @@ export async function POST(request: Request) {
       eventType: 'payment_confirmed',
       source: 'payfast-itn',
       title: `New payment - ${service.title}`,
-      description: `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. Watch for the intake form.`,
+      description: service.kind === 'booking'
+        ? `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. The accepted appointment is confirmed; no additional intake is required.`
+        : `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. Watch for the intake form.`,
       contactName: buyerName || null,
       contactEmail: buyerEmail || null,
       href: buyerEmail ? `mailto:${buyerEmail}?subject=${encodeURIComponent(`Next steps for ${service.title}`)}` : null,

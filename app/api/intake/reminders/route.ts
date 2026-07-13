@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   for (const payment of data || []) {
     const service = asyncServices[payment.service_slug as keyof typeof asyncServices];
-    if (!service) continue;
+    if (!service || service.kind === 'booking') continue;
 
     await sendTransactionalEmail({
       to: [{ email: getContactEmail(), name: 'Coach Kagiso' }],

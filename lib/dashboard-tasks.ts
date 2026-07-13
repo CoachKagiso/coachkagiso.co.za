@@ -540,7 +540,7 @@ export function generateTasks(
 
     if (operation.payment.status !== 'confirmed') return;
 
-    if (!operation.intake && operation.payment.delivery_status !== 'delivered' && operation.payment.delivery_status !== 'cancelled') {
+    if (operation.requiresIntake && !operation.intake && operation.payment.delivery_status !== 'delivered' && operation.payment.delivery_status !== 'cancelled') {
       tasks.push(
         buildTask({
           id: `delivery-chase-intake-${operation.payment.payment_id}`,
@@ -561,7 +561,7 @@ export function generateTasks(
       );
     }
 
-    if (operation.intake && operation.payment.delivery_status === 'not_started') {
+    if ((!operation.requiresIntake || operation.intake) && operation.payment.delivery_status === 'not_started') {
       tasks.push(
         buildTask({
           id: `delivery-start-${operation.payment.payment_id}`,

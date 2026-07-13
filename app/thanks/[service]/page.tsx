@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
 import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
+import { getBookingPaymentId, getBookingPaymentSecret, verifyBookingPaymentToken } from '@/lib/booking-payment';
 import { isPayFastSandboxMode } from '@/lib/payfast';
 import { CV_REVIEW_REVAMP_AMOUNT_DUE, ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -12,7 +13,7 @@ import IntakeForm from './IntakeForm';
 
 type ThanksPageProps = {
   params: Promise<{ service: string }>;
-  searchParams: Promise<{ payment_id?: string; upgrade_token?: string }>;
+  searchParams: Promise<{ payment_id?: string; upgrade_token?: string; booking_token?: string }>;
 };
 
 const INTAKE_ACCESS_WINDOW_DAYS = 14;
@@ -61,12 +62,20 @@ async function validatePayment(serviceSlug: string, paymentId?: string) {
   };
 }
 
-async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upgradeToken?: string) {
+async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upgradeToken?: string, bookingToken?: string) {
   const service = getAsyncService(serviceSlug);
   const isSandbox = isPayFastSandboxMode();
   const isGeneratedPaymentId = paymentId?.startsWith(`${service?.slug}-`);
+  const bookingClaims = service?.checkoutAccess === 'accepted_booking'
+    ? verifyBookingPaymentToken(bookingToken || '', getBookingPaymentSecret())
+    : null;
+  const hasValidBookingAccess = service?.checkoutAccess !== 'accepted_booking' || Boolean(
+    bookingClaims &&
+    bookingClaims.serviceSlug === service.slug &&
+    paymentId === getBookingPaymentId(bookingClaims.serviceSlug, bookingClaims.bookingUid)
+  );
 
-  if (!service || !paymentId || !isSandbox || !isGeneratedPaymentId) {
+  if (!service || !paymentId || !isSandbox || !isGeneratedPaymentId || !hasValidBookingAccess) {
     return false;
   }
 
@@ -104,14 +113,21 @@ async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upg
 
 export default async function ThanksPage({ params, searchParams }: ThanksPageProps) {
   const { service: serviceSlug } = await params;
-  const { payment_id: paymentId, upgrade_token: upgradeToken } = await searchParams;
+  const { payment_id: paymentId, upgrade_token: upgradeToken, booking_token: bookingToken } = await searchParams;
   let { service, valid } = await validatePayment(serviceSlug, paymentId);
-  if (!valid && (await confirmSandboxReturn(serviceSlug, paymentId, upgradeToken))) {
+  if (!valid && (await confirmSandboxReturn(serviceSlug, paymentId, upgradeToken, bookingToken))) {
     valid = true;
   }
   if (!service) notFound();
   const isEventService = service.kind === 'event';
-  const handoffItems = isEventService
+  const isAppointmentService = service.kind === 'booking';
+  const handoffItems = isAppointmentService
+    ? [
+        { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your PayFast reference is connected to the appointment Kagiso accepted.' },
+        { icon: CheckCircle2, label: 'Time secured', detail: 'You do not need to book again or repeat the information you already submitted.' },
+        { icon: Clock3, label: 'Appointment next', detail: `Your service: ${service.turnaround}. Keep the Cal.com confirmation for the agreed date and time.` },
+      ]
+    : isEventService
     ? [
         { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your checkout reference is attached to this seat.' },
         { icon: FileText, label: 'Prep form submitted here', detail: 'Share the context Kagiso needs to shape the live room.' },
@@ -122,7 +138,22 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
         { icon: FileText, label: 'Brief submitted here', detail: 'Share the role context, links, and file Kagiso needs.' },
         { icon: Clock3, label: 'Delivery window begins', detail: `Expected turnaround: ${service.turnaround}.` },
       ];
-  const beforeSubmitFaqs = isEventService
+  const beforeSubmitFaqs = isAppointmentService
+    ? [
+        {
+          question: 'Do I need to fill in another form?',
+          answer: 'No. The information from your accepted Cal.com request is already connected to the appointment.',
+        },
+        {
+          question: 'Where are my appointment details?',
+          answer: 'Use the Cal.com confirmation for the accepted date, time, and meeting information.',
+        },
+        {
+          question: 'What if I need to change something?',
+          answer: 'Reply to your confirmation email or WhatsApp Kagiso before the appointment.',
+        },
+      ]
+    : isEventService
     ? [
         {
           question: 'Why do I need to complete this?',
@@ -173,10 +204,16 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
               Payment secured
             </p>
             <h1 className="mt-7 font-serif text-[50px] leading-[0.98] md:text-[76px]">
-              {isEventService ? 'Your seat is secured. Let&apos;s shape the room.' : 'Your order is in. Let&apos;s make the brief count.'}
+              {isAppointmentService
+                ? 'Your appointment is accepted, paid, and confirmed.'
+                : isEventService
+                  ? 'Your seat is secured. Let&apos;s shape the room.'
+                  : 'Your order is in. Let&apos;s make the brief count.'}
             </h1>
             <p className="mt-7 max-w-2xl text-[18px] leading-relaxed text-[#142334]/76">
-              {isEventService
+              {isAppointmentService
+                ? `I've received your payment for ${service.title}. You do not need to submit your details or choose a time again.`
+                : isEventService
                 ? `I've received your payment for ${service.title}. The short prep form below gives Kagiso the context she needs before the live session.`
                 : `I've received your payment for ${service.title}. The short intake below gives Kagiso the context she needs to deliver sharp, tailored work within ${service.turnaround}.`}
             </p>
@@ -190,11 +227,13 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
             <div className="lg:sticky lg:top-28">
               <div className="border border-[#D8C8BB] bg-white p-6 md:p-7">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
-                  {isEventService ? 'Seat handoff' : 'Order handoff'}
+                  {isAppointmentService ? 'Appointment handoff' : isEventService ? 'Seat handoff' : 'Order handoff'}
                 </p>
                 <h2 className="mt-4 font-serif text-[38px] leading-tight">{service.turnaround}</h2>
                 <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
-                  {isEventService
+                  {isAppointmentService
+                    ? 'The accepted Cal.com time and your payment now form one confirmed appointment.'
+                    : isEventService
                     ? 'Your seat is confirmed. These prep notes help Kagiso make the session more specific and useful.'
                     : 'Your delivery clock starts once the intake form and required file are received.'}
                 </p>
@@ -217,7 +256,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
               </div>
               <div className="mt-5 border border-[#D8C8BB] bg-white p-6 md:p-7">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#C9AD98]">
-                  Before you submit
+                  {isAppointmentService ? 'What happens now' : 'Before you submit'}
                 </p>
                 <div className="mt-5 space-y-4">
                   {beforeSubmitFaqs.map((item) => (
@@ -239,7 +278,20 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
           </Reveal>
 
           <Reveal direction="left" delay={0.08}>
-            {valid && paymentId ? (
+            {valid && paymentId && isAppointmentService ? (
+              <div role="status" className="border border-[#D8C8BB] bg-white p-7 md:p-9">
+                <CheckCircle2 className="h-10 w-10 text-[#C9AD98]" />
+                <h2 className="mt-5 font-serif text-[36px] leading-tight text-[#142334]">
+                  No more forms. You&apos;re confirmed.
+                </h2>
+                <p className="mt-5 text-[17px] leading-relaxed text-[#142334]/72">
+                  Keep your Cal.com confirmation for the accepted date, time, and meeting details. Kagiso now has the information you submitted and the confirmed payment for this appointment.
+                </p>
+                <p className="mt-5 border-t border-[#142334]/10 pt-5 text-[13px] leading-relaxed text-[#142334]/58">
+                  Payment reference: {paymentId}
+                </p>
+              </div>
+            ) : valid && paymentId ? (
               <IntakeForm service={getIntakeService(service)} paymentId={paymentId} />
             ) : (
               <div className="border border-[#D8C8BB] bg-white p-7 md:p-9">

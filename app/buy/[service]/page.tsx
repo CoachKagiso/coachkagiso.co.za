@@ -9,13 +9,19 @@ import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
+import {
+  getBookingPaymentId,
+  getBookingPaymentSecret,
+  verifyBookingPaymentToken,
+} from '@/lib/booking-payment';
 import { getContactEmail } from '@/lib/env';
 import { getPaymentProvider, getPaymentProviderName } from '@/lib/payment-provider';
 import { getUpgradeOfferByToken } from '@/lib/upgrade-credits';
+import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 type BuyPageProps = {
   params: Promise<{ service: string }>;
-  searchParams: Promise<{ upgrade_token?: string }>;
+  searchParams: Promise<{ upgrade_token?: string; booking_token?: string }>;
 };
 
 export function generateStaticParams() {
@@ -40,12 +46,13 @@ export async function generateMetadata({ params }: BuyPageProps): Promise<Metada
       description: service.summary,
       url: `/buy/${serviceSlug}`,
     },
+    robots: service.checkoutAccess === 'accepted_booking' ? { index: false, follow: false } : undefined,
   };
 }
 
 export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const { service: serviceSlug } = await params;
-  const { upgrade_token: upgradeToken } = await searchParams;
+  const { upgrade_token: upgradeToken, booking_token: bookingToken = '' } = await searchParams;
   const service = getAsyncService(serviceSlug);
   if (!service) notFound();
 
@@ -57,8 +64,23 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const hasAppliedUpgrade = Boolean(appliedUpgradeCredit);
   const serviceCheckoutAmount = getServiceCheckoutAmount(service);
   const checkoutAmount = appliedUpgradeCredit?.discounted_amount ?? serviceCheckoutAmount;
-  const paymentId = `${service.slug}-${randomUUID()}`;
+  const bookingClaims = service.checkoutAccess === 'accepted_booking'
+    ? verifyBookingPaymentToken(bookingToken, getBookingPaymentSecret())
+    : null;
+  const hasValidBookingAccess = service.checkoutAccess !== 'accepted_booking' || bookingClaims?.serviceSlug === service.slug;
+  const paymentId = bookingClaims
+    ? getBookingPaymentId(bookingClaims.serviceSlug, bookingClaims.bookingUid)
+    : `${service.slug}-${randomUUID()}`;
   const isEventService = service.kind === 'event';
+  const isAppointmentService = service.kind === 'booking';
+  const { data: existingPayment } = bookingClaims
+    ? await createSupabaseServiceClient()
+        .from('payments')
+        .select('status')
+        .eq('payment_id', paymentId)
+        .maybeSingle()
+    : { data: null };
+  const isAlreadyPaid = existingPayment?.status === 'confirmed';
   const paymentProvider = getPaymentProvider();
   const providerName = getPaymentProviderName(paymentProvider);
   const isManualPaymentMode = paymentProvider === 'manual';
@@ -105,6 +127,8 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               <h2 className="mt-4 font-serif text-[40px] leading-tight text-[#142334]">
                 {isManualPaymentMode
                   ? 'A direct handoff while checkout is being activated.'
+                  : isAppointmentService
+                    ? 'Your time is accepted. Payment confirms it.'
                   : isEventService
                     ? 'Secure your seat, then share your prep notes.'
                     : 'A clear handoff after checkout.'}
@@ -112,6 +136,8 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               <p className="mt-4 text-[16px] leading-relaxed text-[#142334]/68">
                 {isManualPaymentMode
                   ? 'Online payment is being activated. Send Kagiso a purchase request and she will reply with the next step directly.'
+                  : isAppointmentService
+                    ? `Your requested time has been accepted. Pay securely through ${providerName} to confirm it; you will not need to submit your details again.`
                   : isEventService
                     ? `You will pay securely through ${providerName}, then return to a short prep form connected to your seat.`
                     : `You will pay securely through ${providerName}, then return to a private intake page connected to this order.`}
@@ -137,10 +163,14 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     : { icon: LockKeyhole, title: 'Secure payment', detail: `Complete checkout through ${providerName} using the supported card, EFT, bank, or wallet options enabled for Coach Kagiso.` },
                   isManualPaymentMode
                     ? { icon: FileText, title: 'Brief follows manually', detail: 'Once the payment route is confirmed, Kagiso will send the correct intake instructions for this service.' }
+                    : isAppointmentService
+                      ? { icon: FileText, title: 'No repeated form', detail: 'The details from your accepted Cal.com request stay connected to this appointment.' }
                     : isEventService
                       ? { icon: FileText, title: 'Prep form', detail: 'Return automatically to the short prep form with your payment reference already attached.' }
                       : { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
-                  isEventService
+                  isAppointmentService
+                    ? { icon: Clock3, title: 'Appointment confirmed', detail: 'Payment secures the time Kagiso already accepted for you.' }
+                    : isEventService
                     ? { icon: Clock3, title: 'Session access', detail: `The live session is ${service.turnaround}.` }
                     : { icon: Clock3, title: 'Delivery starts', detail: `Your ${service.turnaround} turnaround begins once the brief and required file are submitted.` },
                 ].map((step, index) => {
@@ -207,7 +237,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 </p>
               )}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
-                {isEventService ? 'Session' : 'Turnaround'}: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : `Payment is processed securely by ${providerName}.`}
+                {isAppointmentService ? 'Service' : isEventService ? 'Session' : 'Turnaround'}: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : `Payment is processed securely by ${providerName}.`}
               </p>
               <div className="mt-6 border border-white/12 bg-white/[0.04] p-4">
                 <div className="flex items-start gap-3">
@@ -215,6 +245,8 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   <p className="text-[13px] leading-relaxed text-white/68">
                     {isManualPaymentMode
                       ? 'Online checkout is temporarily paused for merchant verification. Your message keeps your place in the queue without sending you through a broken payment screen.'
+                      : isAppointmentService
+                        ? 'This private checkout is tied to your accepted booking. Your appointment is confirmed once PayFast confirms payment.'
                       : isEventService
                         ? 'After payment, your reference unlocks the prep form. Your spot is secured once PayFast confirms the payment.'
                         : 'After payment, your order reference unlocks the intake page. You will also receive a confirmation email after submitting your brief.'}
@@ -222,7 +254,23 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 </div>
               </div>
 
-              {isManualPaymentMode ? (
+              {!hasValidBookingAccess ? (
+                <div role="alert" className="mt-8 border border-white/18 bg-white/[0.06] p-5">
+                  <p className="text-[14px] font-semibold text-white">This private payment link is unavailable.</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-white/68">
+                    It may have expired or been copied incorrectly. Reply to your acceptance email or WhatsApp Kagiso for a fresh link.
+                  </p>
+                </div>
+              ) : isAlreadyPaid ? (
+                <div role="status" className="mt-8 border border-[#C9AD98]/45 bg-white/[0.06] p-5">
+                  <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
+                    <CheckCircle2 className="h-5 w-5 text-[#C9AD98]" /> Payment already confirmed
+                  </p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-white/68">
+                    This accepted appointment has already been paid. No second payment is needed.
+                  </p>
+                </div>
+              ) : isManualPaymentMode ? (
                 <div className="mt-8 grid gap-3">
                   <a
                     href={manualWhatsAppHref}
@@ -241,6 +289,9 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 <form action="/api/payfast/checkout" method="post" className="mt-8">
                   <input type="hidden" name="service_slug" value={service.slug} />
                   <input type="hidden" name="payment_id" value={paymentId} />
+                  {bookingToken && (
+                    <input type="hidden" name="booking_token" value={bookingToken} />
+                  )}
                   {appliedUpgradeCredit && (
                     <input type="hidden" name="upgrade_token" value={appliedUpgradeCredit.token} />
                   )}
@@ -260,7 +311,9 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               <div className="mt-7 space-y-3 border-t border-white/12 pt-6">
                 {(isManualPaymentMode
                   ? ['No failed checkout page while payment verification is pending', 'Kagiso will reply directly with the safest next step']
-                  : isEventService
+                    : isAppointmentService
+                      ? ['Private link tied to your accepted booking', 'No need to submit your details again']
+                    : isEventService
                       ? ['Card, EFT, PayShap, and supported PayFast options', 'Secure seat reference generated for this masterclass']
                       : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
                 ).map((item) => (

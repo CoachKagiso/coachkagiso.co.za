@@ -40,6 +40,17 @@ export const DELIVERY_MILESTONES: Record<string, MilestoneTemplate[]> = {
     { stageName: 'Session link sent', stageOrder: 3 },
     { stageName: 'Follow-up pack sent', stageOrder: 4 },
   ],
+  'career-clarity': [
+    { stageName: 'Booking accepted', stageOrder: 1 },
+    { stageName: 'Payment confirmed', stageOrder: 2 },
+    { stageName: 'Session completed', stageOrder: 3 },
+  ],
+  'glow-up-vip': [
+    { stageName: 'Kick-off accepted', stageOrder: 1 },
+    { stageName: 'Payment confirmed', stageOrder: 2 },
+    { stageName: '30-day support active', stageOrder: 3 },
+    { stageName: 'Package completed', stageOrder: 4 },
+  ],
 };
 
 type ClientDeliveryInsert = {

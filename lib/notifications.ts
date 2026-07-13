@@ -76,7 +76,13 @@ export async function notifyKagisoPayment(input: {
   const timestamp = input.timestamp ?? new Date();
   const amount = input.amount ?? input.service.amount;
   const isEventService = input.service.kind === 'event';
-  const deadline = isEventService ? '' : formatDeadline(input.service, timestamp);
+  const isAppointmentService = input.service.kind === 'booking';
+  const deadline = isEventService || isAppointmentService ? '' : formatDeadline(input.service, timestamp);
+  const paymentNextStep = isAppointmentService
+    ? 'The accepted appointment is now paid. No additional intake form is required.'
+    : isEventService
+      ? 'Watch for the prep form before sending final session details.'
+      : 'Watch for the intake form before starting delivery.';
 
   await sendTransactionalEmail({
     to: [
@@ -91,20 +97,20 @@ Email: ${input.email || 'Not supplied'}
 Service: ${input.service.title}
 Amount: ${formatCurrency(amount)}
 Date: ${timestamp.toISOString()}
-${isEventService ? `Session: ${input.service.turnaround}` : `Delivery due: ${deadline}`}
+${isAppointmentService || isEventService ? `Service: ${input.service.turnaround}` : `Delivery due: ${deadline}`}
 
-${isEventService ? 'Watch for the prep form before sending final session details.' : 'Watch for the intake form before starting delivery.'}
+${paymentNextStep}
 `,
     html: emailShell(
       `New payment received for ${input.service.title}.`,
       `<h1 style="margin:0;color:#142334;font-size:34px;line-height:1.05;font-weight:400;">New payment received.</h1>
-      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">${isEventService ? 'The seat is paid. Watch for the prep form before sending final session details.' : 'The order is paid. Watch for the intake form before starting delivery.'}</p>
+      <p style="margin:16px 0 24px;color:#4f5b66;font:16px/1.7 Arial,sans-serif;">${paymentNextStep}</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eaded5;border-bottom:1px solid #eaded5;">
         ${detailRow('Client', input.name || 'Not supplied')}
         ${detailRow('Email', input.email || 'Not supplied')}
         ${detailRow('Service', input.service.title)}
         ${detailRow('Amount', formatCurrency(amount))}
-        ${detailRow(isEventService ? 'Session' : 'Delivery due', isEventService ? input.service.turnaround : deadline)}
+        ${detailRow(isAppointmentService || isEventService ? 'Service' : 'Delivery due', isAppointmentService || isEventService ? input.service.turnaround : deadline)}
       </table>`,
     ),
   });
