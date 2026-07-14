@@ -16,7 +16,9 @@ test('presents PayFast separately from the supported payment methods', () => {
       { name: 'Mastercard', src: '/Master Card.png' },
       { name: 'Instant EFT', src: '/instantEFT_hi-Res_logo_png.png' },
       { name: 'Apple Pay', src: '/Apple Pay.png' },
+      { name: 'Google Pay', src: '/google-pay.png' },
       { name: 'Mobicred', src: '/mobicred_logoMark_grp.png' },
+      { name: 'RCS', src: '/RCS.png' },
     ],
   );
 });

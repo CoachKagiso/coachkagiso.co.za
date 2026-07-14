@@ -41,10 +41,24 @@ export const paymentMethodLogos: PaymentBrandLogo[] = [
     displayClassName: 'h-6 w-auto',
   },
   {
+    name: 'Google Pay',
+    src: '/google-pay.png',
+    width: 5900,
+    height: 2412,
+    displayClassName: 'h-6 w-auto',
+  },
+  {
     name: 'Mobicred',
     src: '/mobicred_logoMark_grp.png',
     width: 441,
     height: 86,
+    displayClassName: 'h-5 w-auto',
+  },
+  {
+    name: 'RCS',
+    src: '/RCS.png',
+    width: 242,
+    height: 74,
     displayClassName: 'h-5 w-auto',
   },
 ];
