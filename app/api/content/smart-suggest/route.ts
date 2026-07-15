@@ -407,13 +407,29 @@ export async function POST(request: Request) {
 
   // ─── STAGE 2: Generate suggestion ─────────────────────────────────────────
 
+  const SESSION_SEEDS = [
+    'uncomfortable truth the audience avoids',
+    'a relatable career moment nobody talks about',
+    'contrarian take on common career advice',
+    'a before-and-after transformation',
+    'an uncomfortable question worth sitting with',
+    'a myth worth busting',
+    'a specific observation about Corporate SA culture',
+    'a mistake many professionals keep making',
+    'a moment of vulnerability or honest disclosure',
+    'a hot take on LinkedIn or job search culture',
+    'a behind-the-scenes lesson from coaching practice',
+    'an industry insight backed by trend data',
+  ];
+  const sessionSeed = SESSION_SEEDS[Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % SESSION_SEEDS.length];
+
   const enrichedSources: SmartSuggestSources = {
     ...sources,
     trendSignals: trendSignals.length > 0 ? trendSignals : undefined,
   };
 
   async function callStage2(retry: boolean): Promise<{ suggestion: SmartSuggestion; usedSearch: boolean; usedFallback: boolean } | null> {
-    const temp = retry ? 0.2 : 0.4;
+    const temp = retry ? 0.2 : 0.65;
     try {
       const resp = await fetch(`${AI_BASE_URL}/chat/completions`, {
         method: 'POST',
@@ -427,7 +443,7 @@ export async function POST(request: Request) {
             { role: 'system', content: buildSuggestionPrompt() },
             {
               role: 'user',
-              content: buildSuggestionUserPrompt(enrichedSources, previousSuggestions),
+              content: buildSuggestionUserPrompt(enrichedSources, previousSuggestions, sessionSeed),
             },
           ],
           max_tokens: 900,

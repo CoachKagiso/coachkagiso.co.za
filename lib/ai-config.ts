@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { getAiProviderRequestOptions } from '@/lib/ai-request';
 import { DEFAULT_SETTINGS, type AiConfigSettings } from '@/lib/settings';
 import {
   DEFAULT_OPENROUTER_PRIMARY_MODEL,
@@ -101,6 +102,6 @@ export function buildAiRequestBody(
 ) {
   return {
     ...payload,
-    ...(runtime.provider === 'zai' ? { thinking: { type: 'disabled' } } : {}),
+    ...getAiProviderRequestOptions(runtime.provider, runtime.model),
   };
 }
