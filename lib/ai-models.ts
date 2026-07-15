@@ -15,6 +15,7 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
   { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3' },
   { value: 'deepseek/deepseek-v4-pro', label: 'deepseek/deepseek-v4-pro' },
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2' },
+  { value: 'x-ai/grok-4.5', label: 'x-ai/grok-4.5' },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));

@@ -99,6 +99,14 @@ import {
   type VaultSection,
 } from '@/lib/content/vault-policy';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import {
+  AUTO_TOPIC_STORAGE_KEY,
+  buildAutoTopicPrompt,
+  normalizeAutoTopicHistory,
+  parseAutoTopicSuggestion,
+  recordAutoTopic,
+  type AutoTopicHistoryEntry,
+} from '@/lib/content/auto-topic';
 import type {
   ContentBacklogItem,
   ContentBacklogSource,
@@ -133,6 +141,7 @@ type CreatePillarFocus = ContentPillar | 'auto';
 type CarouselExportMode = 'pdf' | 'png';
 type AiMode =
   | 'signal_brief'
+  | 'auto_topic'
   | 'write_post'
   | 'polish'
   | 'hook_generator'
@@ -3710,7 +3719,30 @@ export default function ContentStudio({
   const [smartSuggestRefreshing, setSmartSuggestRefreshing] = useState(false);
   const [savedSmartSuggestionKeys, setSavedSmartSuggestionKeys] = useState<string[]>([]);
   const [smartSuggestSaveError, setSmartSuggestSaveError] = useState<string | null>(null);
-  const [sessionSuggestions, setSessionSuggestions] = useState<string[]>([]);
+  const [autoTopicHistory, setAutoTopicHistory] = useState<AutoTopicHistoryEntry[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return normalizeAutoTopicHistory(JSON.parse(localStorage.getItem(AUTO_TOPIC_STORAGE_KEY) || '[]'));
+    } catch {
+      return [];
+    }
+  });
+  const [sessionSuggestions, setSessionSuggestions] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('smart_suggest_history');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as { suggestions: string[]; timestamp: number };
+      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+      if (Date.now() - parsed.timestamp > SEVEN_DAYS) {
+        localStorage.removeItem('smart_suggest_history');
+        return [];
+      }
+      return Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    } catch {
+      return [];
+    }
+  });
   const [smartPrepopulateNotice, setSmartPrepopulateNotice] = useState<string | null>(null);
   const [smartPulseKey, setSmartPulseKey] = useState<SmartPulseKey | null>(null);
   const [generatedPost, setGeneratedPost] = useState('');
@@ -4881,13 +4913,19 @@ export default function ContentStudio({
       });
       const suggestion = normalizeSmartSuggestion(data.suggestion);
       setSmartSuggestState({ type: 'suggestion', data: suggestion });
-      setSessionSuggestions((current) => [
-        ...current,
-        `${suggestion.platform}:${suggestion.contentType}:${suggestion.angle}`,
-        suggestion.angleDisplayName,
-        suggestion.headline,
-        suggestion.assignment,
-      ]);
+      setSessionSuggestions((current) => {
+        const next = [
+          ...current,
+          `[TOPIC] ${suggestion.topic}`,
+          `[HEADLINE] ${suggestion.headline}`,
+          `[ANGLE] ${suggestion.angle} on ${suggestion.platform}`,
+        ];
+        const trimmed = next.slice(-60);
+        try {
+          localStorage.setItem('smart_suggest_history', JSON.stringify({ suggestions: trimmed, timestamp: Date.now() }));
+        } catch { /* storage full or unavailable */ }
+        return trimmed;
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not generate a Smart Suggest recommendation.';
       if (keepCurrentSuggestion) {
@@ -4970,9 +5008,39 @@ export default function ContentStudio({
     }
   }
 
+  async function chooseAutoTopic(selection: CreateSelection) {
+    const contentType = findContentTypeOption(selection);
+    const subType = contentType?.subTypes.find((item) => item.id === selection.subType);
+    const angle = findAngleOption(selection);
+    const result = await callAi(
+      'auto_topic',
+      buildAutoTopicPrompt({
+        platform: selection.platform ? createPlatformLabels[selection.platform] : 'Auto',
+        contentType: `${contentType?.label || selection.contentType || 'Post'}${subType ? ` (${subType.label})` : ''}`,
+        angle: angle?.label || selection.angle || 'Auto',
+        history: autoTopicHistory,
+      }),
+      selection,
+    );
+    const suggestion = parseAutoTopicSuggestion(result);
+    if (!suggestion) throw new Error('AI could not choose a fresh topic. Please try Generate again or add your own topic.');
+
+    const nextHistory = recordAutoTopic(autoTopicHistory, suggestion);
+    setAutoTopicHistory(nextHistory);
+    try {
+      localStorage.setItem(AUTO_TOPIC_STORAGE_KEY, JSON.stringify(nextHistory));
+    } catch {
+      // The draft can still be generated when browser storage is unavailable.
+    }
+    setTopic(suggestion.topic);
+    setTopicSource('manual');
+    setSmartPrepopulateNotice(`AI chose a fresh ${suggestion.family.replace(/_/g, ' ')} topic and will avoid recent auto-topics.`);
+    return suggestion.topic;
+  }
+
   async function generatePost(selectionOverride?: CreateSelection, topicOverride?: string, pillarOverride?: CreatePillarFocus) {
     const selectionToUse = selectionOverride || createSelection;
-    const topicToUse = topicOverride ?? topic;
+    let topicToUse = topicOverride ?? topic;
     const pillarToUse = pillarOverride || createPillarFocus;
     if (!isCreateSelectionReady(selectionToUse)) return;
     const busyAction = generatedPost.trim() && !selectionOverride ? 'regenerate' : 'generate';
@@ -4980,6 +5048,9 @@ export default function ContentStudio({
     setCreateBusyAction(busyAction);
     setCreateError(null);
     try {
+      if (!topicToUse.trim()) {
+        topicToUse = await chooseAutoTopic(selectionToUse);
+      }
       const result = await callAi(
         deriveCreateMode(selectionToUse),
         buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse, manifestoSettings),
