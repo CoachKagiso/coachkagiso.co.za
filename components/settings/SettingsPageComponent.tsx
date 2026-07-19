@@ -39,7 +39,6 @@ import {
   DEFAULT_OPENROUTER_SECONDARY_MODEL,
   normalizeOpenRouterModel,
   OPENROUTER_MODEL_OPTIONS,
-  ZAI_TEST_MODEL,
 } from '@/lib/ai-models';
 import type {
   AiConfigSettings,
@@ -116,7 +115,7 @@ const settingsNavItems = [
   {
     id: 'ai_config',
     title: 'AI Model',
-    description: 'Test and production routing',
+    description: 'OpenRouter model and API key',
     icon: Sparkles,
   },
   {
@@ -148,10 +147,10 @@ const sectionDefaults = {
     sunday: null,
   },
   ai_config: {
-    primary_model: ZAI_TEST_MODEL,
-    secondary_model: ZAI_TEST_MODEL,
-    model_provider: 'zai',
-    test_mode: true,
+    primary_model: DEFAULT_OPENROUTER_PRIMARY_MODEL,
+    secondary_model: DEFAULT_OPENROUTER_SECONDARY_MODEL,
+    model_provider: 'openrouter',
+    test_mode: false,
     zai_api_key: '',
     openrouter_api_key: '',
   },
@@ -384,10 +383,8 @@ export default function SettingsPageComponent({
   const [templates, setTemplates] = useState<StoredEmailTemplate[]>(emailTemplates);
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
   const [previewTemplate, setPreviewTemplate] = useState<StoredEmailTemplate | null>(null);
-  const [showZaiKey, setShowZaiKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
   const [testStatus, setTestStatus] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
-  const [productionOpen, setProductionOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('business_profile');
   const [photoUploadState, setPhotoUploadState] = useState<SaveState>('idle');
 
@@ -421,11 +418,8 @@ export default function SettingsPageComponent({
       highestPriority,
     };
   }, [businessGoals]);
-  const productionPrimaryModel = normalizeOpenRouterModel(aiConfig.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL);
-  const productionSecondaryModel = normalizeOpenRouterModel(aiConfig.secondary_model, DEFAULT_OPENROUTER_SECONDARY_MODEL);
-  const activeAiModelLabel = aiConfig.test_mode === false
-    ? `${productionPrimaryModel} via OpenRouter`
-    : `${ZAI_TEST_MODEL} via Z.ai`;
+  const primaryModel = normalizeOpenRouterModel(aiConfig.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL);
+  const secondaryModel = normalizeOpenRouterModel(aiConfig.secondary_model, DEFAULT_OPENROUTER_SECONDARY_MODEL);
 
   async function saveSetting(key: string, value: unknown) {
     setSaveStates((current) => ({ ...current, [key]: 'saving' }));
@@ -526,29 +520,43 @@ export default function SettingsPageComponent({
     void saveSetting('business_goals', nextGoals);
   }
 
-  async function testAiConnection(provider: 'zai' | 'openrouter') {
+  function getOpenRouterConfig(): AiConfigSettings {
+    return {
+      ...aiConfig,
+      primary_model: primaryModel,
+      secondary_model: secondaryModel,
+      model_provider: 'openrouter',
+      test_mode: false,
+    };
+  }
+
+  function saveAiConfiguration() {
+    const nextConfig = getOpenRouterConfig();
+    setAiConfig(nextConfig);
+    void saveSetting('ai_config', nextConfig);
+  }
+
+  async function testAiConnection() {
     setTestStatus(null);
-    setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'saving' }));
-    const testModel = provider === 'zai' ? ZAI_TEST_MODEL : productionPrimaryModel;
+    setSaveStates((current) => ({ ...current, openrouter_test: 'saving' }));
 
     try {
       await postJson('/api/settings/ai-test', {
         adminKey,
-        provider,
-        apiKey: provider === 'zai' ? aiConfig.zai_api_key : aiConfig.openrouter_api_key,
-        model: testModel,
+        apiKey: aiConfig.openrouter_api_key,
+        model: primaryModel,
       });
       setTestStatus({
         tone: 'success',
-        message: provider === 'zai' ? 'Connected to GLM 5.2' : `Connected to ${testModel}`,
+        message: `Connected to ${primaryModel}`,
       });
-      setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'idle' }));
+      setSaveStates((current) => ({ ...current, openrouter_test: 'idle' }));
     } catch (error) {
       setTestStatus({
         tone: 'error',
         message: error instanceof Error ? error.message : 'Connection failed. Check the API key.',
       });
-      setSaveStates((current) => ({ ...current, [`${provider}_test`]: 'idle' }));
+      setSaveStates((current) => ({ ...current, openrouter_test: 'idle' }));
     }
   }
 
@@ -1122,116 +1130,62 @@ export default function SettingsPageComponent({
           {activeSection === 'ai_config' && (
           <SettingsPanel title="AI Model Configuration" icon={Sparkles}>
             <div className="grid gap-5">
-              {aiConfig.test_mode !== false && (
-                <div className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-4 py-3 text-[#92400E]">
-                  <p className="text-[13px] font-bold">Test configuration active</p>
-                  <p className="mt-1 text-[13px] leading-relaxed">Currently routing to GLM 5.2 via Z.ai for testing. Do not use with real lead data during this phase. Switch to production models below when testing is complete.</p>
-                </div>
-              )}
               <div className="grid gap-4 rounded-[8px] bg-[#F8F6F4] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Current model</p>
-                <p className="font-serif text-[28px] leading-tight text-[#142334]">{activeAiModelLabel} {aiConfig.test_mode !== false ? '(Test mode)' : '(Production)'}</p>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">OpenRouter</p>
+                  <p className="mt-1 font-serif text-[25px] leading-tight text-[#142334]">Active model: {primaryModel}</p>
+                </div>
                 <label className="grid gap-2">
-                  <span className="studio-label">Z.ai API key</span>
+                  <span className="studio-label">OpenRouter API key</span>
                   <span className="relative">
                     <input
-                      type={showZaiKey ? 'text' : 'password'}
-                      value={aiConfig.zai_api_key || ''}
-                      onChange={(event) => setAiConfig({ ...aiConfig, zai_api_key: event.target.value })}
+                      type={showOpenRouterKey ? 'text' : 'password'}
+                      value={aiConfig.openrouter_api_key || ''}
+                      onChange={(event) => setAiConfig({ ...aiConfig, openrouter_api_key: event.target.value })}
                       className="studio-input h-11 w-full pr-12"
-                      placeholder="Paste ZAI_API_KEY"
+                      placeholder="Paste your OpenRouter API key"
                     />
-                    <button type="button" onClick={() => setShowZaiKey((value) => !value)} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#142334]/65 hover:bg-[#F5F3EE]" aria-label={showZaiKey ? 'Hide Z.ai key' : 'Show Z.ai key'}>
-                      {showZaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    <button type="button" onClick={() => setShowOpenRouterKey((value) => !value)} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#142334]/65 hover:bg-[#F5F3EE]" aria-label={showOpenRouterKey ? 'Hide OpenRouter key' : 'Show OpenRouter key'}>
+                      {showOpenRouterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </span>
-                  <span className="text-[12px] text-[#6B6B6B]">Add this key to your Vercel environment variables as ZAI_API_KEY.</span>
+                  <span className="text-[12px] text-[#6B6B6B]">This saved key works with every OpenRouter model below. Keep it when switching models, or replace it here before saving.</span>
                 </label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <span className="studio-label">Active model</span>
+                    <FilterDropdown
+                      name="primary_model"
+                      value={primaryModel}
+                      onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value, model_provider: 'openrouter', test_mode: false })}
+                      ariaLabel="Choose active AI model"
+                      options={OPENROUTER_MODEL_OPTIONS}
+                    />
+                    <span className="text-[12px] text-[#6B6B6B]">Used for content generation, brand voice, and Transform mode guardrail.</span>
+                  </div>
+                  <div className="grid gap-2">
+                    <span className="studio-label">Quick tasks model</span>
+                    <FilterDropdown
+                      name="secondary_model"
+                      value={secondaryModel}
+                      onChange={(value) => setAiConfig({ ...aiConfig, secondary_model: value, model_provider: 'openrouter', test_mode: false })}
+                      ariaLabel="Choose quick tasks AI model"
+                      options={OPENROUTER_MODEL_OPTIONS}
+                    />
+                    <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. It uses the same saved OpenRouter key.</span>
+                  </div>
+                </div>
+                <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the active model. This is required for the copyright guardrail to function reliably.</p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <button type="button" className="studio-secondary-button" onClick={() => void saveSetting('ai_config', aiConfig)}>
-                    <Save className="h-4 w-4" /> Save key
+                  <button type="button" className="studio-primary-button" onClick={saveAiConfiguration}>
+                    <Save className="h-4 w-4" /> Save OpenRouter settings
                   </button>
-                  <button type="button" className="studio-primary-button" onClick={() => void testAiConnection('zai')} disabled={saveStates.zai_test === 'saving'}>
-                    {saveStates.zai_test === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Test connection
+                  <button type="button" className="studio-secondary-button" onClick={() => void testAiConnection()} disabled={saveStates.openrouter_test === 'saving'}>
+                    {saveStates.openrouter_test === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Test active model
                   </button>
                 </div>
+                {testStatus && <p role="status" className={`text-[13px] font-semibold ${testStatus.tone === 'success' ? 'text-[#0F766E]' : 'text-[#A24E37]'}`}>{testStatus.message}</p>}
               </div>
-              <details
-                open={productionOpen}
-                onToggle={(event) => setProductionOpen(event.currentTarget.open)}
-                className="relative z-10 overflow-visible rounded-[8px] border border-[#D8C8BB] bg-[#FCFBFA] shadow-[0_1px_2px_rgba(20,35,52,0.04)]"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 border-b border-[#E4D8CB] bg-white px-4 py-3 transition hover:bg-[#F8F6F4] [&::-webkit-details-marker]:hidden">
-                  <span className="font-serif text-[20px] text-[#142334]">Switch to production models</span>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] text-[#8C7466]">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${productionOpen ? 'rotate-180' : ''}`} />
-                  </span>
-                </summary>
-                <div className="grid gap-4 p-4">
-                  <p className="text-[13px] leading-relaxed text-[#6B6B6B]">When testing is complete, switch to production models via OpenRouter for better instruction-following and POPIA compliance.</p>
-                  <label className="grid gap-2">
-                    <span className="studio-label">OpenRouter API key</span>
-                    <span className="relative">
-                      <input type={showOpenRouterKey ? 'text' : 'password'} className="studio-input h-11 w-full pr-12" value={aiConfig.openrouter_api_key || ''} onChange={(event) => setAiConfig({ ...aiConfig, openrouter_api_key: event.target.value })} />
-                      <button type="button" onClick={() => setShowOpenRouterKey((value) => !value)} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#142334]/65 hover:bg-[#F5F3EE]" aria-label={showOpenRouterKey ? 'Hide OpenRouter key' : 'Show OpenRouter key'}>
-                        {showOpenRouterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </span>
-                  </label>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <span className="studio-label">Primary model</span>
-                      <FilterDropdown
-                        name="primary_model"
-                        value={productionPrimaryModel}
-                        onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value })}
-                        ariaLabel="Choose primary AI model"
-                        options={OPENROUTER_MODEL_OPTIONS}
-                      />
-                      <span className="text-[12px] text-[#6B6B6B]">Used for content generation, brand voice, and Transform mode guardrail.</span>
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="studio-label">Secondary model</span>
-                      <FilterDropdown
-                        name="secondary_model"
-                        value={productionSecondaryModel}
-                        onChange={(value) => setAiConfig({ ...aiConfig, secondary_model: value })}
-                        ariaLabel="Choose secondary AI model"
-                        options={OPENROUTER_MODEL_OPTIONS}
-                      />
-                      <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. Faster and cheaper.</span>
-                    </div>
-                  </div>
-                  <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the Primary model. This is required for the copyright guardrail to function reliably.</p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      className="studio-primary-button"
-                      onClick={() => {
-                        if (!aiConfig.openrouter_api_key?.trim()) {
-                          setTestStatus({ tone: 'error', message: 'OpenRouter key is required before switching to production.' });
-                          return;
-                        }
-                        const nextConfig = {
-                          ...aiConfig,
-                          primary_model: productionPrimaryModel,
-                          secondary_model: productionSecondaryModel,
-                          model_provider: 'openrouter' as const,
-                          test_mode: false,
-                        };
-                        setAiConfig(nextConfig);
-                        void saveSetting('ai_config', nextConfig);
-                      }}
-                    >
-                      <Save className="h-4 w-4" /> Save production config
-                    </button>
-                    <button type="button" className="studio-secondary-button" onClick={() => void testAiConnection('openrouter')} disabled={saveStates.openrouter_test === 'saving'}>
-                      {saveStates.openrouter_test === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Test production connection
-                    </button>
-                  </div>
-                </div>
-              </details>
-              {testStatus && <p className={`text-[13px] font-semibold ${testStatus.tone === 'success' ? 'text-[#0F766E]' : 'text-[#A24E37]'}`}>{testStatus.message}</p>}
             </div>
           </SettingsPanel>
           )}
