@@ -5,7 +5,6 @@ import {
   DEFAULT_OPENROUTER_PRIMARY_MODEL,
   DEFAULT_OPENROUTER_SECONDARY_MODEL,
   normalizeOpenRouterModel,
-  ZAI_TEST_MODEL,
 } from '@/lib/ai-models';
 
 export type AiProvider = 'zai' | 'openrouter';
@@ -20,27 +19,7 @@ export type AiRuntimeConfig = {
 };
 
 export const SIMPLE_AI_MODES = new Set(['polish', 'format_recommendation']);
-const ZAI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-
-function normalizeZaiModel(model?: string) {
-  const candidate = model?.trim();
-  return candidate && candidate.startsWith('glm-') ? candidate : ZAI_TEST_MODEL;
-}
-
-function buildZaiRuntime(config: AiConfigSettings, apiKey: string): AiRuntimeConfig {
-  return {
-    provider: 'zai',
-    baseUrl: ZAI_BASE_URL,
-    model: normalizeZaiModel(config.primary_model),
-    apiKey,
-    isTestMode: true,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-  };
-}
 
 export async function loadAiConfig(): Promise<AiConfigSettings> {
   try {
@@ -63,19 +42,9 @@ export async function loadAiConfig(): Promise<AiConfigSettings> {
 
 export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } = {}): Promise<AiRuntimeConfig | null> {
   const config = await loadAiConfig();
-  const isTestMode = config.test_mode !== false;
-  const zaiApiKey = config.zai_api_key?.trim() || process.env.ZAI_API_KEY?.trim() || '';
   const openRouterApiKey = config.openrouter_api_key?.trim() || process.env.OPENROUTER_API_KEY?.trim() || '';
 
-  if (isTestMode) {
-    return zaiApiKey ? buildZaiRuntime(config, zaiApiKey) : null;
-  }
-
   if (!openRouterApiKey) {
-    if (zaiApiKey) {
-      console.warn('OpenRouter key is missing while production AI mode is active. Falling back to Z.ai test runtime.');
-      return buildZaiRuntime(config, zaiApiKey);
-    }
     return null;
   }
 

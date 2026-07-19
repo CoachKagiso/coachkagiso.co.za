@@ -7,6 +7,9 @@ import { ChevronDown } from 'lucide-react';
 type FilterDropdownOption = {
   value: string;
   label: string;
+  intelligence?: number;
+  inputPrice?: number;
+  outputPrice?: number;
 };
 
 type FilterDropdownProps = {
@@ -60,8 +63,15 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
           wrapLabels ? 'min-h-11 py-3' : 'h-11'
         }`}
       >
-        <span className={wrapLabels ? 'min-w-0 whitespace-normal break-words leading-snug' : 'truncate'}>
-          {selectedOption?.label || 'Select...'}
+        <span className={`flex min-w-0 items-center gap-2 ${wrapLabels ? 'whitespace-normal break-words leading-snug' : ''}`}>
+          <span className={wrapLabels ? 'min-w-0' : 'truncate'}>{selectedOption?.label || 'Select...'}</span>
+          {selectedOption && (selectedOption.intelligence != null || selectedOption.inputPrice != null || selectedOption.outputPrice != null) && (
+            <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-normal text-[#6B6B6B]">
+              {selectedOption.intelligence != null && <span title="Intelligence Score">🧠 {selectedOption.intelligence}</span>}
+              {selectedOption.inputPrice != null && <span title="Input Price per 1M tokens">↓${selectedOption.inputPrice}</span>}
+              {selectedOption.outputPrice != null && <span title="Output Price per 1M tokens">↑${selectedOption.outputPrice}</span>}
+            </span>
+          )}
         </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-[#A09086] transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -96,7 +106,16 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                     isSelected ? 'bg-[#F2ECE7]' : ''
                   }`}
                 >
-                  {option.label}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={wrapLabels ? 'min-w-0 whitespace-normal break-words leading-snug' : 'truncate'}>{option.label}</span>
+                    {(option.intelligence != null || option.inputPrice != null || option.outputPrice != null) && (
+                      <span className="flex shrink-0 items-center gap-2 text-[11px] font-normal text-[#6B6B6B]">
+                        {option.intelligence != null && <span title="Intelligence Score">🧠 {option.intelligence}</span>}
+                        {option.inputPrice != null && <span title="Input Price per 1M tokens">↓${option.inputPrice}</span>}
+                        {option.outputPrice != null && <span title="Output Price per 1M tokens">↑${option.outputPrice}</span>}
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}

@@ -11,7 +11,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const provider = String(body?.provider || 'zai');
   const apiKey = String(body?.apiKey || '').trim();
   const model = String(body?.model || '').trim();
 
@@ -19,19 +18,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'API key and model are required.' }, { status: 400 });
   }
 
-  const isOpenRouter = provider === 'openrouter';
-  const baseUrl = isOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.z.ai/api/coding/paas/v4';
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
+    'HTTP-Referer': 'https://coachkagiso.co.za',
+    'X-Title': 'Coach Kagiso Dashboard',
   };
 
-  if (isOpenRouter) {
-    headers['HTTP-Referer'] = 'https://coachkagiso.co.za';
-    headers['X-Title'] = 'Coach Kagiso Dashboard';
-  }
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -39,7 +33,6 @@ export async function POST(request: Request) {
       messages: [{ role: 'user', content: 'Reply with the word CONNECTED only.' }],
       max_tokens: 20,
       temperature: 0,
-      ...(isOpenRouter ? {} : { thinking: { type: 'disabled' } }),
     }),
   });
 
