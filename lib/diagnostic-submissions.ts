@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { getDiagnosticAdminKey } from '@/lib/env';
+import { isDashboardRequestAuthorized } from '@/lib/dashboard-session';
 import { addSastDaysAsDateKey, getEffectiveNextFollowUpAt } from '@/lib/follow-up-utils';
 import {
   isDiagnosticLeadSource,
@@ -91,9 +92,12 @@ export function isDiagnosticLeadStatus(value?: string | null): value is Diagnost
   );
 }
 
-export function isDiagnosticAdminAuthorized(providedKey?: string | null) {
-  const expectedKey = getDiagnosticAdminKey();
-  return Boolean(expectedKey && providedKey && providedKey === expectedKey);
+export function isDiagnosticAdminAuthorized(providedKey?: string | null, request?: Request) {
+  return isDashboardRequestAuthorized({
+    cookieHeader: request?.headers.get('cookie'),
+    providedKey,
+    secret: getDiagnosticAdminKey(),
+  });
 }
 
 export type DiagnosticSubmissionFilters = {

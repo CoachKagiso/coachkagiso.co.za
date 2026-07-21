@@ -1,4 +1,5 @@
 import { listClientRecords } from '@/lib/clients';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import { listManualTasks } from '@/lib/dashboard-task-records';
 import type { ManualTaskRecord } from '@/lib/dashboard-tasks';
 import { listDiagnosticSubmissions, type DiagnosticSubmission } from '@/lib/diagnostic-submissions';
@@ -51,10 +52,6 @@ function toDateTime(date: string, time: string) {
 function isWithinRange(value: string, range: CalendarRange) {
   const time = parseDate(value).getTime();
   return time >= parseDate(range.from).getTime() && time <= parseDate(range.to).getTime();
-}
-
-function encodeAdminKey(adminKey: string) {
-  return encodeURIComponent(adminKey);
 }
 
 function isCalBooking(event: GoogleCalendarEvent) {
@@ -119,19 +116,25 @@ function normalizeGoogleEvent(event: GoogleCalendarEvent): DashboardCalendarEven
 }
 
 function getLeadLink(adminKey: string, leadId: string) {
-  return `/resources/career-diagnostic/submissions/${leadId}?key=${encodeAdminKey(adminKey)}`;
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  const query = legacyKey ? `?key=${encodeURIComponent(legacyKey)}` : '';
+  return `/resources/career-diagnostic/submissions/${leadId}${query}`;
 }
 
 function getClientsLink(adminKey: string, paymentId?: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'clients');
   if (paymentId) params.set('payment', paymentId);
   return `/resources/career-diagnostic/submissions?${params.toString()}`;
 }
 
 function getTasksLink(adminKey: string) {
-  return `/resources/career-diagnostic/submissions?key=${encodeAdminKey(adminKey)}&tab=tasks`;
+  const params = new URLSearchParams({ tab: 'tasks' });
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
+  return `/resources/career-diagnostic/submissions?${params.toString()}`;
 }
 
 function buildLeadFollowUpEvents(leads: DiagnosticSubmission[], range: CalendarRange, adminKey: string) {
@@ -202,7 +205,7 @@ function buildTaskEvents(tasks: ManualTaskRecord[], range: CalendarRange, adminK
 
 async function buildSupabaseEvents(range: CalendarRange, adminKey: string) {
   const [clients, leads, tasks] = await Promise.all([listClientRecords(), listDiagnosticSubmissions(), listManualTasks()]);
-  const deliveryEvents = clients.flatMap((client) => {
+  const deliveryEvents = clients.filter((client) => !client.isTest).flatMap((client) => {
     const events: DashboardCalendarEvent[] = [];
 
     if (client.deadline && !client.isDelivered) {

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const key = String(body?.key || '');
   const url = String(body?.url || '').trim();
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

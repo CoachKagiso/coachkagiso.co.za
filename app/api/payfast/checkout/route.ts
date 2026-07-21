@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       buyer_email: bookingClaims?.email || null,
       buyer_name: bookingClaims?.name || null,
     },
-    { onConflict: 'payment_id' },
+    { onConflict: 'payment_id', ignoreDuplicates: true },
   );
 
   if (pendingError) {

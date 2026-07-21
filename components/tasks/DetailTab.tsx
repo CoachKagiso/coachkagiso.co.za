@@ -3,15 +3,18 @@ import { ArrowUpRight, Loader2 } from 'lucide-react';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import { getPaymentClientName, type Task, type TaskStatus } from '@/lib/dashboard-tasks';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 
 function buildTabHref(key: string, tab: string, extra: Record<string, string> = {}) {
   const params = new URLSearchParams();
-  if (key) params.set('key', key);
+  const legacyKey = getDashboardLegacyKey(key);
+  if (legacyKey) params.set('key', legacyKey);
   if (tab !== 'dashboard') params.set('tab', tab);
   Object.entries(extra).forEach(([name, value]) => {
     if (value) params.set(name, value);
   });
-  return `/resources/career-diagnostic/submissions?${params.toString()}`;
+  const query = params.toString();
+  return query ? `/resources/career-diagnostic/submissions?${query}` : '/resources/career-diagnostic/submissions';
 }
 
 function getLeadName(lead: DiagnosticSubmission) {

@@ -16,6 +16,7 @@ export type AiRuntimeConfig = {
   apiKey: string;
   headers: Record<string, string>;
   isTestMode: boolean;
+  reasoningEnabled: boolean;
 };
 
 export const SIMPLE_AI_MODES = new Set(['polish', 'format_recommendation']);
@@ -56,6 +57,7 @@ export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } =
       : normalizeOpenRouterModel(config.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL),
     apiKey: openRouterApiKey,
     isTestMode: false,
+    reasoningEnabled: config.reasoning_enabled ?? false,
     headers: {
       Authorization: `Bearer ${openRouterApiKey}`,
       'Content-Type': 'application/json',
@@ -71,6 +73,6 @@ export function buildAiRequestBody(
 ) {
   return {
     ...payload,
-    ...getAiProviderRequestOptions(runtime.provider, runtime.model),
+    ...getAiProviderRequestOptions(runtime.provider, runtime.model, runtime.reasoningEnabled),
   };
 }

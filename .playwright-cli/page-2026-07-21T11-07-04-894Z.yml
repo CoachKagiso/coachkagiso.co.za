@@ -1,0 +1,161 @@
+- generic [active] [ref=f2e1]:
+  - main [ref=f2e2]:
+    - generic [ref=f2e3]:
+      - generic [ref=f2e4]:
+        - checkbox "Toggle dashboard sidebar" [ref=f2e5] [cursor=pointer]
+        - complementary [ref=f2e6]:
+          - generic [ref=f2e7]:
+            - link "Coach Kagiso Growth OS" [ref=f2e8] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions
+              - generic [ref=f2e13]:
+                - generic [ref=f2e14]: Coach Kagiso
+                - generic [ref=f2e15]: Growth OS
+            - generic "Toggle sidebar" [ref=f2e16] [cursor=pointer]: Toggle dashboard sidebar
+          - navigation [ref=f2e21]:
+            - link "Dashboard" [ref=f2e22] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions
+            - link "Leads" [ref=f2e29] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=leads
+            - link "Pipeline" [ref=f2e35] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=pipeline
+            - link "Clients" [ref=f2e39] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=clients
+            - link "Finance" [ref=f2e44] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=finance
+            - link "Career Tools" [ref=f2e51] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=career-tools
+            - group [ref=f2e58]:
+              - generic "Studio" [ref=f2e59] [cursor=pointer]
+            - link "Calendar" [ref=f2e65] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=calendar
+            - link "Messages" [ref=f2e69] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=messages
+            - link "Tasks" [ref=f2e73] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=tasks
+            - link "Notes" [ref=f2e78] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=notes
+            - link "Settings" [ref=f2e83] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=settings
+          - generic [ref=f2e88]:
+            - paragraph [ref=f2e89]: Today
+            - paragraph [ref=f2e90]: "12"
+            - paragraph [ref=f2e91]: Follow-ups due before the day closes.
+            - generic [ref=f2e92]:
+              - button "Alistacia - Send second contact" [ref=f2e93] [cursor=pointer]
+              - button "Lerato - Send second contact" [ref=f2e97] [cursor=pointer]
+              - button "Cynthia - Send second contact" [ref=f2e101] [cursor=pointer]
+              - link "and 9more ->" [ref=f2e105] [cursor=pointer]:
+                - /url: /resources/career-diagnostic/submissions?tab=leads&followUp=due
+      - generic [ref=f2e107]:
+        - generic [ref=f2e109]:
+          - generic [ref=f2e110]:
+            - paragraph [ref=f2e111]: Welcome,
+            - heading "Kagiso" [level=2] [ref=f2e112]
+          - generic [ref=f2e113]:
+            - generic [ref=f2e114]:
+              - paragraph [ref=f2e115]: Synced 13:07
+              - paragraph [ref=f2e116]: 14 dashboard notifications
+            - button "14 dashboard notifications." [ref=f2e118] [cursor=pointer]:
+              - generic [ref=f2e122]: "14"
+            - button "Log out" [ref=f2e124] [cursor=pointer]
+            - generic [ref=f2e129]:
+              - img "Kagiso" [ref=f2e130]
+              - generic [ref=f2e131]: Coach Kagiso
+        - generic [ref=f2e132]:
+          - generic [ref=f2e133]:
+            - generic [ref=f2e134]:
+              - generic [ref=f2e135]:
+                - paragraph [ref=f2e141]: Private delivery workspace
+                - heading "Client Strategy Workspace" [level=2] [ref=f2e142]
+                - paragraph [ref=f2e143]: Pull the paid engagement, intake, CV reference, and session notes into one place before drafting the client's follow-up plan.
+              - generic [ref=f2e144]:
+                - paragraph [ref=f2e145]: Choose client
+                - button "Choose a Career Clarity or Glow Up client" [ref=f2e147] [cursor=pointer]:
+                  - generic [ref=f2e148]: Select Career Clarity or Glow Up client
+            - generic [ref=f2e153]:
+              - paragraph [ref=f2e158]: No available strategy client yet.
+              - paragraph [ref=f2e159]: Active and recently completed Career Clarity and Glow Up clients will appear here automatically.
+          - generic [ref=f2e160]:
+            - generic [ref=f2e161]:
+              - generic [ref=f2e162]:
+                - generic [ref=f2e163]:
+                  - paragraph [ref=f2e164]: Career Tools
+                  - heading "CV Positioning Analyzer" [level=1] [ref=f2e165]
+                  - paragraph [ref=f2e166]: Private dashboard analysis for CV clarity, positioning, role fit, and next coaching moves.
+                - generic [ref=f2e167]: No report saved
+              - generic [ref=f2e172]:
+                - generic [ref=f2e173]:
+                  - generic [ref=f2e174]:
+                    - generic [ref=f2e175]:
+                      - paragraph [ref=f2e176]: Upload CV
+                      - paragraph [ref=f2e177]: PDF, Word .docx, or plain text. The file is read for this analysis only.
+                    - generic [ref=f2e178]: Max 8MB
+                  - generic [ref=f2e179]:
+                    - button "Upload PDF, Word, or TXT CV Text-based PDFs work best. Scanned image PDFs may not extract." [ref=f2e180]
+                    - generic [ref=f2e181]:
+                      - generic [ref=f2e185]: Upload PDF, Word, or TXT CV
+                      - generic [ref=f2e186]: Text-based PDFs work best. Scanned image PDFs may not extract.
+                - generic [ref=f2e187]:
+                  - generic [ref=f2e188]: Paste CV text
+                  - textbox "Paste CV text 0 words" [ref=f2e189]:
+                    - /placeholder: Paste the CV text here...
+                  - generic [ref=f2e190]: 0 words
+                - generic [ref=f2e191]:
+                  - generic [ref=f2e192]: Job description — optional for analysis & CV, required for cover letter
+                  - textbox "Job description — optional for analysis & CV, required for cover letter" [ref=f2e193]:
+                    - /placeholder: Paste the job posting to tailor the analysis, ATS CV, and cover letter to this specific role...
+                - generic [ref=f2e194]:
+                  - button "Simple" [ref=f2e195] [cursor=pointer]
+                  - button "Advanced" [ref=f2e196] [cursor=pointer]
+                - button "Analyze CV" [disabled] [ref=f2e197]
+            - complementary [ref=f2e203]:
+              - generic [ref=f2e205]:
+                - paragraph [ref=f2e206]: Analyzer output
+                - heading "Positioning report" [level=2] [ref=f2e207]
+              - generic [ref=f2e209]:
+                - paragraph [ref=f2e214]: Ready for a private CV read.
+                - paragraph [ref=f2e215]: Upload or paste the CV for a quick read, or switch to Advanced when you want a specific goal and role lens.
+    - generic:
+      - region:
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: Growth OS Assistant
+          - generic:
+            - button
+            - button [disabled]
+            - button [disabled]
+            - button [disabled]
+            - button
+            - button
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: What do you need?
+              - generic:
+                - button: What should I do next to move my goals?
+                - button: What should the masterclass cover?
+                - button: Summarise recent inbound replies
+                - button: What drafts are waiting in my Vault?
+        - generic:
+          - generic:
+            - button
+            - button
+            - textbox:
+              - /placeholder: Ask anything or request a draft...
+            - button
+            - button [disabled]
+          - button: Clear conversation
+      - button "Open Growth OS Assistant" [ref=f2e216] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f2e225] [cursor=pointer]
+  - alert [ref=f2e229]
+  - dialog "Cookie notice" [ref=f2e230]:
+    - generic [ref=f2e231]:
+      - paragraph [ref=f2e236]: Cookie note
+      - button "Close cookie notice" [ref=f2e237] [cursor=pointer]
+    - heading "A small note about cookies." [level=2] [ref=f2e241]
+    - paragraph [ref=f2e242]: This site may use essential cookies and simple analytics to understand what is useful, improve the experience, and keep forms working properly.
+    - generic [ref=f2e243]:
+      - button "Accept cookies" [ref=f2e244] [cursor=pointer]
+      - button "Essential only" [ref=f2e245] [cursor=pointer]

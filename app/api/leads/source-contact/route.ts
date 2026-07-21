@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const key = cleanText(body?.key);
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

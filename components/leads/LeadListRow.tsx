@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { FileText, Mail } from 'lucide-react';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import LeadEmailButton from './LeadEmailButton';
@@ -73,6 +74,10 @@ export default function LeadListRow({
   adminKey: string;
   initialNotes: DashboardNote[];
 }) {
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  const profileHref = `/resources/career-diagnostic/submissions/${submission.id}${
+    legacyKey ? `?key=${encodeURIComponent(legacyKey)}` : ''
+  }`;
   const [leadStatus, setLeadStatus] = useState<DiagnosticLeadStatus>(submission.lead_status);
   const [followUpCount, setFollowUpCount] = useState(submission.follow_up_count);
   const [lastContactedAt, setLastContactedAt] = useState<string | null>(submission.last_contacted_at);
@@ -104,7 +109,7 @@ export default function LeadListRow({
         />
         <div className="flex min-w-0 flex-col items-start">
           <Link
-            href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(adminKey)}`}
+            href={profileHref}
             className="block w-full truncate font-serif text-[29px] leading-none text-[#142334] transition hover:text-[#C9AD98]"
           >
             {submission.first_name}
@@ -172,7 +177,7 @@ export default function LeadListRow({
           onNoteCreated={(note) => setNotes((current) => [note, ...current])}
         />
         <Link
-          href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(adminKey)}`}
+          href={profileHref}
           className="inline-flex items-center gap-2 rounded-full border border-[#D8C8BB] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:border-[#C9AD98] hover:text-[#C9AD98]"
         >
           Profile <FileText className="h-4 w-4" />

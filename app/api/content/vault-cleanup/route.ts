@@ -6,7 +6,7 @@ import { pruneExpiredVaultItems } from '@/lib/content/vault-maintenance';
 export const dynamic = 'force-dynamic';
 
 function isCleanupAuthorized(request: Request, key: string) {
-  if (isDiagnosticAdminAuthorized(key)) return true;
+  if (isDiagnosticAdminAuthorized(key, request)) return true;
 
   const cleanupSecret = process.env.VAULT_CLEANUP_SECRET || process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization') || '';

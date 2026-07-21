@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const key = url.searchParams.get('key');
   const clientId = process.env.ZOHO_MAIL_CLIENT_ID?.trim();
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

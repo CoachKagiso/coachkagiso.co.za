@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <h1 className="mt-6 font-serif text-[50px] leading-tight md:text-[74px]">
           Privacy Policy
         </h1>
-        <p className="mt-3 text-[14px] text-[#A09086]">Last updated: 2 May 2026</p>
+        <p className="mt-3 text-[14px] text-[#A09086]">Last updated: 19 July 2026</p>
 
         <div className="mt-12 space-y-10 text-[16px] leading-relaxed text-[#142334]/78">
           <p>
@@ -59,6 +59,7 @@ export default function PrivacyPage() {
             <h2 className="font-serif text-[30px] text-[#142334]">3. Why I use your information</h2>
             <ul className="mt-4 list-disc space-y-2 pl-6">
               <li>To deliver the service you booked, including coaching, CV work, and masterclass support</li>
+              <li>To assist with career analysis and personalized plan drafting, with human review before use</li>
               <li>To send session links, resources, and follow-ups</li>
               <li>To process payments and issue invoices</li>
               <li>To send you the Personal Brand Audit you requested</li>
@@ -90,6 +91,7 @@ export default function PrivacyPage() {
               <li><strong>Loom</strong> in the United States for video walkthroughs using private links only</li>
               <li><strong>Zoom</strong> in the United States for live coaching sessions</li>
               <li><strong>WhatsApp Business</strong>, Meta in the United States, for client communication</li>
+              <li><strong>OpenRouter and the selected AI model provider</strong> for AI-assisted career analysis and drafting. For personalized support plans, contact details and high-risk identifiers are redacted before processing, and requests are restricted to providers marked for zero data retention and no data collection</li>
             </ul>
             <p className="mt-4">All processors are required to protect your information under their own terms and privacy notices.</p>
             <p className="mt-4">

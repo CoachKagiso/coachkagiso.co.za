@@ -35,7 +35,7 @@ function normalizeEmail(value?: string | null) {
 }
 
 export async function GET(request: Request) {
-  if (!isDiagnosticAdminAuthorized(getRequestKey(request))) {
+  if (!isDiagnosticAdminAuthorized(getRequestKey(request), request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import { AlertTriangle, Clock, Loader2, MailCheck, Send, X } from 'lucide-react';
 import type { DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import { buildDashboardAuthUrl } from '@/lib/dashboard-auth-url';
 import type { Task, TaskStatus } from '@/lib/dashboard-tasks';
 import { buildEmailHistoryNote } from '@/lib/email-history-note';
 import {
@@ -254,7 +255,7 @@ export function EmailTab({
     let cancelled = false;
     async function loadGuardrail() {
       try {
-        const response = await fetch(`/api/email/guardrails?key=${encodeURIComponent(adminKey)}&leadId=${encodeURIComponent(guardrailLeadId)}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/email/guardrails', adminKey, { leadId: guardrailLeadId }));
         const data = (await response.json().catch(() => ({}))) as GuardrailResponse;
         if (!response.ok || !data.guardrail || cancelled) return;
         setTemplateGuardrailState({ leadId: guardrailLeadId, guardrail: data.guardrail });
@@ -282,7 +283,7 @@ export function EmailTab({
 
     async function loadTemplates() {
       try {
-        const response = await fetch(`/api/email/templates?key=${encodeURIComponent(adminKey)}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/email/templates', adminKey));
         const data = (await response.json().catch(() => ({}))) as { templates?: StoredEmailTemplate[] };
         if (!response.ok || !data.templates?.length || cancelled) return;
         setAvailableTemplates(data.templates);

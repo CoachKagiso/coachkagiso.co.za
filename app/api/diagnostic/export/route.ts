@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const archetype = searchParams.get('archetype');
   const source = searchParams.get('source');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

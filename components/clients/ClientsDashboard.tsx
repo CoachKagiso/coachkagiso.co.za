@@ -4,11 +4,31 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Check, ChevronDown, ChevronRight, CreditCard, Mail, Search } from 'lucide-react';
 import FilterDropdown from '@/components/FilterDropdown';
+import ManualClientEngagementForm from '@/components/clients/ManualClientEngagementForm';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { ClientMilestone, ClientRecord } from '@/lib/clients';
+import {
+  buildClientStrategyWorkspaceHref,
+  getClientStrategyAccess,
+  isClientStrategyServiceSlug,
+} from '@/lib/client-strategy';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 
 type ClientStatus = 'overdue' | 'awaiting_intake' | 'active' | 'delivered';
+
+function getClientProfileHref(adminKey: string, diagnosticId: string) {
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  const query = legacyKey ? `?key=${encodeURIComponent(legacyKey)}` : '';
+  return `/resources/career-diagnostic/submissions/${diagnosticId}${query}`;
+}
+
+function getClientMessagesHref(adminKey: string, email: string) {
+  const params = new URLSearchParams({ tab: 'messages', q: email });
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
+  return `/resources/career-diagnostic/submissions?${params.toString()}`;
+}
 
 const statusLabels: Record<ClientStatus, string> = {
   overdue: 'Overdue',
@@ -184,15 +204,38 @@ function IntakeResponses({ client }: { client: ClientRecord }) {
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {entries.map(([key, value]) => (
-        <div key={key} className="rounded-[8px] bg-white p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
-            {key.replace(/([A-Z])/g, ' $1')}
-          </p>
-          <p className="mt-1 text-[13px] leading-relaxed text-[#142334]">{String(value)}</p>
-        </div>
-      ))}
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-[#6B6B6B]">
+        <p>
+          Source: {client.intake?.source === 'cal'
+            ? 'Cal.com booking'
+            : client.intake?.source === 'manual_dashboard'
+              ? 'Manual dashboard entry'
+              : 'Client intake form'}
+        </p>
+        {client.intake?.cv_file_url && (
+          <a
+            href={client.intake.cv_file_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#142334] underline-offset-4 hover:text-[#C9AD98] hover:underline"
+          >
+            Open CV file
+          </a>
+        )}
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {entries.map(([key, value]) => (
+          <div key={key} className="rounded-[8px] bg-white p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">
+              {key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ')}
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-[#142334]">
+              {Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -294,8 +337,11 @@ export default function ClientsDashboard({
   const [query, setQuery] = useState('');
   const [service, setService] = useState('all');
   const [status, setStatus] = useState('all');
+  const [showTests, setShowTests] = useState(false);
   const [stageError, setStageError] = useState<string | null>(null);
   const [currentTime] = useState(() => Date.now());
+
+  const liveRecords = useMemo(() => records.filter((client) => !client.isTest), [records]);
 
   const serviceOptions = useMemo(
     () => [...new Set(records.map((client) => client.serviceName))].sort((left, right) => left.localeCompare(right)),
@@ -303,19 +349,20 @@ export default function ClientsDashboard({
   );
 
   const stats = useMemo(() => {
-    const active = records.filter((client) => !client.isDelivered).length;
-    const deliveredThisMonth = records.filter((client) => client.isDelivered && isThisMonth(client.deliveredAt, currentTime)).length;
-    const overdue = records.filter((client) => client.isOverdue).length;
-    const revenueThisMonth = records
+    const active = liveRecords.filter((client) => !client.isDelivered).length;
+    const deliveredThisMonth = liveRecords.filter((client) => client.isDelivered && isThisMonth(client.deliveredAt, currentTime)).length;
+    const overdue = liveRecords.filter((client) => client.isOverdue).length;
+    const revenueThisMonth = liveRecords
       .filter((client) => isThisMonth(client.confirmedAt, currentTime))
       .reduce((total, client) => total + client.amount, 0);
 
     return { active, deliveredThisMonth, overdue, revenueThisMonth };
-  }, [currentTime, records]);
+  }, [currentTime, liveRecords]);
 
   const filteredClients = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return records.filter((client) => {
+      if (client.isTest && !showTests) return false;
       if (needle) {
         const matches = [client.buyerName, client.buyerEmail, client.serviceName]
           .filter(Boolean)
@@ -325,7 +372,7 @@ export default function ClientsDashboard({
       if (service !== 'all' && client.serviceName !== service) return false;
       return matchesStatus(client, status);
     });
-  }, [query, records, service, status]);
+  }, [query, records, service, showTests, status]);
 
   function updateClient(paymentId: string, updater: (client: ClientRecord) => ClientRecord) {
     setRecords((current) => current.map((client) => (client.paymentId === paymentId ? updater(client) : client)).sort(sortClientRecords));
@@ -377,12 +424,20 @@ export default function ClientsDashboard({
 
   return (
     <section id="clients-overview" className="rounded-[8px] bg-[#F5F3EE] p-4 md:p-5">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Clients / Overview</p>
-        <h2 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">Active clients</h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-[#6B6B6B]">
-          {stats.active} active - {stats.deliveredThisMonth} delivered this month - {stats.overdue} overdue
-        </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">Clients / Overview</p>
+          <h2 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">Active clients</h2>
+          <p className="mt-2 text-[14px] leading-relaxed text-[#6B6B6B]">
+            {stats.active} active - {stats.deliveredThisMonth} delivered this month - {stats.overdue} overdue
+          </p>
+        </div>
+        <ManualClientEngagementForm
+          adminKey={adminKey}
+          onCreated={(isTest) => {
+            if (isTest) setShowTests(true);
+          }}
+        />
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -455,6 +510,18 @@ export default function ClientsDashboard({
         )}
       </div>
 
+      {records.some((client) => client.isTest) && (
+        <label className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#C4B5FD] bg-[#F5F3FF] px-4 py-2 text-[12px] font-semibold text-[#5B21B6]">
+          <input
+            type="checkbox"
+            checked={showTests}
+            onChange={(event) => setShowTests(event.target.checked)}
+            className="h-4 w-4 accent-[#6D28D9]"
+          />
+          Show test records ({records.filter((client) => client.isTest).length})
+        </label>
+      )}
+
       {stageError && (
         <div className="mt-5 flex items-start gap-3 rounded-[8px] bg-[#FEE2E2] p-4 text-[13px] leading-relaxed text-[#991B1B]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -493,6 +560,8 @@ export default function ClientsDashboard({
             const statusStyle = statusClasses[clientStatus];
             const expanded = expandedPaymentId === client.paymentId;
             const dueSoon = client.deadline && !client.isOverdue && new Date(client.deadline).getTime() - currentTime <= 24 * 60 * 60 * 1000;
+            const strategyAccess = getClientStrategyAccess(client, new Date(currentTime));
+            const canOpenStrategyWorkspace = strategyAccess.status === 'active' || strategyAccess.status === 'recently-completed';
 
             return (
               <article
@@ -510,6 +579,9 @@ export default function ClientsDashboard({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
+                      {client.isTest && (
+                        <span className="rounded-full bg-[#EDE9FE] px-3 py-1.5 text-[11px] font-semibold text-[#6D28D9]">Test record</span>
+                      )}
                       <span className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${statusStyle.badge}`}>
                         {statusLabels[clientStatus]}
                       </span>
@@ -543,6 +615,21 @@ export default function ClientsDashboard({
                     </div>
 
                     <div className="flex flex-wrap gap-2 md:justify-end" onClick={(event) => event.stopPropagation()}>
+                      {isClientStrategyServiceSlug(client.serviceSlug) && canOpenStrategyWorkspace && (
+                        <Link
+                          href={buildClientStrategyWorkspaceHref(adminKey, client.paymentId)}
+                          className="rounded-full bg-[#142334] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                        >
+                          {strategyAccess.status === 'recently-completed'
+                            ? `Strategy workspace, ${strategyAccess.daysRemaining === 0 ? 'expires today' : `${strategyAccess.daysRemaining} day${strategyAccess.daysRemaining === 1 ? '' : 's'} left`}`
+                            : 'Strategy workspace'}
+                        </Link>
+                      )}
+                      {isClientStrategyServiceSlug(client.serviceSlug) && strategyAccess.status === 'archived' && (
+                        <span className="inline-flex items-center px-2 py-2 text-[12px] font-semibold text-[#6B6B6B]">
+                          Strategy rework window ended
+                        </span>
+                      )}
                       {!client.isDelivered && client.currentStageOrder && (
                         <button
                           type="button"
@@ -552,21 +639,23 @@ export default function ClientsDashboard({
                           Complete: {client.currentStage}
                         </button>
                       )}
-                      <LeadEmailButton
-                        lead={{
-                          id: client.diagnosticId || '',
-                          firstName: getFirstName(client),
-                          email: client.buyerEmail,
-                          archetype: client.archetype || '',
-                          serviceInterest: client.serviceName,
-                        }}
-                        initialNotes={[]}
-                        label={`Email ${getFirstName(client)}`}
-                        className="inline-flex items-center gap-2 rounded-full border border-[#142334] px-4 py-2 text-[12px] font-semibold text-[#142334] transition hover:bg-[#142334] hover:text-white"
-                      />
+                      {!client.isTest && (
+                        <LeadEmailButton
+                          lead={{
+                            id: client.diagnosticId || '',
+                            firstName: getFirstName(client),
+                            email: client.buyerEmail,
+                            archetype: client.archetype || '',
+                            serviceInterest: client.serviceName,
+                          }}
+                          initialNotes={[]}
+                          label={`Email ${getFirstName(client)}`}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#142334] px-4 py-2 text-[12px] font-semibold text-[#142334] transition hover:bg-[#142334] hover:text-white"
+                        />
+                      )}
                       {client.diagnosticId && (
                         <Link
-                          href={`/resources/career-diagnostic/submissions/${client.diagnosticId}?key=${encodeURIComponent(adminKey)}`}
+                          href={getClientProfileHref(adminKey, client.diagnosticId)}
                           className="inline-flex items-center px-1 py-2 text-[12px] font-semibold text-[#142334] underline-offset-4 transition hover:text-[#C9AD98] hover:underline"
                         >
                           View profile
@@ -597,9 +686,13 @@ export default function ClientsDashboard({
                       <div className="rounded-[8px] bg-white p-4">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">Payment detail</p>
                         <div className="mt-3 space-y-2 text-[13px] leading-relaxed text-[#142334]">
-                          <p>PayFast ID: {client.paymentId}</p>
-                          <p>Amount: {client.amountLabel}</p>
-                          <p>Confirmed: {formatDateTime(client.confirmedAt)}</p>
+                        <p>Engagement ID: {client.paymentId}</p>
+                        <p>Source: {client.paymentProvider === 'manual' ? 'Manual payment' : client.paymentProvider}</p>
+                        {client.manualPaymentMethod && <p>Method: {client.manualPaymentMethod.replace(/_/g, ' ')}</p>}
+                        {client.paymentReference && <p>Reference: {client.paymentReference}</p>}
+                        <p>Amount: {client.amountLabel}</p>
+                        <p>Confirmed: {formatDateTime(client.confirmedAt)}</p>
+                        {client.paymentNotes && <p>Private note: {client.paymentNotes}</p>}
                         </div>
                       </div>
                       <div className="rounded-[8px] bg-white p-4">
@@ -620,7 +713,7 @@ export default function ClientsDashboard({
                           )}
                         </div>
                         <Link
-                          href={`/resources/career-diagnostic/submissions?key=${encodeURIComponent(adminKey)}&tab=messages&q=${encodeURIComponent(client.buyerEmail)}`}
+                          href={getClientMessagesHref(adminKey, client.buyerEmail)}
                           className="mt-3 inline-flex text-[12px] font-semibold text-[#142334] underline-offset-4 hover:text-[#C9AD98] hover:underline"
                         >
                           View all in Messages

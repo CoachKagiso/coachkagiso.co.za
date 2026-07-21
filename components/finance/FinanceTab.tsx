@@ -14,6 +14,7 @@ import {
 import DashboardDatePicker from '@/components/DashboardDatePicker';
 import FilterDropdown from '@/components/FilterDropdown';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { ClientOperation } from '@/lib/client-operations';
 import type { DiagnosticLeadStatus, DiagnosticSubmission } from '@/lib/diagnostic-submissions';
 
@@ -140,15 +141,18 @@ function getDaysSince(value?: string | null) {
 
 function getClientHref(adminKey: string, paymentId: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('payment', paymentId);
   return `/dashboard/clients?${params.toString()}`;
 }
 
 function getLeadHref(adminKey: string, leadId: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
-  return `/resources/career-diagnostic/submissions/${leadId}?${params.toString()}`;
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
+  const query = params.toString();
+  return `/resources/career-diagnostic/submissions/${leadId}${query ? `?${query}` : ''}`;
 }
 
 function normalizeServiceKey(value?: string | null) {
@@ -272,7 +276,7 @@ export default function FinanceTab({
   const [logTo, setLogTo] = useState('');
 
   const confirmedOperations = useMemo(
-    () => operations.filter((operation) => operation.payment.status === 'confirmed'),
+    () => operations.filter((operation) => operation.payment.status === 'confirmed' && !operation.payment.is_test),
     [operations],
   );
 
@@ -319,7 +323,7 @@ export default function FinanceTab({
   }, [appliedFrom, appliedTo, logFrom, logTo, search, serviceFilter, transactionOperations]);
 
   const transactionTotal = filteredTransactions
-    .filter((operation) => operation.payment.status === 'confirmed')
+    .filter((operation) => operation.payment.status === 'confirmed' && !operation.payment.is_test)
     .reduce((sum, operation) => sum + operation.payment.amount, 0);
 
   const awaitingIntake = useMemo(
@@ -627,7 +631,12 @@ export default function FinanceTab({
                           {formatDate(getTransactionDate(operation))}
                         </td>
                         <td className="px-4 py-[14px]">
-                          <p className="text-[14px] font-bold text-[#142334]">{getClientName(operation)}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[14px] font-bold text-[#142334]">{getClientName(operation)}</p>
+                            {operation.payment.is_test && (
+                              <span className="rounded-full bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#6D28D9]">Test</span>
+                            )}
+                          </div>
                           <p className="mt-1 text-[12px] text-[#6B6B6B]">{getClientEmail(operation)}</p>
                         </td>
                         <td className="px-4 py-[14px]">

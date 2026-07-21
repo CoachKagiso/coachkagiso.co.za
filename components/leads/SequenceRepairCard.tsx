@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Loader2, MailCheck, Wrench } from 'lucide-react';
+import { buildDashboardAuthUrl } from '@/lib/dashboard-auth-url';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
 import type { EmailTemplateGuardrail } from '@/lib/email-template-guardrails';
 import type { SequenceRepairAction } from '@/lib/email-sequence-repair';
@@ -44,7 +45,7 @@ export default function SequenceRepairCard({ adminKey, lead, initialNotes }: Seq
     let cancelled = false;
     async function loadGuardrail() {
       try {
-        const response = await fetch(`/api/email/guardrails?key=${encodeURIComponent(adminKey)}&leadId=${encodeURIComponent(lead.id)}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/email/guardrails', adminKey, { leadId: lead.id }));
         const data = (await response.json().catch(() => ({}))) as GuardrailResponse;
         if (!response.ok || cancelled) return;
         setGuardrail(data.guardrail || null);

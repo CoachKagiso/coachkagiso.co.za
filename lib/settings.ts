@@ -47,6 +47,7 @@ export type AiConfigSettings = {
   zai_api_key?: string;
   openrouter_api_key?: string;
   test_mode: boolean;
+  reasoning_enabled?: boolean;
 };
 
 export type NotificationSettings = {
@@ -159,6 +160,7 @@ export const DEFAULT_SETTINGS = {
     zai_api_key: '',
     openrouter_api_key: '',
     test_mode: false,
+    reasoning_enabled: false,
   } satisfies AiConfigSettings,
   notifications: {
     new_lead: true,

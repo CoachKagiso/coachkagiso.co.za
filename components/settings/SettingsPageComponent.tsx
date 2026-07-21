@@ -1175,6 +1175,17 @@ export default function SettingsPageComponent({
                     <span className="text-[12px] text-[#6B6B6B]">Used for Polish and Format Check. It uses the same saved OpenRouter key.</span>
                   </div>
                 </div>
+                <div className="flex items-center justify-between gap-4 rounded-[8px] border border-[#E8DDD2] bg-white px-4 py-3">
+                  <div className="grid gap-0.5">
+                    <span className="text-[13px] font-semibold text-[#142334]">Reasoning / Extended Thinking</span>
+                    <span className="text-[12px] text-[#6B6B6B]">ON = model thinks deeply before responding (slower, higher quality). OFF = direct responses (faster, cheaper).</span>
+                  </div>
+                  <Toggle
+                    checked={aiConfig.reasoning_enabled ?? false}
+                    onChange={(checked) => setAiConfig({ ...aiConfig, reasoning_enabled: checked })}
+                    label="Toggle reasoning / extended thinking"
+                  />
+                </div>
                 <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the active model. This is required for the copyright guardrail to function reliably.</p>
                 <div className="flex flex-wrap items-center gap-3">
                   <button type="button" className="studio-primary-button" onClick={saveAiConfiguration}>

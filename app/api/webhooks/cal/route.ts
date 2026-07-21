@@ -3,11 +3,17 @@ import { NextResponse } from 'next/server';
 import {
   BOOKING_PAYMENT_WINDOW_HOURS,
   createBookingPaymentToken,
+  getBookingPaymentId,
   getBookingPaymentSecret,
   getBookingPaymentServiceSlug,
 } from '@/lib/booking-payment';
 import { sendTransactionalEmail } from '@/lib/brevo';
 import { asyncServices, formatCurrency } from '@/lib/buying-flow';
+import {
+  buildCalBookingIntake,
+  normalizeCalBookingResponses,
+  type CalBookingData,
+} from '@/lib/cal-booking-intake';
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { getSiteUrl } from '@/lib/env';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -24,23 +30,7 @@ const EVENT_SLUG_MAP: Record<string, string> = {
 
 type CalWebhookPayload = {
   triggerEvent?: string;
-  payload?: {
-    uid?: string;
-    bookingUid?: string;
-    type?: string;
-    eventType?: {
-      slug?: string;
-    };
-    attendees?: {
-      email?: string;
-      name?: string;
-    }[];
-    responses?: {
-      email?: {
-        value?: string;
-      };
-    };
-  };
+  payload?: CalBookingData;
 };
 
 type WebhookLogValues = {
@@ -87,13 +77,102 @@ function getBookingUid(payload: CalWebhookPayload) {
 function getBookerEmail(payload: CalWebhookPayload) {
   const booking = getBookingPayload(payload);
   const attendeeEmail = booking.attendees?.find((attendee) => attendee.email)?.email;
-  const responseEmail = booking.responses?.email?.value;
+  const normalizedEmail = normalizeCalBookingResponses(booking).email;
+  const responseEmail = typeof normalizedEmail === 'string' ? normalizedEmail : '';
   return String(attendeeEmail || responseEmail || '').toLowerCase().trim();
 }
 
 function getBookerName(payload: CalWebhookPayload) {
   const booking = getBookingPayload(payload);
-  return String(booking.attendees?.find((attendee) => attendee.email)?.name || '').trim();
+  const attendeeName = booking.attendees?.find((attendee) => attendee.email || attendee.name)?.name;
+  const normalizedName = normalizeCalBookingResponses(booking).fullName;
+  const responseName = typeof normalizedName === 'string' ? normalizedName : '';
+  return String(attendeeName || responseName || '').trim();
+}
+
+async function persistAcceptedBookingIntake(input: {
+  payload: CalWebhookPayload;
+  eventSlug: string;
+  bookingUid: string;
+  email: string;
+  webhookVersion: string | null;
+}) {
+  const serviceSlug = getBookingPaymentServiceSlug(input.eventSlug);
+  if (!serviceSlug) return null;
+
+  const service = asyncServices[serviceSlug];
+  const paymentId = getBookingPaymentId(serviceSlug, input.bookingUid);
+  const name = getBookerName(input.payload);
+  const intake = buildCalBookingIntake(getBookingPayload(input.payload), {
+    webhookVersion: input.webhookVersion,
+  });
+  const supabase = createSupabaseServiceClient();
+
+  const { error: paymentError } = await supabase.from('payments').upsert(
+    {
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      amount: service.amount,
+      status: 'pending',
+      buyer_email: input.email,
+      buyer_name: name || null,
+    },
+    { onConflict: 'payment_id', ignoreDuplicates: true },
+  );
+
+  if (paymentError) {
+    throw new Error(`Could not create booking engagement: ${paymentError.message}`);
+  }
+
+  const { data: existingIntake, error: existingIntakeError } = await supabase
+    .from('intake_submissions')
+    .select('form_data, cv_file_url, source_metadata')
+    .eq('source', 'cal')
+    .eq('source_reference', input.bookingUid)
+    .maybeSingle();
+
+  if (existingIntakeError) {
+    throw new Error(`Could not inspect existing booking intake: ${existingIntakeError.message}`);
+  }
+
+  const currentSourceMetadata = Object.fromEntries(
+    Object.entries(intake.sourceMetadata).filter(([, value]) => value !== null),
+  );
+
+  const { error: intakeError } = await supabase.from('intake_submissions').upsert(
+    {
+      payment_id: paymentId,
+      service_slug: serviceSlug,
+      form_data: {
+        ...((existingIntake?.form_data as Record<string, unknown> | null) || {}),
+        ...intake.formData,
+      },
+      cv_file_url: intake.cvFileUrl || existingIntake?.cv_file_url || null,
+      duplicate_attempt: false,
+      source: 'cal',
+      source_reference: input.bookingUid,
+      source_metadata: {
+        ...((existingIntake?.source_metadata as Record<string, unknown> | null) || {}),
+        ...currentSourceMetadata,
+      },
+    },
+    { onConflict: 'source,source_reference' },
+  );
+
+  if (intakeError) {
+    throw new Error(`Could not save booking intake: ${intakeError.message}`);
+  }
+
+  const { error: intakeStatusError } = await supabase
+    .from('payments')
+    .update({ intake_submitted_at: new Date().toISOString() })
+    .eq('payment_id', paymentId);
+
+  if (intakeStatusError) {
+    throw new Error(`Could not mark booking intake received: ${intakeStatusError.message}`);
+  }
+
+  return { paymentId, serviceSlug };
 }
 
 async function sendAcceptedBookingPaymentLink(input: {
@@ -216,6 +295,7 @@ export async function POST(request: Request) {
   const bookingUid = getBookingUid(payload);
   const bookerEmail = getBookerEmail(payload);
   const serviceLabel = EVENT_SLUG_MAP[eventSlug] || eventSlug || 'unknown';
+  const webhookVersion = request.headers.get('x-cal-webhook-version');
 
   if (!bookingUid) {
     await logWebhookEvent({
@@ -243,6 +323,34 @@ export async function POST(request: Request) {
     });
     console.warn('Cal booking received with no attendee email', { bookingUid, eventSlug });
     return NextResponse.json({ received: true });
+  }
+
+  try {
+    await persistAcceptedBookingIntake({
+      payload,
+      eventSlug,
+      bookingUid,
+      email: bookerEmail,
+      webhookVersion,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown booking intake persistence error';
+    await logWebhookEvent({
+      source: 'cal',
+      event_type: eventSlug || null,
+      booking_uid: bookingUid,
+      email: bookerEmail,
+      matched: false,
+      payload,
+      error: message,
+    });
+    console.error('Cal webhook: failed to persist booking intake', {
+      bookingUid,
+      eventSlug,
+      email: bookerEmail,
+      error: message,
+    });
+    return NextResponse.json({ error: 'Could not persist booking intake' }, { status: 500 });
   }
 
   const paymentLink = await sendAcceptedBookingPaymentLink({

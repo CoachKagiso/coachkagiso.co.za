@@ -534,6 +534,7 @@ export function generateTasks(
   });
 
   clientOps.forEach((operation) => {
+    if (operation.payment.is_test) return;
     const clientName = getPaymentClientName(operation);
     const dueDate = getDeliveryDueAt(operation);
     const subtitle = `${operation.serviceTitle} - ${operation.deliveryLabel}`;

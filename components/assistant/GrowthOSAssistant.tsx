@@ -38,6 +38,7 @@ import {
   type AssistantSavedConversation,
 } from '@/lib/assistant-preferences';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { buildDashboardAuthUrl, getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 
 type AssistantRecommendationItem = {
   label: string;
@@ -225,7 +226,8 @@ function normalizePlatform(value: string) {
 
 function buildStudioHref(adminKey: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'content');
   params.set('studio', 'content');
   return `/resources/career-diagnostic/submissions?${params.toString()}`;
@@ -284,8 +286,7 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
 
     async function loadAssistantMemory() {
       try {
-        const params = new URLSearchParams({ key: adminKey });
-        const response = await fetch(`/api/settings?${params.toString()}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/settings', adminKey));
         const data = (await response.json().catch(() => null)) as { settings?: Record<string, unknown> } | null;
         if (!response.ok || !data?.settings || cancelled) return;
 
@@ -530,7 +531,8 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
 
   function openAssistantSettings() {
     const params = new URLSearchParams();
-    if (adminKey) params.set('key', adminKey);
+    const legacyKey = getDashboardLegacyKey(adminKey);
+    if (legacyKey) params.set('key', legacyKey);
     params.set('tab', 'settings');
     router.push(`/resources/career-diagnostic/submissions?${params.toString()}`);
   }

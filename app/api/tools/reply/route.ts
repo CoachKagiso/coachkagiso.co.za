@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not read reply input.' }, { status: 400 });
   }
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -12,6 +12,12 @@ type PaymentRow = {
   buyer_name: string | null;
   created_at: string;
   confirmed_at: string | null;
+  payment_provider?: string | null;
+  manual_payment_method?: string | null;
+  manual_payment_reference?: string | null;
+  manual_payment_notes?: string | null;
+  confirmed_by?: string | null;
+  is_test?: boolean | null;
 };
 
 type ClientDeliveryRow = {
@@ -24,7 +30,7 @@ type ClientDeliveryRow = {
   created_at: string;
 };
 
-type IntakeSubmissionRow = {
+export type ClientIntakeRecord = {
   id: string;
   payment_id: string;
   service_slug: string;
@@ -32,6 +38,9 @@ type IntakeSubmissionRow = {
   cv_file_url: string | null;
   submitted_at: string;
   duplicate_attempt: boolean;
+  source: string;
+  source_reference: string | null;
+  source_metadata: Record<string, unknown>;
 };
 
 type DiagnosticRow = {
@@ -76,6 +85,12 @@ export type ClientRecord = {
   amount: number;
   amountLabel: string;
   confirmedAt: string;
+  paymentProvider: string;
+  manualPaymentMethod: string | null;
+  paymentReference: string | null;
+  paymentNotes: string | null;
+  confirmedBy: string | null;
+  isTest: boolean;
   milestones: ClientMilestone[];
   currentStage: string;
   currentStageOrder: number | null;
@@ -87,7 +102,7 @@ export type ClientRecord = {
   daysOverdue: number;
   deadline: string | null;
   hasIntake: boolean;
-  intake: IntakeSubmissionRow | null;
+  intake: ClientIntakeRecord | null;
   archetype: string | null;
   diagnosticId: string | null;
   recentEmails: { subject: string; sentAt: string; templateId: string | null }[];
@@ -97,9 +112,9 @@ export type ClientRecord = {
 const CLIENT_DELIVERY_SELECT =
   'id, payment_id, stage_name, stage_order, completed, completed_at, created_at';
 const PAYMENT_SELECT =
-  'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at';
+  'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, payment_provider, manual_payment_method, manual_payment_reference, manual_payment_notes, confirmed_by, is_test';
 const INTAKE_SELECT =
-  'id, payment_id, service_slug, form_data, cv_file_url, submitted_at, duplicate_attempt';
+  'id, payment_id, service_slug, form_data, cv_file_url, submitted_at, duplicate_attempt, source, source_reference, source_metadata';
 const NOTE_SELECT =
   'id, body, linked_task_id, linked_lead_id, linked_payment_id, created_at, updated_at';
 
@@ -110,6 +125,15 @@ function isMissingOptionalClientTable(message?: string) {
         message.includes('sent_emails') ||
         message.includes('notes') ||
         message.includes('schema cache'))
+  );
+}
+
+function isMissingManualPaymentColumn(message?: string) {
+  return Boolean(
+    message &&
+      ['is_test', 'manual_payment_method', 'manual_payment_reference', 'manual_payment_notes', 'confirmed_by'].some((column) =>
+        message.includes(column)
+      )
   );
 }
 
@@ -210,7 +234,7 @@ function sortClients(left: ClientRecord, right: ClientRecord) {
 export function buildClientList(
   payments: PaymentRow[],
   deliveries: ClientDeliveryRow[],
-  intakes: IntakeSubmissionRow[],
+  intakes: ClientIntakeRecord[],
   diagnostics: DiagnosticRow[],
   sentEmails: SentEmailRow[],
   notes: NoteRow[] = []
@@ -219,7 +243,7 @@ export function buildClientList(
     acc[delivery.payment_id] = [...(acc[delivery.payment_id] || []), delivery];
     return acc;
   }, {});
-  const intakesByPayment = intakes.reduce<Record<string, IntakeSubmissionRow>>((acc, intake) => {
+  const intakesByPayment = intakes.reduce<Record<string, ClientIntakeRecord>>((acc, intake) => {
     if (!acc[intake.payment_id]) acc[intake.payment_id] = intake;
     return acc;
   }, {});
@@ -285,6 +309,12 @@ export function buildClientList(
         amount: Number(payment.amount || 0),
         amountLabel: formatCurrency(Number(payment.amount || 0)),
         confirmedAt,
+        paymentProvider: payment.payment_provider || 'payfast',
+        manualPaymentMethod: payment.manual_payment_method || null,
+        paymentReference: payment.manual_payment_reference || null,
+        paymentNotes: payment.manual_payment_notes || null,
+        confirmedBy: payment.confirmed_by || null,
+        isTest: Boolean(payment.is_test),
         milestones,
         currentStage: currentMilestone?.stageName || (isDelivered ? 'Delivered' : 'Milestones not generated'),
         currentStageOrder: currentMilestone?.stageOrder || null,
@@ -295,7 +325,7 @@ export function buildClientList(
         isOverdue,
         daysOverdue: isOverdue && deadlineEnd ? countWorkingDaysAfter(deadlineEnd, new Date()) : 0,
         deadline,
-        hasIntake: service?.kind === 'booking' || Boolean(intake),
+        hasIntake: Boolean(intake),
         intake,
         archetype: diagnostic?.archetype_name || null,
         diagnosticId: diagnostic?.id || null,
@@ -321,9 +351,23 @@ export async function listClientRecords() {
     .order('confirmed_at', { ascending: false })
     .limit(250);
 
-  if (paymentResult.error) throw new Error(paymentResult.error.message);
+  let paymentRows = paymentResult.data as PaymentRow[] | null;
+  let paymentError = paymentResult.error;
 
-  const payments = (paymentResult.data || []) as PaymentRow[];
+  if (paymentError && isMissingManualPaymentColumn(paymentError.message)) {
+    const legacyPaymentResult = await supabase
+      .from('payments')
+      .select('payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, payment_provider')
+      .eq('status', 'confirmed')
+      .order('confirmed_at', { ascending: false })
+      .limit(250);
+    paymentRows = legacyPaymentResult.data as PaymentRow[] | null;
+    paymentError = legacyPaymentResult.error;
+  }
+
+  if (paymentError) throw new Error(paymentError.message);
+
+  const payments = paymentRows || [];
   const paymentIds = payments.map((payment) => payment.payment_id);
   const emails = [...new Set(payments.map((payment) => normalizeEmail(payment.buyer_email)).filter(Boolean))];
 
@@ -390,7 +434,7 @@ export async function listClientRecords() {
   return buildClientList(
     payments,
     deliveries,
-    (intakeResult.data || []) as IntakeSubmissionRow[],
+    (intakeResult.data || []) as ClientIntakeRecord[],
     (diagnosticResult.data || []) as DiagnosticRow[],
     sentEmails,
     notes

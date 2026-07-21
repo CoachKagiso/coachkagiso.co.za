@@ -192,21 +192,64 @@ body {
 
 .coach-dashboard-clean .dashboard-filter-dropdown-trigger,
 .coach-dashboard-clean .dashboard-filter-dropdown-menu {
-  border-color: #d8c8bb !important;
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean .dashboard-filter-dropdown-trigger:focus,
+.coach-dashboard-clean .dashboard-filter-dropdown-trigger[aria-expanded="true"] {
+  border-color: #142334 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+.coach-dashboard-clean [role="dialog"] select,
+.coach-dashboard-clean [role="dialog"] textarea {
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] input:not([type="checkbox"]):not([type="radio"]):focus,
+.coach-dashboard-clean [role="dialog"] select:focus,
+.coach-dashboard-clean [role="dialog"] textarea:focus {
+  border-color: #142334 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] .amount-input-container {
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] .amount-input-container:focus-within {
+  border-color: #142334 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] .amount-input-prefix {
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean [role="dialog"] .amount-input-container:focus-within .amount-input-prefix {
+  border-color: #142334 !important;
 }
 
 .coach-dashboard-clean .dashboard-date-picker-trigger,
 .coach-dashboard-clean .dashboard-date-picker-popover {
-  border-color: #d8c8bb !important;
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean .dashboard-date-picker-trigger:focus,
+.coach-dashboard-clean .dashboard-date-picker-trigger[aria-expanded="true"] {
+  border-color: #142334 !important;
 }
 
 .coach-dashboard-clean .dashboard-time-picker-trigger,
 .coach-dashboard-clean .dashboard-time-picker-popover {
-  border-color: #d8c8bb !important;
+  border-color: #a09086 !important;
+}
+
+.coach-dashboard-clean .dashboard-time-picker-trigger:focus,
+.coach-dashboard-clean .dashboard-time-picker-trigger[aria-expanded="true"] {
+  border-color: #142334 !important;
 }
 
 .coach-dashboard-clean input.dashboard-date-picker {
-  border-color: #d8c8bb !important;
+  border-color: #a09086 !important;
   color-scheme: light;
 }
 

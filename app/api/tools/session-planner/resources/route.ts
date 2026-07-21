@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const key = String(body?.key || req.headers.get('x-diagnostic-admin-key') || '');
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
