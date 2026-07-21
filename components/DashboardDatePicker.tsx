@@ -112,7 +112,7 @@ export default function DashboardDatePicker({ name, value = '', onChange, ariaLa
           if (!isOpen && selectedDate) setViewDate(selectedDate);
           setIsOpen((current) => !current);
         }}
-        className="dashboard-date-picker-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
+        className="dashboard-date-picker-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#A09086] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
       >
         <span className={selectedDate ? 'truncate' : 'truncate text-[#7C6F66]'}>
           {selectedDate ? displayFormatter.format(selectedDate) : placeholder}
@@ -127,7 +127,7 @@ export default function DashboardDatePicker({ name, value = '', onChange, ariaLa
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="dashboard-date-picker-popover absolute left-0 top-full z-[110] mt-2 w-[min(320px,calc(100vw-48px))] rounded-[10px] border border-[#D8C8BB] bg-white p-3 shadow-xl shadow-[#142334]/14"
+            className="dashboard-date-picker-popover absolute left-0 top-full z-[110] mt-2 w-[min(320px,calc(100vw-48px))] rounded-[10px] border border-[#A09086] bg-white p-3 shadow-xl shadow-[#142334]/14"
           >
             <div className="flex items-center justify-between gap-2">
               <button

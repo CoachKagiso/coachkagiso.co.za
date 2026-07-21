@@ -15,7 +15,7 @@ export async function DELETE(request: Request, context: MessageRouteContext) {
   const body = await request.json().catch(() => ({}));
   const key = typeof body.key === 'string' ? body.key : url.searchParams.get('key');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

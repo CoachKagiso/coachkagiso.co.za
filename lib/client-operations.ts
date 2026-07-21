@@ -1,8 +1,9 @@
 import { asyncServices, formatCurrency, getDeadlineDate, type AsyncServiceSlug } from '@/lib/buying-flow';
+import { extractSupabaseStorageLocation } from '@/lib/client-strategy-cv';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 const PAYMENT_SELECT =
-  'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, intake_submitted_at, intake_reminder_sent_at, delivery_status, delivery_notes, delivered_at, delivery_status_updated_at';
+  'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, intake_submitted_at, intake_reminder_sent_at, delivery_status, delivery_notes, delivered_at, delivery_status_updated_at, payment_provider, is_test';
 
 export type PaymentStatus = 'pending' | 'confirmed' | 'failed';
 export type DeliveryStatus = 'not_started' | 'in_progress' | 'delivered' | 'cancelled';
@@ -22,6 +23,8 @@ export type PaymentRecord = {
   delivery_notes: string | null;
   delivered_at: string | null;
   delivery_status_updated_at: string | null;
+  payment_provider: string;
+  is_test: boolean;
 };
 
 export type IntakeSubmissionRecord = {
@@ -77,13 +80,15 @@ function normalizePayment(row: Partial<PaymentRecord>) {
     delivery_notes: row.delivery_notes || null,
     delivered_at: row.delivered_at || null,
     delivery_status_updated_at: row.delivery_status_updated_at || null,
+    payment_provider: row.payment_provider || 'payfast',
+    is_test: Boolean(row.is_test),
   } as PaymentRecord;
 }
 
 function isMissingDeliveryColumn(message?: string) {
   return Boolean(
     message &&
-      ['delivery_status', 'delivery_notes', 'delivered_at', 'delivery_status_updated_at'].some((column) =>
+      ['delivery_status', 'delivery_notes', 'delivered_at', 'delivery_status_updated_at', 'is_test'].some((column) =>
         message.includes(column)
       )
   );
@@ -171,7 +176,7 @@ export async function listClientOperations(filters: ClientOperationFilters = {})
     let legacyQuery = supabase
       .from('payments')
       .select(
-        'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, intake_submitted_at, intake_reminder_sent_at'
+        'payment_id, service_slug, amount, status, buyer_email, buyer_name, created_at, confirmed_at, intake_submitted_at, intake_reminder_sent_at, payment_provider'
       )
       .order('created_at', { ascending: false })
       .limit(250);
@@ -275,6 +280,17 @@ export async function deleteClientOperations(paymentIds: string[]) {
 
   const supabase = createSupabaseServiceClient();
 
+  const cvResult = await supabase
+    .from('intake_submissions')
+    .select('cv_file_url')
+    .in('payment_id', paymentIds);
+  if (cvResult.error) throw new Error(cvResult.error.message);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '';
+  const privateCvPaths = (cvResult.data || [])
+    .map((intake) => extractSupabaseStorageLocation(String(intake.cv_file_url || ''), supabaseUrl))
+    .filter((location): location is { bucket: string; path: string } => location?.bucket === 'client-uploads')
+    .map((location) => location.path);
+
   const intakeResult = await supabase
     .from('intake_submissions')
     .delete()
@@ -288,4 +304,9 @@ export async function deleteClientOperations(paymentIds: string[]) {
     .in('payment_id', paymentIds);
 
   if (paymentResult.error) throw new Error(paymentResult.error.message);
+
+  if (privateCvPaths.length > 0) {
+    const storageResult = await supabase.storage.from('client-uploads').remove(privateCvPaths);
+    if (storageResult.error) console.error('Deleted test engagements left private CV objects for manual cleanup.');
+  }
 }

@@ -7,6 +7,7 @@ import { ArrowUpRight, ChevronDown, ChevronRight, Mail, Search, Trash2 } from 'l
 import DashboardDatePicker from '@/components/DashboardDatePicker';
 import FilterDropdown from '@/components/FilterDropdown';
 import MessagesBrevoImportButton from '@/components/messages/MessagesBrevoImportButton';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { DiagnosticLeadStatus } from '@/lib/diagnostic-submissions';
 import { leadSourceLabels } from '@/lib/lead-sources';
 import type { SentEmail, SentEmailFilterOption } from '@/lib/sent-emails';
@@ -139,7 +140,8 @@ function getInitial(email: SentEmail) {
 
 function getClearHref(adminKey: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'messages');
   return `/resources/career-diagnostic/submissions?${params.toString()}`;
 }
@@ -147,7 +149,8 @@ function getClearHref(adminKey: string) {
 function getProfileHref(adminKey: string, leadId: string | null) {
   if (!leadId) return '';
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'messages');
   return `/resources/career-diagnostic/submissions/${leadId}?${params.toString()}`;
 }

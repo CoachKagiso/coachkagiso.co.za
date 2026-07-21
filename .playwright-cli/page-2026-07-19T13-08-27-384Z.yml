@@ -1,0 +1,217 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - generic [ref=f1e767]:
+        - checkbox "Toggle dashboard sidebar" [ref=f1e768] [cursor=pointer]
+        - complementary [ref=f1e769]:
+          - generic [ref=f1e770]:
+            - link "Coach Kagiso Growth OS" [ref=f1e771] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions
+              - generic [ref=f1e776]:
+                - generic [ref=f1e777]: Coach Kagiso
+                - generic [ref=f1e778]: Growth OS
+            - generic "Toggle sidebar" [ref=f1e779] [cursor=pointer]: Toggle dashboard sidebar
+          - navigation [ref=f1e784]:
+            - link "Dashboard" [ref=f1e785] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions
+            - link "Leads" [ref=f1e792] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=leads
+            - link "Pipeline" [ref=f1e798] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=pipeline
+            - link "Clients" [ref=f1e802] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=clients
+            - link "Finance" [ref=f1e807] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=finance
+            - link "Career Tools" [ref=f1e814] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=career-tools
+            - group [ref=f1e821]:
+              - generic "Studio" [ref=f1e822] [cursor=pointer]
+            - link "Calendar" [ref=f1e828] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=calendar
+            - link "Messages" [ref=f1e832] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=messages
+            - link "Tasks" [ref=f1e836] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=tasks
+            - link "Notes" [ref=f1e841] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=notes
+            - link "Settings" [ref=f1e846] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=settings
+          - generic [ref=f1e851]:
+            - paragraph [ref=f1e852]: Today
+            - paragraph [ref=f1e853]: "12"
+            - paragraph [ref=f1e854]: Follow-ups due before the day closes.
+            - generic [ref=f1e855]:
+              - button "Alistacia - Send second contact" [ref=f1e856] [cursor=pointer]
+              - button "Lerato - Send second contact" [ref=f1e860] [cursor=pointer]
+              - button "Cynthia - Send second contact" [ref=f1e864] [cursor=pointer]
+              - link "and 9more ->" [ref=f1e868] [cursor=pointer]:
+                - /url: /resources/career-diagnostic/submissions?tab=leads&followUp=due
+      - generic [ref=f1e5]:
+        - generic [ref=f1e7]:
+          - generic [ref=f1e8]:
+            - paragraph [ref=f1e9]: Welcome,
+            - heading "Kagiso" [level=2] [ref=f1e10]
+          - searchbox "Find lead, email, service..." [ref=f1e12]
+          - generic [ref=f1e13]:
+            - generic [ref=f1e869]:
+              - paragraph [ref=f1e870]: Synced 15:06
+              - paragraph [ref=f1e871]: 13 dashboard notifications
+            - button "13 dashboard notifications." [ref=f1e15] [cursor=pointer]:
+              - generic [ref=f1e19]: "13"
+            - button "Log out" [ref=f1e21] [cursor=pointer]
+            - generic [ref=f1e25]:
+              - img "Kagiso" [ref=f1e26]
+              - generic [ref=f1e27]: Coach Kagiso
+        - generic [ref=f1e375]:
+          - generic [ref=f1e376]:
+            - generic [ref=f1e377]:
+              - paragraph [ref=f1e378]: Clients / Overview
+              - heading "Active clients" [level=2] [ref=f1e379]
+              - paragraph [ref=f1e380]: 0 active - 4 delivered this month - 0 overdue
+            - button "Add client manually" [ref=f1e381] [cursor=pointer]
+          - generic [ref=f1e385]:
+            - generic [ref=f1e386]:
+              - paragraph [ref=f1e387]: Active
+              - paragraph [ref=f1e388]: "0"
+              - paragraph [ref=f1e389]: Active clients
+            - generic [ref=f1e390]:
+              - paragraph [ref=f1e391]: Delivered
+              - paragraph [ref=f1e392]: "4"
+              - paragraph [ref=f1e393]: Delivered this month
+            - generic [ref=f1e394]:
+              - paragraph [ref=f1e395]: Overdue
+              - paragraph [ref=f1e396]: "0"
+              - paragraph [ref=f1e397]: Overdue
+            - generic [ref=f1e398]:
+              - paragraph [ref=f1e399]: Revenue
+              - paragraph [ref=f1e400]: R1 500
+              - paragraph [ref=f1e401]: Revenue this month
+          - generic [ref=f1e402]:
+            - textbox [ref=f1e404]:
+              - /placeholder: Search name, email, service...
+            - button "Filter clients by service" [ref=f1e406] [cursor=pointer]:
+              - generic [ref=f1e407]: All services
+            - button "Filter clients by status" [ref=f1e412] [cursor=pointer]:
+              - generic [ref=f1e413]: All statuses
+            - button "Apply" [ref=f1e417] [cursor=pointer]
+          - generic [ref=f1e418]:
+            - article [ref=f1e419]:
+              - generic [ref=f1e420]:
+                - generic [ref=f1e421]:
+                  - generic [ref=f1e422]:
+                    - heading "Client" [level=3] [ref=f1e423]
+                    - paragraph [ref=f1e424]: No email - No archetype - R500 paid 03 Jul 2026
+                  - generic [ref=f1e425]: Delivered
+                - generic [ref=f1e431]:
+                  - generic [ref=f1e432]: Intake received
+                  - generic [ref=f1e439]: CV in progress
+                  - generic [ref=f1e446]: LinkedIn in progress
+                  - generic [ref=f1e453]: Loom recorded
+                  - generic [ref=f1e460]: Delivered
+                - paragraph [ref=f1e466]: 5 of 5 stages complete
+                - button "Email Client" [ref=f1e469] [cursor=pointer]
+              - generic [ref=f1e473]:
+                - generic [ref=f1e474]:
+                  - generic [ref=f1e475]:
+                    - paragraph [ref=f1e476]: Intake responses
+                    - paragraph [ref=f1e478]: No intake form submitted yet.
+                  - generic [ref=f1e479]:
+                    - paragraph [ref=f1e480]: Delivery notes
+                    - generic [ref=f1e482]:
+                      - paragraph [ref=f1e484]: No delivery notes yet.
+                      - generic [ref=f1e485]:
+                        - textbox "Add a delivery note..." [ref=f1e486]
+                        - button "Save note" [disabled] [ref=f1e487]
+                - generic [ref=f1e488]:
+                  - generic [ref=f1e489]:
+                    - paragraph [ref=f1e490]: Payment detail
+                    - generic [ref=f1e491]:
+                      - paragraph [ref=f1e492]: "Engagement ID: bundle-7a7bea36-3568-4731-aac2-9cbe6406c50d"
+                      - paragraph [ref=f1e493]: "Source: payfast"
+                      - paragraph [ref=f1e494]: "Amount: R500"
+                      - paragraph [ref=f1e495]: "Confirmed: 03 Jul 2026, 12:29"
+                  - generic [ref=f1e496]:
+                    - paragraph [ref=f1e498]: Recent emails
+                    - paragraph [ref=f1e503]: No dashboard emails logged yet.
+                    - link "View all in Messages" [ref=f1e504] [cursor=pointer]:
+                      - /url: /resources/career-diagnostic/submissions?tab=messages&q=
+            - article [ref=f1e505]:
+              - generic [ref=f1e506]:
+                - generic [ref=f1e507]:
+                  - generic [ref=f1e508]:
+                    - heading "0737469385" [level=3] [ref=f1e509]
+                    - paragraph [ref=f1e510]: No email - No archetype - R500 paid 01 Jul 2026
+                  - generic [ref=f1e511]: Delivered
+                - generic [ref=f1e517]:
+                  - generic [ref=f1e518]: Intake received
+                  - generic [ref=f1e525]: CV in progress
+                  - generic [ref=f1e532]: LinkedIn in progress
+                  - generic [ref=f1e539]: Loom recorded
+                  - generic [ref=f1e546]: Delivered
+                - paragraph [ref=f1e552]: 5 of 5 stages complete
+                - button "Email 0737469385" [ref=f1e555] [cursor=pointer]
+            - article [ref=f1e559]:
+              - generic [ref=f1e560]:
+                - generic [ref=f1e561]:
+                  - generic [ref=f1e562]:
+                    - heading "Sifiso Kunene" [level=3] [ref=f1e563]
+                    - paragraph [ref=f1e564]: sifisokunene26@gmail.com - No archetype - R500 paid 20 Jun 2026
+                  - generic [ref=f1e565]: Delivered
+                - generic [ref=f1e571]:
+                  - generic [ref=f1e572]: Intake received
+                  - generic [ref=f1e579]: CV in progress
+                  - generic [ref=f1e586]: LinkedIn in progress
+                  - generic [ref=f1e593]: Loom recorded
+                  - generic [ref=f1e600]: Delivered
+                - paragraph [ref=f1e606]: 5 of 5 stages complete
+                - button "Email Sifiso" [ref=f1e609] [cursor=pointer]
+            - article [ref=f1e613]:
+              - generic [ref=f1e614]:
+                - generic [ref=f1e615]:
+                  - generic [ref=f1e616]:
+                    - heading "Boitumelo Lethwane" [level=3] [ref=f1e617]
+                    - paragraph [ref=f1e618]: gillygamesh@gmail.com - No archetype - R500 paid 01 Jul 2026
+                  - generic [ref=f1e619]: Delivered
+                - generic [ref=f1e625]:
+                  - generic [ref=f1e626]: Intake received
+                  - generic [ref=f1e633]: CV in progress
+                  - generic [ref=f1e640]: LinkedIn in progress
+                  - generic [ref=f1e647]: Loom recorded
+                  - generic [ref=f1e654]: Delivered
+                - paragraph [ref=f1e660]: 5 of 5 stages complete
+                - button "Email Boitumelo" [ref=f1e663] [cursor=pointer]
+    - generic:
+      - region:
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: Growth OS Assistant
+          - generic:
+            - button
+            - button [disabled]
+            - button [disabled]
+            - button [disabled]
+            - button
+            - button
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: What do you need?
+              - generic:
+                - button: What should I do next to move my goals?
+                - button: What should the masterclass cover?
+                - button: Summarise recent inbound replies
+                - button: What drafts are waiting in my Vault?
+        - generic:
+          - generic:
+            - button
+            - button
+            - textbox:
+              - /placeholder: Ask anything or request a draft...
+            - button
+            - button [disabled]
+          - button: Clear conversation
+      - button "Open Growth OS Assistant" [ref=f1e345] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f1e354] [cursor=pointer]
+  - alert [ref=f1e358]

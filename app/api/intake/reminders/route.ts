@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     .from('payments')
     .select('payment_id, service_slug, buyer_email, buyer_name, created_at')
     .eq('status', 'confirmed')
+    .eq('is_test', false)
     .is('intake_submitted_at', null)
     .is('intake_reminder_sent_at', null)
     .lt('created_at', cutoff);

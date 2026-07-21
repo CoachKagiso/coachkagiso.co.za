@@ -1,11 +1,16 @@
 import { getBrevoListId, getContactEmail } from '@/lib/env';
+import { classifyBrevoSendResult, type BrevoSendResult } from '@/lib/brevo-send-result';
 
 type SendEmailInput = {
   to: { email: string; name?: string }[];
   subject: string;
   text: string;
   html?: string;
+  headers?: Record<string, string>;
+  tags?: string[];
 };
+
+export type { BrevoSendResult } from '@/lib/brevo-send-result';
 
 export type BrevoTransactionalEmail = {
   date?: string;
@@ -44,8 +49,7 @@ async function brevoFetch(path: string, init: RequestInit) {
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    console.error(`Brevo request failed: ${response.status} ${body}`);
+    console.error(`Brevo request failed with status ${response.status}.`);
   }
 
   return response;
@@ -55,7 +59,14 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function sendTransactionalEmail({ to, subject, text, html }: SendEmailInput) {
+export async function sendTransactionalEmailWithStatus({
+  to,
+  subject,
+  text,
+  html,
+  headers,
+  tags,
+}: SendEmailInput): Promise<BrevoSendResult> {
   const senderEmail = getContactEmail();
   const response = await brevoFetch('/smtp/email', {
     method: 'POST',
@@ -65,12 +76,25 @@ export async function sendTransactionalEmail({ to, subject, text, html }: SendEm
       subject,
       textContent: text,
       htmlContent: html,
+      headers,
+      tags,
     }),
   });
 
-  if (!response || !response.ok) return null;
+  if (!response) return classifyBrevoSendResult({ responsePresent: false, responseOk: false });
+  if (!response.ok) return classifyBrevoSendResult({ responsePresent: true, responseOk: false });
 
-  return (await response.json().catch(() => ({}))) as { messageId?: string };
+  const result = (await response.json().catch(() => ({}))) as { messageId?: string };
+  return classifyBrevoSendResult({
+    responsePresent: true,
+    responseOk: true,
+    messageId: result.messageId,
+  });
+}
+
+export async function sendTransactionalEmail(input: SendEmailInput) {
+  const result = await sendTransactionalEmailWithStatus(input);
+  return result.outcome === 'accepted' ? { messageId: result.messageId } : null;
 }
 
 export async function listBrevoTransactionalEmails({

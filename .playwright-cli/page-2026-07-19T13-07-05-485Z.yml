@@ -1,0 +1,290 @@
+- generic [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e7]:
+        - generic [ref=f1e8]:
+          - paragraph [ref=f1e9]: Welcome,
+          - heading "Kagiso" [level=2] [ref=f1e10]
+        - searchbox "Find lead, email, service..." [ref=f1e12]
+        - generic [ref=f1e13]:
+          - button "13 dashboard notifications." [ref=f1e15] [cursor=pointer]:
+            - generic [ref=f1e19]: "13"
+          - button "Log out" [ref=f1e21] [cursor=pointer]
+          - generic [ref=f1e25]:
+            - img "Kagiso" [ref=f1e26]
+            - generic [ref=f1e27]: Coach Kagiso
+      - navigation "Dashboard tabs" [ref=f1e158]:
+        - link "Dashboard" [ref=f1e159] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions
+        - link "Leads" [ref=f1e160] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=leads
+        - link "Pipeline" [ref=f1e161] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=pipeline
+        - link "Clients" [ref=f1e162] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=clients
+        - link "Finance" [ref=f1e163] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=finance
+        - link "Career Tools" [ref=f1e164] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=career-tools
+        - link "Studio" [ref=f1e165] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=content
+        - link "Calendar" [ref=f1e166] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=calendar
+        - link "Messages" [ref=f1e167] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=messages
+        - link "Tasks" [ref=f1e168] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=tasks
+        - link "Notes" [ref=f1e169] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=notes
+        - link "Settings" [ref=f1e170] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=settings
+      - generic [ref=f1e375]:
+        - generic [ref=f1e376]:
+          - generic [ref=f1e377]:
+            - paragraph [ref=f1e378]: Clients / Overview
+            - heading "Active clients" [level=2] [ref=f1e379]
+            - paragraph [ref=f1e380]: 0 active - 4 delivered this month - 0 overdue
+          - button "Add client manually" [active] [ref=f1e381] [cursor=pointer]
+          - dialog [ref=f1e667]:
+            - generic [ref=f1e668]:
+              - generic [ref=f1e669]:
+                - paragraph [ref=f1e670]: Clients / Manual engagement
+                - heading "Add a paid client" [level=2] [ref=f1e671]
+                - paragraph [ref=f1e672]: Save the verified payment, questionnaire, and CV once. Eligible services will appear in Career Tools automatically.
+              - button "Close manual client form" [ref=f1e673] [cursor=pointer]
+            - generic [ref=f1e677]:
+              - generic [ref=f1e683]:
+                - paragraph [ref=f1e684]: Record safety
+                - paragraph [ref=f1e685]: No email is sent when this record is created. Test records are excluded from live figures and cannot send a strategy plan.
+              - generic [ref=f1e686]:
+                - heading "Client and service" [level=3] [ref=f1e688]
+                - generic [ref=f1e689]:
+                  - text: Full name
+                  - textbox "Full name" [ref=f1e690]
+                - generic [ref=f1e691]:
+                  - text: Email address
+                  - textbox "Email address" [ref=f1e692]
+                - generic [ref=f1e693]:
+                  - text: WhatsApp number
+                  - generic [ref=f1e694]: Optional
+                  - textbox "WhatsApp number Optional" [ref=f1e695]
+                - generic [ref=f1e696]:
+                  - text: Service purchased
+                  - combobox "Service purchased" [ref=f1e697]:
+                    - option "48-Hour CV Review · R150"
+                    - option "CV Revamp · R400"
+                    - option "Cover Letter · R150"
+                    - option "LinkedIn Optimisation · R300"
+                    - option "CV + LinkedIn Bundle · R500"
+                    - option "Career Clarity Session · R800" [selected]
+                    - option "Glow Up VIP Package · R1 200"
+                    - option "Saturday Masterclass · R450"
+                - generic [ref=f1e698]:
+                  - checkbox "This is a test record. Keep the workflow realistic, but exclude it from revenue and block external delivery." [ref=f1e699] [cursor=pointer]
+                  - generic [ref=f1e700]:
+                    - strong [ref=f1e701]: This is a test record.
+                    - text: Keep the workflow realistic, but exclude it from revenue and block external delivery.
+              - generic [ref=f1e702]:
+                - generic [ref=f1e703]:
+                  - heading "Verified payment" [level=3] [ref=f1e704]
+                  - paragraph [ref=f1e705]: Only add a real client after the money is visible in the bank or has been received.
+                - generic [ref=f1e706]:
+                  - text: Payment method
+                  - combobox "Payment method" [ref=f1e707]:
+                    - option "EFT / bank transfer" [selected]
+                    - option "Cash"
+                    - option "Card machine"
+                    - option "Other verified method"
+                - generic [ref=f1e708]:
+                  - text: Amount received
+                  - generic [ref=f1e709]:
+                    - generic [ref=f1e710]: R
+                    - spinbutton "Amount received R" [ref=f1e711]: "800"
+                - generic [ref=f1e712]:
+                  - text: Payment received
+                  - textbox "Payment received" [ref=f1e713]: 2026-07-19T15:07
+                - generic [ref=f1e714]:
+                  - text: Bank or receipt reference
+                  - generic [ref=f1e715]: Optional
+                  - textbox "Bank or receipt reference Optional" [ref=f1e716]
+                - generic [ref=f1e717]:
+                  - text: Private payment note
+                  - generic [ref=f1e718]: Optional
+                  - textbox "Private payment note Optional" [ref=f1e719]
+                - generic [ref=f1e720]:
+                  - checkbox "I confirm that I verified this payment before creating the paid engagement." [ref=f1e721] [cursor=pointer]
+                  - generic [ref=f1e722]: I confirm that I verified this payment before creating the paid engagement.
+              - generic [ref=f1e723]:
+                - generic [ref=f1e724]:
+                  - heading "Questionnaire and CV" [level=3] [ref=f1e725]
+                  - paragraph [ref=f1e726]: These answers become the client intake used by the delivery workspace.
+                - generic [ref=f1e727]:
+                  - generic [ref=f1e728]: What is their current role and career situation? (required)
+                  - textbox "What is their current role and career situation? (required)" [ref=f1e729]
+                - generic [ref=f1e730]:
+                  - generic [ref=f1e731]: What would they like to leave the session clear about? (required)
+                  - textbox "What would they like to leave the session clear about? (required)" [ref=f1e732]
+                - generic [ref=f1e733]:
+                  - generic [ref=f1e734]: What feels most stuck or uncertain right now? (required)
+                  - textbox "What feels most stuck or uncertain right now? (required)" [ref=f1e735]
+                - generic [ref=f1e736]:
+                  - generic [ref=f1e737]: What decision or next move are they trying to make? (required)
+                  - textbox "What decision or next move are they trying to make? (required)" [ref=f1e738]
+                - generic [ref=f1e739]:
+                  - text: Session or kick-off date
+                  - generic [ref=f1e740]: Optional
+                  - textbox "Session or kick-off date Optional" [ref=f1e741]
+                - generic [ref=f1e742]:
+                  - text: Client CV
+                  - generic [ref=f1e743]: Required
+                  - button "Client CV Required PDF or Word, maximum 10MB. Stored in the private client bucket." [ref=f1e744]
+                  - generic [ref=f1e745]: PDF or Word, maximum 10MB. Stored in the private client bucket.
+              - generic [ref=f1e746]:
+                - button "Cancel" [ref=f1e747] [cursor=pointer]
+                - button "Create engagement" [ref=f1e748] [cursor=pointer]
+        - generic [ref=f1e385]:
+          - generic [ref=f1e386]:
+            - paragraph [ref=f1e387]: Active
+            - paragraph [ref=f1e388]: "0"
+            - paragraph [ref=f1e389]: Active clients
+          - generic [ref=f1e390]:
+            - paragraph [ref=f1e391]: Delivered
+            - paragraph [ref=f1e392]: "4"
+            - paragraph [ref=f1e393]: Delivered this month
+          - generic [ref=f1e394]:
+            - paragraph [ref=f1e395]: Overdue
+            - paragraph [ref=f1e396]: "0"
+            - paragraph [ref=f1e397]: Overdue
+          - generic [ref=f1e398]:
+            - paragraph [ref=f1e399]: Revenue
+            - paragraph [ref=f1e400]: R1 500
+            - paragraph [ref=f1e401]: Revenue this month
+        - generic [ref=f1e402]:
+          - textbox [ref=f1e404]:
+            - /placeholder: Search name, email, service...
+          - button "Filter clients by service" [ref=f1e406] [cursor=pointer]:
+            - generic [ref=f1e407]: All services
+          - button "Filter clients by status" [ref=f1e412] [cursor=pointer]:
+            - generic [ref=f1e413]: All statuses
+          - button "Apply" [ref=f1e417] [cursor=pointer]
+        - generic [ref=f1e418]:
+          - article [ref=f1e419]:
+            - generic [ref=f1e420]:
+              - generic [ref=f1e421]:
+                - generic [ref=f1e422]:
+                  - heading "Client" [level=3] [ref=f1e423]
+                  - paragraph [ref=f1e424]: No email - No archetype - R500 paid 03 Jul 2026
+                - generic [ref=f1e425]: Delivered
+              - generic [ref=f1e431]:
+                - generic [ref=f1e432]: Intake received
+                - generic [ref=f1e439]: CV in progress
+                - generic [ref=f1e446]: LinkedIn in progress
+                - generic [ref=f1e453]: Loom recorded
+                - generic [ref=f1e460]: Delivered
+              - paragraph [ref=f1e466]: 5 of 5 stages complete
+              - button "Email Client" [ref=f1e469] [cursor=pointer]
+            - generic [ref=f1e473]:
+              - generic [ref=f1e474]:
+                - generic [ref=f1e475]:
+                  - paragraph [ref=f1e476]: Intake responses
+                  - paragraph [ref=f1e478]: No intake form submitted yet.
+                - generic [ref=f1e479]:
+                  - paragraph [ref=f1e480]: Delivery notes
+                  - generic [ref=f1e482]:
+                    - paragraph [ref=f1e484]: No delivery notes yet.
+                    - generic [ref=f1e485]:
+                      - textbox "Add a delivery note..." [ref=f1e486]
+                      - button "Save note" [disabled] [ref=f1e487]
+              - generic [ref=f1e488]:
+                - generic [ref=f1e489]:
+                  - paragraph [ref=f1e490]: Payment detail
+                  - generic [ref=f1e491]:
+                    - paragraph [ref=f1e492]: "Engagement ID: bundle-7a7bea36-3568-4731-aac2-9cbe6406c50d"
+                    - paragraph [ref=f1e493]: "Source: payfast"
+                    - paragraph [ref=f1e494]: "Amount: R500"
+                    - paragraph [ref=f1e495]: "Confirmed: 03 Jul 2026, 12:29"
+                - generic [ref=f1e496]:
+                  - paragraph [ref=f1e498]: Recent emails
+                  - paragraph [ref=f1e503]: No dashboard emails logged yet.
+                  - link "View all in Messages" [ref=f1e504] [cursor=pointer]:
+                    - /url: /resources/career-diagnostic/submissions?tab=messages&q=
+          - article [ref=f1e505]:
+            - generic [ref=f1e506]:
+              - generic [ref=f1e507]:
+                - generic [ref=f1e508]:
+                  - heading "0737469385" [level=3] [ref=f1e509]
+                  - paragraph [ref=f1e510]: No email - No archetype - R500 paid 01 Jul 2026
+                - generic [ref=f1e511]: Delivered
+              - generic [ref=f1e517]:
+                - generic [ref=f1e518]: Intake received
+                - generic [ref=f1e525]: CV in progress
+                - generic [ref=f1e532]: LinkedIn in progress
+                - generic [ref=f1e539]: Loom recorded
+                - generic [ref=f1e546]: Delivered
+              - paragraph [ref=f1e552]: 5 of 5 stages complete
+              - button "Email 0737469385" [ref=f1e555] [cursor=pointer]
+          - article [ref=f1e559]:
+            - generic [ref=f1e560]:
+              - generic [ref=f1e561]:
+                - generic [ref=f1e562]:
+                  - heading "Sifiso Kunene" [level=3] [ref=f1e563]
+                  - paragraph [ref=f1e564]: sifisokunene26@gmail.com - No archetype - R500 paid 20 Jun 2026
+                - generic [ref=f1e565]: Delivered
+              - generic [ref=f1e571]:
+                - generic [ref=f1e572]: Intake received
+                - generic [ref=f1e579]: CV in progress
+                - generic [ref=f1e586]: LinkedIn in progress
+                - generic [ref=f1e593]: Loom recorded
+                - generic [ref=f1e600]: Delivered
+              - paragraph [ref=f1e606]: 5 of 5 stages complete
+              - button "Email Sifiso" [ref=f1e609] [cursor=pointer]
+          - article [ref=f1e613]:
+            - generic [ref=f1e614]:
+              - generic [ref=f1e615]:
+                - generic [ref=f1e616]:
+                  - heading "Boitumelo Lethwane" [level=3] [ref=f1e617]
+                  - paragraph [ref=f1e618]: gillygamesh@gmail.com - No archetype - R500 paid 01 Jul 2026
+                - generic [ref=f1e619]: Delivered
+              - generic [ref=f1e625]:
+                - generic [ref=f1e626]: Intake received
+                - generic [ref=f1e633]: CV in progress
+                - generic [ref=f1e640]: LinkedIn in progress
+                - generic [ref=f1e647]: Loom recorded
+                - generic [ref=f1e654]: Delivered
+              - paragraph [ref=f1e660]: 5 of 5 stages complete
+              - button "Email Boitumelo" [ref=f1e663] [cursor=pointer]
+    - generic:
+      - region:
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: Growth OS Assistant
+          - generic:
+            - button
+            - button [disabled]
+            - button [disabled]
+            - button [disabled]
+            - button
+            - button
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: What do you need?
+              - generic:
+                - button: What should I do next to move my goals?
+                - button: What should the masterclass cover?
+                - button: Summarise recent inbound replies
+                - button: What drafts are waiting in my Vault?
+        - generic:
+          - generic:
+            - button
+            - button
+            - textbox:
+              - /placeholder: Ask anything or request a draft...
+            - button
+            - button [disabled]
+          - button: Clear conversation
+      - button "Open Growth OS Assistant" [ref=f1e345] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f1e354] [cursor=pointer]
+  - alert [ref=f1e358]

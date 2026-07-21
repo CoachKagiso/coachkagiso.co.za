@@ -219,7 +219,7 @@ function formatErrorMessage(status: number) {
 }
 
 export async function POST(request: Request) {
-  if (!isDiagnosticAdminAuthorized(getRequestKey(request))) {
+  if (!isDiagnosticAdminAuthorized(getRequestKey(request), request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

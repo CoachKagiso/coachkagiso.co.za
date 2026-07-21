@@ -32,6 +32,7 @@ import BatchDeleteControls from '@/components/BatchDeleteControls';
 import { GrowthOSAssistant } from '@/components/assistant/GrowthOSAssistant';
 import SettingsPageComponent from '@/components/settings/SettingsPageComponent';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
+import ClientStrategyWorkspace from '@/components/career-tools/ClientStrategyWorkspace';
 import CvAnalyzerDashboard from '@/components/career-tools/CvAnalyzerDashboard';
 import ClientsDashboard from '@/components/clients/ClientsDashboard';
 import ContentStudio from '@/components/content/ContentStudio';
@@ -57,7 +58,6 @@ import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
 import {
   diagnosticLeadStatuses,
-  isDiagnosticAdminAuthorized,
   isDiagnosticArchetypeKey,
   isDiagnosticLeadStatus,
   listDiagnosticSubmissions,
@@ -86,6 +86,8 @@ import {
   type DashboardNotificationEventType,
 } from '@/lib/dashboard-notifications';
 import { getDiagnosticAdminKey } from '@/lib/env';
+import { DASHBOARD_SESSION_CLIENT_MARKER, getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
+import { isDashboardServerAuthorized } from '@/lib/dashboard-session-server';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 import { buildAssistantDashboardContext } from '@/lib/growth-os-assistant';
 import { listInboundEmailReplies } from '@/lib/inbound-email-replies';
@@ -133,9 +135,11 @@ type DiagnosticSubmissionsPageProps = {
     from?: string;
     to?: string;
     studio?: string;
+    client?: string;
     updated?: string;
     deletedCount?: string;
     error?: string;
+    auth?: string;
   }>;
 };
 
@@ -572,9 +576,16 @@ function getFunnelActivityHref(activity: DashboardEventNotification) {
 
 function buildFunnelActivityRecordHref(id: string, key: string, returnTo: string) {
   const params = new URLSearchParams();
-  if (key) params.set('key', key);
+  const legacyKey = getDashboardLegacyKey(key);
+  if (legacyKey) params.set('key', legacyKey);
   if (returnTo) params.set('returnTo', returnTo);
   return `/resources/career-diagnostic/submissions/funnel/${id}?${params.toString()}`;
+}
+
+function buildSubmissionHref(id: string, key: string | undefined) {
+  const legacyKey = getDashboardLegacyKey(key);
+  const query = legacyKey ? `?key=${encodeURIComponent(legacyKey)}` : '';
+  return `/resources/career-diagnostic/submissions/${id}${query}`;
 }
 
 function getDateBoundaryTimestamp(value: string | null | undefined, boundary: 'start' | 'end') {
@@ -723,19 +734,22 @@ function buildFilterHref(
   next: Partial<typeof current>
 ) {
   const params = new URLSearchParams();
-  if (key) params.set('key', key);
+  const legacyKey = getDashboardLegacyKey(key);
+  if (legacyKey) params.set('key', legacyKey);
 
   const merged = { ...current, ...next };
   Object.entries(merged).forEach(([paramKey, value]) => {
     if (value && value !== 'all' && !(paramKey === 'tab' && value === 'dashboard')) params.set(paramKey, value);
   });
 
-  return `/resources/career-diagnostic/submissions?${params.toString()}`;
+  const query = params.toString();
+  return query ? `/resources/career-diagnostic/submissions?${query}` : '/resources/career-diagnostic/submissions';
 }
 
 function buildDashboardTabHref(key: string | undefined, tab: DashboardTab) {
   const params = new URLSearchParams();
-  if (key) params.set('key', key);
+  const legacyKey = getDashboardLegacyKey(key);
+  if (legacyKey) params.set('key', legacyKey);
   if (tab !== 'dashboard') params.set('tab', tab);
   const query = params.toString();
   return query ? `/resources/career-diagnostic/submissions?${query}` : '/resources/career-diagnostic/submissions';
@@ -1040,7 +1054,7 @@ async function loadDashboardProfilePhoto() {
   }
 }
 
-function AccessGate() {
+function AccessGate({ authStatus }: { authStatus?: string }) {
   const hasKeyConfigured = Boolean(getDiagnosticAdminKey());
 
   return (
@@ -1062,21 +1076,44 @@ function AccessGate() {
               </p>
 
               {hasKeyConfigured ? (
-                <form action="/resources/career-diagnostic/submissions" method="get" className="mt-8 grid gap-3 md:grid-cols-[1fr_auto]">
-                  <input
-                    type="password"
-                    name="key"
-                    required
-                    placeholder="Diagnostic admin key"
-                    className="w-full border border-[#D8C8BB] bg-[#FCFBFA] px-4 py-3.5 text-[15px] outline-none focus:border-[#142334]"
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-[#142334] px-7 py-3.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
-                  >
-                    Open dashboard <ArrowUpRight className="h-4 w-4" />
-                  </button>
-                </form>
+                <>
+                  {authStatus === 'invalid' && (
+                    <p role="alert" className="mt-6 border border-[#C98672] bg-[#FFF5F2] px-4 py-3 text-[13px] font-semibold text-[#7A2F22]">
+                      That access key was not accepted. Check it and try again.
+                    </p>
+                  )}
+                  {authStatus === 'limited' && (
+                    <p role="alert" className="mt-6 border border-[#E8CF9E] bg-[#FFF9ED] px-4 py-3 text-[13px] font-semibold text-[#76541D]">
+                      Too many attempts. Wait 15 minutes before trying again.
+                    </p>
+                  )}
+                  <form action="/api/dashboard/session" method="post" className="mt-8 grid gap-3 md:grid-cols-[1fr_auto]">
+                    <input
+                      type="text"
+                      name="username"
+                      value="dashboard-admin"
+                      readOnly
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      autoComplete="username"
+                      className="sr-only"
+                    />
+                    <input
+                      type="password"
+                      name="key"
+                      required
+                      autoComplete="current-password"
+                      placeholder="Diagnostic admin key"
+                      className="w-full border border-[#D8C8BB] bg-[#FCFBFA] px-4 py-3.5 text-[15px] outline-none focus:border-[#142334]"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-[#142334] px-7 py-3.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                    >
+                      Open dashboard <ArrowUpRight className="h-4 w-4" />
+                    </button>
+                  </form>
+                </>
               ) : (
                 <div className="mt-8 border border-[#C9AD98]/55 bg-[#F7F1EC] p-5 text-[14px] leading-relaxed text-[#142334]/72">
                   Add `DIAGNOSTIC_ADMIN_KEY` to `.env.local`, restart the dev server, and this private dashboard will unlock.
@@ -1093,7 +1130,6 @@ function AccessGate() {
 
 export default async function DiagnosticSubmissionsPage({ searchParams }: DiagnosticSubmissionsPageProps) {
   const {
-    key,
     tab,
     archetype,
     status,
@@ -1107,14 +1143,18 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     from,
     to,
     studio,
+    client,
     updated,
     deletedCount,
     error,
+    auth,
   } = await searchParams;
 
-  if (!isDiagnosticAdminAuthorized(key)) {
-    return <AccessGate />;
+  if (!await isDashboardServerAuthorized()) {
+    return <AccessGate authStatus={auth} />;
   }
+
+  const key = DASHBOARD_SESSION_CLIENT_MARKER;
 
   const selectedFilter = isDiagnosticArchetypeKey(archetype) ? archetype : 'all';
   const selectedStatus = isDiagnosticLeadStatus(status) ? status : 'all';
@@ -1181,7 +1221,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         }),
     listInboundEmailReplies({ limit: 60 }),
     listSentEmails(),
-    activeTab === 'clients' ? listClientRecords() : Promise.resolve([]),
+    activeTab === 'clients' || activeTab === 'career-tools' ? listClientRecords() : Promise.resolve([]),
     listContentCalendarItems(),
     listContentBacklogItems(),
     activeTab === 'content' ? listResearchEntries() : Promise.resolve([]),
@@ -1194,9 +1234,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     loadDashboardProfilePhoto(),
   ]);
   const dashboardNotificationCount = followUpNotificationCount + dashboardEventNotificationCount;
-  const exportHref = `/api/diagnostic/export?key=${encodeURIComponent(key || '')}${
-    selectedFilter === 'all' ? '' : `&archetype=${selectedFilter}`
-  }${selectedSource === 'all' ? '' : `&source=${selectedSource}`}`;
+  const exportParams = new URLSearchParams();
+  const exportLegacyKey = getDashboardLegacyKey(key);
+  if (exportLegacyKey) exportParams.set('key', exportLegacyKey);
+  if (selectedFilter !== 'all') exportParams.set('archetype', selectedFilter);
+  if (selectedSource !== 'all') exportParams.set('source', selectedSource);
+  const exportQuery = exportParams.toString();
+  const exportHref = `/api/diagnostic/export${exportQuery ? `?${exportQuery}` : ''}`;
   const currentFilters = {
     tab: activeTab,
     archetype: selectedFilter,
@@ -1262,7 +1306,9 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
       (submission.follow_up_count ?? 0) === 0
   ).length;
   const conversionReady = submissions.filter((submission) => revenueStatuses.includes(submission.lead_status)).length;
-  const confirmedOperations = operations.filter((operation) => operation.payment.status === 'confirmed');
+  const liveOperations = operations.filter((operation) => !operation.payment.is_test);
+  const testOperations = operations.filter((operation) => operation.payment.is_test);
+  const confirmedOperations = liveOperations.filter((operation) => operation.payment.status === 'confirmed');
   const totalRevenue = confirmedOperations.reduce((total, operation) => total + operation.payment.amount, 0);
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -1271,8 +1317,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     (operation) => new Date(operation.payment.confirmed_at || operation.payment.created_at).getTime() >= monthStart.getTime()
   );
   const monthlyRevenue = monthlyConfirmedOperations.reduce((total, operation) => total + operation.payment.amount, 0);
-  const waitingForIntake = operations.filter((operation) => operation.deliveryState === 'waiting_for_intake');
-  const activeDeliveryQueue = operations
+  const waitingForIntake = liveOperations.filter((operation) => operation.deliveryState === 'waiting_for_intake');
+  const activeDeliveryQueue = liveOperations
     .filter((operation) => ['ready', 'in_progress', 'due_soon', 'overdue'].includes(operation.deliveryState))
     .slice(0, 8);
   const operationServiceCounts = confirmedOperations.reduce<Record<string, number>>((acc, operation) => {
@@ -1321,8 +1367,8 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
       (submission.lead_status === 'discovery_booked' || getPriorityScore(submission) >= 70)
   ).length;
   const paidClientCount = confirmedOperations.length;
-  const overdueDeliveryCount = operations.filter((operation) => operation.deliveryState === 'overdue').length;
-  const paidDeliveryPressureCount = operations.filter(
+  const overdueDeliveryCount = liveOperations.filter((operation) => operation.deliveryState === 'overdue').length;
+  const paidDeliveryPressureCount = liveOperations.filter(
     (operation) =>
       operation.payment.status === 'confirmed' &&
       ['waiting_for_intake', 'ready', 'in_progress', 'due_soon', 'overdue'].includes(operation.deliveryState)
@@ -1422,7 +1468,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     ...actionQueue.slice(0, 3).map((submission) => ({
       title: `${submission.first_name || 'Lead'} - ${getNextAction(submission)}`,
       detail: `${submission.archetype_payload?.service || submission.archetype_name} - Priority ${getPriorityScore(submission)}`,
-      href: `/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`,
+      href: buildSubmissionHref(submission.id, key),
     })),
     ...activeDeliveryQueue.slice(0, 2).map((operation) => ({
       title: `${operation.payment.buyer_name || operation.intake?.form_data.fullName || 'Client'} - ${operation.deliveryLabel}`,
@@ -2203,11 +2249,23 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
 
         {activeTab === 'clients' && (
-          <ClientsDashboard adminKey={key || ''} clients={clientRecords} />
+          <ClientsDashboard
+            key={clientRecords.map((clientRecord) => clientRecord.paymentId).join('|') || 'clients-empty'}
+            adminKey={key || ''}
+            clients={clientRecords}
+          />
         )}
 
         {activeTab === 'career-tools' && (
-          <CvAnalyzerDashboard adminKey={key || ''} />
+          <div className="space-y-3">
+            <ClientStrategyWorkspace
+              key={client || 'strategy-workspace-empty'}
+              adminKey={key || ''}
+              clients={clientRecords}
+              selectedPaymentId={client}
+            />
+            <CvAnalyzerDashboard adminKey={key || ''} />
+          </div>
         )}
 
         {activeTab === 'pipeline' && (
@@ -2240,7 +2298,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                           <div>
                             <div className="flex flex-wrap items-center gap-3">
                               <Link
-                                href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`}
+                                href={buildSubmissionHref(submission.id, key)}
                                 className="font-serif text-[29px] leading-none text-[#142334] transition hover:text-[#C9AD98]"
                               >
                                 {submission.first_name}
@@ -2344,7 +2402,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       waitingForResponseQueue.map((submission) => (
                         <Link
                           key={submission.id}
-                          href={`/resources/career-diagnostic/submissions/${submission.id}?key=${encodeURIComponent(key || '')}`}
+                          href={buildSubmissionHref(submission.id, key)}
                           className="grid gap-2 rounded-[8px] bg-white px-4 py-3 transition hover:text-[#C9AD98]"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -2485,13 +2543,13 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A09086]">
                       Recent payment records
                     </p>
-                    <h2 className="mt-2 font-serif text-[36px] leading-tight">Clean up sandbox payment tests</h2>
+                    <h2 className="mt-2 font-serif text-[36px] leading-tight">Clean up test client records</h2>
                   </div>
                   <Settings className="h-5 w-5 shrink-0 text-[#C9AD98]" />
                 </div>
-                {operations.length === 0 ? (
+                {testOperations.length === 0 ? (
                   <div className="p-6 text-[15px] leading-relaxed text-[#142334]/70">
-                    No payment records found.
+                    No test client records found. Real payments are never listed in this cleanup tool.
                   </div>
                 ) : (
                   <form action="/api/operations/payments/batch" method="post">
@@ -2503,7 +2561,7 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
                       label="payment records"
                     />
                     <div className="divide-y divide-[#D8C8BB]">
-                      {operations.slice(0, 12).map((operation) => (
+                      {testOperations.slice(0, 12).map((operation) => (
                         <div key={operation.payment.payment_id} className="grid gap-4 px-6 py-5 md:grid-cols-[auto_1fr] md:items-center">
                           <input
                             type="checkbox"

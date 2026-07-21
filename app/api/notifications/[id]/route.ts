@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const url = new URL(request.url);
   const key = String(body?.key || url.searchParams.get('key') || request.headers.get('x-diagnostic-admin-key') || '');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -34,7 +34,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   const url = new URL(request.url);
   const key = String(body?.key || url.searchParams.get('key') || request.headers.get('x-diagnostic-admin-key') || '');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

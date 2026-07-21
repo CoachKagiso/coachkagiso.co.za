@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const key = url.searchParams.get('key') || '';
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const key = String(body?.key || '');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

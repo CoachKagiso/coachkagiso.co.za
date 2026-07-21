@@ -100,8 +100,8 @@ export default function DashboardTimePicker({
         aria-expanded={isOpen}
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
-        className={`dashboard-time-picker-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30 ${
-          disabled ? 'cursor-not-allowed bg-[#F8F6F4] text-[#A09086] hover:border-[#D8C8BB] hover:bg-[#F8F6F4]' : ''
+        className={`dashboard-time-picker-trigger flex h-11 w-full items-center justify-between rounded-[8px] border border-[#A09086] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30 ${
+          disabled ? 'cursor-not-allowed bg-[#F8F6F4] text-[#A09086] hover:border-[#A09086] hover:bg-[#F8F6F4]' : ''
         }`}
       >
         <span className={selectedLabel ? 'truncate' : 'truncate text-[#7C6F66]'}>{selectedLabel || placeholder}</span>
@@ -118,7 +118,7 @@ export default function DashboardTimePicker({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="dashboard-time-picker-popover absolute left-0 top-full z-[110] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#D8C8BB] bg-white shadow-xl shadow-[#142334]/12"
+            className="dashboard-time-picker-popover absolute left-0 top-full z-[110] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#A09086] bg-white shadow-xl shadow-[#142334]/12"
           >
             {options.map((option) => {
               const isSelected = option.value === selectedValue;

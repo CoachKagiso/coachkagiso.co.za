@@ -24,10 +24,11 @@ import Reveal from '@/components/Reveal';
 import {
   diagnosticLeadStatuses,
   getDiagnosticSubmissionById,
-  isDiagnosticAdminAuthorized,
   type DiagnosticLeadStatus,
   type DiagnosticSubmission,
 } from '@/lib/diagnostic-submissions';
+import { DASHBOARD_SESSION_CLIENT_MARKER } from '@/lib/dashboard-auth-url';
+import { isDashboardServerAuthorized } from '@/lib/dashboard-session-server';
 import { questions } from '@/lib/career-diagnostic';
 import { listNotes } from '@/lib/dashboard-task-records';
 import { getDashboardEventNotificationCount } from '@/lib/dashboard-notifications';
@@ -156,11 +157,12 @@ export default async function DiagnosticSubmissionSummaryPage({
   searchParams,
 }: DiagnosticSubmissionSummaryPageProps) {
   const { id } = await params;
-  const { key, updated, error } = await searchParams;
+  const { updated, error } = await searchParams;
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!await isDashboardServerAuthorized()) {
     notFound();
   }
+  const key = DASHBOARD_SESSION_CLIENT_MARKER;
 
   const submission = await getDiagnosticSubmissionById(id);
 
@@ -171,9 +173,8 @@ export default async function DiagnosticSubmissionSummaryPage({
   const payload = submission.archetype_payload || {};
   const answerRows = getAnswerRows(submission);
   const priority = getPriorityScore(submission);
-  const encodedKey = encodeURIComponent(key || '');
-  const leadsHref = `/resources/career-diagnostic/submissions?key=${encodedKey}&tab=leads`;
-  const profileHref = `/resources/career-diagnostic/submissions/${submission.id}?key=${encodedKey}`;
+  const leadsHref = '/resources/career-diagnostic/submissions?tab=leads';
+  const profileHref = `/resources/career-diagnostic/submissions/${submission.id}`;
   const [allNotes, followUpNotificationCount, dashboardEventNotificationCount, sidebarFollowUps] = await Promise.all([
     listNotes(),
     getFollowUpNotificationCount(),

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const formData = await request.formData().catch(() => null);
   const adminKey = String(formData?.get('adminKey') || formData?.get('key') || '');
 
-  if (!isDiagnosticAdminAuthorized(adminKey)) {
+  if (!isDiagnosticAdminAuthorized(adminKey, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

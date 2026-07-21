@@ -20,6 +20,7 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { FollowUpNotification } from '@/lib/follow-up-utils';
 
 const primaryDashboardNavItems = [
@@ -56,7 +57,8 @@ type DashboardSidebarProps = {
 
 function buildTabHref(adminKey: string | undefined, tab: string, options?: { studio?: string }) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   if (tab !== 'dashboard') params.set('tab', tab);
   if (tab === 'content' && options?.studio) params.set('studio', options.studio);
   const query = params.toString();

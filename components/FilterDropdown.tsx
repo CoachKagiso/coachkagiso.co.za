@@ -59,7 +59,7 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
         aria-label={ariaLabel}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
-        className={`dashboard-filter-dropdown-trigger flex w-full items-center justify-between rounded-[8px] border border-[#D8C8BB] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30 ${
+        className={`dashboard-filter-dropdown-trigger flex w-full items-center justify-between rounded-[8px] border border-[#A09086] bg-white px-4 text-left text-[13px] font-semibold text-[#142334] outline-none transition-all duration-200 hover:border-[#C9AD98] hover:bg-[#F8F6F4] focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30 ${
           wrapLabels ? 'min-h-11 py-3' : 'h-11'
         }`}
       >
@@ -83,7 +83,7 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="dashboard-filter-dropdown-menu absolute left-0 top-full z-[300] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#D8C8BB] bg-white shadow-xl shadow-[#142334]/12"
+            className="dashboard-filter-dropdown-menu absolute left-0 top-full z-[300] mt-2 max-h-[280px] w-full overflow-y-auto rounded-[8px] border border-[#A09086] bg-white shadow-xl shadow-[#142334]/12"
           >
             {options.map((option) => {
               const isSelected = option.value === selectedValue;

@@ -25,7 +25,7 @@ function isCronAuthorized(request: Request) {
 }
 
 function isRequestAuthorized(request: Request, key?: string | null) {
-  return isCronAuthorized(request) || isDiagnosticAdminAuthorized(key);
+  return isCronAuthorized(request) || isDiagnosticAdminAuthorized(key, request);
 }
 
 type InboundImportResult = Awaited<ReturnType<typeof importZohoInboundReplies>>;
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const key = url.searchParams.get('key');
 
   const cronAuthorized = isCronAuthorized(request);
-  if (!cronAuthorized && !isDiagnosticAdminAuthorized(key)) {
+  if (!cronAuthorized && !isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

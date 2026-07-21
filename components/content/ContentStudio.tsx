@@ -99,6 +99,7 @@ import {
   type VaultSection,
 } from '@/lib/content/vault-policy';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { buildDashboardAuthUrl } from '@/lib/dashboard-auth-url';
 import {
   AUTO_TOPIC_STORAGE_KEY,
   buildAutoTopicPrompt,
@@ -13700,7 +13701,7 @@ function ResearchVaultTab({
   async function handleArchive(id: string) {
     setArchiveBusy(true);
     try {
-      await requestJson<{ ok: true }>(`/api/content/research/${id}?key=${encodeURIComponent(adminKey)}`, 'DELETE', {});
+      await requestJson<{ ok: true }>(buildDashboardAuthUrl(`/api/content/research/${id}`, adminKey), 'DELETE', {});
       onArchive(id);
       setConfirmArchiveId(null);
       if (selectedEntry?.id === id) {

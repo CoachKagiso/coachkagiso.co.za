@@ -32,7 +32,7 @@ export async function POST(request: Request, context: RouteContext) {
   const key = String(formData.get('key') || '');
   const redirectTo = String(formData.get('redirectTo') || `/resources/career-diagnostic/submissions/${id}`);
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return redirectWithStatus(redirectTo, request.url, 'unauthorized');
   }
 
@@ -102,7 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const body = await request.json().catch(() => null);
   const key = String(body?.key || '');
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

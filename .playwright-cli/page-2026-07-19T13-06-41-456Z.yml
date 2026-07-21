@@ -1,0 +1,301 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e7]:
+        - generic [ref=f1e8]:
+          - paragraph [ref=f1e9]: Welcome,
+          - heading "Kagiso" [level=2] [ref=f1e10]
+        - searchbox "Find lead, email, service..." [ref=f1e12]
+        - generic [ref=f1e13]:
+          - button "13 dashboard notifications." [ref=f1e15] [cursor=pointer]:
+            - generic [ref=f1e19]: "13"
+          - button "Log out" [ref=f1e21] [cursor=pointer]
+          - generic [ref=f1e25]:
+            - img "Kagiso" [ref=f1e26]
+            - generic [ref=f1e27]: Coach Kagiso
+      - generic [ref=f1e28]:
+        - generic [ref=f1e29]:
+          - generic [ref=f1e30]:
+            - paragraph [ref=f1e31]: Home / Dashboard
+            - heading "Good Afternoon, Kagiso." [level=1] [ref=f1e32]:
+              - generic [ref=f1e33]: Good Afternoon,
+              - text: Kagiso.
+            - paragraph [ref=f1e34]: It's Sunday, 19th July 2026 - Updated 15:06 SAST
+            - paragraph [ref=f1e35]:
+              - text: Hey, Coach.
+              - generic [ref=f1e36]: "12"
+              - text: follow-ups need attention,
+              - generic [ref=f1e37]: "4"
+              - text: paid clients are waiting on delivery, and the strongest content signal today is career growth clarity.
+          - generic [ref=f1e38]:
+            - link "Export" [ref=f1e39] [cursor=pointer]:
+              - /url: /api/diagnostic/export
+            - link "Refresh" [ref=f1e43] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions
+        - generic [ref=f1e49]:
+          - generic [ref=f1e50]:
+            - link "Open New leads" [ref=f1e51] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=leads&status=new
+              - paragraph [ref=f1e58]: "0"
+              - paragraph [ref=f1e59]: New leads
+              - paragraph [ref=f1e60]: Updated 15:06
+            - link "Open Hot leads" [ref=f1e61] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=pipeline
+              - paragraph [ref=f1e67]: "3"
+              - paragraph [ref=f1e68]: Hot leads
+              - paragraph [ref=f1e69]: Priority score or booked call
+            - link "Open Follow-ups due" [ref=f1e70] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=pipeline&followUp=due
+              - paragraph [ref=f1e76]: "12"
+              - paragraph [ref=f1e77]: Follow-ups due
+              - paragraph [ref=f1e78]: Due by 15:06
+            - link "Open Paid clients" [ref=f1e79] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=clients
+              - paragraph [ref=f1e86]: "4"
+              - paragraph [ref=f1e87]: Paid clients
+              - paragraph [ref=f1e88]: Confirmed payments
+            - link "Open Revenue this month" [ref=f1e89] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=finance
+              - paragraph [ref=f1e94]: R1 500
+              - paragraph [ref=f1e95]: Revenue this month
+              - paragraph [ref=f1e96]: As of 15:06
+            - link "Open Overdue delivery" [ref=f1e97] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=clients
+              - paragraph [ref=f1e102]: "2"
+              - paragraph [ref=f1e103]: Overdue delivery
+              - paragraph [ref=f1e104]: Needs attention
+          - generic [ref=f1e105]:
+            - generic [ref=f1e106]:
+              - generic [ref=f1e107]:
+                - paragraph [ref=f1e108]: Conversion readiness
+                - paragraph [ref=f1e109]: 0%
+              - generic [ref=f1e110]: 0/56
+            - generic [ref=f1e112]:
+              - paragraph [ref=f1e113]: Top signal
+              - paragraph [ref=f1e114]: Engaged Strategist
+        - generic [ref=f1e115]:
+          - generic [ref=f1e116]:
+            - generic [ref=f1e117]:
+              - generic [ref=f1e122]:
+                - paragraph [ref=f1e123]: Goal compass
+                - heading "New business goal" [level=2] [ref=f1e124]
+              - paragraph [ref=f1e125]: 2 active goals in focus. Average progress is 9%, and the assistant will use these targets when recommending priorities.
+            - link "Manage goals" [ref=f1e126] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=settings
+          - generic [ref=f1e130]:
+            - link "90-day / Clients New business goal Target 0/15 Due 30 Aug - Priority 2/5" [ref=f1e131] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=leads
+              - generic [ref=f1e133]:
+                - paragraph [ref=f1e134]: 90-day / Clients
+                - paragraph [ref=f1e135]: New business goal
+              - generic [ref=f1e139]:
+                - generic [ref=f1e140]: Target
+                - generic [ref=f1e141]: 0/15
+              - paragraph [ref=f1e143]: Due 30 Aug - Priority 2/5
+            - link "Short term / Content New business goal Target 2/12 Due 30 Jun - Priority 1/5" [ref=f1e144] [cursor=pointer]:
+              - /url: /resources/career-diagnostic/submissions?tab=content
+              - generic [ref=f1e146]:
+                - paragraph [ref=f1e147]: Short term / Content
+                - paragraph [ref=f1e148]: New business goal
+              - generic [ref=f1e152]:
+                - generic [ref=f1e153]: Target
+                - generic [ref=f1e154]: 2/12
+              - paragraph [ref=f1e157]: Due 30 Jun - Priority 1/5
+      - navigation "Dashboard tabs" [ref=f1e158]:
+        - link "Dashboard" [ref=f1e159] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions
+        - link "Leads" [ref=f1e160] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=leads
+        - link "Pipeline" [ref=f1e161] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=pipeline
+        - link "Clients" [ref=f1e162] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=clients
+        - link "Finance" [ref=f1e163] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=finance
+        - link "Career Tools" [ref=f1e164] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=career-tools
+        - link "Studio" [ref=f1e165] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=content
+        - link "Calendar" [ref=f1e166] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=calendar
+        - link "Messages" [ref=f1e167] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=messages
+        - link "Tasks" [ref=f1e168] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=tasks
+        - link "Notes" [ref=f1e169] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=notes
+        - link "Settings" [ref=f1e170] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=settings
+      - generic [ref=f1e171]:
+        - link "Open lead pipeline" [ref=f1e172] [cursor=pointer]:
+          - /url: /resources/career-diagnostic/submissions?tab=pipeline
+          - generic [ref=f1e173]:
+            - generic [ref=f1e174]:
+              - paragraph [ref=f1e175]: Lead pipeline
+              - heading "High-intent prospects by stage" [level=2] [ref=f1e176]
+            - paragraph [ref=f1e178]: 21 active leads
+          - generic [ref=f1e183]:
+            - generic [ref=f1e184]:
+              - paragraph [ref=f1e185]: "9"
+              - paragraph [ref=f1e186]: Funnel
+              - paragraph [ref=f1e187]: Downloads and reservations
+            - generic [ref=f1e190]:
+              - paragraph [ref=f1e191]: "0"
+              - paragraph [ref=f1e192]: Lead magnet
+              - paragraph [ref=f1e193]: New diagnostic signups
+            - generic [ref=f1e195]:
+              - paragraph [ref=f1e196]: "17"
+              - paragraph [ref=f1e197]: Contacted
+              - paragraph [ref=f1e198]: First reply sent
+            - generic [ref=f1e201]:
+              - paragraph [ref=f1e202]: "0"
+              - paragraph [ref=f1e203]: Call booked
+              - paragraph [ref=f1e204]: Discovery scheduled
+            - generic [ref=f1e206]:
+              - paragraph [ref=f1e207]: "12"
+              - paragraph [ref=f1e208]: Follow-up
+              - paragraph [ref=f1e209]: Due or parked
+            - generic [ref=f1e212]:
+              - paragraph [ref=f1e213]: "4"
+              - paragraph [ref=f1e214]: Paid client
+              - paragraph [ref=f1e215]: Confirmed payments
+          - generic [ref=f1e218]:
+            - generic [ref=f1e219]:
+              - generic [ref=f1e220]:
+                - paragraph [ref=f1e221]: Simnikiwe - Follow up today
+                - paragraph [ref=f1e222]: Career Clarity Session - Contacted
+              - generic [ref=f1e223]: Hot - 75
+            - generic [ref=f1e224]:
+              - generic [ref=f1e225]:
+                - paragraph [ref=f1e226]: Alistacia - Follow up today
+                - paragraph [ref=f1e227]: Career Clarity Session - Contacted
+              - generic [ref=f1e228]: Hot - 75
+            - generic [ref=f1e229]:
+              - generic [ref=f1e230]:
+                - paragraph [ref=f1e231]: Theo - Follow up today
+                - paragraph [ref=f1e232]: Career Clarity Session - Contacted
+              - generic [ref=f1e233]: Hot - 75
+        - generic [ref=f1e234]:
+          - paragraph [ref=f1e235]: Diagnostic archetypes
+          - heading "Where prospects are getting stuck" [level=2] [ref=f1e236]
+          - generic [ref=f1e237]:
+            - generic [ref=f1e238]: "56"
+            - generic [ref=f1e240]:
+              - generic [ref=f1e241]:
+                - generic [ref=f1e243]: Engaged Strategist
+                - generic [ref=f1e244]: 43%
+              - generic [ref=f1e245]:
+                - generic [ref=f1e247]: Quiet Pivoter
+                - generic [ref=f1e248]: 21%
+              - generic [ref=f1e249]:
+                - generic [ref=f1e251]: Lost Pivoter
+                - generic [ref=f1e252]: 18%
+              - generic [ref=f1e253]:
+                - generic [ref=f1e255]: Plateaued Performer
+                - generic [ref=f1e256]: 11%
+              - generic [ref=f1e257]:
+                - generic [ref=f1e259]: Burnt-Out Builder
+                - generic [ref=f1e260]: 7%
+          - generic [ref=f1e261]:
+            - paragraph [ref=f1e262]: Signal to watch
+            - paragraph [ref=f1e263]: Engaged Strategist is leading the diagnostic mix. Shape the next content angle around career growth clarity.
+        - generic [ref=f1e264]:
+          - generic [ref=f1e265]:
+            - generic [ref=f1e266]:
+              - paragraph [ref=f1e267]: Revenue by service
+              - heading "Month-to-date mix" [level=2] [ref=f1e268]
+            - paragraph [ref=f1e269]: R1 500
+          - generic [ref=f1e271]:
+            - paragraph [ref=f1e272]: CV + LinkedIn Bundle
+            - paragraph [ref=f1e275]: R1 500
+          - generic [ref=f1e276]:
+            - generic [ref=f1e277]:
+              - paragraph [ref=f1e278]: 100%
+              - paragraph [ref=f1e279]: Top-service share
+            - generic [ref=f1e280]:
+              - paragraph [ref=f1e281]: R500
+              - paragraph [ref=f1e282]: Avg paid package
+            - generic [ref=f1e283]:
+              - paragraph [ref=f1e284]: "4"
+              - paragraph [ref=f1e285]: Delivery pressure
+            - generic [ref=f1e286]:
+              - paragraph [ref=f1e287]: 0%
+              - paragraph [ref=f1e288]: Lead-to-call rate
+      - generic [ref=f1e289]:
+        - generic [ref=f1e290]:
+          - generic [ref=f1e291]:
+            - paragraph [ref=f1e292]: Today's priority actions
+            - heading "Move the highest-value work first" [level=2] [ref=f1e293]
+          - paragraph [ref=f1e294]: 5 queued
+        - generic [ref=f1e295]:
+          - link "Simnikiwe - Follow up today Career Clarity Session - Priority 75 Revenue 48-hour window 09:30" [ref=f1e296] [cursor=pointer]:
+            - /url: /resources/career-diagnostic/submissions/b30705fb-ffce-4d00-9948-d096b52a5bb2
+            - generic [ref=f1e301]:
+              - generic [ref=f1e302]: Simnikiwe - Follow up today
+              - generic [ref=f1e303]: Career Clarity Session - Priority 75
+              - generic [ref=f1e304]:
+                - generic [ref=f1e305]: Revenue
+                - generic [ref=f1e306]: 48-hour window
+            - generic [ref=f1e307]: 09:30
+          - link "Alistacia - Follow up today Career Clarity Session - Priority 75 Discovery Call prep 11:00" [ref=f1e308] [cursor=pointer]:
+            - /url: /resources/career-diagnostic/submissions/31d7bf3b-a718-403e-b96a-43fa9b446b8d
+            - generic [ref=f1e313]:
+              - generic [ref=f1e314]: Alistacia - Follow up today
+              - generic [ref=f1e315]: Career Clarity Session - Priority 75
+              - generic [ref=f1e316]:
+                - generic [ref=f1e317]: Discovery
+                - generic [ref=f1e318]: Call prep
+            - generic [ref=f1e319]: 11:00
+          - link "Theo - Follow up today Career Clarity Session - Priority 75 Delivery risk Client promise 14:00" [ref=f1e320] [cursor=pointer]:
+            - /url: /resources/career-diagnostic/submissions/8531fbb6-debb-4b7f-8170-3dbc9958bae9
+            - generic [ref=f1e327]:
+              - generic [ref=f1e328]: Theo - Follow up today
+              - generic [ref=f1e329]: Career Clarity Session - Priority 75
+              - generic [ref=f1e330]:
+                - generic [ref=f1e331]: Delivery risk
+                - generic [ref=f1e332]: Client promise
+            - generic [ref=f1e333]: 14:00
+          - link "Client - Overdue 48-Hour CV Review - Due 10 Jul Content Lead insight 16:15" [ref=f1e334] [cursor=pointer]:
+            - /url: /resources/career-diagnostic/submissions?tab=clients
+            - generic [ref=f1e338]:
+              - generic [ref=f1e339]: Client - Overdue
+              - generic [ref=f1e340]: 48-Hour CV Review - Due 10 Jul
+              - generic [ref=f1e341]:
+                - generic [ref=f1e342]: Content
+                - generic [ref=f1e343]: Lead insight
+            - generic [ref=f1e344]: 16:15
+    - generic:
+      - region:
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: Growth OS Assistant
+          - generic:
+            - button
+            - button [disabled]
+            - button [disabled]
+            - button [disabled]
+            - button
+            - button
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - paragraph: What do you need?
+              - generic:
+                - button: What should I do next to move my goals?
+                - button: What should the masterclass cover?
+                - button: Summarise recent inbound replies
+                - button: What drafts are waiting in my Vault?
+        - generic:
+          - generic:
+            - button
+            - button
+            - textbox:
+              - /placeholder: Ask anything or request a draft...
+            - button
+            - button [disabled]
+          - button: Clear conversation
+      - button "Open Growth OS Assistant" [ref=f1e345] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f1e354] [cursor=pointer]
+  - alert [ref=f1e358]

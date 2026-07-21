@@ -21,7 +21,8 @@ import {
   type DashboardEventNotification,
   type DashboardNotificationEventType,
 } from '@/lib/dashboard-notifications';
-import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { DASHBOARD_SESSION_CLIENT_MARKER } from '@/lib/dashboard-auth-url';
+import { isDashboardServerAuthorized } from '@/lib/dashboard-session-server';
 import { getFollowUpNotificationCount, listFollowUpNotifications } from '@/lib/follow-up-notifications';
 
 export const dynamic = 'force-dynamic';
@@ -92,11 +93,20 @@ function getMailHref(activity: DashboardEventNotification) {
   return '';
 }
 
-function getSafeReturnHref(returnTo: string | undefined, key: string | undefined) {
-  const fallback = `/resources/career-diagnostic/submissions?key=${encodeURIComponent(key || '')}&tab=leads`;
+function getSafeReturnHref(returnTo: string | undefined) {
+  const fallback = '/resources/career-diagnostic/submissions?tab=leads';
   if (!returnTo) return fallback;
 
-  return returnTo.startsWith('/resources/career-diagnostic/submissions') ? returnTo : fallback;
+  try {
+    const parsed = new URL(returnTo, 'https://dashboard.local');
+    if (parsed.origin !== 'https://dashboard.local' || !parsed.pathname.startsWith('/resources/career-diagnostic/submissions')) {
+      return fallback;
+    }
+    parsed.searchParams.delete('key');
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
 }
 
 function formatMetadataValue(value: unknown) {
@@ -122,11 +132,12 @@ export default async function FunnelActivityRecordPage({
   searchParams,
 }: FunnelActivityRecordPageProps) {
   const { id } = await params;
-  const { key, returnTo } = await searchParams;
+  const { returnTo } = await searchParams;
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!await isDashboardServerAuthorized()) {
     notFound();
   }
+  const key = DASHBOARD_SESSION_CLIENT_MARKER;
 
   const activity = await getDashboardEventNotificationById(id);
   if (!activity || activity.status === 'archived') {
@@ -144,7 +155,7 @@ export default async function FunnelActivityRecordPage({
   ]);
   const notificationCount = followUpNotificationCount + dashboardEventNotificationCount;
   const dashboardTimeLabel = formatDashboardTime(new Date());
-  const returnHref = getSafeReturnHref(returnTo, key);
+  const returnHref = getSafeReturnHref(returnTo);
   const mailHref = getMailHref(activity);
   const metadataEntries = getMetadataEntries(activity.metadata);
   const contactLabel = getContactLabel(activity);

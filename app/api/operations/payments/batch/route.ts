@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { deleteClientOperations } from '@/lib/client-operations';
 import { isValidBatchDeletePhrase } from '@/lib/dashboard-cleanup';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     .map((value) => String(value))
     .filter((value) => PAYMENT_ID_PATTERN.test(value));
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return redirectWithStatus(redirectTo, request.url, 'unauthorized');
   }
 
@@ -31,10 +32,21 @@ export async function POST(request: Request) {
     return redirectWithStatus(redirectTo, request.url, 'invalid');
   }
 
-  await deleteClientOperations(paymentIds);
+  const supabase = createSupabaseServiceClient();
+  const testResult = await supabase
+    .from('payments')
+    .select('payment_id')
+    .in('payment_id', paymentIds)
+    .eq('is_test', true);
+  if (testResult.error) return redirectWithStatus(redirectTo, request.url, 'invalid');
+
+  const testPaymentIds = (testResult.data || []).map((payment) => String(payment.payment_id));
+  if (testPaymentIds.length === 0) return redirectWithStatus(redirectTo, request.url, 'invalid');
+
+  await deleteClientOperations(testPaymentIds);
 
   const url = new URL(redirectTo, request.url);
   url.searchParams.set('updated', 'deleted');
-  url.searchParams.set('deletedCount', String(paymentIds.length));
+  url.searchParams.set('deletedCount', String(testPaymentIds.length));
   return NextResponse.redirect(url, { status: 303 });
 }

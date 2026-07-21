@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowUpRight, CheckCircle2, ChevronDown, ChevronRight, Inbox, Mail, RefreshCcw, XCircle } from 'lucide-react';
 import LeadEmailButton from '@/components/leads/LeadEmailButton';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { InboundEmailReply } from '@/lib/inbound-email-replies';
 
 type ImportResult = {
@@ -69,7 +70,8 @@ function getInitial(reply: InboundEmailReply) {
 function getProfileHref(adminKey: string, leadId: string | null) {
   if (!leadId) return '';
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'messages');
   return `/resources/career-diagnostic/submissions/${leadId}?${params.toString()}`;
 }

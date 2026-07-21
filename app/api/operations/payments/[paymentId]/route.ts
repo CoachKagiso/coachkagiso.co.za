@@ -28,7 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
   const deliveryStatus = String(formData.get('delivery_status') || '');
   const deliveryNotes = String(formData.get('delivery_notes') || '').trim();
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return redirectWithStatus(redirectTo, request.url, 'unauthorized');
   }
 

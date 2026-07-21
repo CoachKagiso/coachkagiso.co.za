@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     .map((value) => String(value))
     .filter((value) => UUID_PATTERN.test(value));
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return redirectWithStatus(redirectTo, request.url, 'unauthorized');
   }
 

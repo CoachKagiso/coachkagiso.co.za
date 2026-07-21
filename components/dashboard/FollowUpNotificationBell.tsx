@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Bell, CheckCircle2, Loader2, MailCheck, X } from 'lucide-react';
 import LeadEmailModal, { type LeadEmailModalLead } from '@/components/leads/LeadEmailModal';
+import { buildDashboardAuthUrl, getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type { DashboardEventNotification, DashboardNotificationEventType } from '@/lib/dashboard-notifications';
 import type { FollowUpNotification } from '@/lib/follow-up-utils';
 
@@ -84,7 +85,8 @@ function formatEventTime(value: string) {
 
 function buildLeadsHref(adminKey: string) {
   const params = new URLSearchParams();
-  if (adminKey) params.set('key', adminKey);
+  const legacyKey = getDashboardLegacyKey(adminKey);
+  if (legacyKey) params.set('key', legacyKey);
   params.set('tab', 'leads');
   params.set('followUp', 'due');
   return `/resources/career-diagnostic/submissions?${params.toString()}`;
@@ -272,7 +274,7 @@ export default function FollowUpNotificationBell({
     setError(null);
 
     try {
-      const response = await fetch(`/api/notifications?key=${encodeURIComponent(adminKey)}`, {
+      const response = await fetch(buildDashboardAuthUrl('/api/notifications', adminKey), {
         headers: { accept: 'application/json' },
       });
       const data = (await response.json().catch(() => ({}))) as NotificationResponse;

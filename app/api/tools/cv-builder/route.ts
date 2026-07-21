@@ -802,7 +802,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not read CV builder input.' }, { status: 400 });
   }
 
-  if (!isDiagnosticAdminAuthorized(key)) {
+  if (!isDiagnosticAdminAuthorized(key, request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

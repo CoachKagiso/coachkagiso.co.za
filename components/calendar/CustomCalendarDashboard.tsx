@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import FollowUpNotificationBell, { type NotificationPanelSection } from '@/components/dashboard/FollowUpNotificationBell';
 import DashboardProfileAvatar from '@/components/dashboard/DashboardProfileAvatar';
+import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import type {
   DashboardCalendarEvent,
   DashboardCalendarEventPayload,
@@ -479,7 +480,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
   const diagnosticFollowUpsDue = useMemo(() => getDiagnosticFollowUpsDue(leads, currentDate), [currentDate, leads]);
   const oldestDiagnosticFollowUp = diagnosticFollowUpsDue[0] || null;
   const overdueDiagnosticCount = diagnosticFollowUpsDue.filter((item) => item.daysOverdue > 0).length;
-  const encodedAdminKey = useMemo(() => encodeURIComponent(adminKey), [adminKey]);
+  const legacyAdminKey = useMemo(() => getDashboardLegacyKey(adminKey), [adminKey]);
   const selectedDateNonActionEvents = useMemo(() => selectedDateEvents.filter((event) => !isActionEvent(event)), [selectedDateEvents]);
   const selectedDateAppointmentEvents = selectedDateNonActionEvents;
   const selectedDateExtraActionEvents = useMemo(
@@ -533,11 +534,8 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
       setError(null);
 
       try {
-        const params = new URLSearchParams({
-          key: adminKey,
-          from: range.from,
-          to: range.to,
-        });
+        const params = new URLSearchParams({ from: range.from, to: range.to });
+        if (legacyAdminKey) params.set('key', legacyAdminKey);
         const response = await fetch(`/api/calendar/events?${params.toString()}`);
         const data = (await response.json().catch(() => ({}))) as CalendarResponse & { error?: string };
 
@@ -559,7 +557,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
     return () => {
       cancelled = true;
     };
-  }, [adminKey, range.from, range.to, refreshIndex]);
+  }, [legacyAdminKey, range.from, range.to, refreshIndex]);
 
   function moveCalendar(direction: -1 | 1) {
     if (view === 'month') setSelectedDate((current) => addMonths(current, direction));
@@ -594,7 +592,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
     setError(null);
 
     const payload: DashboardCalendarEventPayload = {
-      key: adminKey,
+      key: legacyAdminKey,
       title: draft.title,
       date: draft.date,
       startTime: draft.startTime,
@@ -665,7 +663,7 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          key: adminKey,
+          key: legacyAdminKey,
           ...pendingMove.draft,
           linkedLeadId: pendingMove.draft.linkedLeadId || null,
         }),
@@ -697,7 +695,8 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
     setError(null);
 
     try {
-      const response = await fetch(`/api/calendar/events/${selectedEvent.googleEventId}?key=${encodeURIComponent(adminKey)}`, {
+      const deleteQuery = legacyAdminKey ? `?key=${encodeURIComponent(legacyAdminKey)}` : '';
+      const response = await fetch(`/api/calendar/events/${selectedEvent.googleEventId}${deleteQuery}`, {
         method: 'DELETE',
       });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
@@ -1174,7 +1173,9 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
                 {diagnosticFollowUpsDue.slice(0, 3).map((item) => (
                   <Link
                     key={item.lead.id}
-                    href={`/resources/career-diagnostic/submissions/${item.lead.id}?key=${encodedAdminKey}`}
+                    href={`/resources/career-diagnostic/submissions/${item.lead.id}${
+                      legacyAdminKey ? `?key=${encodeURIComponent(legacyAdminKey)}` : ''
+                    }`}
                     className="flex items-center justify-between gap-3 rounded-[8px] bg-white px-3 py-2 text-[#142334] transition hover:bg-[#F8F6F4]"
                   >
                     <span className="min-w-0">
@@ -1190,7 +1191,10 @@ export default function CustomCalendarDashboard({ adminKey, leads, dashboardNoti
                 ))}
                 {diagnosticFollowUpsDue.length > 3 && (
                   <Link
-                    href={`/resources/career-diagnostic/submissions?key=${encodedAdminKey}&tab=leads`}
+                    href={`/resources/career-diagnostic/submissions?${new URLSearchParams({
+                      ...(legacyAdminKey ? { key: legacyAdminKey } : {}),
+                      tab: 'leads',
+                    }).toString()}`}
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10"
                   >
                     View {diagnosticFollowUpsDue.length - 3} more follow-up{diagnosticFollowUpsDue.length - 3 === 1 ? '' : 's'}

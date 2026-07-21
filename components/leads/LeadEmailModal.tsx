@@ -6,6 +6,7 @@ import type { FormEvent, WheelEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Clock, Loader2, MailCheck, Save, Send, X } from 'lucide-react';
 import type { DashboardNote } from '@/lib/dashboard-tasks';
+import { buildDashboardAuthUrl } from '@/lib/dashboard-auth-url';
 import {
   EMAIL_TEMPLATES,
   getEmailSequenceDots,
@@ -385,7 +386,7 @@ export default function LeadEmailModal({
     let cancelled = false;
     async function loadGuardrail() {
       try {
-        const response = await fetch(`/api/email/guardrails?key=${encodeURIComponent(adminKey)}&leadId=${encodeURIComponent(modalLead.id)}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/email/guardrails', adminKey, { leadId: modalLead.id }));
         const data = (await response.json().catch(() => ({}))) as GuardrailResponse;
         if (!response.ok || !data.guardrail || cancelled) return;
         setTemplateGuardrailState({ leadId: modalLead.id, guardrail: data.guardrail });
@@ -415,7 +416,7 @@ export default function LeadEmailModal({
 
     async function loadTemplates() {
       try {
-        const response = await fetch(`/api/email/templates?key=${encodeURIComponent(adminKey)}`);
+        const response = await fetch(buildDashboardAuthUrl('/api/email/templates', adminKey));
         const data = (await response.json().catch(() => ({}))) as { templates?: StoredEmailTemplate[] };
         if (!response.ok || !data.templates?.length || cancelled) return;
         setAvailableTemplates(data.templates);
