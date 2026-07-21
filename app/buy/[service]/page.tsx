@@ -232,6 +232,19 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     Includes your R150 CV Review credit. This upgrade link expires in 7 days.
                   </p>
                 </div>
+              ) : service.slug === 'bundle' ? (
+                <div className="mt-5">
+                  {/* TEMP: July 2026 month-end special, R400 instead of R500. Revert to R500 after 31 July 2026. */}
+                  <p className="text-[15px] uppercase tracking-[0.12em] text-white/48 line-through">
+                    {formatCurrency(service.amount)}
+                  </p>
+                  <p className="mt-2 font-serif text-[62px] leading-none text-white">
+                    R400
+                  </p>
+                  <p className="mt-3 text-[14px] leading-relaxed text-white/68">
+                    Special ends 31 July 2026.
+                  </p>
+                </div>
               ) : (
                 <p className="mt-5 font-serif text-[62px] leading-none text-white">
                   {formatCurrency(service.amount)}

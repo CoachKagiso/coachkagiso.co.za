@@ -373,9 +373,24 @@ export default function WorkWithMePage() {
                               <h3 className="font-serif text-[34px] md:text-[42px] leading-[1.02]">
                                 {service.title}
                               </h3>
-                              <span className={`font-serif text-[25px] ${isDark ? 'text-[#C9AD98]' : 'text-[#C9AD98]'}`}>
-                                {service.price}
-                              </span>
+                              {service.title === 'CV + LinkedIn Bundle' ? (
+                                <span className="text-right">
+                                  {/* TEMP: July 2026 month-end special, R400 instead of R500. Revert to R500 after 31 July 2026. */}
+                                  <span className="block font-serif text-[18px] text-[#C9AD98]/60 line-through">
+                                    R500
+                                  </span>
+                                  <span className="block font-serif text-[25px] text-[#C9AD98]">
+                                    R400
+                                  </span>
+                                  <span className={`mt-1 block text-[12px] leading-relaxed ${isDark ? 'text-white/60' : 'text-[#142334]/60'}`}>
+                                    Special ends 31 July 2026.
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className={`font-serif text-[25px] ${isDark ? 'text-[#C9AD98]' : 'text-[#C9AD98]'}`}>
+                                  {service.price}
+                                </span>
+                              )}
                             </div>
                             {service.sessionLine && (
                               <p className={`mt-4 text-[16px] leading-relaxed ${isDark ? 'text-white/66' : 'text-[#142334]/72'}`}>
