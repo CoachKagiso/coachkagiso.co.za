@@ -11,7 +11,7 @@ export const DEFAULT_OPENROUTER_PRIMARY_MODEL = 'z-ai/glm-5.2';
 export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'z-ai/glm-5.2';
 
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
-  { value: 'anthropic/claude-fable-5', label: 'anthropic/claude-fable-5', intelligence: 60, inputPrice: 10.0, outputPrice: 50.0 },
+  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 61, inputPrice: 5.0, outputPrice: 25.0 },
   { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 59, inputPrice: 5.0, outputPrice: 30.0 },
   { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 57, inputPrice: 3.0, outputPrice: 15.0 },
   { value: 'anthropic/claude-opus-4.8', label: 'anthropic/claude-opus-4.8', intelligence: 56, inputPrice: 5.0, outputPrice: 25.0 },
