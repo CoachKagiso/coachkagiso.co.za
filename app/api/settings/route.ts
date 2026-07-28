@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
-import { loadSettings, stripSecretsFromSettings, upsertSetting } from '@/lib/settings';
+import { loadSettings, mergeAiConfigForSave, stripSecretsFromSettings, upsertSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,11 @@ export async function POST(request: Request) {
   }
 
   const supabase = createSupabaseServiceClient();
-  await upsertSetting(supabase, settingKey, body?.value);
+  const settings = settingKey === 'ai_config' ? await loadSettings(supabase) : null;
+  const value = settingKey === 'ai_config'
+    ? mergeAiConfigForSave(settings?.ai_config, body?.value)
+    : body?.value;
+  await upsertSetting(supabase, settingKey, value);
 
   return NextResponse.json({ success: true });
 }

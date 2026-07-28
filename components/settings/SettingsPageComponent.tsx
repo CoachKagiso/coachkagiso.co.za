@@ -7,6 +7,7 @@ import {
   Bot,
   BriefcaseBusiness,
   Check,
+  CheckCircle2,
   ChevronDown,
   Clock3,
   Eye,
@@ -521,8 +522,9 @@ export default function SettingsPageComponent({
   }
 
   function getOpenRouterConfig(): AiConfigSettings {
+    const { openrouter_api_key_configured: _configured, ...persistedConfig } = aiConfig;
     return {
-      ...aiConfig,
+      ...persistedConfig,
       primary_model: primaryModel,
       secondary_model: secondaryModel,
       model_provider: 'openrouter',
@@ -532,7 +534,10 @@ export default function SettingsPageComponent({
 
   function saveAiConfiguration() {
     const nextConfig = getOpenRouterConfig();
-    setAiConfig(nextConfig);
+    setAiConfig({
+      ...nextConfig,
+      openrouter_api_key_configured: Boolean(aiConfig.openrouter_api_key_configured || nextConfig.openrouter_api_key?.trim()),
+    });
     void saveSetting('ai_config', nextConfig);
   }
 
@@ -1143,13 +1148,17 @@ export default function SettingsPageComponent({
                       value={aiConfig.openrouter_api_key || ''}
                       onChange={(event) => setAiConfig({ ...aiConfig, openrouter_api_key: event.target.value })}
                       className="studio-input h-11 w-full pr-12"
-                      placeholder="Paste your OpenRouter API key"
+                      placeholder={aiConfig.openrouter_api_key_configured ? 'A key is already saved. Paste a new key to replace it.' : 'Paste your OpenRouter API key'}
                     />
                     <button type="button" onClick={() => setShowOpenRouterKey((value) => !value)} className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#142334]/65 hover:bg-[#F5F3EE]" aria-label={showOpenRouterKey ? 'Hide OpenRouter key' : 'Show OpenRouter key'}>
                       {showOpenRouterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </span>
-                  <span className="text-[12px] text-[#6B6B6B]">This saved key works with every OpenRouter model below. Keep it when switching models, or replace it here before saving.</span>
+                  <span className="text-[12px] text-[#6B6B6B]">
+                    {aiConfig.openrouter_api_key_configured
+                      ? 'An OpenRouter API key is already saved. Leave this blank when switching models, or paste a new key to replace it.'
+                      : 'This key works with every OpenRouter model below. Paste it once, then you can change models without entering it again.'}
+                  </span>
                 </label>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
@@ -1188,13 +1197,14 @@ export default function SettingsPageComponent({
                 </div>
                 <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the active model. This is required for the copyright guardrail to function reliably.</p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <button type="button" className="studio-primary-button" onClick={saveAiConfiguration}>
-                    <Save className="h-4 w-4" /> Save OpenRouter settings
+                  <button type="button" className="studio-primary-button" onClick={saveAiConfiguration} disabled={saveStates.ai_config === 'saving'}>
+                    {saveStates.ai_config === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : saveStates.ai_config === 'saved' ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />} {saveStates.ai_config === 'saving' ? 'Saving' : saveStates.ai_config === 'saved' ? 'Saved' : saveStates.ai_config === 'error' ? 'Save failed' : 'Save OpenRouter settings'}
                   </button>
                   <button type="button" className="studio-secondary-button" onClick={() => void testAiConnection()} disabled={saveStates.openrouter_test === 'saving'}>
                     {saveStates.openrouter_test === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Test active model
                   </button>
                 </div>
+                {saveStates.ai_config === 'error' && <p role="status" className="text-[13px] font-semibold text-[#A24E37]">Could not save. Check your admin key and network connection, then try again.</p>}
                 {testStatus && <p role="status" className={`text-[13px] font-semibold ${testStatus.tone === 'success' ? 'text-[#0F766E]' : 'text-[#A24E37]'}`}>{testStatus.message}</p>}
               </div>
             </div>

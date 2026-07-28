@@ -107,6 +107,7 @@ import {
   type SettingsMap,
   type StoredEmailTemplate,
 } from '@/lib/settings';
+import { loadSettingsDashboardBundle } from '@/lib/settings-dashboard-bundle';
 
 export const dynamic = 'force-dynamic';
 
@@ -1009,16 +1010,17 @@ function FunnelPipelinePanel({
 async function loadSettingsBundle(): Promise<{ settings: SettingsMap; emailTemplates: StoredEmailTemplate[] }> {
   try {
     const supabase = createSupabaseServiceClient();
-    await seedSettings(supabase);
-    const [settings, emailTemplates] = await Promise.all([
-      loadSettings(supabase),
-      listStoredEmailTemplates(supabase),
-    ]);
-
-    return {
-      settings: stripSecretsFromSettings(settings),
-      emailTemplates,
-    };
+    return await loadSettingsDashboardBundle({
+      defaults: {
+        settings: DEFAULT_SETTINGS,
+        emailTemplates: EMAIL_TEMPLATES.map((template) => ({ ...template, active: true })),
+      },
+      loadSettings: async () => {
+        await seedSettings(supabase);
+        return stripSecretsFromSettings(await loadSettings(supabase));
+      },
+      loadEmailTemplates: () => listStoredEmailTemplates(supabase),
+    });
   } catch {
     return {
       settings: DEFAULT_SETTINGS,
