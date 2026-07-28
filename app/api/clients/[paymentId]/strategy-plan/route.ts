@@ -15,8 +15,9 @@ import {
   createClientStrategyPlan,
   getClientStrategyGenerationSource,
   getClientStrategyPlans,
+  saveClientStrategyWorkspace,
 } from '@/lib/client-strategy-store';
-import { countCompletedDebriefFields } from '@/lib/client-strategy';
+import { createEmptySessionDebrief } from '@/lib/client-strategy';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
@@ -65,9 +66,11 @@ export async function POST(
     if (!source) {
       return NextResponse.json({ error: 'Eligible confirmed engagement not found.' }, { status: 404 });
     }
-    if (!source.workspace || countCompletedDebriefFields(source.workspace.debrief) === 0) {
-      return NextResponse.json({ error: 'Save the session debrief before generating a plan.' }, { status: 409 });
-    }
+    const workspace = source.workspace || await saveClientStrategyWorkspace({
+      paymentId: source.paymentId,
+      serviceSlug: source.serviceSlug,
+      debrief: createEmptySessionDebrief(),
+    });
 
     const runtime = await resolveAiRuntimeConfig();
     if (!runtime) {
@@ -78,12 +81,13 @@ export async function POST(
     }
 
     const intake = sanitizeClientStrategyIntake(source.intake?.formData || {});
-    const cv = await loadClientStrategyCvText(source.intake?.cvFileUrl || null);
+    const cv = await loadClientStrategyCvText(source.cvSource || source.intake?.cvFileUrl || null);
     const promptInput = {
       serviceSlug: source.serviceSlug,
       intake,
-      debrief: source.workspace.debrief,
+      debrief: workspace.debrief,
       cvText: cv.text,
+      cvAnalysis: source.cvAnalysis?.report || null,
     };
 
     let response: Response;
@@ -140,13 +144,18 @@ export async function POST(
     }
 
     const plan = await createClientStrategyPlan({
-      workspaceId: source.workspace.id,
+      workspaceId: workspace.id,
       generatedContent: planContent,
       sourceSnapshot: {
-        workspaceVersion: source.workspace.version,
+        workspaceVersion: workspace.version,
         intakeId: source.intake?.id || null,
         intakeSubmittedAt: source.intake?.submittedAt || null,
         cv: { included: cv.included, issue: cv.issue },
+        cvAnalysis: {
+          reportId: source.cvAnalysis?.id || null,
+          createdAt: source.cvAnalysis?.created_at || null,
+          included: Boolean(source.cvAnalysis),
+        },
       },
       generatorProvider: runtime.provider,
       generatorModel: aiResponse.model || runtime.model,

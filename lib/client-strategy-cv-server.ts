@@ -106,16 +106,40 @@ async function fileFromStoredUrl(cvFileUrl: string, supabaseUrl: string) {
   return new File([bytes], inferFileName(finalUrl, contentType), { type: contentType });
 }
 
-export async function loadClientStrategyCvText(cvFileUrl: string | null): Promise<ClientStrategyCvResult> {
+export type ClientStrategyCvSource = {
+  storagePath?: string | null;
+  externalUrl?: string | null;
+};
+
+async function fileFromClientSource(source: ClientStrategyCvSource, supabaseUrl: string) {
+  if (source.storagePath) {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase.storage.from('client-uploads').download(source.storagePath);
+    if (error || !data) throw new Error('CV_FETCH_FAILED');
+    const fileName = source.storagePath.split('/').pop() || 'client-cv';
+    return new File([data], fileName, { type: data.type });
+  }
+
+  if (source.externalUrl) return fileFromStoredUrl(source.externalUrl, supabaseUrl);
+  throw new Error('CV_EMPTY');
+}
+
+export async function loadClientStrategyCvText(
+  cvFileUrl: string | ClientStrategyCvSource | null,
+): Promise<ClientStrategyCvResult> {
   if (!cvFileUrl) return emptyCvResult('No CV is attached to this intake.');
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '';
-  if (!supabaseUrl || !isAllowedClientStrategyCvUrl(cvFileUrl, supabaseUrl)) {
+  const source = typeof cvFileUrl === 'string'
+    ? { externalUrl: cvFileUrl }
+    : cvFileUrl;
+  const sourceUrl = source.externalUrl || '';
+  if (!supabaseUrl || (sourceUrl && !isAllowedClientStrategyCvUrl(sourceUrl, supabaseUrl))) {
     return emptyCvResult('The saved CV link is not from an approved file host.');
   }
 
   try {
-    const file = await fileFromStoredUrl(cvFileUrl, supabaseUrl);
+    const file = await fileFromClientSource(source, supabaseUrl);
     const text = redactClientStrategySourceText(await extractTextFromCvFile(file)).slice(0, MAX_CV_TEXT_CHARS);
     if (text.length < 200) {
       return emptyCvResult('The CV did not contain enough readable text, so it was not used.');
@@ -131,4 +155,3 @@ export async function loadClientStrategyCvText(cvFileUrl: string | null): Promis
     return emptyCvResult('The CV could not be read. The draft used the intake and session debrief only.');
   }
 }
-

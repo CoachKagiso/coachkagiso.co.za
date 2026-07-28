@@ -110,7 +110,8 @@ export async function listFollowUpNotifications({
 
   if (error) {
     if (isMissingNotificationColumn(error.message)) return [];
-    throw new Error(error.message);
+    console.error('Failed to fetch follow-up notifications:', error.message);
+    return [];
   }
 
   return ((data || []) as FollowUpNotificationRow[])

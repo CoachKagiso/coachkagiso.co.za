@@ -63,6 +63,7 @@ export default function PrivacyPage() {
               <li>To send session links, resources, and follow-ups</li>
               <li>To process payments and issue invoices</li>
               <li>To send you the Personal Brand Audit you requested</li>
+              <li>If you explicitly opt in on a career diagnostic, to use those answers as historical context when preparing for a coaching session you later book</li>
               <li>To improve my services and content</li>
               <li>To comply with legal and tax obligations</li>
             </ul>

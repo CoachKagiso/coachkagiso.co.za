@@ -69,6 +69,12 @@ export default function ClientStrategyPlanReview({
         <span aria-hidden="true" className="text-[#C9AD98]">/</span>
         <span className="text-[#6B6B6B]">{selectedPlan.sourceSnapshot.cv.included ? 'CV included' : 'CV not included'}</span>
         <span aria-hidden="true" className="text-[#C9AD98]">/</span>
+        {selectedPlan.sourceSnapshot.cvAnalysis?.included && (
+          <>
+            <span className="text-[#6B6B6B]">Saved CV analysis included</span>
+            <span aria-hidden="true" className="text-[#C9AD98]">/</span>
+          </>
+        )}
         <span className="text-[#6B6B6B]">{selectedPlan.generatorModel}</span>
       </div>
 

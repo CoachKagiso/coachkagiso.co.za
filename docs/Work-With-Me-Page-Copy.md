@@ -117,15 +117,16 @@ Everything in the CV Revamp and LinkedIn Optimisation, but built together so the
 
 **Tagline:** *When you don't know what's next, and you're tired of guessing.*
 
-Seventy-five minutes, just you and me, working through where you actually are and where you want to go. You leave with a written action plan that includes your next 30 days, the skills worth investing in, and the conversations that need to happen.
+Sixty minutes, just you and me, working through where you actually are and where you want to go. You leave with a CV that's ready to send and a written plan for what to do next, scaled to what your goal actually needs. Some plans are thirty days. Some need sixty or ninety to get you there properly.
 
 Includes a 14-day follow-up so you don't disappear into your own life with a plan you never used.
 
 **What you get:**
-- 75-minute 1-on-1 session on Zoom
-- Written action plan (1 page) covering direction, skills, and next steps
-- A skills pathway tailored to your goal: 3 free resources, 2 paid courses, 1 certification worth considering
-- 14-day follow-up call (15 minutes) to check what's moved
+- 60-minute 1-on-1 session on Microsoft Teams
+- Full CV Revamp
+- 30-day written action plan, scaled to 60 or 90 days for more complex goals
+- Skills pathway tailored to your goal
+- 14-day follow-up call
 
 **[Book my Clarity Session]**
 
@@ -141,13 +142,15 @@ Includes a 14-day follow-up so you don't disappear into your own life with a pla
 
 **Tagline:** *Everything, sharpened. For when landing the role properly is the priority.*
 
-Your CV, your LinkedIn, your interview prep, and 30 days of structured support so you don't lose momentum after the work is done. Built for people who want it all aligned and want a coach in their corner while they apply.
+Your CV, your LinkedIn, a strategy session, and a plan that includes how to walk into the interview room ready. Built for people who want it all aligned and want a coach in their corner while they apply.
 
 **What you get:**
 - Full CV Revamp
-- Full LinkedIn Optimisation
-- 60-minute interview prep session
-- 30 days of structured support: 2 scheduled check-ins, weekdays 9-5, quick questions only
+- Full LinkedIn Optimization
+- 60-minute 1-on-1 strategy session on Microsoft Teams
+- 30-day written action plan, scaled to 60 or 90 days for more complex goals
+- Interview prep guide: likely questions, story prompts, and a research checklist tailored to your target role
+- Two check-ins across your first 30 days to keep you moving
 
 **[Book my Glow Up]**
 

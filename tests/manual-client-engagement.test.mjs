@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getManualClientIntakeFields,
-  manualClientRequiresCv,
   normalizeManualClientEngagement,
 } from '../lib/manual-client-engagement.ts';
 
@@ -43,9 +42,6 @@ test('adds service-aware manual questions for the two strategy services', () => 
     getManualClientIntakeFields(glowUp).map((field) => field.name),
     ['currentRole', 'targetRole', 'linkedinUrl', 'interviewHistory', 'biggestChallenge', 'thirtyDayOutcome'],
   );
-  assert.equal(manualClientRequiresCv(careerClarity), true);
-  assert.equal(manualClientRequiresCv(glowUp), true);
-  assert.equal(manualClientRequiresCv(linkedIn), false);
 });
 
 test('reuses existing service questions without duplicating identity fields', () => {

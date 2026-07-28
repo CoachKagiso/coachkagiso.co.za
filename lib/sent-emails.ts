@@ -554,7 +554,18 @@ export async function listSentEmails(filters: SentEmailFilters = {}): Promise<Se
       };
     }
 
-    throw new Error(result.error.message);
+    console.error('Failed to fetch sent emails:', result.error.message);
+    return {
+      emails: [],
+      totalCount: 0,
+      thisWeekCount: 0,
+      uniqueLeadCount: 0,
+      importedCount: 0,
+      engagedCount: 0,
+      segmentOptions: [],
+      stateOptions: [],
+      hasFilters: hasSentEmailFilters(filters),
+    };
   }
 
   const allEmails = ((result.data || []) as SentEmailRow[]).map(normalizeSentEmail);
