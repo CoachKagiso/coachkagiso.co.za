@@ -10,6 +10,7 @@ import {
   type AssistantConversationStore,
   type AssistantPreferences,
 } from '@/lib/assistant-preferences';
+import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave } from '@/lib/openrouter-key-settings';
 
 export type SettingsMap = Record<string, unknown>;
 
@@ -46,6 +47,7 @@ export type AiConfigSettings = {
   model_provider: 'zai' | 'openrouter';
   zai_api_key?: string;
   openrouter_api_key?: string;
+  openrouter_api_key_configured?: boolean;
   test_mode: boolean;
   reasoning_enabled?: boolean;
 };
@@ -214,16 +216,25 @@ export function mergeSettings(settings: SettingsMap): SettingsMap {
 }
 
 export function stripSecretsFromSettings(settings: SettingsMap): SettingsMap {
+  const storedAiConfig = (settings.ai_config || {}) as Partial<AiConfigSettings>;
   const aiConfig = {
     ...(DEFAULT_SETTINGS.ai_config as AiConfigSettings),
-    ...((settings.ai_config || {}) as Partial<AiConfigSettings>),
+    ...storedAiConfig,
     zai_api_key: '',
     openrouter_api_key: '',
+    openrouter_api_key_configured: hasConfiguredOpenRouterKey(storedAiConfig),
   };
 
   return {
     ...settings,
     ai_config: aiConfig,
+  };
+}
+
+export function mergeAiConfigForSave(currentValue: unknown, nextValue: unknown): AiConfigSettings {
+  return {
+    ...(DEFAULT_SETTINGS.ai_config as AiConfigSettings),
+    ...mergeOpenRouterKeyForSave(currentValue, nextValue),
   };
 }
 
@@ -333,7 +344,10 @@ export async function seedSettings(supabase: SupabaseClient) {
 export async function loadSettings(supabase: SupabaseClient) {
   const { data, error } = await supabase.from('settings').select('key, value');
   if (isMissingSettingsTableError(error)) return DEFAULT_SETTINGS;
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Failed to load settings:', error.message);
+    return DEFAULT_SETTINGS;
+  }
 
   const settings = Object.fromEntries((data || []).map((row: { key: string; value: unknown }) => [row.key, row.value]));
   return mergeSettings(settings);
@@ -378,7 +392,10 @@ export async function listStoredEmailTemplates(supabase: SupabaseClient) {
   if (isMissingSettingsTableError(error)) {
     return EMAIL_TEMPLATES.map((template) => ({ ...template, active: true }));
   }
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Failed to load email templates:', error.message);
+    return EMAIL_TEMPLATES.map((template) => ({ ...template, active: true }));
+  }
 
   const hasMissingDefaults =
     !data?.length || EMAIL_TEMPLATES.some((template) => !data.some((row) => row.template_id === template.id));
