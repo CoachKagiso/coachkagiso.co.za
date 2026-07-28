@@ -7,7 +7,6 @@ import { ChevronDown } from 'lucide-react';
 type FilterDropdownOption = {
   value: string;
   label: string;
-  disabled?: boolean;
   intelligence?: number;
   inputPrice?: number;
   outputPrice?: number;
@@ -93,9 +92,7 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                 <button
                   key={option.value}
                   type="button"
-                  disabled={option.disabled}
                   onClick={() => {
-                    if (option.disabled) return;
                     if (onChange) {
                       onChange(option.value);
                     } else {
@@ -107,7 +104,7 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                     wrapLabels ? 'whitespace-normal break-words leading-snug' : ''
                   } ${
                     isSelected ? 'bg-[#F2ECE7]' : ''
-                  } ${option.disabled ? 'cursor-not-allowed text-[#A09086] hover:bg-white hover:pl-4' : ''}`}
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className={wrapLabels ? 'min-w-0 whitespace-normal break-words leading-snug' : 'truncate'}>{option.label}</span>

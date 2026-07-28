@@ -1,40 +1,14 @@
 export const CLIENT_STRATEGY_SERVICE_SLUGS = ['career-clarity', 'glow-up-vip'] as const;
-export const CLIENT_CV_SERVICE_SLUGS = ['cv-review', 'cv-revamp', 'cover-letter', 'linkedin', 'bundle'] as const;
-export const CLIENT_STRATEGY_WORKSPACE_VIEWS = ['context', 'cv', 'prep', 'strategy'] as const;
-export const CLIENT_IDENTITY_INTAKE_KEYS = ['fullName', 'email', 'phone', 'whatsapp', 'attendeePhoneNumber', 'attendeePhone', 'telephone'] as const;
-export const CAREER_CLARITY_INTAKE_ORDER = [
-  'cvNoted',
-  'notes',
-  'currentRole',
-  'skillStrength',
-  'clarityQuestion',
-  'clarityGoal',
-  'previousAttempts',
-  'alreadyTried',
-  'stuckScale',
-  'additionalInfo',
-  'additionalContext',
-] as const;
 export const CLIENT_STRATEGY_REOPEN_WINDOW_DAYS = 30;
 
 export type ClientStrategyServiceSlug = (typeof CLIENT_STRATEGY_SERVICE_SLUGS)[number];
-export type ClientCvServiceSlug = (typeof CLIENT_CV_SERVICE_SLUGS)[number];
-export type ClientStrategyWorkspaceView = (typeof CLIENT_STRATEGY_WORKSPACE_VIEWS)[number];
-export type ClientIntakeCardGroup = 'identity' | 'context';
-export type ClientWorkspaceAccessStatus = 'active' | 'recently-completed' | 'archived' | 'ineligible';
-export type ClientWorkspaceAccess = {
-  status: ClientWorkspaceAccessStatus;
+export type ClientStrategyAccessStatus = 'active' | 'recently-completed' | 'archived' | 'ineligible';
+export type ClientStrategyAccess = {
+  status: ClientStrategyAccessStatus;
   daysRemaining: number | null;
-  selectable: boolean;
-  canUseCvAnalyzer: boolean;
-  canUseStrategyTab: boolean;
 };
 
-function normalizedIntakeKey(key: string) {
-  return key.replace(/[_\-\s]/g, '').toLowerCase();
-}
-
-type ClientWorkspaceAccessInput = {
+type ClientStrategyAccessInput = {
   serviceSlug: string;
   isDelivered: boolean;
   deliveredAt: string | null;
@@ -51,16 +25,36 @@ const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 export const SESSION_DEBRIEF_FIELDS = [
   {
     key: 'clarityShift',
-    label: 'What shifted in the session',
-    prompt: 'Capture what became clearer, changed, or moved forward in the conversation.',
+    label: 'What changed or became clearer',
+    prompt: 'Capture the shift in direction, confidence, language, or priorities that happened in the session.',
   },
   {
-    key: 'commitments',
-    label: 'Commitments made',
-    prompt: 'Record the commitments made by the client and by Kagiso in one shared field.',
+    key: 'blockers',
+    label: 'Key blockers or risks',
+    prompt: 'Name the patterns, constraints, missing evidence, or practical risks that could slow the client down.',
   },
   {
-    key: 'sensitivityNotes',
+    key: 'strengthsEvidence',
+    label: 'Strengths and proof surfaced',
+    prompt: 'Record concrete examples, achievements, responsibilities, or signals the client can use as evidence.',
+  },
+  {
+    key: 'decisions',
+    label: 'Decisions made',
+    prompt: 'Record the direction, priorities, boundaries, and trade-offs agreed during the session.',
+  },
+  {
+    key: 'clientCommitments',
+    label: 'Client commitments',
+    prompt: 'List what the client agreed to complete, test, send, or decide next.',
+  },
+  {
+    key: 'coachCommitments',
+    label: 'Kagiso commitments',
+    prompt: 'List the resources, feedback, introductions, or follow-up Kagiso agreed to provide.',
+  },
+  {
+    key: 'toneNotes',
     label: 'Tone or sensitivity notes',
     prompt: 'Capture anything the follow-up should handle carefully, including confidence, urgency, or personal context.',
   },
@@ -86,108 +80,27 @@ export function isClientStrategyServiceSlug(value: unknown): value is ClientStra
   return CLIENT_STRATEGY_SERVICE_SLUGS.includes(value as ClientStrategyServiceSlug);
 }
 
-export function isClientCvServiceSlug(value: unknown): value is ClientCvServiceSlug {
-  return CLIENT_CV_SERVICE_SLUGS.includes(value as ClientCvServiceSlug);
-}
-
-export function normalizeClientStrategyWorkspaceView(value: unknown): ClientStrategyWorkspaceView {
-  return CLIENT_STRATEGY_WORKSPACE_VIEWS.includes(value as ClientStrategyWorkspaceView)
-    ? value as ClientStrategyWorkspaceView
-    : 'context';
-}
-
-export function getClientIntakeCardGroup(key: string): ClientIntakeCardGroup {
-  const normalizedKey = normalizedIntakeKey(key);
-  return CLIENT_IDENTITY_INTAKE_KEYS.some((candidate) => normalizedIntakeKey(candidate) === normalizedKey) ? 'identity' : 'context';
-}
-
-export function orderClientIntakeKeys(keys: string[]) {
-  const identityOrder = new Map<string, number>(CLIENT_IDENTITY_INTAKE_KEYS.map((key, index) => [normalizedIntakeKey(key), index]));
-  const contextOrder = new Map<string, number>(CAREER_CLARITY_INTAKE_ORDER.map((key, index) => [normalizedIntakeKey(key), index]));
-
-  return [...keys].sort((left, right) => {
-    const leftGroup = getClientIntakeCardGroup(left);
-    const rightGroup = getClientIntakeCardGroup(right);
-    if (leftGroup !== rightGroup) return leftGroup === 'identity' ? -1 : 1;
-
-    const leftOrder = leftGroup === 'identity' ? identityOrder.get(normalizedIntakeKey(left)) : contextOrder.get(normalizedIntakeKey(left));
-    const rightOrder = rightGroup === 'identity' ? identityOrder.get(normalizedIntakeKey(right)) : contextOrder.get(normalizedIntakeKey(right));
-    if (leftOrder !== undefined && rightOrder !== undefined && leftOrder !== rightOrder) return leftOrder - rightOrder;
-    if (leftOrder !== undefined) return -1;
-    if (rightOrder !== undefined) return 1;
-    return 0;
-  });
-}
-
 export function getClientStrategyAccess(
-  client: ClientWorkspaceAccessInput,
-  options: { requireCoachingService?: boolean } = {},
+  client: ClientStrategyAccessInput,
   now = new Date(),
-): ClientWorkspaceAccess {
-  const isCoachingService = isClientStrategyServiceSlug(client.serviceSlug);
-  const isCvService = isClientCvServiceSlug(client.serviceSlug);
-
-  if (!isCoachingService && !isCvService) {
-    return {
-      status: 'ineligible',
-      daysRemaining: null,
-      selectable: false,
-      canUseCvAnalyzer: false,
-      canUseStrategyTab: false,
-    };
-  }
-
-  if (options.requireCoachingService && !isCoachingService) {
-    return {
-      status: 'ineligible',
-      daysRemaining: null,
-      selectable: false,
-      canUseCvAnalyzer: false,
-      canUseStrategyTab: false,
-    };
-  }
-
-  if (isCvService) {
-    return {
-      status: 'active',
-      daysRemaining: null,
-      selectable: true,
-      canUseCvAnalyzer: true,
-      canUseStrategyTab: false,
-    };
+): ClientStrategyAccess {
+  if (!isClientStrategyServiceSlug(client.serviceSlug)) {
+    return { status: 'ineligible', daysRemaining: null };
   }
 
   if (!client.isDelivered) {
-    return {
-      status: 'active',
-      daysRemaining: null,
-      selectable: true,
-      canUseCvAnalyzer: true,
-      canUseStrategyTab: true,
-    };
+    return { status: 'active', daysRemaining: null };
   }
 
   const deliveredAt = client.deliveredAt ? Date.parse(client.deliveredAt) : Number.NaN;
   const nowTime = now.getTime();
   if (!Number.isFinite(deliveredAt) || !Number.isFinite(nowTime)) {
-    return {
-      status: 'archived',
-      daysRemaining: 0,
-      selectable: false,
-      canUseCvAnalyzer: false,
-      canUseStrategyTab: false,
-    };
+    return { status: 'archived', daysRemaining: 0 };
   }
 
   const availableUntil = deliveredAt + (CLIENT_STRATEGY_REOPEN_WINDOW_DAYS * DAY_IN_MILLISECONDS);
   if (nowTime > availableUntil) {
-    return {
-      status: 'archived',
-      daysRemaining: 0,
-      selectable: false,
-      canUseCvAnalyzer: false,
-      canUseStrategyTab: false,
-    };
+    return { status: 'archived', daysRemaining: 0 };
   }
 
   return {
@@ -196,16 +109,12 @@ export function getClientStrategyAccess(
       CLIENT_STRATEGY_REOPEN_WINDOW_DAYS,
       Math.max(0, Math.ceil((availableUntil - nowTime) / DAY_IN_MILLISECONDS)),
     ),
-    selectable: true,
-    canUseCvAnalyzer: true,
-    canUseStrategyTab: true,
   };
 }
 
-
 export function buildClientStrategyClientChoiceLabel(
   client: ClientStrategyChoiceInput,
-  access: ClientWorkspaceAccess,
+  access: ClientStrategyAccess,
 ) {
   let accessLabel = 'Unavailable';
   if (access.status === 'active') {
@@ -251,15 +160,10 @@ export function getClientStrategyPlanLabel(serviceSlug: ClientStrategyServiceSlu
   return serviceSlug === 'career-clarity' ? '14-day follow-up' : '30-day support plan';
 }
 
-export function buildClientStrategyWorkspaceHref(
-  adminKey: string,
-  paymentId: string,
-  view?: ClientStrategyWorkspaceView,
-) {
+export function buildClientStrategyWorkspaceHref(adminKey: string, paymentId: string) {
   const params = new URLSearchParams();
   if (adminKey && adminKey !== 'dashboard-session') params.set('key', adminKey);
   params.set('tab', 'career-tools');
   params.set('client', paymentId);
-  if (view) params.set('view', view);
   return `/resources/career-diagnostic/submissions?${params.toString()}`;
 }

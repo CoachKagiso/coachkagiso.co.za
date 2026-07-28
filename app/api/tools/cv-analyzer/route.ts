@@ -2,10 +2,6 @@ import { NextResponse } from 'next/server';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { extractTextFromCvFile } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
-import { getClientCvSource, saveClientCvAnalysisReport, saveClientCvVersion } from '@/lib/client-cv-store';
-import { getClientLiveIntake } from '@/lib/client-intake-store';
-import { loadClientStrategyCvText } from '@/lib/client-strategy-cv-server';
-import { sanitizeClientStrategyIntake } from '@/lib/client-strategy-cv';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
@@ -239,7 +235,6 @@ function buildCvAnalyzerUserPrompt({
   contextNotes,
   goal,
   seniority,
-  intakeData,
 }: {
   analysisMode: AnalyzerMode;
   cvText: string;
@@ -247,7 +242,6 @@ function buildCvAnalyzerUserPrompt({
   contextNotes: string;
   goal: CvGoalContext;
   seniority: SeniorityContext;
-  intakeData: Record<string, unknown> | null;
 }) {
   const goalLabel = goal === 'auto_infer' ? 'Auto-infer from CV' : goal;
   const seniorityLabel = seniority === 'auto_infer' ? 'Auto-infer from CV' : seniority;
@@ -260,7 +254,6 @@ function buildCvAnalyzerUserPrompt({
     targetRole ? `Target role or job description:\n${targetRole}` : 'Target role or job description: Not provided',
     contextNotes ? `Kagiso context notes:\n${contextNotes}` : 'Kagiso context notes: Not provided',
     `</analysis_context>`,
-    intakeData ? `<client_intake>\n${JSON.stringify(intakeData)}\n</client_intake>` : '',
     '',
     `<cv_text>`,
     cvText,
@@ -317,7 +310,6 @@ export async function POST(request: Request) {
   let rawGoal = '';
   let rawSeniority = '';
   let cvFile: File | null = null;
-  let paymentId = '';
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -329,7 +321,6 @@ export async function POST(request: Request) {
       rawAnalysisMode = String(formData.get('analysisMode') || 'simple');
       rawGoal = String(formData.get('goal') || '');
       rawSeniority = String(formData.get('seniority') || '');
-      paymentId = compactString(formData.get('paymentId'));
       const uploadedFile = formData.get('cvFile');
       cvFile = uploadedFile instanceof File ? uploadedFile : null;
     } else {
@@ -341,7 +332,6 @@ export async function POST(request: Request) {
       rawAnalysisMode = String(body?.analysisMode || 'simple');
       rawGoal = String(body?.goal || '');
       rawSeniority = String(body?.seniority || '');
-      paymentId = compactString(body?.paymentId);
     }
   } catch {
     return NextResponse.json({ error: 'Could not read CV analyzer input.' }, { status: 400 });
@@ -366,44 +356,8 @@ export async function POST(request: Request) {
     ? rawSeniority
     : 'auto_infer';
 
-  let intakeData: Record<string, unknown> | null = null;
-  let clientCvPath: string | null = null;
-  let clientCvFileName: string | null = null;
-
-  if (paymentId) {
-    try {
-      const source = await getClientCvSource(paymentId);
-      if (source) {
-        clientCvPath = source.storagePath;
-        clientCvFileName = source.fileName;
-      }
-
-      const liveIntake = await getClientLiveIntake(paymentId);
-      intakeData = liveIntake.hasIntake
-        ? sanitizeClientStrategyIntake(liveIntake.formData)
-        : null;
-
-      if (!cvFile && !cvText.trim() && source) {
-        const loaded = await loadClientStrategyCvText(source);
-        if (loaded.included) {
-          cvText = loaded.text;
-        } else {
-          return NextResponse.json({ error: loaded.issue || 'The saved CV could not be read.' }, { status: 400 });
-        }
-      }
-    } catch (error) {
-      console.error('Client CV source load failed:', error instanceof Error ? error.message : 'unknown error');
-      return NextResponse.json({ error: 'Could not load the selected client context or CV.' }, { status: 400 });
-    }
-  }
-
   if (cvFile) {
     try {
-      if (paymentId) {
-        const saved = await saveClientCvVersion({ paymentId, file: cvFile, source: 'analyzer' });
-        clientCvPath = saved.source.storagePath;
-        clientCvFileName = saved.source.fileName;
-      }
       cvText = await extractTextFromCvFile(cvFile);
     } catch (error) {
       return NextResponse.json(
@@ -447,7 +401,6 @@ export async function POST(request: Request) {
               contextNotes,
               goal: resolvedGoal,
               seniority: resolvedSeniority,
-              intakeData,
             }),
           },
         ],
@@ -483,26 +436,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The analyzer returned an incomplete report. Try again.' }, { status: 500 });
     }
 
-    let savedReport: { id: string; createdAt: string } | null = null;
-    if (paymentId) {
-      let report;
-      try {
-        report = await saveClientCvAnalysisReport({
-          paymentId,
-          report: result,
-          analysisMode,
-          targetRole,
-          cvFileName: clientCvFileName,
-          cvPath: clientCvPath,
-        });
-      } catch (error) {
-        console.error('CV analyzer report save failed:', error instanceof Error ? error.message : 'unknown error');
-        return NextResponse.json({ error: 'The analysis completed, but the report could not be saved.' }, { status: 500 });
-      }
-      savedReport = { id: report.id, createdAt: report.created_at };
-    }
-
-    return NextResponse.json({ result, savedReport });
+    return NextResponse.json({ result });
   } catch (error) {
     console.error('CV analyzer parse error:', error);
     return NextResponse.json({ error: 'AI service returned an unreadable report. Try again.' }, { status: 500 });

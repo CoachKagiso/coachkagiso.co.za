@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
-  ChevronDown,
-  ChevronUp,
   CheckCircle2,
   ClipboardCheck,
   Download,
@@ -21,8 +19,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { copyTextToClipboard } from '@/lib/clipboard';
-import type { CvAnalyzerResult, ChangeReportEntry } from '@/lib/cv-analyzer-types';
-import type { ClientRecord } from '@/lib/clients';
 
 type CvGoal =
   | 'new_role'
@@ -35,6 +31,38 @@ type CvGoal =
 type Seniority = 'early' | 'mid' | 'senior' | 'executive';
 type AnalyzerMode = 'simple' | 'advanced';
 type DeliverableKind = 'cv' | 'cover_letter' | 'linkedin';
+type ChangeReportEntry = {
+  category: string;
+  summary: string;
+  before: string;
+  after: string;
+};
+
+type CvAnalyzerResult = {
+  snapshot: string;
+  scores: {
+    positioning: number;
+    clarity: number;
+    roleFit: number;
+    atsReadability: number;
+  };
+  recruiterRead: {
+    headline: string;
+    firstImpression: string;
+    possibleConcern: string;
+  };
+  strongestSignals: string[];
+  priorityFixes: Array<{ title: string; whyItMatters: string; fix: string }>;
+  evidenceGaps: Array<{ title: string; detail: string; fix: string }>;
+  rewriteSamples: Array<{ before: string; after: string; why: string }>;
+  atsNotes: string[];
+  interviewAngles: string[];
+  nextActions: Array<{ title: string; detail: string }>;
+  recommendedCoachMove: {
+    label: string;
+    reason: string;
+  };
+};
 type ExportFormat = 'pdf' | 'docx';
 type CvReportSection = {
   heading: string;
@@ -58,22 +86,6 @@ const seniorityOptions: Array<{ value: Seniority; label: string }> = [
 ];
 const cvFileAccept = '.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
 const maxCvFileBytes = 8 * 1024 * 1024;
-
-type CvSourceState = {
-  available: boolean;
-  fileName: string | null;
-  contentType: string | null;
-  origin: 'stored' | 'external' | null;
-};
-
-type CvWorkspaceResponse = {
-  source?: CvSourceState;
-  latestReport?: {
-    report: CvAnalyzerResult;
-    createdAt: string;
-  } | null;
-  error?: string;
-};
 
 function scoreLabel(value: number) {
   if (value >= 85) return 'Strong';
@@ -345,20 +357,9 @@ function DetailList({
   );
 }
 
-export default function CvAnalyzerDashboard({
-  adminKey,
-  selectedClient = null,
-  active = true,
-  onPrepareSession,
-}: {
-  adminKey: string;
-  selectedClient?: ClientRecord | null;
-  active?: boolean;
-  onPrepareSession?: () => void;
-}) {
+export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) {
   const [analyzerMode, setAnalyzerMode] = useState<AnalyzerMode>('simple');
   const [cvText, setCvText] = useState('');
-  const [isPasteCvOpen, setIsPasteCvOpen] = useState(false);
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [targetRole, setTargetRole] = useState('');
@@ -374,48 +375,9 @@ export default function CvAnalyzerDashboard({
   const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
   const [cvChangeReport, setCvChangeReport] = useState<ChangeReportEntry[] | null>(null);
-  const [cvSource, setCvSource] = useState<CvSourceState>({ available: false, fileName: null, contentType: null, origin: null });
-  const [lastAnalyzedAt, setLastAnalyzedAt] = useState<string | null>(null);
-  const [isLoadingClientCv, setIsLoadingClientCv] = useState(false);
-  const [isUploadingClientCv, setIsUploadingClientCv] = useState(false);
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
-  const canAnalyze = (
-    cvText.trim().length >= 300 ||
-    Boolean(cvFile) ||
-    (Boolean(selectedClient) && cvSource.available)
-  ) && !busy && !isLoadingClientCv && !isUploadingClientCv;
-
-  useEffect(() => {
-    if (!selectedClient || !active) return;
-
-    const controller = new AbortController();
-    const paymentId = selectedClient.paymentId;
-
-    async function loadClientCv() {
-      setIsLoadingClientCv(true);
-      setError('');
-      try {
-        const response = await fetch(`/api/clients/${encodeURIComponent(paymentId)}/cv`, {
-          headers: { 'x-diagnostic-admin-key': adminKey },
-          signal: controller.signal,
-        });
-        const data = await response.json().catch(() => null) as CvWorkspaceResponse | null;
-        if (!response.ok) throw new Error(data?.error || 'Could not load the client CV workspace.');
-        setCvSource(data?.source || { available: false, fileName: null, contentType: null, origin: null });
-        setResult(data?.latestReport?.report || null);
-        setLastAnalyzedAt(data?.latestReport?.createdAt || null);
-      } catch (caught) {
-        if (caught instanceof DOMException && caught.name === 'AbortError') return;
-        setError(caught instanceof Error ? caught.message : 'Could not load the client CV workspace.');
-      } finally {
-        if (!controller.signal.aborted) setIsLoadingClientCv(false);
-      }
-    }
-
-    void loadClientCv();
-    return () => controller.abort();
-  }, [active, adminKey, selectedClient]);
+  const canAnalyze = (cvText.trim().length >= 300 || Boolean(cvFile)) && !busy;
 
   function getCvFileValidationError(file: File) {
     const lowerName = file.name.toLowerCase();
@@ -438,32 +400,7 @@ export default function CvAnalyzerDashboard({
     }
     setError('');
     setCopied(false);
-
-    if (!selectedClient) {
-      setCvFile(file);
-      return;
-    }
-
-    setIsUploadingClientCv(true);
-    const formData = new FormData();
-    formData.append('key', adminKey);
-    formData.append('file', file);
-    void fetch(`/api/clients/${encodeURIComponent(selectedClient.paymentId)}/cv`, {
-      method: 'POST',
-      body: formData,
-    })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null) as CvWorkspaceResponse | null;
-        if (!response.ok) throw new Error(data?.error || 'Could not save this CV version.');
-        setCvSource(data?.source || { available: true, fileName: file.name, contentType: file.type || null, origin: 'stored' });
-        setCvFile(null);
-        setFileInputKey((current) => current + 1);
-      })
-      .catch((caught) => {
-        setError(caught instanceof Error ? caught.message : 'Could not save this CV version.');
-        setFileInputKey((current) => current + 1);
-      })
-      .finally(() => setIsUploadingClientCv(false));
+    setCvFile(file);
   }
 
   function clearCvFile() {
@@ -487,7 +424,6 @@ export default function CvAnalyzerDashboard({
         formData.append('key', adminKey);
         formData.append('analysisMode', analyzerMode);
         formData.append('cvFile', cvFile);
-        if (selectedClient) formData.append('paymentId', selectedClient.paymentId);
         formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
@@ -508,7 +444,6 @@ export default function CvAnalyzerDashboard({
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
-            paymentId: selectedClient?.paymentId || '',
           }),
         });
       }
@@ -516,7 +451,6 @@ export default function CvAnalyzerDashboard({
       if (!response.ok) throw new Error(data?.error || 'Could not analyse this CV.');
       if (!data?.result) throw new Error('The analyzer returned an empty report.');
       setResult(data.result);
-      setLastAnalyzedAt(new Date().toISOString());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not analyse this CV.');
     } finally {
@@ -566,7 +500,6 @@ export default function CvAnalyzerDashboard({
         formData.append('analysisMode', analyzerMode);
         formData.append('deliverable', kind);
         formData.append('cvFile', cvFile);
-        if (selectedClient) formData.append('paymentId', selectedClient.paymentId);
         formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
@@ -587,7 +520,6 @@ export default function CvAnalyzerDashboard({
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
             analysis: result,
-            paymentId: selectedClient?.paymentId || '',
           }),
         });
       }
@@ -630,20 +562,14 @@ export default function CvAnalyzerDashboard({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Career Tools</p>
-            <h1 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">
-              {selectedClient ? `CV Analysis for ${selectedClient.buyerName}` : 'CV Positioning Analyzer'}
-            </h1>
+            <h1 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">CV Positioning Analyzer</h1>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/64">
               Private dashboard analysis for CV clarity, positioning, role fit, and next coaching moves.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">
             <LockKeyhole className="h-3.5 w-3.5" />
-            {isLoadingClientCv
-              ? 'Loading client workspace'
-              : lastAnalyzedAt
-                ? `Last analyzed: ${new Intl.DateTimeFormat('en-ZA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Johannesburg' }).format(new Date(lastAnalyzedAt))}`
-                : 'No report saved'}
+            No report saved
           </span>
         </div>
 
@@ -651,12 +577,8 @@ export default function CvAnalyzerDashboard({
           <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">{cvSource.available ? 'Replace current CV' : 'Upload CV'}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
-                  {cvSource.available
-                    ? `${cvSource.fileName || 'A CV'} is loaded and ready to analyze. Upload a newer version when needed.`
-                    : 'No CV is on file yet. Upload PDF, Word .docx, or plain text.'}
-                </p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Upload CV</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">PDF, Word .docx, or plain text. The file is read for this analysis only.</p>
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Max 8MB</span>
             </div>
@@ -671,12 +593,8 @@ export default function CvAnalyzerDashboard({
               />
               <span className="grid justify-items-center">
                 <Upload className="h-6 w-6 text-[#C9AD98]" />
-                <span className="mt-2 text-[13px] font-bold text-[#142334]">
-                  {isUploadingClientCv ? 'Saving CV version...' : cvFile ? cvFile.name : cvSource.fileName || (cvSource.available ? 'Replace CV' : 'Upload PDF, Word, or TXT CV')}
-                </span>
-                <span className="mt-1 text-[11px] text-[#142334]/55">
-                  {cvSource.available ? 'The current file of record stays available until you replace it.' : 'Text-based PDFs work best. Scanned image PDFs may not extract.'}
-                </span>
+                <span className="mt-2 text-[13px] font-bold text-[#142334]">{cvFile ? cvFile.name : 'Upload PDF, Word, or TXT CV'}</span>
+                <span className="mt-1 text-[11px] text-[#142334]/55">{cvFile ? 'This file will be used instead of pasted text.' : 'Text-based PDFs work best. Scanned image PDFs may not extract.'}</span>
               </span>
             </label>
 
@@ -688,37 +606,17 @@ export default function CvAnalyzerDashboard({
             )}
           </div>
 
-          <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4]">
-            <button
-              type="button"
-              aria-expanded={isPasteCvOpen}
-              aria-controls="paste-cv-text-panel"
-              onClick={() => setIsPasteCvOpen((current) => !current)}
-              className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[#FBFAF8]"
-            >
-              <span>
-                <span className="block text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Paste CV text</span>
-                <span className="mt-1 block text-[11px] text-[#142334]/55">
-                  {cvText.trim() ? `${wordCount} words pasted` : 'Optional — expand when you need to paste a CV'}
-                </span>
-              </span>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#8C7466]">
-                {isPasteCvOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </span>
-            </button>
-            {isPasteCvOpen && (
-              <div id="paste-cv-text-panel" className="border-t border-[#E4D8CB] p-3">
-                <textarea
-                  value={cvText}
-                  onChange={(event) => setCvText(event.target.value)}
-                  rows={13}
-                  placeholder="Paste the CV text here..."
-                  className="min-h-[330px] w-full rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:ring-2 focus:ring-[#BFA490]/25"
-                />
-                <span className="mt-2 block text-[11px] font-medium text-[#142334]/50">{wordCount} words</span>
-              </div>
-            )}
-          </div>
+          <label className="grid gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Paste CV text</span>
+            <textarea
+              value={cvText}
+              onChange={(event) => setCvText(event.target.value)}
+              rows={13}
+              placeholder="Paste the CV text here..."
+              className="min-h-[330px] rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:bg-white focus:ring-2 focus:ring-[#BFA490]/25"
+            />
+            <span className="text-[11px] font-medium text-[#142334]/50">{wordCount} words</span>
+          </label>
 
           <label className="grid gap-2">
             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
@@ -801,7 +699,7 @@ export default function CvAnalyzerDashboard({
             className="inline-flex h-12 items-center justify-center gap-2 rounded-[8px] bg-[#142334] px-5 text-[12px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:bg-[#D8C8BB] disabled:text-[#142334]/45"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
-            {busy ? 'Analysing CV...' : result ? 'Re-analyze' : 'Analyze CV'}
+            {busy ? 'Analysing CV...' : 'Analyze CV'}
           </button>
         </div>
       </div>
@@ -818,12 +716,6 @@ export default function CvAnalyzerDashboard({
                 <ClipboardCheck className="h-4 w-4" />
                 {copied ? 'Copied' : 'Copy report'}
               </button>
-              {onPrepareSession && (
-                <button type="button" onClick={onPrepareSession} className="studio-secondary-button">
-                  <Sparkles className="h-4 w-4" />
-                  Prepare session
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => void exportReport('pdf')}

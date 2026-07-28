@@ -142,8 +142,7 @@ export async function listManualTasks() {
 
   if (result.error) {
     if (isMissingDashboardTable(result.error.message)) return [];
-    console.error('Failed to fetch tasks:', result.error.message);
-    return [];
+    throw new Error(result.error.message);
   }
 
   return ((result.data || []) as ManualTaskRow[]).map(normalizeTask);
@@ -159,8 +158,7 @@ export async function listNotes() {
 
   if (result.error) {
     if (isMissingDashboardTable(result.error.message)) return [];
-    console.error('Failed to fetch notes:', result.error.message);
-    return [];
+    throw new Error(result.error.message);
   }
 
   return ((result.data || []) as NoteRow[]).map(normalizeNote);

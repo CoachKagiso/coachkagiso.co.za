@@ -59,7 +59,7 @@ export default function ClientStrategyPlanPanel({
   );
   const definition = getClientStrategyPlanDefinition(serviceSlug);
   const isDirty = Boolean(editedContent) && JSON.stringify(editedContent) !== savedSnapshot;
-  const canGenerate = !debriefDirty && !isGenerating;
+  const canGenerate = Boolean(workspace) && !debriefDirty && !isGenerating;
 
   const selectLoadedPlan = useCallback((plan: ClientStrategyPlanRecord | null) => {
     setSelectedPlanId(plan?.id || '');
