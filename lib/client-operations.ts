@@ -194,7 +194,10 @@ export async function listClientOperations(filters: ClientOperationFilters = {})
     paymentError = legacyResult.error;
   }
 
-  if (paymentError) throw new Error(paymentError.message);
+  if (paymentError) {
+    console.error('Failed to fetch payments:', paymentError.message);
+    return [];
+  }
 
   const intakeResult = await supabase
     .from('intake_submissions')
@@ -203,7 +206,10 @@ export async function listClientOperations(filters: ClientOperationFilters = {})
     .order('submitted_at', { ascending: false })
     .limit(250);
 
-  if (intakeResult.error) throw new Error(intakeResult.error.message);
+  if (intakeResult.error) {
+    console.error('Failed to fetch intakes:', intakeResult.error.message);
+    return [];
+  }
 
   const intakes = ((intakeResult.data || []) as IntakeSubmissionRecord[]).reduce<Record<string, IntakeSubmissionRecord>>(
     (acc, intake) => {

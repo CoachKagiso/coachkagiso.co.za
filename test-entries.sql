@@ -90,15 +90,7 @@ INSERT INTO public.client_strategy_workspaces (
   'manual-career-clarity-test-001',
   'career-clarity',
   'draft',
-  '{
-    "clarityShift": "Client recognizes she has hit a ceiling after 18 years and is considering two paths: staying in corporate HR or pivoting to consulting/coaching.",
-    "blockers": "Long tenure at same company may make transition difficult; age concerns (40+); fear of losing stability.",
-    "strengthsEvidence": "MBA, SPHR, SHRM-SCP certifications; 18+ years HR experience; international HR launch experience; M&A due diligence expertise; budget management ($135K); team leadership (4 professionals).",
-    "decisions": "Client is open to exploring both corporate advancement and independent consulting paths.",
-    "clientCommitments": "Will update LinkedIn profile; will research HR consulting market in Chicago area.",
-    "coachCommitments": "Will provide career assessment framework; will share HR consulting startup guide.",
-    "toneNotes": "Client is experienced and professional; may need encouragement to see value in transition."
-  }'::jsonb,
+  '{}'::jsonb,
   1,
   'dashboard-admin'
 );
@@ -196,15 +188,7 @@ INSERT INTO public.client_strategy_workspaces (
   'manual-glow-up-vip-test-002',
   'glow-up-vip',
   'draft',
-  '{
-    "clarityShift": "Client recognizes she has hit a ceiling after 18 years and is considering two paths: staying in corporate HR or pivoting to consulting/coaching. Clear desire for VP-level or CHRO role.",
-    "blockers": "Long tenure at same company may make transition difficult; age concerns (40+); fear of losing stability; low interview-to-offer ratio (2 interviews, 0 offers from 10 applications).",
-    "strengthsEvidence": "MBA, SPHR, SHRM-SCP certifications; 18+ years HR experience; international HR launch experience; M&A due diligence expertise; budget management ($135K); team leadership (4 professionals); organizational transformation experience.",
-    "decisions": "Client is open to exploring both corporate advancement and independent consulting paths. Targeting VP of People/CHRO in tech or consulting, or independent HR consultancy.",
-    "clientCommitments": "Will update LinkedIn profile; will research HR consulting market in Chicago area; will practice interview skills.",
-    "coachCommitments": "Will provide career assessment framework; will share HR consulting startup guide; will conduct mock interviews.",
-    "toneNotes": "Client is experienced and professional; may need encouragement to see value in transition; concerned about age and stability."
-  }'::jsonb,
+  '{}'::jsonb,
   1,
   'dashboard-admin'
 );

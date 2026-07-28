@@ -2,7 +2,7 @@ export const MAX_PRIVATE_CV_BYTES = 10 * 1024 * 1024;
 
 const FILE_TYPES: Record<string, {
   extensions: readonly string[];
-  signature: readonly number[];
+  signature?: readonly number[];
   requiredMarkers?: readonly string[];
 }> = {
   'application/pdf': { extensions: ['pdf'], signature: [0x25, 0x50, 0x44, 0x46, 0x2d] },
@@ -12,6 +12,7 @@ const FILE_TYPES: Record<string, {
     signature: [0x50, 0x4b],
     requiredMarkers: ['[Content_Types].xml', 'word/'],
   },
+  'text/plain': { extensions: ['txt'] },
 } as const;
 
 export function cleanPrivateCvFilename(name: string) {
@@ -44,13 +45,13 @@ export function validatePrivateCvUpload(input: {
   if (input.size > MAX_PRIVATE_CV_BYTES) throw new Error('The CV must be 10MB or smaller.');
 
   const definition = FILE_TYPES[input.type as keyof typeof FILE_TYPES];
-  if (!definition) throw new Error('The CV must be a PDF or Word document.');
+  if (!definition) throw new Error('The CV must be a PDF, Word .docx, or plain text document.');
 
   const extension = input.name.split('.').pop()?.toLowerCase() || '';
   if (!(definition.extensions as readonly string[]).includes(extension)) {
     throw new Error('The CV filename does not match its document type.');
   }
-  if (!startsWith(input.bytes, definition.signature)) {
+  if (definition.signature && !startsWith(input.bytes, definition.signature)) {
     throw new Error('The CV file contents do not match its document type.');
   }
   if (definition.requiredMarkers?.some((marker) => !includesAscii(input.bytes, marker))) {
@@ -60,5 +61,7 @@ export function validatePrivateCvUpload(input: {
   return {
     filename: cleanPrivateCvFilename(input.name),
     contentType: input.type,
+    extension,
+    size: input.size,
   };
 }

@@ -678,7 +678,8 @@ export async function listInboundEmailReplies({
   const { data, error } = await query;
   if (error) {
     if (isMissingInboundTable(error.message)) return [];
-    throw new Error(error.message);
+    console.error('Failed to fetch inbound email replies:', error.message);
+    return [];
   }
 
   return ((data || []) as InboundReplyRow[]).map(normalizeInboundReply);

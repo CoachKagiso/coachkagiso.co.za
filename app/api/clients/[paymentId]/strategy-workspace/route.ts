@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import {
+  getClientStrategyAccess,
   isClientStrategyServiceSlug,
   normalizeSessionDebrief,
   type ClientStrategyServiceSlug,
@@ -25,6 +26,25 @@ async function getEligiblePayment(paymentId: string) {
   if (error) throw new Error(error.message);
   if (!data || data.status !== 'confirmed') return null;
   if (!isClientStrategyServiceSlug(data.service_slug)) return null;
+
+  const deliveryResult = await supabase
+    .from('client_deliveries')
+    .select('completed, completed_at')
+    .eq('payment_id', paymentId);
+  if (deliveryResult.error && !deliveryResult.error.message.includes('client_deliveries')) {
+    throw new Error(deliveryResult.error.message);
+  }
+
+  const deliveryRows = (deliveryResult.data || []) as Array<{ completed: boolean; completed_at: string | null }>;
+  const access = getClientStrategyAccess(
+    {
+      serviceSlug: String(data.service_slug),
+      isDelivered: deliveryRows.length > 0 && deliveryRows.every((row) => Boolean(row.completed)),
+      deliveredAt: deliveryRows.map((row) => row.completed_at).filter(Boolean).sort().at(-1) || null,
+    },
+    { requireCoachingService: true },
+  );
+  if (!access.canUseStrategyTab) return null;
 
   return {
     paymentId: String(data.payment_id),
