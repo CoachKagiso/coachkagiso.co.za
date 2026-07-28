@@ -1,7 +1,6 @@
 import {
   normalizeSessionDebrief,
   isClientStrategyServiceSlug,
-  getClientStrategyAccess,
   type ClientStrategyServiceSlug,
   type ClientStrategyWorkspaceRecord,
   type SessionDebrief,
@@ -13,8 +12,6 @@ import {
   type ClientStrategyPlanSourceSnapshot,
   type ClientStrategyPlanStatus,
 } from '@/lib/client-strategy-plan';
-import { getClientCvSource, getLatestClientCvAnalysisReport } from '@/lib/client-cv-store';
-import { getClientLiveIntake } from '@/lib/client-intake-store';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
 type ClientStrategyWorkspaceRow = {
@@ -130,7 +127,7 @@ export async function saveClientStrategyWorkspace(input: {
 
 export async function getClientStrategyGenerationSource(paymentId: string) {
   const supabase = createSupabaseServiceClient();
-  const [paymentResult, workspaceResult, deliveryResult] = await Promise.all([
+  const [paymentResult, workspaceResult, intakeResult] = await Promise.all([
     supabase
       .from('payments')
       .select('payment_id, service_slug, status')
@@ -142,36 +139,23 @@ export async function getClientStrategyGenerationSource(paymentId: string) {
       .eq('payment_id', paymentId)
       .maybeSingle(),
     supabase
-      .from('client_deliveries')
-      .select('completed, completed_at')
-      .eq('payment_id', paymentId),
+      .from('intake_submissions')
+      .select('id, form_data, cv_file_url, submitted_at')
+      .eq('payment_id', paymentId)
+      .eq('duplicate_attempt', false)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (paymentResult.error) throw new Error(paymentResult.error.message);
   if (workspaceResult.error) throw new Error(workspaceResult.error.message);
-  if (deliveryResult.error && !deliveryResult.error.message.includes('client_deliveries')) throw new Error(deliveryResult.error.message);
+  if (intakeResult.error) throw new Error(intakeResult.error.message);
 
   const payment = paymentResult.data;
   if (!payment || payment.status !== 'confirmed' || !isClientStrategyServiceSlug(payment.service_slug)) {
     return null;
   }
-
-  const deliveryRows = (deliveryResult.data || []) as Array<{ completed: boolean; completed_at: string | null }>;
-  const access = getClientStrategyAccess(
-    {
-      serviceSlug: String(payment.service_slug),
-      isDelivered: deliveryRows.length > 0 && deliveryRows.every((row) => Boolean(row.completed)),
-      deliveredAt: deliveryRows.map((row) => row.completed_at).filter(Boolean).sort().at(-1) || null,
-    },
-    { requireCoachingService: true },
-  );
-  if (!access.canUseStrategyTab) return null;
-
-  const [cvSource, latestCvAnalysis, liveIntake] = await Promise.all([
-    getClientCvSource(paymentId),
-    getLatestClientCvAnalysisReport(paymentId),
-    getClientLiveIntake(paymentId),
-  ]);
 
   return {
     paymentId: String(payment.payment_id),
@@ -179,25 +163,14 @@ export async function getClientStrategyGenerationSource(paymentId: string) {
     workspace: workspaceResult.data
       ? normalizeWorkspaceRow(workspaceResult.data as ClientStrategyWorkspaceRow)
       : null,
-    intake: liveIntake.intakeId
+    intake: intakeResult.data
       ? {
-          id: liveIntake.intakeId,
-          formData: liveIntake.formData,
-          contextVerified: liveIntake.contextVerified,
-          cvFileUrl: liveIntake.cvFileUrl,
-          submittedAt: liveIntake.submittedAt || '',
+          id: String(intakeResult.data.id),
+          formData: (intakeResult.data.form_data || {}) as Record<string, unknown>,
+          cvFileUrl: intakeResult.data.cv_file_url ? String(intakeResult.data.cv_file_url) : null,
+          submittedAt: String(intakeResult.data.submitted_at),
         }
-      : liveIntake.hasIntake
-        ? {
-            id: '',
-            formData: liveIntake.formData,
-            contextVerified: liveIntake.contextVerified,
-            cvFileUrl: liveIntake.cvFileUrl,
-            submittedAt: liveIntake.submittedAt || '',
-          }
-        : null,
-    cvSource,
-    cvAnalysis: latestCvAnalysis,
+      : null,
   };
 }
 

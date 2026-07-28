@@ -8,7 +8,6 @@ import Reveal from '@/components/Reveal';
 import { ContourField, FlowRibbon, GeoArchPattern } from '@/components/DecorativeMotifs';
 import { archetypes as diagnosticArchetypes } from '@/lib/career-diagnostic';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
-import { DIAGNOSTIC_CONTEXT_CONSENT_VERSION } from '@/lib/client-diagnostic-context';
 
 type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 
@@ -367,7 +366,6 @@ function getResult(answers: Partial<Record<number, OptionKey>>) {
 
 export default function CareerDiagnostic() {
   const [lead, setLead] = useState({ firstName: '', email: '' });
-  const [coachingContextConsent, setCoachingContextConsent] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [answers, setAnswers] = useState<Partial<Record<number, OptionKey>>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -396,8 +394,6 @@ export default function CareerDiagnostic() {
           answers: nextAnswers,
           score: nextResult.score,
           archetype: nextResult.archetype,
-          coachingContextConsent,
-          coachingContextConsentVersion: coachingContextConsent ? DIAGNOSTIC_CONTEXT_CONSENT_VERSION : null,
         }),
       });
 
@@ -547,19 +543,8 @@ export default function CareerDiagnostic() {
                       Begin <ArrowUpRight className="h-4 w-4" />
                     </button>
                   </form>
-                  <label className="mt-4 flex max-w-2xl items-start gap-3 text-[12px] leading-relaxed text-white/72">
-                    <input
-                      type="checkbox"
-                      checked={coachingContextConsent}
-                      onChange={(event) => setCoachingContextConsent(event.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#C9AD98]"
-                    />
-                    <span>
-                      Optional: if I later book a coaching session, Coach Kagiso may use these diagnostic answers to prepare for that session. I can change my mind at any time.
-                    </span>
-                  </label>
                   <p className="mt-4 text-[12px] leading-relaxed text-white/48">
-                    Your choice above does not affect access to the diagnostic. See the <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>.
+                    POPIA-conscious. No spam. Just the diagnostic and useful career notes.
                   </p>
                 </div>
               ) : result ? (

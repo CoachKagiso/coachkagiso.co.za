@@ -48,7 +48,7 @@ export default function SessionDebriefEditor({
       <div className="rounded-[8px] bg-white p-5" aria-busy="true" aria-label="Loading session debrief">
         <div className="h-6 w-52 animate-pulse rounded bg-[#E4D8CB]" />
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {Array.from({ length: SESSION_DEBRIEF_FIELDS.length }).map((_, index) => (
+          {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-36 animate-pulse rounded-[8px] bg-[#F5F3EE]" />
           ))}
         </div>

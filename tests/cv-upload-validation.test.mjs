@@ -16,25 +16,6 @@ test('accepts a PDF whose extension, MIME type, and signature agree', () => {
     {
       filename: 'Lerato-CV-2026.pdf',
       contentType: 'application/pdf',
-      extension: 'pdf',
-      size: 12,
-    },
-  );
-});
-
-test('accepts plain text CVs for Career Tools storage', () => {
-  assert.deepEqual(
-    validatePrivateCvUpload({
-      name: 'Lerato-CV.txt',
-      type: 'text/plain',
-      size: 12,
-      bytes: new TextEncoder().encode('Career history and experience'),
-    }),
-    {
-      filename: 'Lerato-CV.txt',
-      contentType: 'text/plain',
-      extension: 'txt',
-      size: 12,
     },
   );
 });

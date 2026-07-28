@@ -203,8 +203,7 @@ export async function listDashboardEventNotifications({
 
   if (error) {
     if (isMissingDashboardNotificationsTable(error)) return [];
-    console.error('Failed to fetch dashboard notifications:', error.message);
-    return [];
+    throw new Error(error.message);
   }
 
   return ((data || []) as DashboardNotificationRow[]).map(normalizeDashboardNotification);
@@ -240,8 +239,7 @@ export async function getDashboardEventNotificationCount(status: DashboardNotifi
 
   if (error) {
     if (isMissingDashboardNotificationsTable(error)) return 0;
-    console.error('Failed to fetch notification count:', error.message);
-    return 0;
+    throw new Error(error.message);
   }
 
   return count || 0;

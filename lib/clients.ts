@@ -365,10 +365,7 @@ export async function listClientRecords() {
     paymentError = legacyPaymentResult.error;
   }
 
-  if (paymentError) {
-    console.error('Failed to fetch client payments:', paymentError.message);
-    return [];
-  }
+  if (paymentError) throw new Error(paymentError.message);
 
   const payments = paymentRows || [];
   const paymentIds = payments.map((payment) => payment.payment_id);
@@ -407,20 +404,15 @@ export async function listClientRecords() {
       .limit(500),
   ]);
 
-  if (intakeResult.error) {
-    console.error('Failed to fetch intakes for client list:', intakeResult.error.message);
-  }
-
-  if (diagnosticResult.error) {
-    console.error('Failed to fetch diagnostics for client list:', diagnosticResult.error.message);
-  }
+  if (intakeResult.error) throw new Error(intakeResult.error.message);
+  if (diagnosticResult.error) throw new Error(diagnosticResult.error.message);
 
   const deliveries =
     deliveryResult.error && isMissingOptionalClientTable(deliveryResult.error.message)
       ? []
       : ((deliveryResult.data || []) as ClientDeliveryRow[]);
   if (deliveryResult.error && deliveries.length === 0 && !isMissingOptionalClientTable(deliveryResult.error.message)) {
-    console.error('Failed to fetch deliveries for client list:', deliveryResult.error.message);
+    throw new Error(deliveryResult.error.message);
   }
 
   const sentEmails =
@@ -428,7 +420,7 @@ export async function listClientRecords() {
       ? []
       : ((sentEmailResult.data || []) as SentEmailRow[]);
   if (sentEmailResult.error && sentEmails.length === 0 && !isMissingOptionalClientTable(sentEmailResult.error.message)) {
-    console.error('Failed to fetch sent emails for client list:', sentEmailResult.error.message);
+    throw new Error(sentEmailResult.error.message);
   }
 
   const notes =
@@ -436,7 +428,7 @@ export async function listClientRecords() {
       ? []
       : ((noteResult.data || []) as NoteRow[]);
   if (noteResult.error && notes.length === 0 && !isMissingOptionalClientTable(noteResult.error.message)) {
-    console.error('Failed to fetch notes for client list:', noteResult.error.message);
+    throw new Error(noteResult.error.message);
   }
 
   return buildClientList(

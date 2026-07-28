@@ -11,8 +11,6 @@ import {
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { extractTextFromCvFile } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
-import { getClientCvSource } from '@/lib/client-cv-store';
-import { loadClientStrategyCvText } from '@/lib/client-strategy-cv-server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
@@ -772,7 +770,6 @@ export async function POST(request: Request) {
   let rawDeliverable = 'cv';
   let analysisInput: unknown = null;
   let cvFile: File | null = null;
-  let paymentId = '';
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -785,7 +782,6 @@ export async function POST(request: Request) {
       rawGoal = String(formData.get('goal') || '');
       rawSeniority = String(formData.get('seniority') || '');
       rawDeliverable = String(formData.get('deliverable') || 'cv');
-      paymentId = compactString(formData.get('paymentId'));
       const rawAnalysis = compactString(formData.get('analysis'));
       analysisInput = rawAnalysis ? JSON.parse(rawAnalysis) : null;
       const uploadedFile = formData.get('cvFile');
@@ -800,7 +796,6 @@ export async function POST(request: Request) {
       rawGoal = String(body?.goal || '');
       rawSeniority = String(body?.seniority || '');
       rawDeliverable = String(body?.deliverable || 'cv');
-      paymentId = compactString(body?.paymentId);
       analysisInput = body?.analysis ?? null;
     }
   } catch {
@@ -825,19 +820,6 @@ export async function POST(request: Request) {
   const seniorityLabel = analysisMode === 'advanced' && includesValue(seniorityLevels, rawSeniority)
     ? rawSeniority
     : 'Auto-infer from CV';
-
-  if (paymentId && !cvFile && !cvText.trim()) {
-    try {
-      const source = await getClientCvSource(paymentId);
-      if (!source) return NextResponse.json({ error: 'No CV is available for this client yet.' }, { status: 400 });
-      const loaded = await loadClientStrategyCvText(source);
-      if (!loaded.included) return NextResponse.json({ error: loaded.issue || 'The saved CV could not be read.' }, { status: 400 });
-      cvText = loaded.text;
-    } catch (error) {
-      console.error('Client CV builder source load failed:', error instanceof Error ? error.message : 'unknown error');
-      return NextResponse.json({ error: 'Could not load the selected client CV.' }, { status: 400 });
-    }
-  }
 
   if (cvFile) {
     try {

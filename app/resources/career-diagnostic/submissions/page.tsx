@@ -33,6 +33,7 @@ import { GrowthOSAssistant } from '@/components/assistant/GrowthOSAssistant';
 import SettingsPageComponent from '@/components/settings/SettingsPageComponent';
 import CustomCalendarDashboard from '@/components/calendar/CustomCalendarDashboard';
 import ClientStrategyWorkspace from '@/components/career-tools/ClientStrategyWorkspace';
+import CvAnalyzerDashboard from '@/components/career-tools/CvAnalyzerDashboard';
 import ClientsDashboard from '@/components/clients/ClientsDashboard';
 import ContentStudio from '@/components/content/ContentStudio';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
@@ -136,7 +137,6 @@ type DiagnosticSubmissionsPageProps = {
     to?: string;
     studio?: string;
     client?: string;
-    view?: string;
     updated?: string;
     deletedCount?: string;
     error?: string;
@@ -1146,7 +1146,6 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
     to,
     studio,
     client,
-    view,
     updated,
     deletedCount,
     error,
@@ -2260,13 +2259,15 @@ export default async function DiagnosticSubmissionsPage({ searchParams }: Diagno
         )}
 
         {activeTab === 'career-tools' && (
-          <ClientStrategyWorkspace
-            key={client || 'career-tools-workspace-empty'}
-            adminKey={key || ''}
-            clients={clientRecords}
-            selectedPaymentId={client}
-            selectedView={view}
-          />
+          <div className="space-y-3">
+            <ClientStrategyWorkspace
+              key={client || 'strategy-workspace-empty'}
+              adminKey={key || ''}
+              clients={clientRecords}
+              selectedPaymentId={client}
+            />
+            <CvAnalyzerDashboard adminKey={key || ''} />
+          </div>
         )}
 
         {activeTab === 'pipeline' && (
