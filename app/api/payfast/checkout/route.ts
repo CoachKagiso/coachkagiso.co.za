@@ -50,10 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid upgrade credit' }, { status: 400 });
   }
 
-  // TEMP: July 2026 month-end special, R400 instead of R500. Revert to R500 after 31 July 2026.
-  const checkoutAmount = service.slug === 'bundle'
-    ? 400
-    : upgradeOffer?.valid
+  const checkoutAmount = upgradeOffer?.valid
     ? upgradeOffer.credit.discounted_amount
     : getServiceCheckoutAmount(service);
 
