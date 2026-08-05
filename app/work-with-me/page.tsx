@@ -369,28 +369,13 @@ export default function WorkWithMePage() {
                         )}
                         <div className="grid gap-6 lg:grid-cols-[0.78fr_1fr] lg:gap-10">
                           <div>
-                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                            <div className="flex flex-wrap items-baseline justify-between gap-3">
                               <h3 className="font-serif text-[34px] md:text-[42px] leading-[1.02]">
                                 {service.title}
                               </h3>
-                              {service.title === 'CV + LinkedIn Bundle' ? (
-                                <span className="text-right">
-                                  {/* TEMP: July 2026 month-end special, R400 instead of R500. Revert to R500 after 31 July 2026. */}
-                                  <span className={`block text-[12px] leading-relaxed ${isDark ? 'text-white/60' : 'text-[#142334]/60'}`}>
-                                    Special ends 31 July 2026.
-                                  </span>
-                                  <span className="block font-serif text-[18px] text-[#C9AD98]/60 line-through">
-                                    R500
-                                  </span>
-                                  <span className="block font-serif text-[25px] text-[#C9AD98]">
-                                    R400
-                                  </span>
-                                </span>
-                              ) : (
-                                <span className={`font-serif text-[25px] ${isDark ? 'text-[#C9AD98]' : 'text-[#C9AD98]'}`}>
-                                  {service.price}
-                                </span>
-                              )}
+                              <span className={`font-serif text-[25px] ${isDark ? 'text-[#C9AD98]' : 'text-[#C9AD98]'}`}>
+                                {service.price}
+                              </span>
                             </div>
                             {service.sessionLine && (
                               <p className={`mt-4 text-[16px] leading-relaxed ${isDark ? 'text-white/66' : 'text-[#142334]/72'}`}>
