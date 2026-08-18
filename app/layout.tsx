@@ -26,10 +26,10 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://coachkagiso.co.za'),
   manifest: '/site.webmanifest',
   title: {
-    default: 'Coach Kagiso | Career Coach South Africa — CV Reviews, LinkedIn, Clarity Sessions',
+    default: 'Coach Kagiso | Career Coach South Africa — CV Writing, LinkedIn, Clarity Sessions',
     template: '%s | Coach Kagiso',
   },
-  description: 'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
+  description: 'Career development and personal brand coaching for South African professionals. CV revamps, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
   keywords: [
     'career coach south africa',
     'CV review south africa',

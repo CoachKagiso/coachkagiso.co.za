@@ -44,7 +44,7 @@ export default function TermsPage() {
             <p className="mt-4">Currently available:</p>
             <ul className="mt-3 list-disc space-y-2 pl-6">
               <li>1-on-1 coaching: Career Clarity Session and Glow Up VIP Package</li>
-              <li>Done-with-you services: CV Revamp, Cover Letter, LinkedIn Optimisation, CV + LinkedIn Bundle, and 48-Hour CV Review</li>
+              <li>Done-with-you services: CV Revamp, Cover Letter, LinkedIn Optimisation, and CV + LinkedIn Bundle</li>
               <li>Saturday Masterclass, which is live group sessions fortnightly during the cohort window</li>
               <li>Free resource: Personal Brand Audit</li>
             </ul>

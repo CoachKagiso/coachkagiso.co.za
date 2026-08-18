@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ArrowUpRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 const serviceOptions = [
-  '48-Hour CV Review',
   'CV Revamp',
   'Cover Letter',
   'LinkedIn Optimisation',

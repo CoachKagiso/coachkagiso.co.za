@@ -36,7 +36,6 @@ type Service = {
 
 function getServiceRoute(title: string) {
   const routes: Record<string, string> = {
-    '48-Hour CV Review': '/buy/cv-review',
     'CV Revamp': '/buy/cv-revamp',
     'Cover Letter': '/buy/cover-letter',
     'LinkedIn Optimisation': '/buy/linkedin',
@@ -61,14 +60,14 @@ type Track = {
 export const metadata: Metadata = {
   title: 'Career Coaching & CV Services South Africa | Work With Me',
   description:
-    'Career coaching, CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more with Coach Kagiso. Services for South African professionals.',
+    'Career coaching, CV revamps from R400, LinkedIn optimisation, career clarity sessions, and more with Coach Kagiso. Services for South African professionals.',
   alternates: {
     canonical: '/work-with-me',
   },
   openGraph: {
     title: 'Career Coaching & CV Services South Africa | Coach Kagiso',
     description:
-      'CV reviews, LinkedIn optimisation, career clarity sessions, and more. Pricing from R150.',
+      'CV revamps, LinkedIn optimisation, career clarity sessions, and more. Pricing from R150.',
     url: '/work-with-me',
   },
 };
@@ -84,19 +83,6 @@ const tracks: Track[] = [
       'For graduates, job seekers, and employed professionals who need their CV, LinkedIn, or online presence working harder.',
     icon: ClipboardCheck,
     services: [
-      {
-        title: '48-Hour CV Review',
-        price: 'R150',
-        tagline: 'Your CV, my expert eye. Back in under 48 hours.',
-        body: "Send me your current CV. I'll record a 5-minute video walking you through what's broken, what's working, and what to fix first. This is feedback, not a rewrite. If you later want Kagiso to do the full rewrite, your R150 is credited toward the CV Revamp and you only pay the R250 difference.",
-        items: [
-          '5-minute review delivered within 48 hours',
-          '3 specific fixes you can apply yourself',
-          '3 strengths worth keeping',
-          'Honest, no fluff',
-        ],
-        cta: 'Get my CV reviewed',
-      },
       {
         title: 'CV Revamp',
         price: 'R400',
@@ -164,10 +150,11 @@ const tracks: Track[] = [
         title: 'Career Clarity Session',
         price: 'R800',
         tagline: "When you don't know what's next, and you're tired of guessing.",
-        body: 'Seventy-five minutes, just you and me, working through where you actually are and where you want to go. You leave with a written action plan for your next 30 days.',
+        body: "Sixty minutes, just you and me, working through where you actually are and where you want to go. You leave with a CV that's ready to send and a written plan for what to do next, scaled to what your goal actually needs. Some plans are thirty days. Some need sixty or ninety to get you there properly.",
         items: [
-          '75-minute 1-on-1 session on Zoom',
-          'Written 1-page action plan',
+          '60-minute 1-on-1 session on Microsoft Teams',
+          'Full CV Revamp',
+          '30-day written action plan, scaled to 60 or 90 days for more complex goals',
           'Skills pathway tailored to your goal',
           '14-day follow-up call',
         ],
@@ -187,12 +174,14 @@ const tracks: Track[] = [
         title: 'Glow Up VIP Package',
         price: 'R1,200',
         tagline: 'Everything, sharpened. For when landing the role properly is the priority.',
-        body: "Your CV, your LinkedIn, your interview prep, and 30 days of structured support so you don't lose momentum after the work is done.",
+        body: 'Your CV, your LinkedIn, a strategy session, and a plan that includes how to walk into the interview room ready. Built for people who want it all aligned and want a coach in their corner while they apply.',
         items: [
           'Full CV Revamp',
-          'Full LinkedIn Optimisation',
-          '60-minute interview prep session',
-          '30 days of structured support',
+          'Full LinkedIn Optimization',
+          '60-minute 1-on-1 strategy session on Microsoft Teams',
+          '30-day written action plan, scaled to 60 or 90 days for more complex goals',
+          'Interview prep guide: likely questions, story prompts, and a research checklist tailored to your target role',
+          'Two check-ins across your first 30 days to keep you moving',
         ],
         cta: 'Book my Glow Up',
       },
@@ -236,7 +225,7 @@ const workWithMeFaqs = [
   },
   {
     question: 'Can I start small and upgrade later?',
-    answer: 'Yes. Many people begin with a lower-risk service like the CV Review, then move into a fuller rewrite or a bigger package once they have momentum.',
+    answer: 'Yes. Many people begin with a single deliverable like a CV Revamp, then move into a fuller package once they have momentum.',
   },
   {
     question: 'Are these services only for people in finance?',
@@ -522,7 +511,7 @@ export default function WorkWithMePage() {
         <div className="max-w-[980px] mx-auto px-6 lg:px-8">
           <Reveal>
             <p className="border-y border-[#142334]/15 py-7 text-center text-[15px] leading-relaxed text-[#142334]/72">
-              If R400 isn&apos;t possible right now, the R150 CV Review is built for you. Same eye, no rewrite. Payment plans on packages over R800 via PayJustNow. If finances are genuinely the barrier, message me directly. I sponsor one CV Revamp every quarter for someone who can&apos;t afford it.
+              Payment plans on packages over R800 via PayJustNow. If finances are genuinely the barrier, message me directly. I sponsor one CV Revamp every quarter for someone who can&apos;t afford it.
             </p>
           </Reveal>
         </div>

@@ -27,7 +27,6 @@ export function OrganizationJsonLd() {
     serviceType: [
       'Career Coaching',
       'CV Writing',
-      'CV Review',
       'LinkedIn Optimisation',
       'Personal Brand Coaching',
       'Interview Preparation',

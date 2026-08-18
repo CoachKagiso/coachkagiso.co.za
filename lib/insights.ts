@@ -626,7 +626,7 @@ export const insights: Insight[] = [
           "ATS gets you through the first filter. But a CV that passes ATS and still doesn't reflect your actual story, your progression, your positioning - that CV gets read by a human and then quietly set aside. Different problem, same outcome.",
           'Formatting is fixable in four minutes. Positioning takes longer. And positioning is the work that actually gets you hired - not just screened in.',
           "If you've been applying consistently and not hearing back, the ATS test is a good starting point. Run it. Fix what's broken.",
-          "But if you've been getting past ATS and still not converting interviews, the issue isn't your formatting. It's your story. That's a different conversation - and if you want to have it, [the 48-Hour CV Review](/buy/cv-review) is where we start.",
+          "But if you've been getting past ATS and still not converting interviews, the issue isn't your formatting. It's your story. That's a different conversation - and if you want to have it, the [CV Revamp](/buy/cv-revamp) is where we start.",
         ],
       },
       {

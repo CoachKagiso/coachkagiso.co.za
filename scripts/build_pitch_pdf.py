@@ -222,9 +222,10 @@ story.append(Paragraph(
 story.append(Paragraph("3. Every product is a paid advertisement for the services", styles["h3"]))
 story.append(Paragraph(
     "Each product carries a built-in upgrade path: <i>“Want this done for you? Your purchase is credited "
-    "toward the full service.”</i> You already use this mechanic — the R150 CV Review credits toward the R400 "
-    "Revamp. We are extending a proven part of your own model. A customer who has paid you R99 and got value "
-    "trusts you. Upgrading a happy R99 customer is far easier than convincing a cold stranger to spend R1,200.",
+    "toward the full service.”</i> You already use this mechanic — masterclass attendees get R100 off the CV "
+    "Revamp for 48 hours after class. We are extending a proven part of your own model. A customer who has paid "
+    "you R99 and got value trusts you. Upgrading a happy R99 customer is far easier than convincing a cold "
+    "stranger to spend R1,200.",
     styles["body"],
 ))
 story.append(Paragraph("4. Lower-priced products make the premium look premium", styles["h3"]))
@@ -318,7 +319,7 @@ story.append(product_block(
         "It also catches the very bottom of the market: people for whom even R150 is a stretch today. They "
         "are real, they are numerous, and right now they leave empty-handed.",
     ],
-    feeds="The report ends with: “This was the robot. Get the human version — 48-Hour CV Review R150, your "
+    feeds="The report ends with: “This was the robot. Get the human version — CV Revamp R400, your "
           "R49 credited.” The robot deliberately whets the appetite for your eye.",
     effort="Technical wiring only, handled by us. None of your time — not at launch and not per sale.",
 ))
