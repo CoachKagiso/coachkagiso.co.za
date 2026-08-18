@@ -14,7 +14,7 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
   { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 61, inputPrice: 5.0, outputPrice: 25.0 },
   { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 59, inputPrice: 5.0, outputPrice: 30.0 },
   { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56, inputPrice: 1.25, outputPrice: 7.5 },
-  { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 57, inputPrice: 3.0, outputPrice: 15.0 },
+  { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 57, inputPrice: 2.6, outputPrice: 13.0 },
   { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875 },
   { value: 'x-ai/grok-4.5', label: 'x-ai/grok-4.5', intelligence: 54, inputPrice: 2.0, outputPrice: 6.0 },
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 51, inputPrice: 0.49, outputPrice: 1.54 },
