@@ -150,7 +150,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   </p>
                   <p className="mt-2 text-[15px] leading-relaxed text-[#142334]/72">
                     {upgradeOffer.valid
-                      ? `Your R150 CV Review credit is active for 7 days, so the amount due today is ${formatCurrency(appliedUpgradeCredit?.discounted_amount ?? service.amount)}.`
+                      ? `Your upgrade credit is active for 7 days, so the amount due today is ${formatCurrency(appliedUpgradeCredit?.discounted_amount ?? service.amount)}.`
                       : upgradeOffer.reason === 'used'
                         ? 'That upgrade link has already been used. If you need help, email or WhatsApp Kagiso and she can guide you.'
                         : 'That upgrade link has expired or is no longer valid. If you need help, email or WhatsApp Kagiso and she can guide you.'}
@@ -191,17 +191,6 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 })}
               </div>
 
-              {service.slug === 'cv-review' && (
-                <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
-                  <p className="text-[15px] leading-relaxed text-[#142334]/72">
-                    If the review confirms you want Kagiso to do the rewrite, your R150 review fee carries over to the CV Revamp. You would only pay the R250 difference.
-                  </p>
-                  <Link href="/buy/cv-revamp" className="mt-3 inline-flex text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] hover:text-[#142334]">
-                    View the CV Revamp <ArrowUpRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              )}
-
               {(service.slug === 'cv-revamp' || service.slug === 'linkedin') && (
                 <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
                   <p className="text-[15px] leading-relaxed text-[#142334]/72">
@@ -229,7 +218,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     {formatCurrency(checkoutAmount)}
                   </p>
                   <p className="mt-3 text-[14px] leading-relaxed text-white/68">
-                    Includes your R150 CV Review credit. This upgrade link expires in 7 days.
+                    Includes your upgrade credit. This upgrade link expires in 7 days.
                   </p>
                 </div>
               ) : (

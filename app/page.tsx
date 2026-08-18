@@ -14,16 +14,16 @@ import Footer from '@/components/Footer';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 export const metadata: Metadata = {
-  title: 'Coach Kagiso | Career Coach South Africa — CV Reviews, LinkedIn, Clarity Sessions',
+  title: 'Coach Kagiso | Career Coach South Africa — CV Writing, LinkedIn, Clarity Sessions',
   description:
-    'Career development and personal brand coaching for South African professionals. CV reviews from R150, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
+    'Career development and personal brand coaching for South African professionals. CV revamps, LinkedIn optimisation, career clarity sessions, and more. Show up. Stand out. Level up.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: 'Coach Kagiso | Career Coach South Africa',
     description:
-      'CV reviews, LinkedIn optimisation, career clarity sessions, and more for South African professionals.',
+      'CV revamps, LinkedIn optimisation, career clarity sessions, and more for South African professionals.',
     url: '/',
   },
 };

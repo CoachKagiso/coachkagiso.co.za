@@ -6,11 +6,6 @@ export type MilestoneTemplate = {
 };
 
 export const DELIVERY_MILESTONES: Record<string, MilestoneTemplate[]> = {
-  'cv-review': [
-    { stageName: 'Intake received', stageOrder: 1 },
-    { stageName: 'Loom recorded', stageOrder: 2 },
-    { stageName: 'Delivered', stageOrder: 3 },
-  ],
   'cv-revamp': [
     { stageName: 'Intake received', stageOrder: 1 },
     { stageName: 'CV in progress', stageOrder: 2 },

@@ -124,7 +124,6 @@ type EmailTemplateRow = {
 };
 
 export const DEFAULT_SERVICES: ServiceSetting[] = [
-  { name: '48-Hour CV Review', slug: 'cv-review-48hr', price: 150, turnaround: '2 working days', active: true },
   { name: 'CV Revamp', slug: 'cv-revamp', price: 400, turnaround: '5 working days', active: true },
   { name: 'Cover Letter', slug: 'cover-letter', price: 150, turnaround: '5 working days', active: true },
   { name: 'LinkedIn Optimisation', slug: 'linkedin-optimisation', price: 300, turnaround: '5 working days', active: true },

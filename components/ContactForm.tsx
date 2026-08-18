@@ -23,7 +23,7 @@ const contactRoutes = [
 ];
 
 const quickSupportOptions = [
-  'CV Review or CV Revamp',
+  'CV Revamp',
   'LinkedIn Optimisation',
   'CV + LinkedIn Bundle',
   'Career Clarity Session',

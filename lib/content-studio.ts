@@ -118,8 +118,6 @@ const archetypeLabels = {
 } as const;
 
 const serviceEstimateByName: Record<string, number> = {
-  '48-hour cv review': 150,
-  'cv review': 150,
   'cv revamp': 400,
   'cover letter': 150,
   'linkedin optimisation': 300,

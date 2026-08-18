@@ -7,7 +7,7 @@ import Reveal from '@/components/Reveal';
 import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
 import { getBookingPaymentId, getBookingPaymentSecret, verifyBookingPaymentToken } from '@/lib/booking-payment';
 import { isPayFastSandboxMode } from '@/lib/payfast';
-import { CV_REVIEW_REVAMP_AMOUNT_DUE, ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
+import { getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import IntakeForm from './IntakeForm';
 
@@ -89,7 +89,7 @@ async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upg
     {
       payment_id: paymentId,
       service_slug: service.slug,
-      amount: upgradeOffer?.valid ? CV_REVIEW_REVAMP_AMOUNT_DUE : service.amount,
+      amount: upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : service.amount,
       status: 'confirmed',
       confirmed_at: now,
     },
@@ -98,10 +98,6 @@ async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upg
 
   if (error) {
     return false;
-  }
-
-  if (service.slug === 'cv-review') {
-    await ensureCvReviewUpgradeCredit({ paymentId, confirmedAt: now });
   }
 
   if (upgradeOffer?.valid) {

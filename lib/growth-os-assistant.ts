@@ -830,7 +830,6 @@ KAGISO'S SERVICES:
 - Saturday Masterclass: R450 early bird, 2-hour online
 - CV Revamp: R400, 5 working days
 - LinkedIn Optimisation: R300, 5 working days
-- 48-Hour CV Review: R150
 
 WHAT YOU CAN DO:
 Answer questions about leads, pipeline, content, and performance.

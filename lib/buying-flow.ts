@@ -1,5 +1,4 @@
 export type AsyncServiceSlug =
-  | 'cv-review'
   | 'cv-revamp'
   | 'cover-letter'
   | 'linkedin'
@@ -85,63 +84,6 @@ export type BookingPageConfig = {
 };
 
 export const asyncServices: Record<AsyncServiceSlug, AsyncService> = {
-  'cv-review': {
-    slug: 'cv-review',
-    title: '48-Hour CV Review',
-    amount: 150,
-    turnaround: '48 hours',
-    deliveryDays: 2,
-    buyCta: 'Get my CV reviewed',
-    folder: 'cv-review',
-    requiresCvUpload: true,
-    cvInstruction: 'If you choose the email option instead, send your CV to hello@coachkagiso.co.za with the subject: Your Name - CV Review.',
-    summary:
-      "Your CV, my expert eye. Send your current CV and I'll show you what's working, what's broken, and what to fix first.",
-    fields: [
-      { name: 'fullName', label: 'Full name', type: 'text', required: true, maxLength: 80 },
-      { name: 'email', label: 'Email address', type: 'email', required: true, maxLength: 120 },
-      { name: 'whatsapp', label: 'WhatsApp number', type: 'tel', maxLength: 30 },
-      {
-        name: 'targetRoles',
-        label: 'What role or roles are you currently applying for?',
-        type: 'textarea',
-        required: true,
-        maxLength: 900,
-      },
-      {
-        name: 'mainFocus',
-        label: "What's the one thing you most want me to look at?",
-        type: 'textarea',
-        required: true,
-        maxLength: 900,
-      },
-    ],
-    faqs: [
-      {
-        question: 'What do I get in a CV Review?',
-        answer: 'You get expert feedback on what is working, what is weakening your positioning, and what to fix first. It is feedback, not a rewrite.',
-      },
-      {
-        question: 'Do I need to upload my CV right away?',
-        answer: 'Yes, either upload it in the brief form or choose the email option and send it straight after submitting.',
-      },
-      {
-        question: 'Can I upgrade later to the full revamp?',
-        answer: 'Yes. If you want Kagiso to do the rewrite after the review, your R150 review fee is credited toward the R400 CV Revamp, so you only pay the R250 difference.',
-      },
-    ],
-    confirmationSubject: 'Your CV Review is in motion',
-    confirmationBody: (firstName) => `Hi ${firstName},
-
-Got your CV. I'll record your review and have it back to you within 48 hours.
-
-When the Loom video lands in your inbox, watch it once through, then watch it again with your CV open and make the changes as I call them out. Most people find that takes about 30 minutes.
-
-If you want a full rewrite after the review, the CV Revamp picks up where the review leaves off. Your R150 review fee is credited, so you only pay the R250 difference.
-
-Talk soon,
-Kagiso`,
-  },
   'cv-revamp': {
     slug: 'cv-revamp',
     title: 'CV Revamp',
@@ -608,4 +550,67 @@ export function getDeadlineDate(deliveryDays: number, from = new Date()) {
 
 export function formatCurrency(amount: number) {
   return `R${amount.toLocaleString('en-ZA')}`;
+}
+
+export function formatServicePriceLabel(slug: AsyncServiceSlug, now = new Date()) {
+  return slug === 'masterclass'
+    ? getMasterclassPriceLabel(now)
+    : formatCurrency(asyncServices[slug].amount);
+}
+
+export function formatServiceCatalogueLines(
+  slugs: readonly AsyncServiceSlug[] = Object.keys(asyncServices) as AsyncServiceSlug[],
+  now = new Date(),
+) {
+  return slugs.map((slug) => `- ${asyncServices[slug].title}: ${formatServicePriceLabel(slug, now)}, ${asyncServices[slug].turnaround}`);
+}
+
+// The CV Analyzer may only recommend the async delivery services. Career Clarity, Glow Up VIP,
+// and the masterclass are bookings or events, not outcomes of a CV read.
+export const CV_COACH_MOVE_SLUGS = [
+  'cv-revamp',
+  'cover-letter',
+  'linkedin',
+  'bundle',
+] as const satisfies readonly AsyncServiceSlug[];
+
+export type CvCoachMoveSlug = (typeof CV_COACH_MOVE_SLUGS)[number];
+
+const cvCoachMoveGuidance: Record<CvCoachMoveSlug, string> = {
+  'cv-revamp': 'Choose this when the CV needs a full rewrite. Best for career pivots, outdated formats, or people who have been applying without results.',
+  'cover-letter': 'Choose this when the CV is solid but the person needs a tailored letter for a specific application.',
+  linkedin: 'Choose this when the CV is strong but the online presence does not match or support it.',
+  bundle: 'Choose this when the person needs both a full CV rewrite and LinkedIn alignment.',
+};
+
+// Labels an earlier prompt version invented. Saved cv_analysis_reports rows can still contain them.
+const legacyCvCoachMoveLabels: Record<string, CvCoachMoveSlug> = {
+  'LinkedIn Profile': 'linkedin',
+  'CV + LinkedIn + Cover Letter Bundle': 'bundle',
+};
+
+export function getCvCoachMoveLabels() {
+  return CV_COACH_MOVE_SLUGS.map((slug) => asyncServices[slug].title);
+}
+
+export function isCvCoachMoveLabel(value: string) {
+  return getCvCoachMoveLabels().includes(value);
+}
+
+export function normalizeCvCoachMoveLabel(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (isCvCoachMoveLabel(trimmed)) return trimmed;
+  const legacySlug = legacyCvCoachMoveLabels[trimmed];
+  return legacySlug ? asyncServices[legacySlug].title : '';
+}
+
+export function buildCvCoachMoveLabelUnion() {
+  return getCvCoachMoveLabels().map((label) => `'${label}'`).join(' | ');
+}
+
+export function buildCvCoachMoveRulesPrompt() {
+  return CV_COACH_MOVE_SLUGS
+    .map((slug, index) => `${index + 1}. "${asyncServices[slug].title}" (${formatCurrency(asyncServices[slug].amount)}) - ${cvCoachMoveGuidance[slug]}`)
+    .join('\n');
 }

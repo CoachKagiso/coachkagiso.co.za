@@ -35,9 +35,6 @@ type DateRangePreset = 'month' | '30' | 'all' | 'custom';
 const financeTimeZone = 'Africa/Johannesburg';
 const revenueStatuses: DiagnosticLeadStatus[] = ['discovery_booked', 'paid'];
 const servicePrices: Record<string, number> = {
-  'cv-review-48hr': 150,
-  '48-hour-cv-review': 150,
-  'cv-review': 150,
   'cv-revamp': 400,
   'cover-letter': 150,
   'linkedin-optimisation': 300,

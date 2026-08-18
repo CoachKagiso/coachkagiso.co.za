@@ -9,7 +9,7 @@ import {
 import { recordDashboardNotification } from '@/lib/dashboard-notifications';
 import { ensureClientDeliveryMilestones } from '@/lib/delivery-milestones';
 import { validatePayFastSignature, validatePayFastSignatureFromRawBody } from '@/lib/payfast';
-import { ensureCvReviewUpgradeCredit, getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
+import { getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { notifyKagisoPayment } from '@/lib/notifications';
 
@@ -193,15 +193,6 @@ export async function POST(request: Request) {
 
   if (isComplete) {
     await ensureClientDeliveryMilestones(supabase, paymentId, service.slug);
-
-    if (service.slug === 'cv-review') {
-      await ensureCvReviewUpgradeCredit({
-        paymentId,
-        buyerEmail,
-        buyerName,
-        confirmedAt: now,
-      });
-    }
 
     if (upgradeOffer?.valid) {
       await markUpgradeCreditUsed(upgradeOffer.credit.token, paymentId);

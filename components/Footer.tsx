@@ -13,7 +13,7 @@ const navigation = [
 ];
 
 const services = [
-  { label: 'CV strategy', href: '/buy/cv-review' },
+  { label: 'CV strategy', href: '/buy/cv-revamp' },
   { label: 'Personal brand audit', href: '/resources/personal-brand-audit' },
   { label: 'Career clarity', href: '/book/clarity' },
   { label: 'Interview preparation', href: '/book/glow-up' },

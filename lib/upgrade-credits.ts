@@ -1,10 +1,4 @@
-import crypto from 'node:crypto';
-import { getSiteUrl } from '@/lib/env';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
-
-export const CV_REVIEW_UPGRADE_WINDOW_DAYS = 7;
-export const CV_REVIEW_CREDIT_AMOUNT = 150;
-export const CV_REVIEW_REVAMP_AMOUNT_DUE = 250;
 
 export type UpgradeCreditStatus = 'active' | 'used' | 'expired';
 
@@ -37,22 +31,12 @@ export type UpgradeOffer =
       credit: UpgradeCreditRecord | null;
     };
 
-function createUpgradeToken() {
-  return `cku_${crypto.randomBytes(12).toString('hex')}`;
-}
-
 function normalizeCredit(row: Partial<UpgradeCreditRecord>) {
   return {
     ...row,
     credit_amount: Number(row.credit_amount || 0),
     discounted_amount: Number(row.discounted_amount || 0),
   } as UpgradeCreditRecord;
-}
-
-function addDaysIso(from: string, days: number) {
-  const date = new Date(from);
-  date.setDate(date.getDate() + days);
-  return date.toISOString();
 }
 
 function deriveOffer(credit: UpgradeCreditRecord | null, targetServiceSlug: string): UpgradeOffer {
@@ -75,58 +59,6 @@ function deriveOffer(credit: UpgradeCreditRecord | null, targetServiceSlug: stri
   return { valid: true, reason: null, credit };
 }
 
-export function getCvRevampUpgradeUrl(token: string) {
-  return `${getSiteUrl()}/buy/cv-revamp?upgrade_token=${encodeURIComponent(token)}`;
-}
-
-export async function ensureCvReviewUpgradeCredit(input: {
-  paymentId: string;
-  buyerEmail?: string | null;
-  buyerName?: string | null;
-  confirmedAt?: string | null;
-}) {
-  const supabase = createSupabaseServiceClient();
-  const existingResult = await supabase
-    .from('upgrade_credits')
-    .select('*')
-    .eq('source_payment_id', input.paymentId)
-    .eq('target_service_slug', 'cv-revamp')
-    .maybeSingle();
-
-  if (existingResult.error) {
-    throw new Error(existingResult.error.message);
-  }
-
-  if (existingResult.data) {
-    return normalizeCredit(existingResult.data);
-  }
-
-  const confirmedAt = input.confirmedAt || new Date().toISOString();
-  const token = createUpgradeToken();
-  const insertResult = await supabase
-    .from('upgrade_credits')
-    .insert({
-      source_payment_id: input.paymentId,
-      source_service_slug: 'cv-review',
-      target_service_slug: 'cv-revamp',
-      buyer_email: input.buyerEmail || null,
-      buyer_name: input.buyerName || null,
-      token,
-      credit_amount: CV_REVIEW_CREDIT_AMOUNT,
-      discounted_amount: CV_REVIEW_REVAMP_AMOUNT_DUE,
-      expires_at: addDaysIso(confirmedAt, CV_REVIEW_UPGRADE_WINDOW_DAYS),
-      status: 'active',
-    })
-    .select('*')
-    .single();
-
-  if (insertResult.error) {
-    throw new Error(insertResult.error.message);
-  }
-
-  return normalizeCredit(insertResult.data);
-}
-
 export async function getUpgradeOfferByToken(token: string, targetServiceSlug: string) {
   const supabase = createSupabaseServiceClient();
   const result = await supabase
@@ -141,22 +73,6 @@ export async function getUpgradeOfferByToken(token: string, targetServiceSlug: s
 
   const credit = result.data ? normalizeCredit(result.data) : null;
   return deriveOffer(credit, targetServiceSlug);
-}
-
-export async function getCvReviewUpgradeCreditByPaymentId(paymentId: string) {
-  const supabase = createSupabaseServiceClient();
-  const result = await supabase
-    .from('upgrade_credits')
-    .select('*')
-    .eq('source_payment_id', paymentId)
-    .eq('target_service_slug', 'cv-revamp')
-    .maybeSingle();
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-
-  return result.data ? normalizeCredit(result.data) : null;
 }
 
 export async function markUpgradeCreditUsed(token: string, paymentId: string) {
