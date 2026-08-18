@@ -39,7 +39,7 @@ function TikTokIcon({ className = 'h-4 w-4' }: { className?: string }) {
 const socialRoutes = [
   { label: 'LinkedIn', href: 'https://linkedin.com/in/coach-kagiso', icon: Linkedin },
   { label: 'TikTok', href: 'https://www.tiktok.com/@coach_kagiso', icon: TikTokIcon },
-  { label: 'Facebook', href: 'https://www.facebook.com/coachkagisoSA', icon: Facebook },
+  { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61590468154605', icon: Facebook },
   { label: 'Instagram', href: 'https://www.instagram.com/coach.kagiso/', icon: Instagram },
 ];
 

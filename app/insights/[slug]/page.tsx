@@ -24,7 +24,7 @@ const articleAuthor = {
   aboutHref: '/about',
   linkedin: 'https://linkedin.com/in/coach-kagiso',
   tiktok: 'https://www.tiktok.com/@coach_kagiso',
-  facebook: 'https://www.facebook.com/coachkagisoSA',
+  facebook: 'https://www.facebook.com/profile.php?id=61590468154605',
   instagram: 'https://www.instagram.com/coach.kagiso',
 };
 
