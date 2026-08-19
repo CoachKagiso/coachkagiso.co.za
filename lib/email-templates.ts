@@ -72,6 +72,7 @@ export const bookingLinks: Record<string, string> = {
   'Saturday Masterclass': `${publicSiteUrl}/buy/masterclass`,
   'CV + LinkedIn Bundle': `${publicSiteUrl}/buy/bundle`,
   'Career Clarity Session': process.env.NEXT_PUBLIC_CAL_CLARITY_URL ?? `${publicSiteUrl}/book/clarity`,
+  'Free Discovery Call': process.env.NEXT_PUBLIC_CAL_DISCOVERY_URL ?? `${publicSiteUrl}/book/discovery`,
   'CV Revamp': `${publicSiteUrl}/buy/cv-revamp`,
   'LinkedIn Optimisation': `${publicSiteUrl}/buy/linkedin`,
 };
@@ -204,8 +205,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'engaged_strategist',
     archetypeName: 'Engaged Strategist',
-    recommendedService: 'Saturday Masterclass Series',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     variant: 1,
     sequenceIndex: 1,
     stageLabel: 'First contact',
@@ -216,18 +217,15 @@ Most people who take the diagnostic are stuck. You're not.
 
 Your answers tell me you already know where you're going. You're clear on what you want, you're moving toward it, and honestly? You're probably doing fine on your own.
 
-So here's my guess about what you actually need: other people who are moving at the same speed you are.
+Which is why I'm curious about something.
 
-The Saturday Masterclass series is less about teaching and more about the room. Across the series, we go deep on the things that actually move careers: how you build and use your network strategically, how you make yourself visible to the right people, how you position your personal brand so opportunities find you, and how to find mentors worth having. 
+What made you take the diagnostic in the first place?
 
-Each session is 2 hours online, and the people who show up are the kind who push you to think differently just by being there.
+People who are already moving don't usually go looking for a career diagnostic on a Tuesday night. There's normally something specific behind it. A move you're weighing up. A gap between how good you actually are and how visible that is. A sense that the next step should be arriving faster than it is.
 
-We're still finalising the agenda, and we'll share it once official bookings open. But because you scored in the top tier of this diagnostic, you can bypass the waitlist and grab an early bird spot for R450 right now
-[BOOKING LINK]
+Which one is it for you?
 
-If you'd rather wait for the final schedule, no stress. I'll email you when it's live.
-
-But I'm also curious. What made you take the diagnostic in the first place? If you're already moving, what are you trying to figure out?
+Reply and tell me. I read everything.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -235,8 +233,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'engaged_strategist_follow_up_1',
     archetypeName: 'Engaged Strategist',
-    recommendedService: 'Saturday Masterclass Series',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     variant: 2,
     sequenceIndex: 2,
     stageLabel: 'Second contact',
@@ -251,7 +249,7 @@ So here's a different one.
 
 What's the thing you're trying to get better at right now that you can't just Google your way through?
 
-Not a skill you can learn from a course. The thing where you actually need to be in a room with people who've done it before and can tell you what actually works.
+Not a skill you can learn from a course. The thing where you need someone who has already done it to tell you what actually works.
 
 That's the thing I'm curious about.
 
@@ -261,8 +259,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'engaged_strategist_follow_up_2',
     archetypeName: 'Engaged Strategist',
-    recommendedService: 'Saturday Masterclass Series',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     variant: 3,
     sequenceIndex: 3,
     stageLabel: 'Third contact',
@@ -271,9 +269,11 @@ hello@coachkagiso.co.za`,
 
 This is my last personalized follow-up.
 
-You're already moving in the right direction. You don't need me to tell you what to do. But if you ever want to be in a room with other people who are serious about their careers, the Saturday Masterclass is that room.
+You're already moving in the right direction. You don't need me to tell you what to do.
 
-Details here if you want them: [BOOKING LINK]
+The only thing I'll leave you with is this: momentum is easy to lose when it stays private. Most of the people I've watched stall out weren't short on ability. They were short one honest conversation about where the move was actually going.
+
+If you ever want that conversation, this is where we have it: [BOOKING LINK]
 
 If not, no worries, keep going. I'm adding you to my upcoming newsletter with what I'm thinking about, but I'll stop sending these direct follow-ups.
 
@@ -283,8 +283,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'engaged_strategist_newsletter_bridge',
     archetypeName: 'Engaged Strategist',
-    recommendedService: 'Saturday Masterclass Series',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     variant: 4,
     sequenceIndex: 4,
     stageLabel: 'Newsletter bridge',
@@ -309,8 +309,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'plateaued_performer',
     archetypeName: 'Plateaued Performer',
-    recommendedService: 'Saturday Masterclass - From Stuck to Strategic',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Free Discovery Call',
+    bookingKey: 'Free Discovery Call',
     variant: 1,
     sequenceIndex: 1,
     stageLabel: 'First contact',
@@ -327,9 +327,9 @@ Do you think you've outgrown the role, or do you think the role stopped challeng
 
 Because those are two different problems with two different solutions. One means you leave. The other means you find a way to stretch inside the job you already have.
 
-I run a workshop on this (From Stuck to Strategic). But before I talk about that, I actually want to know what you think the answer is.
+I have a view on it, but mine is worth nothing until I know yours.
 
-Reply and tell me.
+Reply and tell me which one it is.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -337,8 +337,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'plateaued_performer_follow_up_1',
     archetypeName: 'Plateaued Performer',
-    recommendedService: 'Saturday Masterclass - From Stuck to Strategic',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Free Discovery Call',
+    bookingKey: 'Free Discovery Call',
     variant: 2,
     sequenceIndex: 2,
     stageLabel: 'Second contact',
@@ -363,8 +363,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'plateaued_performer_follow_up_2',
     archetypeName: 'Plateaued Performer',
-    recommendedService: 'Saturday Masterclass - From Stuck to Strategic',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Free Discovery Call',
+    bookingKey: 'Free Discovery Call',
     variant: 3,
     sequenceIndex: 3,
     stageLabel: 'Third contact',
@@ -375,7 +375,7 @@ I'm going to stop sending these personalized emails after this one, but I want t
 
 Staying where you are feels safe. But if you're someone who still has more to give, comfortable is actually the riskiest place to be. Because a year from now, you'll be in the same spot, just more frustrated.
 
-I run a workshop called From Stuck to Strategic. It's for people who are good at their jobs but can't figure out why the growth stopped. If you want in, it's here: [BOOKING LINK]
+If you want help working out which one it is, book a free discovery call and we'll talk it through. Twenty minutes, no pitch: [BOOKING LINK]
 
 If you're not ready, that's fine. You'll keep getting my weekly newsletter, where I share what I'm seeing with other people in similar spots.
 
@@ -387,8 +387,8 @@ hello@coachkagiso.co.za`,
   {
     id: 'plateaued_performer_newsletter_bridge',
     archetypeName: 'Plateaued Performer',
-    recommendedService: 'Saturday Masterclass - From Stuck to Strategic',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Free Discovery Call',
+    bookingKey: 'Free Discovery Call',
     variant: 4,
     sequenceIndex: 4,
     stageLabel: 'Newsletter bridge',
@@ -673,13 +673,13 @@ Here's what I see most often with new managers in corporate SA: the technical sk
 
 The thing nobody warns you about is the shift from doing to leading. You spent years being good at the work. Now your job is to get other people to be good at the work. That's a completely different skill, and most companies give you zero preparation for it.
 
-The first 90 days either builds or breaks your credibility with your team. 
+The first 90 days either builds or breaks your credibility with your team, and most of that gets decided by things that have nothing to do with how good you are at the work.
 
-If you want to talk through what this transition looks like for your specific situation, I run a 75-minute Career Clarity Session. We’ll map out exactly where you are and design a plan for your first three months.
+So I'd rather ask than assume: how is the transition actually going?
 
-It's here if you want to set that up: [BOOKING LINK]
+Which part of it is harder than you expected? The delegating, the difficult conversations, being the person everyone brings problems to, something else entirely?
 
-If you're not ready for that, no stress. But I'd still love to know: how is the transition actually going?
+Reply and tell me. I read everything.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -703,7 +703,9 @@ I'm adding you to my upcoming newsletter. When it launches, it'll cover leadersh
 
 You're on the early-access list. If it's not your thing, you can easily opt out with the link at the bottom of the first email.
 
-And if you ever want to continue the conversation we started, just reply to any email. 
+And if you would rather map the transition out properly than work it out as you go, a Career Clarity Session is where we do that: [BOOKING LINK]
+
+No rush on it. Replying to any email works just as well.
 
 Your career matters, {{firstName}}.
 
@@ -759,13 +761,11 @@ If your headline still says your job title from two years ago, you're invisible 
 
 The headline is just one piece of it. Your summary, your experience section, the way your profile tells the story of where you're going, all of that works together or it doesn't work at all.
 
-If you want someone to do that work with you properly, the CV + LinkedIn Bundle is how I help people close that gap. I rewrite both, built around where you actually want to go.
+So here is what I am curious about: did you rewrite yours?
 
-R500. Seven working days.
+If you did, send me what you landed on. I will tell you honestly whether it would show up in the searches you want it to, and what I would change if it would not.
 
-Details here: [BOOKING LINK]
-
-Or if you just have a question about the builder, reply and ask. I'm here.
+If you have not got to it yet, reply and tell me what your headline says now. That is usually enough for me to spot the problem.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -789,7 +789,9 @@ I'm adding you to my upcoming newsletter. When it launches, it'll cover career g
 
 You'll be on the early list. Opt out anytime.
 
-If you ever want to talk through your LinkedIn or CV, just reply to any email. I'll make time.
+And if you would rather have both rewritten properly than keep patching them, the CV + LinkedIn Bundle is here: [BOOKING LINK]
+
+No rush on it. Replying to any email works just as well, and I'll make time.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -839,13 +841,11 @@ I sent you the CV Checklist a few days ago and wanted to follow up.
 
 Here's what I see most often. A CV rarely gets thrown out. The risk is quieter than that. If it can't be read cleanly, or it doesn't speak to the role, it ranks low and a recruiter never reaches it. The person was good enough. The CV just got in the way.
 
-The checklist shows you where that's happening. The fixing is the next part, and it's the fastest win available to you. A clear, well-built CV changes the response you get.
+The checklist shows you where that is happening. A clear, well-built CV changes the response you get, and it is usually the fastest win available to you.
 
-If you'd like a professional set of eyes on yours, that's what I do. I offer CV reviews and full revamps, built for the South African market and the way recruiters here actually read.
+So which checks tripped you up?
 
-You can see how that works here: [BOOKING LINK]
-
-Or just reply and tell me which checks tripped you up. I'm here.
+Reply and tell me the ones you marked red. If there is a pattern in them, I will tell you what it is.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -869,7 +869,9 @@ I'm adding you to my upcoming newsletter. When it launches, it'll cover careers,
 
 You're on the early-access list, and you can opt out anytime with the link at the bottom of the first email.
 
-And if you ever want a professional set of eyes on your CV, just reply to any email. I'll make time.
+And if you would rather have a professional set of eyes on your CV than do another round of self-editing, a CV Revamp is here: [BOOKING LINK]
+
+No rush on it. Replying to any email works just as well, and I'll make time.
 
 Show up. Stand out. Level up. Your career matters, {{firstName}}.
 
@@ -923,11 +925,9 @@ Here's the thing most people get wrong. An interview is rarely lost on the day. 
 
 The checklist shows you where you're exposed. The next part is closing those gaps, especially the hard ones: the examples you tell, the reason you're moving, the salary number you'll state, and the way you handle a question you didn't want.
 
-That's what I help people with. We work through your real examples and the answers to the questions that catch people out, so you walk in ready.
+So which of those is the one you are least ready for?
 
-You can see how that works here: [BOOKING LINK]
-
-Or just reply and tell me which checks tripped you up. I'm here.
+Reply and tell me. If it is the salary number, say so. That is the one most people go quiet on, and it is also the most fixable.
 
 Kagiso
 hello@coachkagiso.co.za`,
@@ -951,7 +951,9 @@ I'm adding you to my upcoming newsletter. When it launches, it'll cover intervie
 
 You're on the early-access list, and you can opt out anytime with the link at the bottom of the first email.
 
-And if you ever want to get properly interview-ready before a big one, just reply to any email. I'll make time.
+And if you have a big one coming and want to walk in properly ready for it, a Career Clarity Session is where we do that work: [BOOKING LINK]
+
+No rush on it. Replying to any email works just as well, and I'll make time.
 
 Show up. Stand out. Level up. Your career matters, {{firstName}}.
 
@@ -965,40 +967,30 @@ hello@coachkagiso.co.za`,
   {
     id: 'masterclass_waitlist_confirmation',
     archetypeName: 'Masterclass Waitlist',
-    recommendedService: 'Saturday Masterclass',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     source: 'masterclass_waitlist',
     variant: 1,
     sequenceIndex: 1,
-    stageLabel: 'Registration confirmation',
-    subject: 'Your spot is being held — here is how to pay',
+    stageLabel: 'Waitlist confirmation',
+    subject: 'About the Masterclass, {{firstName}}',
     body: `Hi {{firstName}},
 
-Thank you for registering for the July Saturday Masterclass. Your details are in.
+Thank you for putting your name down for the Saturday Masterclass. Your details are in and you are on the list.
 
-To secure your spot, please complete your payment using the banking details below:
+I want to be straight with you about where it stands.
 
-Account name: Kagiso Shabangu
-Bank: Capitec Bank
-Account type: Savings
-Account number: 1248602321
-Branch code: 470010
-Reference: Your full name + JULY
+We are not running it yet. We had the date, the topic and the room ready to go, and when I looked at who had actually signed up, it was clear we had moved faster than the demand did. I would rather hold it than run a half-empty session that is not worth your Saturday morning.
 
-Once your payment reflects, you will receive a confirmation email with everything you need to prepare for the session.
+So the Masterclass is on pause. There is nothing you need to pay and nothing you need to do.
 
-A few things to note:
+You stay on the list. When we run it, you hear first, before it goes anywhere public.
 
-- Session date: Saturday 4 July 2026
-- Time: 10:00 to 12:00 SAST
-- Platform: Microsoft Teams
-- Price: R450 early bird, valid until Sunday 7 June at 21:00
-- Standard price from Monday 8 June: R500
-- Spots are capped at 12
+In the meantime, one question, because your answer is the kind of thing that decides what the session actually covers.
 
-If you have any questions before your payment goes through, reply to this email and we will get back to you.
+What made you sign up? Not the polite version. What were you hoping to walk out of that room with?
 
-Your career matters. See you on 4 July.
+Reply and tell me. I read everything.
 
 Kagiso Shabangu
 hello@coachkagiso.co.za
@@ -1007,36 +999,29 @@ coachkagiso.co.za`,
   {
     id: 'masterclass_waitlist_bookings_open',
     archetypeName: 'Masterclass Waitlist',
-    recommendedService: 'Saturday Masterclass',
-    bookingKey: 'Saturday Masterclass',
+    recommendedService: 'Career Clarity Session',
+    bookingKey: 'Career Clarity Session',
     source: 'masterclass_waitlist',
     manualOnly: true,
     variant: 2,
     sequenceIndex: 2,
-    stageLabel: 'Bookings open',
-    subject: 'Registration is open — July Masterclass',
+    stageLabel: 'Second contact',
+    subject: 'Still holding, {{firstName}}',
     body: `Hi {{firstName}},
 
-You are on the list. Registration for the July Saturday Masterclass is now open and your spot is available to secure today.
+Quick update on the Saturday Masterclass, since you are on the list.
 
-Here is what you need to know:
+It is still on hold. I said I would tell you first when it runs, and I am not going to pretend a date exists just to keep the list warm.
 
-- Session date: Saturday 4 July 2026
-- Time: 10:00 to 12:00 SAST
-- Platform: Microsoft Teams
-- Topic: From Stuck to Strategic
-- Early bird price: R450, closes Sunday 7 June at 21:00
-- Standard price from Monday 8 June: R500
-- Spots are capped at 12
+But you signed up for a reason, and that reason has not paused.
 
-To secure your spot through PayFast, go here:
-[REGISTRATION PAGE LINK]
+So if you would rather not wait for a room to fill up, the same ground gets covered one-to-one in a Career Clarity Session. It is an hour, it is about your situation specifically rather than a general audience, and you leave with a direction and a next move instead of notes.
 
-What you will leave with: a clear picture of what is actually holding your career back and a map of your next 90 days to change it. Plus a take-home pack, a 14-day email follow-up, and R100 off any CV Revamp or LinkedIn Package for 48 hours after the session.
+If that is useful: [BOOKING LINK]
 
-If you have any questions, reply to this email directly.
+If you would rather wait for the Masterclass, that is genuinely fine. You keep your place on the list and I will email you the moment there is a date.
 
-Your career matters. See you on 4 July.
+Either way, reply if you have a question. I read everything.
 
 Kagiso Shabangu
 hello@coachkagiso.co.za
