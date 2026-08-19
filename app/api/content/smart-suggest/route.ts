@@ -7,11 +7,10 @@ import {
 } from '@/lib/content/system-prompt';
 import type { SmartSuggestion, SmartSuggestSource, SmartSuggestSources, TrendSignal } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 
 export const dynamic = 'force-dynamic';
 
-const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.2';
 
 const VALID_PLATFORMS = ['linkedin', 'instagram_facebook', 'tiktok', 'email_voice'] as const;
 const VALID_PILLARS = ['career_growth', 'leadership', 'personal_brand', 'mentorship'] as const;
@@ -296,15 +295,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = process.env.ZAI_API_KEY;
+  const runtime = await resolveAiRuntimeConfig({ simpleMode: true });
   const tavilyApiKey = process.env.TAVILY_API_KEY;
 
-  if (!apiKey) {
+  if (!runtime) {
     return NextResponse.json(
-      { error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' },
+      { error: 'AI service not configured. Add the active provider API key in Settings.' },
       { status: 503 }
     );
   }
+  // Aliased after the guard so the nested stage-2 closure sees a non-null runtime.
+  const aiRuntime = runtime;
 
   const sources = body?.sources as SmartSuggestSources | undefined;
   if (!sources || typeof sources !== 'object') {
@@ -322,14 +323,11 @@ export async function POST(request: Request) {
   let trendSignals: TrendSignal[] = [];
 
   try {
-    const decisionResponse = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    const decisionResponse = await fetch(`${runtime.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
+      headers: runtime.headers,
+      body: JSON.stringify(buildAiRequestBody(runtime, {
+        model: runtime.model,
         messages: [
           { role: 'system', content: buildDecisionPrompt() },
           { role: 'user', content: buildDecisionUserPrompt(sources) },
@@ -337,8 +335,7 @@ export async function POST(request: Request) {
         max_tokens: 100,
         temperature: 0.3,
         response_format: { type: 'json_object' },
-        thinking: { type: 'disabled' },
-      }),
+      })),
     });
 
     if (decisionResponse.ok) {
@@ -431,14 +428,11 @@ export async function POST(request: Request) {
   async function callStage2(retry: boolean): Promise<{ suggestion: SmartSuggestion; usedSearch: boolean; usedFallback: boolean } | null> {
     const temp = retry ? 0.2 : 0.65;
     try {
-      const resp = await fetch(`${AI_BASE_URL}/chat/completions`, {
+      const resp = await fetch(`${aiRuntime.baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: AI_MODEL,
+        headers: aiRuntime.headers,
+        body: JSON.stringify(buildAiRequestBody(aiRuntime, {
+          model: aiRuntime.model,
           messages: [
             { role: 'system', content: buildSuggestionPrompt() },
             {
@@ -449,8 +443,7 @@ export async function POST(request: Request) {
           max_tokens: 900,
           temperature: temp,
           response_format: { type: 'json_object' },
-          thinking: { type: 'disabled' },
-        }),
+        })),
       });
 
       if (!resp.ok) return null;

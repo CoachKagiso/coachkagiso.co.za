@@ -378,7 +378,8 @@ export async function listContentCalendarItems() {
 
   if (error) {
     if (isMissingContentTable(error.message)) return [];
-    throw new Error(error.message);
+    console.error('Failed to fetch content calendar:', error.message);
+    return [];
   }
   return ((data || []) as ContentCalendarRow[]).map(normalizeCalendarRow);
 }
@@ -392,7 +393,8 @@ export async function listContentBacklogItems() {
 
   if (error) {
     if (isMissingContentTable(error.message)) return [];
-    throw new Error(error.message);
+    console.error('Failed to fetch content backlog:', error.message);
+    return [];
   }
   return ((data || []) as ContentBacklogRow[]).map(normalizeBacklogRow);
 }
@@ -582,7 +584,8 @@ export async function listResearchEntries() {
 
   if (error) {
     if (isMissingResearchTable(error.message)) return [];
-    throw new Error(error.message);
+    console.error('Failed to fetch research entries:', error.message);
+    return [];
   }
   return ((data || []) as ResearchVaultRow[]).map(normalizeResearchRow);
 }

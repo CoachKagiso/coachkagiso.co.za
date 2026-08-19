@@ -330,7 +330,8 @@ export async function listDiagnosticSubmissions(
   }
 
   if (error) {
-    throw new Error(error.message);
+    console.error('Failed to fetch diagnostic submissions:', error.message);
+    return [];
   }
 
   let submissions = (data || []).map((row) => normalizeSubmission(row as Partial<DiagnosticSubmission>));

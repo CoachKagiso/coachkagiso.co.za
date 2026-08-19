@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
-import { getAiProviderRequestOptions } from '@/lib/ai-request';
+import { getAiProviderRequestOptions, isReasoningActive } from '@/lib/ai-request';
+import { buildProviderPreferences, type AiRequestOptions } from '@/lib/ai-provider-preferences';
 import { DEFAULT_SETTINGS, type AiConfigSettings } from '@/lib/settings';
 import {
   DEFAULT_OPENROUTER_PRIMARY_MODEL,
@@ -21,6 +22,13 @@ export type AiRuntimeConfig = {
 
 export const SIMPLE_AI_MODES = new Set(['polish', 'format_recommendation']);
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+/**
+ * Reasoning tokens are billed from the same output budget as the answer, so a max_tokens sized
+ * for the JSON alone gets spent thinking and the object arrives truncated. Routes keep stating
+ * the budget their content needs; this adds the thinking allowance on top when it applies.
+ */
+const REASONING_TOKEN_HEADROOM = 4000;
 
 export async function loadAiConfig(): Promise<AiConfigSettings> {
   try {
@@ -70,9 +78,21 @@ export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } =
 export function buildAiRequestBody(
   runtime: AiRuntimeConfig,
   payload: Record<string, unknown>,
-) {
+  options: AiRequestOptions = {},
+): Record<string, unknown> {
+  // `provider` is pulled out of the payload so exactly one provider key can survive the
+  // spread, and it is always the merged one.
+  const { provider: payloadProvider, ...rest } = payload;
+  const provider = buildProviderPreferences(runtime.provider, options, payloadProvider);
+  const needsReasoningHeadroom = typeof rest.max_tokens === 'number'
+    && isReasoningActive(runtime.provider, runtime.model, runtime.reasoningEnabled);
+
   return {
-    ...payload,
+    ...rest,
+    ...(needsReasoningHeadroom
+      ? { max_tokens: (rest.max_tokens as number) + REASONING_TOKEN_HEADROOM }
+      : {}),
     ...getAiProviderRequestOptions(runtime.provider, runtime.model, runtime.reasoningEnabled),
+    ...(provider ? { provider } : {}),
   };
 }

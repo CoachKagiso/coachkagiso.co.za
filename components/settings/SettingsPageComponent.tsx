@@ -22,6 +22,7 @@ import {
   Sparkles,
   Target,
   Trash2,
+  TriangleAlert,
   UserRound,
 } from 'lucide-react';
 import {
@@ -41,6 +42,7 @@ import {
   normalizeOpenRouterModel,
   OPENROUTER_MODEL_OPTIONS,
 } from '@/lib/ai-models';
+import { SECONDARY_MODEL_TOOLS } from '@/lib/zai-pinned-tools';
 import type {
   AiConfigSettings,
   AssistantPreferences,
@@ -522,7 +524,11 @@ export default function SettingsPageComponent({
   }
 
   function getOpenRouterConfig(): AiConfigSettings {
-    const { openrouter_api_key_configured: _configured, ...persistedConfig } = aiConfig;
+    // Both *_configured flags are derived server-side for display only, so neither is persisted.
+    const {
+      openrouter_api_key_configured: _configured,
+      ...persistedConfig
+    } = aiConfig;
     return {
       ...persistedConfig,
       primary_model: primaryModel,
@@ -537,6 +543,7 @@ export default function SettingsPageComponent({
     setAiConfig({
       ...nextConfig,
       openrouter_api_key_configured: Boolean(aiConfig.openrouter_api_key_configured || nextConfig.openrouter_api_key?.trim()),
+      // Server-derived and not part of the saved payload, so carry it across the save.
     });
     void saveSetting('ai_config', nextConfig);
   }
@@ -1195,7 +1202,30 @@ export default function SettingsPageComponent({
                     label="Toggle reasoning / extended thinking"
                   />
                 </div>
+                <p className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
+                  <Eye className="h-3.5 w-3.5 shrink-0 text-[#8C7466]" />
+                  This icon marks a model that can read image attachments.
+                </p>
                 <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the active model. This is required for the copyright guardrail to function reliably.</p>
+                <div className="grid gap-2 rounded-[8px] border border-[#E8DDD2] bg-white px-4 py-3">
+                  <p className="text-[13px] font-semibold text-[#142334]">Tools that run on the secondary model</p>
+                  <p className="text-[12px] leading-relaxed text-[#6B6B6B]">
+                    These {SECONDARY_MODEL_TOOLS.length} high-volume tools use the
+                    {' '}<span className="font-semibold text-[#142334]">secondary model</span> above rather than the primary one,
+                    so they stay cheap to run. Change the secondary model and they follow it.
+                  </p>
+                  <ul className="grid gap-1 text-[12px] text-[#6B6B6B]">
+                    {SECONDARY_MODEL_TOOLS.map((tool) => (
+                      <li key={tool.id}>
+                        {tool.label} <span className="text-[#9A9A9A]">({tool.where})</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[12px] leading-relaxed text-[#6B6B6B]">
+                    Caption Writer and Reply Writer accept image attachments. If the secondary model cannot read
+                    images, those requests automatically use an image-capable model instead.
+                  </p>
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <button type="button" className="studio-primary-button" onClick={saveAiConfiguration} disabled={saveStates.ai_config === 'saving'}>
                     {saveStates.ai_config === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : saveStates.ai_config === 'saved' ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />} {saveStates.ai_config === 'saving' ? 'Saving' : saveStates.ai_config === 'saved' ? 'Saved' : saveStates.ai_config === 'error' ? 'Save failed' : 'Save OpenRouter settings'}

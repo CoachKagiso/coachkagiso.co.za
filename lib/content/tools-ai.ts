@@ -1,7 +1,5 @@
-const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_TEXT_MODEL = 'glm-5.2';
-const AI_VISION_MODEL = 'GLM-4.6V-Flash';
-const AI_VISION_FALLBACK_MODEL = 'glm-4.5v';
+import { buildAiRequestBody, resolveAiRuntimeConfig, type AiRuntimeConfig } from '@/lib/ai-config';
+import { getFallbackVisionModel, modelSupportsVision } from '@/lib/ai-models';
 
 export type ToolAiMessage = {
   role: 'system' | 'user';
@@ -21,52 +19,69 @@ export function extractToolJsonObject(text: string) {
   }
 }
 
+/**
+ * The high-volume tools run on the configured secondary model rather than a pinned one, so the
+ * Settings picker governs them like every other AI surface.
+ */
+export function resolveToolAiRuntime() {
+  return resolveAiRuntimeConfig({ simpleMode: true });
+}
+
 async function callToolModel(
-  apiKey: string,
+  runtime: AiRuntimeConfig,
   model: string,
   messages: ToolAiMessage[],
   maxTokens: number,
   temperature: number,
 ) {
-  return fetch(`${AI_BASE_URL}/chat/completions`, {
+  return fetch(`${runtime.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+    headers: runtime.headers,
+    body: JSON.stringify(buildAiRequestBody({ ...runtime, model }, {
       model,
       messages,
-      thinking: { type: 'disabled' },
       max_tokens: maxTokens,
       temperature,
       response_format: { type: 'json_object' },
-    }),
+    })),
   });
 }
 
 export async function callToolAi({
-  apiKey,
+  runtime,
   messages,
   maxTokens,
   temperature,
   needsVision,
 }: {
-  apiKey: string;
+  runtime: AiRuntimeConfig;
   messages: ToolAiMessage[];
   maxTokens: number;
   temperature: number;
   needsVision: boolean;
 }) {
-  const models = needsVision ? [AI_VISION_MODEL, AI_VISION_FALLBACK_MODEL] : [AI_TEXT_MODEL];
+  // An attachment must not fail purely because the configured model is text only, so image
+  // requests fall back to a vision-capable model and text requests keep the chosen one.
+  const models: string[] = [];
+  if (needsVision && !modelSupportsVision(runtime.model)) {
+    const fallback = getFallbackVisionModel();
+    if (!fallback) throw new Error('TOOL_AI_NO_VISION_MODEL');
+    models.push(fallback);
+  } else {
+    models.push(runtime.model);
+    if (needsVision) {
+      const fallback = getFallbackVisionModel();
+      if (fallback && fallback !== runtime.model) models.push(fallback);
+    }
+  }
 
-  for (const model of models) {
-    const response = await callToolModel(apiKey, model, messages, maxTokens, temperature);
+  for (const [index, model] of models.entries()) {
+    const response = await callToolModel(runtime, model, messages, maxTokens, temperature);
     const responseText = await response.text();
 
     if (!response.ok) {
       console.error(`Tool AI error ${response.status} (${model}):`, responseText);
-      if (needsVision && model === AI_VISION_MODEL && (response.status === 429 || response.status >= 500)) {
+      if (index < models.length - 1 && (response.status === 429 || response.status >= 500)) {
         continue;
       }
       throw new Error('TOOL_AI_FAILED');

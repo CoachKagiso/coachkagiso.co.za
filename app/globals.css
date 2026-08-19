@@ -376,7 +376,7 @@ textarea::-webkit-scrollbar {
 }
 
 textarea {
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
 }
 

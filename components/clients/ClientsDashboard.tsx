@@ -213,16 +213,7 @@ function IntakeResponses({ client }: { client: ClientRecord }) {
               ? 'Manual dashboard entry'
               : 'Client intake form'}
         </p>
-        {client.intake?.cv_file_url && (
-          <a
-            href={client.intake.cv_file_url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#142334] underline-offset-4 hover:text-[#C9AD98] hover:underline"
-          >
-            Open CV file
-          </a>
-        )}
+        {client.intake?.cv_file_url && <span className="text-[#142334]">CV captured for Career Tools</span>}
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {entries.map(([key, value]) => (
@@ -560,8 +551,7 @@ export default function ClientsDashboard({
             const statusStyle = statusClasses[clientStatus];
             const expanded = expandedPaymentId === client.paymentId;
             const dueSoon = client.deadline && !client.isOverdue && new Date(client.deadline).getTime() - currentTime <= 24 * 60 * 60 * 1000;
-            const strategyAccess = getClientStrategyAccess(client, new Date(currentTime));
-            const canOpenStrategyWorkspace = strategyAccess.status === 'active' || strategyAccess.status === 'recently-completed';
+            const workspaceAccess = getClientStrategyAccess(client, {}, new Date(currentTime));
 
             return (
               <article
@@ -615,17 +605,19 @@ export default function ClientsDashboard({
                     </div>
 
                     <div className="flex flex-wrap gap-2 md:justify-end" onClick={(event) => event.stopPropagation()}>
-                      {isClientStrategyServiceSlug(client.serviceSlug) && canOpenStrategyWorkspace && (
+                      {workspaceAccess.selectable && (
                         <Link
                           href={buildClientStrategyWorkspaceHref(adminKey, client.paymentId)}
                           className="rounded-full bg-[#142334] px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
                         >
-                          {strategyAccess.status === 'recently-completed'
-                            ? `Strategy workspace, ${strategyAccess.daysRemaining === 0 ? 'expires today' : `${strategyAccess.daysRemaining} day${strategyAccess.daysRemaining === 1 ? '' : 's'} left`}`
-                            : 'Strategy workspace'}
+                          {workspaceAccess.canUseStrategyTab
+                            ? workspaceAccess.status === 'recently-completed'
+                              ? `Strategy workspace, ${workspaceAccess.daysRemaining === 0 ? 'expires today' : `${workspaceAccess.daysRemaining} day${workspaceAccess.daysRemaining === 1 ? '' : 's'} left`}`
+                              : 'Strategy workspace'
+                            : 'Open Career Tools'}
                         </Link>
                       )}
-                      {isClientStrategyServiceSlug(client.serviceSlug) && strategyAccess.status === 'archived' && (
+                      {isClientStrategyServiceSlug(client.serviceSlug) && workspaceAccess.status === 'archived' && (
                         <span className="inline-flex items-center px-2 py-2 text-[12px] font-semibold text-[#6B6B6B]">
                           Strategy rework window ended
                         </span>

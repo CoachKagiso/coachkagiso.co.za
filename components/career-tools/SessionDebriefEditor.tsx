@@ -1,12 +1,15 @@
 import { CheckCircle2, Loader2, Save, ShieldCheck } from 'lucide-react';
+import AutoGrowTextarea from '@/components/career-tools/AutoGrowTextarea';
 import {
-  SESSION_DEBRIEF_FIELDS,
   countCompletedDebriefFields,
+  getSessionDebriefFields,
+  type ClientStrategyServiceSlug,
   type SessionDebrief,
   type SessionDebriefFieldKey,
 } from '@/lib/client-strategy';
 
 type SessionDebriefEditorProps = {
+  serviceSlug: ClientStrategyServiceSlug;
   debrief: SessionDebrief;
   isDirty: boolean;
   isLoading: boolean;
@@ -28,7 +31,15 @@ function formatSavedTime(value: string | null) {
   }).format(new Date(value));
 }
 
+const DEBRIEF_PLACEHOLDERS: Record<SessionDebriefFieldKey, string> = {
+  clarityShift: 'What became clearer about the direction, decision, or story they want to tell?',
+  commitments: 'What did the client commit to, what did Kagiso commit to, and by when?',
+  sensitivityNotes: 'What should the follow-up handle carefully: confidence, urgency, privacy, or personal context?',
+  interviewStoryEvidence: 'Capture the supported situation, responsibility, actions, and outcome. Use [Confirm: ...] for missing specifics.',
+};
+
 export default function SessionDebriefEditor({
+  serviceSlug,
   debrief,
   isDirty,
   isLoading,
@@ -40,7 +51,8 @@ export default function SessionDebriefEditor({
   onChange,
   onSave,
 }: SessionDebriefEditorProps) {
-  const completedFields = countCompletedDebriefFields(debrief);
+  const visibleFields = getSessionDebriefFields(serviceSlug);
+  const completedFields = countCompletedDebriefFields(debrief, serviceSlug);
   const canSave = completedFields > 0 && isDirty && !isLoading && !isSaving;
 
   if (isLoading) {
@@ -48,7 +60,7 @@ export default function SessionDebriefEditor({
       <div className="rounded-[8px] bg-white p-5" aria-busy="true" aria-label="Loading session debrief">
         <div className="h-6 w-52 animate-pulse rounded bg-[#E4D8CB]" />
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: getSessionDebriefFields(serviceSlug).length }).map((_, index) => (
             <div key={index} className="h-36 animate-pulse rounded-[8px] bg-[#F5F3EE]" />
           ))}
         </div>
@@ -73,27 +85,27 @@ export default function SessionDebriefEditor({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[11px] font-bold text-[#142334]">{completedFields} of {SESSION_DEBRIEF_FIELDS.length} fields</p>
+          <p className="text-[11px] font-bold text-[#142334]">{completedFields} of {visibleFields.length} fields</p>
           <p className="mt-1 text-[10px] text-[#6B6B6B]">{version ? `Revision ${version}` : 'New draft'} · {formatSavedTime(updatedAt)}</p>
         </div>
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {SESSION_DEBRIEF_FIELDS.map((field, index) => {
+        {visibleFields.map((field, index) => {
           const fieldId = `session-debrief-${field.key}`;
-          const fullWidth = index === SESSION_DEBRIEF_FIELDS.length - 1;
+          const fullWidth = index === visibleFields.length - 1;
           return (
             <label key={field.key} htmlFor={fieldId} className={`grid gap-2 ${fullWidth ? 'md:col-span-2' : ''}`}>
               <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">{field.label}</span>
               <span className="text-[12px] leading-relaxed text-[#142334]/52">{field.prompt}</span>
-              <textarea
+              <AutoGrowTextarea
                 id={fieldId}
                 value={debrief[field.key]}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 rows={fullWidth ? 3 : 5}
                 maxLength={4000}
-                className="min-h-32 resize-y rounded-[8px] border border-[#D8C8BB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#142334] focus:bg-white focus:ring-2 focus:ring-[#C9AD98]/30"
-                placeholder="Add the specific details that came from the session..."
+                className="min-h-32 rounded-[8px] border border-[#D8C8BB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#142334] focus:bg-white focus:ring-2 focus:ring-[#C9AD98]/30"
+                placeholder={DEBRIEF_PLACEHOLDERS[field.key]}
               />
               <span className="text-right text-[10px] text-[#6B6B6B]">{debrief[field.key].length}/4000</span>
             </label>

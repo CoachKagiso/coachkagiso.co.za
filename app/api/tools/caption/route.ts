@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callToolAi, extractToolJsonObject, type ToolAiMessage } from '@/lib/content/tools-ai';
+import { callToolAi, resolveToolAiRuntime, extractToolJsonObject, type ToolAiMessage } from '@/lib/content/tools-ai';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
 
-const AI_API_KEY_ENV = 'ZAI_API_KEY';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const captionPlatforms = ['linkedin', 'instagram', 'tiktok', 'facebook'] as const;
 const captionTones = [
@@ -161,9 +160,9 @@ function normalizeCaptions(value: unknown) {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env[AI_API_KEY_ENV];
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' }, { status: 503 });
+  const runtime = await resolveToolAiRuntime();
+  if (!runtime) {
+    return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
   }
 
   const contentType = req.headers.get('content-type') ?? '';
@@ -232,7 +231,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const text = await callToolAi({
-      apiKey,
+      runtime,
       messages: [
         { role: 'system', content: buildCaptionSystemPrompt() },
         buildCaptionUserMessage({ platform, tone, context, imageBase64, imageMediaType, sourceText }),

@@ -6,7 +6,6 @@ import { validatePrivateCvUpload } from '@/lib/cv-upload-validation';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import {
   getManualClientIntakeFields,
-  manualClientRequiresCv,
   normalizeManualClientEngagement,
 } from '@/lib/manual-client-engagement';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -99,9 +98,6 @@ export async function POST(request: Request) {
 
   const file = formData.get('cv_file');
   const hasCv = file instanceof File && file.size > 0;
-  if (manualClientRequiresCv(service) && !hasCv) {
-    return NextResponse.json({ error: 'Upload the client CV before creating this engagement.' }, { status: 422 });
-  }
 
   const supabase = createSupabaseServiceClient();
   if (!isTruthy(formData.get('confirm_duplicate'))) {
@@ -154,8 +150,8 @@ export async function POST(request: Request) {
 
     const signed = await supabase.storage.from('client-uploads').createSignedUrl(uploadedPath, 7 * 24 * 60 * 60);
     if (signed.error || !signed.data?.signedUrl) {
-      await supabase.storage.from('client-uploads').remove([uploadedPath]);
-      return NextResponse.json({ error: 'Could not secure the client CV link.' }, { status: 500 });
+      console.error('Could not secure the client CV link; retained upload for manual reconciliation:', uploadedPath);
+      return NextResponse.json({ error: 'Could not secure the client CV link. The uploaded file was retained for manual reconciliation.' }, { status: 500 });
     }
     cvFileUrl = signed.data.signedUrl;
   }
@@ -179,8 +175,7 @@ export async function POST(request: Request) {
   });
 
   if (paymentInsert.error) {
-    if (uploadedPath) await supabase.storage.from('client-uploads').remove([uploadedPath]);
-    console.error('Manual client payment insert failed.');
+    console.error('Manual client payment insert failed. Retained upload for manual reconciliation:', uploadedPath || 'none');
     return NextResponse.json({ error: 'Could not create the manual client engagement.' }, { status: 500 });
   }
 
@@ -209,10 +204,8 @@ export async function POST(request: Request) {
   });
 
   if (intakeInsert.error) {
-    await supabase.from('payments').delete().eq('payment_id', paymentId);
-    if (uploadedPath) await supabase.storage.from('client-uploads').remove([uploadedPath]);
-    console.error('Manual client intake insert failed.');
-    return NextResponse.json({ error: 'Could not save the manual client questionnaire.' }, { status: 500 });
+    console.error('Manual client intake insert failed. Payment and upload retained for manual reconciliation:', paymentId, uploadedPath || 'none');
+    return NextResponse.json({ error: 'Could not save the manual client questionnaire. The payment and uploaded CV were retained for manual reconciliation.' }, { status: 500 });
   }
 
   revalidatePath('/resources/career-diagnostic/submissions');

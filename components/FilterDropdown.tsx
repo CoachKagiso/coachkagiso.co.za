@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Eye } from 'lucide-react';
 
 type FilterDropdownOption = {
   value: string;
   label: string;
+  disabled?: boolean;
   intelligence?: number;
   inputPrice?: number;
   outputPrice?: number;
+  /** Renders an eye badge so an image-capable option is obvious before it is picked. */
+  supportsVision?: boolean;
 };
 
 type FilterDropdownProps = {
@@ -65,8 +68,13 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
       >
         <span className={`flex min-w-0 items-center gap-2 ${wrapLabels ? 'whitespace-normal break-words leading-snug' : ''}`}>
           <span className={wrapLabels ? 'min-w-0' : 'truncate'}>{selectedOption?.label || 'Select...'}</span>
-          {selectedOption && (selectedOption.intelligence != null || selectedOption.inputPrice != null || selectedOption.outputPrice != null) && (
+          {selectedOption && (selectedOption.intelligence != null || selectedOption.inputPrice != null || selectedOption.outputPrice != null || selectedOption.supportsVision) && (
             <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-normal text-[#6B6B6B]">
+              {selectedOption.supportsVision && (
+                <Eye className="h-3.5 w-3.5 text-[#8C7466]" aria-label="Reads images" >
+                  <title>Reads images</title>
+                </Eye>
+              )}
               {selectedOption.intelligence != null && <span title="Intelligence Score">🧠 {selectedOption.intelligence}</span>}
               {selectedOption.inputPrice != null && <span title="Input Price per 1M tokens">↓${selectedOption.inputPrice}</span>}
               {selectedOption.outputPrice != null && <span title="Output Price per 1M tokens">↑${selectedOption.outputPrice}</span>}
@@ -92,7 +100,9 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                 <button
                   key={option.value}
                   type="button"
+                  disabled={option.disabled}
                   onClick={() => {
+                    if (option.disabled) return;
                     if (onChange) {
                       onChange(option.value);
                     } else {
@@ -104,12 +114,17 @@ export default function FilterDropdown({ name, value, onChange, options, ariaLab
                     wrapLabels ? 'whitespace-normal break-words leading-snug' : ''
                   } ${
                     isSelected ? 'bg-[#F2ECE7]' : ''
-                  }`}
+                  } ${option.disabled ? 'cursor-not-allowed text-[#A09086] hover:bg-white hover:pl-4' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className={wrapLabels ? 'min-w-0 whitespace-normal break-words leading-snug' : 'truncate'}>{option.label}</span>
-                    {(option.intelligence != null || option.inputPrice != null || option.outputPrice != null) && (
+                    {(option.intelligence != null || option.inputPrice != null || option.outputPrice != null || option.supportsVision) && (
                       <span className="flex shrink-0 items-center gap-2 text-[11px] font-normal text-[#6B6B6B]">
+                        {option.supportsVision && (
+                          <Eye className="h-3.5 w-3.5 text-[#8C7466]" aria-label="Reads images">
+                            <title>Reads images</title>
+                          </Eye>
+                        )}
                         {option.intelligence != null && <span title="Intelligence Score">🧠 {option.intelligence}</span>}
                         {option.inputPrice != null && <span title="Input Price per 1M tokens">↓${option.inputPrice}</span>}
                         {option.outputPrice != null && <span title="Output Price per 1M tokens">↑${option.outputPrice}</span>}

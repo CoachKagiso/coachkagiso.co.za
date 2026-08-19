@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, ShieldCheck, UserPlus, X } from 'lucide-react';
 import { asyncServices, formatCurrency, type AsyncServiceSlug, type IntakeField } from '@/lib/buying-flow';
-import { buildClientStrategyWorkspaceHref, isClientStrategyServiceSlug } from '@/lib/client-strategy';
+import { buildClientStrategyWorkspaceHref } from '@/lib/client-strategy';
 import { getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 import {
   getManualClientIntakeFields,
-  manualClientRequiresCv,
   MANUAL_PAYMENT_METHODS,
 } from '@/lib/manual-client-engagement';
 import FilterDropdown from '@/components/FilterDropdown';
@@ -102,7 +101,6 @@ export default function ManualClientEngagementForm({
   const [created, setCreated] = useState<CreateResponse | null>(null);
   const service = asyncServices[serviceSlug];
   const intakeFields = useMemo(() => getManualClientIntakeFields(service), [service]);
-  const requiresCv = manualClientRequiresCv(service);
 
   // Datetime state for Payment received
   const now = useMemo(() => new Date(), []);
@@ -226,12 +224,12 @@ export default function ManualClientEngagementForm({
                     {created.isTest ? 'This is clearly marked as a test record.' : 'The verified manual payment and intake are now connected.'}
                   </p>
                   <div className="mt-5 flex flex-wrap gap-3">
-                    {created.serviceSlug && isClientStrategyServiceSlug(created.serviceSlug) && (
+                    {created.serviceSlug && (
                       <Link
                         href={buildClientStrategyWorkspaceHref(adminKey, created.paymentId)}
                         className="inline-flex items-center gap-2 rounded-full bg-[#142334] px-5 py-2.5 text-[12px] font-semibold text-white"
                       >
-                        Open Strategy Workspace <ExternalLink className="h-4 w-4" />
+                        Open Career Tools <ExternalLink className="h-4 w-4" />
                       </Link>
                     )}
                     <button type="button" onClick={close} className="rounded-full border border-[#142334] px-5 py-2.5 text-[12px] font-semibold text-[#142334]">
@@ -388,15 +386,14 @@ export default function ManualClientEngagementForm({
                     </div>
                   )}
                   <label className="grid gap-2 text-[12px] font-semibold text-[#142334] md:col-span-2">
-                    Client CV {requiresCv ? <span className="text-[#A15C38]">Required</span> : <span className="font-normal text-[#6B6B6B]">Optional</span>}
+                    Client CV <span className="font-normal text-[#6B6B6B]">Optional - upload now or later from Career Tools</span>
                     <input
                       name="cv_file"
                       type="file"
-                      required={requiresCv}
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                       className="rounded-[8px] border border-[#A09086] bg-[#FCFBFA] px-3 py-2.5 text-[13px] file:mr-4 file:rounded-full file:border-0 file:bg-[#142334] file:px-4 file:py-2 file:text-[11px] file:font-semibold file:text-white"
                     />
-                    <span className="font-normal text-[#6B6B6B]">PDF or Word, maximum 10MB. Stored in the private client bucket.</span>
+                    <span className="font-normal text-[#6B6B6B]">PDF, Word .docx, or plain text, maximum 8MB. You can add a newer version in Career Tools.</span>
                   </label>
                 </div>
 

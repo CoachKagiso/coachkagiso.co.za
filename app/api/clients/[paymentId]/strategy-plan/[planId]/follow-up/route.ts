@@ -6,11 +6,12 @@ import {
   completeClientStrategyPlanDelivery,
   failClientStrategyPlanDelivery,
   getClientStrategyFollowUpState,
-  getClientStrategyThemeReport,
   reserveClientStrategyPlanDelivery,
+  recordManualClientStrategyPlanDelivery,
 } from '@/lib/client-strategy-follow-up-store';
 import { getClientStrategyPlan } from '@/lib/client-strategy-store';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { completeClientStrategyFulfillmentItems } from '@/lib/client-strategy-fulfillment';
 import { recordSentEmail } from '@/lib/sent-emails';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 
@@ -22,9 +23,7 @@ function getRequestKey(request: Request) {
 }
 
 function getSubject(serviceSlug: 'career-clarity' | 'glow-up-vip') {
-  return serviceSlug === 'career-clarity'
-    ? 'Your personalized 14-day Career Clarity plan'
-    : 'Your personalized 30-day Glow Up support plan';
+  return `Your Career Development Plan | ${serviceSlug === 'career-clarity' ? 'Career Clarity' : 'Glow Up VIP'}`;
 }
 
 function reservationError(message: string) {
@@ -65,14 +64,10 @@ export async function GET(
     const plan = await getClientStrategyPlan(paymentId, planId);
     if (!plan) return NextResponse.json({ error: 'Strategy plan not found.' }, { status: 404 });
 
-    const [followUp, themeReport] = await Promise.all([
-      getClientStrategyFollowUpState(paymentId, planId),
-      getClientStrategyThemeReport(),
-    ]);
+    const followUp = await getClientStrategyFollowUpState(paymentId, planId);
     return NextResponse.json({
       ...followUp,
       subject: getSubject(plan.serviceSlug),
-      themeReport,
     });
   } catch {
     console.error('Strategy plan follow-up load failed.');
@@ -98,6 +93,37 @@ export async function POST(
   if (!plan) return NextResponse.json({ error: 'Strategy plan not found.' }, { status: 404 });
   if (plan.status !== 'approved') {
     return NextResponse.json({ error: 'Only an approved plan can be sent.' }, { status: 409 });
+  }
+
+  if (body?.mode === 'manual_email') {
+    const state = await getClientStrategyFollowUpState(paymentId, planId);
+    if (!state.recipient?.email) {
+      return NextResponse.json({ error: 'Recipient email is missing.' }, { status: 400 });
+    }
+    const deliveredAt = new Date(String(body?.deliveredAt || ''));
+    if (Number.isNaN(deliveredAt.getTime()) || deliveredAt.getTime() > Date.now() + 60_000) {
+      return NextResponse.json({ error: 'Choose a valid email delivery date that is not in the future.' }, { status: 400 });
+    }
+    try {
+      await recordManualClientStrategyPlanDelivery({
+        planId,
+        recipientEmail: state.recipient.email,
+        recipientName: state.recipient.name,
+        subject: getSubject(plan.serviceSlug),
+        deliveredAt: deliveredAt.toISOString(),
+      });
+      await completeClientStrategyFulfillmentItems(paymentId, plan.serviceSlug, ['client_pack_emailed']).catch(() => null);
+      const followUp = await getClientStrategyFollowUpState(paymentId, planId);
+      revalidatePath('/resources/career-diagnostic/submissions');
+      return NextResponse.json({ ...followUp, subject: getSubject(plan.serviceSlug) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('approved') || message.includes('Recipient')) {
+        return NextResponse.json({ error: message }, { status: 409 });
+      }
+      console.error('Manual strategy plan delivery record failed:', message || 'unknown error');
+      return NextResponse.json({ error: 'Could not record the manual email delivery.' }, { status: 500 });
+    }
   }
   try {
     if (await isTestEngagement(paymentId)) {
@@ -164,6 +190,7 @@ export async function POST(
       { status: 502 },
     );
   }
+  await completeClientStrategyFulfillmentItems(paymentId, plan.serviceSlug, ['client_pack_emailed']).catch(() => null);
 
   await recordSentEmail({
     toEmail: reservation.recipientEmail,
@@ -179,10 +206,7 @@ export async function POST(
     sentAt: delivery.deliveredAt,
   }).catch(() => console.error('Strategy plan sent email audit record could not be saved.'));
 
-  const [followUp, themeReport] = await Promise.all([
-    getClientStrategyFollowUpState(paymentId, planId),
-    getClientStrategyThemeReport(),
-  ]);
+  const followUp = await getClientStrategyFollowUpState(paymentId, planId);
   revalidatePath('/resources/career-diagnostic/submissions');
-  return NextResponse.json({ ...followUp, subject: email.subject, themeReport });
+  return NextResponse.json({ ...followUp, subject: email.subject });
 }

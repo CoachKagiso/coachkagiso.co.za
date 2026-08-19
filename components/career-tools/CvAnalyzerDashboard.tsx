@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   ClipboardCheck,
   Download,
@@ -18,7 +20,10 @@ import {
   TriangleAlert,
   Upload,
 } from 'lucide-react';
+import { renderRichText, stripEmphasis } from '@/components/career-tools/RichText';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import type { CvAnalyzerResult, ChangeReportEntry } from '@/lib/cv-analyzer-types';
+import type { ClientRecord } from '@/lib/clients';
 
 type CvGoal =
   | 'new_role'
@@ -31,38 +36,6 @@ type CvGoal =
 type Seniority = 'early' | 'mid' | 'senior' | 'executive';
 type AnalyzerMode = 'simple' | 'advanced';
 type DeliverableKind = 'cv' | 'cover_letter' | 'linkedin';
-type ChangeReportEntry = {
-  category: string;
-  summary: string;
-  before: string;
-  after: string;
-};
-
-type CvAnalyzerResult = {
-  snapshot: string;
-  scores: {
-    positioning: number;
-    clarity: number;
-    roleFit: number;
-    atsReadability: number;
-  };
-  recruiterRead: {
-    headline: string;
-    firstImpression: string;
-    possibleConcern: string;
-  };
-  strongestSignals: string[];
-  priorityFixes: Array<{ title: string; whyItMatters: string; fix: string }>;
-  evidenceGaps: Array<{ title: string; detail: string; fix: string }>;
-  rewriteSamples: Array<{ before: string; after: string; why: string }>;
-  atsNotes: string[];
-  interviewAngles: string[];
-  nextActions: Array<{ title: string; detail: string }>;
-  recommendedCoachMove: {
-    label: string;
-    reason: string;
-  };
-};
 type ExportFormat = 'pdf' | 'docx';
 type CvReportSection = {
   heading: string;
@@ -86,6 +59,22 @@ const seniorityOptions: Array<{ value: Seniority; label: string }> = [
 ];
 const cvFileAccept = '.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain';
 const maxCvFileBytes = 8 * 1024 * 1024;
+
+type CvSourceState = {
+  available: boolean;
+  fileName: string | null;
+  contentType: string | null;
+  origin: 'stored' | 'external' | null;
+};
+
+type CvWorkspaceResponse = {
+  source?: CvSourceState;
+  latestReport?: {
+    report: CvAnalyzerResult;
+    createdAt: string;
+  } | null;
+  error?: string;
+};
 
 function scoreLabel(value: number) {
   if (value >= 85) return 'Strong';
@@ -159,7 +148,10 @@ function getCvReportSections(result: CvAnalyzerResult): CvReportSection[] {
       heading: 'Recommended coaching move',
       lines: [`${result.recommendedCoachMove.label}: ${result.recommendedCoachMove.reason}`],
     },
-  ].filter((section) => section.lines.some(Boolean));
+  ]
+    // Plain-text destinations must not show the bold marks used by the on-screen report.
+    .map((section) => ({ ...section, lines: section.lines.map((line) => stripEmphasis(line || '')) }))
+    .filter((section) => section.lines.some(Boolean));
 }
 
 function formatCvReport(result: CvAnalyzerResult) {
@@ -331,35 +323,82 @@ function PillGroup<T extends string>({
   );
 }
 
+function DetailBlock({ label, value, tone }: { label: string; value: string; tone: 'context' | 'action' }) {
+  // Brand palette only (Dark Gunmetal / Chai / Latte) — tone is distinguished by the label
+  // and fill, not by hue. See docs/AI-Brand-Brief.md for the palette source of truth.
+  if (tone === 'action') {
+    return (
+      <div className="mt-3 rounded-[6px] bg-[#E4D8CB] px-3 py-2.5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#142334]/70">{label}</p>
+        <p className="mt-1.5 text-[13px] leading-[1.65] text-[#142334]">{renderRichText(value)}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-l-2 border-[#E4D8CB] pl-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">{label}</p>
+      <p className="mt-1 text-[13px] leading-[1.65] text-[#142334]/62">{renderRichText(value)}</p>
+    </div>
+  );
+}
+
 function DetailList({
   title,
   items,
+  detailLabel = 'Detail',
+  detailTone = 'context',
+  fixLabel = 'Do this',
 }: {
   title: string;
   items: Array<{ title: string; detail?: string; whyItMatters?: string; fix?: string }>;
+  detailLabel?: string;
+  detailTone?: 'context' | 'action';
+  fixLabel?: string;
 }) {
   if (!items.length) return null;
 
   return (
     <div>
       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">{title}</p>
-      <div className="mt-3 grid gap-3">
+      <ol className="mt-3 grid gap-3">
         {items.map((item, index) => (
-          <div key={`${item.title}-${index}`} className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
-            <p className="font-semibold leading-tight text-[#142334]">{item.title}</p>
-            {item.whyItMatters && <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">{item.whyItMatters}</p>}
-            {item.detail && <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">{item.detail}</p>}
-            {item.fix && <p className="mt-3 text-[13px] leading-relaxed text-[#142334]/78">{item.fix}</p>}
-          </div>
+          <li key={`${item.title}-${index}`} className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#142334] text-[11px] font-bold text-white"
+              >
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold leading-snug text-[#142334]">{item.title}</p>
+                {item.whyItMatters && <DetailBlock label="Why this matters" value={item.whyItMatters} tone="context" />}
+                {item.detail && <DetailBlock label={detailLabel} value={item.detail} tone={detailTone} />}
+                {item.fix && <DetailBlock label={fixLabel} value={item.fix} tone="action" />}
+              </div>
+            </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }
 
-export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) {
+export default function CvAnalyzerDashboard({
+  adminKey,
+  selectedClient = null,
+  active = true,
+  onPrepareSession,
+}: {
+  adminKey: string;
+  selectedClient?: ClientRecord | null;
+  active?: boolean;
+  onPrepareSession?: () => void;
+}) {
   const [analyzerMode, setAnalyzerMode] = useState<AnalyzerMode>('simple');
   const [cvText, setCvText] = useState('');
+  const [isPasteCvOpen, setIsPasteCvOpen] = useState(false);
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [targetRole, setTargetRole] = useState('');
@@ -375,9 +414,48 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
   const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
   const [cvChangeReport, setCvChangeReport] = useState<ChangeReportEntry[] | null>(null);
+  const [cvSource, setCvSource] = useState<CvSourceState>({ available: false, fileName: null, contentType: null, origin: null });
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState<string | null>(null);
+  const [isLoadingClientCv, setIsLoadingClientCv] = useState(false);
+  const [isUploadingClientCv, setIsUploadingClientCv] = useState(false);
 
   const wordCount = useMemo(() => cvText.trim().split(/\s+/).filter(Boolean).length, [cvText]);
-  const canAnalyze = (cvText.trim().length >= 300 || Boolean(cvFile)) && !busy;
+  const canAnalyze = (
+    cvText.trim().length >= 300 ||
+    Boolean(cvFile) ||
+    (Boolean(selectedClient) && cvSource.available)
+  ) && !busy && !isLoadingClientCv && !isUploadingClientCv;
+
+  useEffect(() => {
+    if (!selectedClient || !active) return;
+
+    const controller = new AbortController();
+    const paymentId = selectedClient.paymentId;
+
+    async function loadClientCv() {
+      setIsLoadingClientCv(true);
+      setError('');
+      try {
+        const response = await fetch(`/api/clients/${encodeURIComponent(paymentId)}/cv`, {
+          headers: { 'x-diagnostic-admin-key': adminKey },
+          signal: controller.signal,
+        });
+        const data = await response.json().catch(() => null) as CvWorkspaceResponse | null;
+        if (!response.ok) throw new Error(data?.error || 'Could not load the client CV workspace.');
+        setCvSource(data?.source || { available: false, fileName: null, contentType: null, origin: null });
+        setResult(data?.latestReport?.report || null);
+        setLastAnalyzedAt(data?.latestReport?.createdAt || null);
+      } catch (caught) {
+        if (caught instanceof DOMException && caught.name === 'AbortError') return;
+        setError(caught instanceof Error ? caught.message : 'Could not load the client CV workspace.');
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingClientCv(false);
+      }
+    }
+
+    void loadClientCv();
+    return () => controller.abort();
+  }, [active, adminKey, selectedClient]);
 
   function getCvFileValidationError(file: File) {
     const lowerName = file.name.toLowerCase();
@@ -400,7 +478,32 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
     }
     setError('');
     setCopied(false);
-    setCvFile(file);
+
+    if (!selectedClient) {
+      setCvFile(file);
+      return;
+    }
+
+    setIsUploadingClientCv(true);
+    const formData = new FormData();
+    formData.append('key', adminKey);
+    formData.append('file', file);
+    void fetch(`/api/clients/${encodeURIComponent(selectedClient.paymentId)}/cv`, {
+      method: 'POST',
+      body: formData,
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null) as CvWorkspaceResponse | null;
+        if (!response.ok) throw new Error(data?.error || 'Could not save this CV version.');
+        setCvSource(data?.source || { available: true, fileName: file.name, contentType: file.type || null, origin: 'stored' });
+        setCvFile(null);
+        setFileInputKey((current) => current + 1);
+      })
+      .catch((caught) => {
+        setError(caught instanceof Error ? caught.message : 'Could not save this CV version.');
+        setFileInputKey((current) => current + 1);
+      })
+      .finally(() => setIsUploadingClientCv(false));
   }
 
   function clearCvFile() {
@@ -424,6 +527,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         formData.append('key', adminKey);
         formData.append('analysisMode', analyzerMode);
         formData.append('cvFile', cvFile);
+        if (selectedClient) formData.append('paymentId', selectedClient.paymentId);
         formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
@@ -444,6 +548,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             contextNotes: analyzerMode === 'advanced' ? contextNotes : '',
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
+            paymentId: selectedClient?.paymentId || '',
           }),
         });
       }
@@ -451,6 +556,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
       if (!response.ok) throw new Error(data?.error || 'Could not analyse this CV.');
       if (!data?.result) throw new Error('The analyzer returned an empty report.');
       setResult(data.result);
+      setLastAnalyzedAt(new Date().toISOString());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not analyse this CV.');
     } finally {
@@ -500,6 +606,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         formData.append('analysisMode', analyzerMode);
         formData.append('deliverable', kind);
         formData.append('cvFile', cvFile);
+        if (selectedClient) formData.append('paymentId', selectedClient.paymentId);
         formData.append('targetRole', targetRole);
         formData.append('contextNotes', analyzerMode === 'advanced' ? contextNotes : '');
         formData.append('goal', analyzerMode === 'advanced' ? goal : '');
@@ -520,6 +627,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             goal: analyzerMode === 'advanced' ? goal : '',
             seniority: analyzerMode === 'advanced' ? seniority : '',
             analysis: result,
+            paymentId: selectedClient?.paymentId || '',
           }),
         });
       }
@@ -562,14 +670,20 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Career Tools</p>
-            <h1 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">CV Positioning Analyzer</h1>
+            <h1 className="mt-2 font-serif text-[36px] leading-tight text-[#142334]">
+              {selectedClient ? `CV Analysis for ${selectedClient.buyerName}` : 'CV Positioning Analyzer'}
+            </h1>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#142334]/64">
               Private dashboard analysis for CV clarity, positioning, role fit, and next coaching moves.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">
             <LockKeyhole className="h-3.5 w-3.5" />
-            No report saved
+            {isLoadingClientCv
+              ? 'Loading client workspace'
+              : lastAnalyzedAt
+                ? `Last analyzed: ${new Intl.DateTimeFormat('en-ZA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Johannesburg' }).format(new Date(lastAnalyzedAt))}`
+                : 'No report saved'}
           </span>
         </div>
 
@@ -577,8 +691,12 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
           <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Upload CV</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">PDF, Word .docx, or plain text. The file is read for this analysis only.</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">{cvSource.available ? 'Replace current CV' : 'Upload CV'}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                  {cvSource.available
+                    ? `${cvSource.fileName || 'A CV'} is loaded and ready to analyze. Upload a newer version when needed.`
+                    : 'No CV is on file yet. Upload PDF, Word .docx, or plain text.'}
+                </p>
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Max 8MB</span>
             </div>
@@ -593,8 +711,12 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
               />
               <span className="grid justify-items-center">
                 <Upload className="h-6 w-6 text-[#C9AD98]" />
-                <span className="mt-2 text-[13px] font-bold text-[#142334]">{cvFile ? cvFile.name : 'Upload PDF, Word, or TXT CV'}</span>
-                <span className="mt-1 text-[11px] text-[#142334]/55">{cvFile ? 'This file will be used instead of pasted text.' : 'Text-based PDFs work best. Scanned image PDFs may not extract.'}</span>
+                <span className="mt-2 text-[13px] font-bold text-[#142334]">
+                  {isUploadingClientCv ? 'Saving CV version...' : cvFile ? cvFile.name : cvSource.fileName || (cvSource.available ? 'Replace CV' : 'Upload PDF, Word, or TXT CV')}
+                </span>
+                <span className="mt-1 text-[11px] text-[#142334]/55">
+                  {cvSource.available ? 'The current file of record stays available until you replace it.' : 'Text-based PDFs work best. Scanned image PDFs may not extract.'}
+                </span>
               </span>
             </label>
 
@@ -606,17 +728,37 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             )}
           </div>
 
-          <label className="grid gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Paste CV text</span>
-            <textarea
-              value={cvText}
-              onChange={(event) => setCvText(event.target.value)}
-              rows={13}
-              placeholder="Paste the CV text here..."
-              className="min-h-[330px] rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:bg-white focus:ring-2 focus:ring-[#BFA490]/25"
-            />
-            <span className="text-[11px] font-medium text-[#142334]/50">{wordCount} words</span>
-          </label>
+          <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4]">
+            <button
+              type="button"
+              aria-expanded={isPasteCvOpen}
+              aria-controls="paste-cv-text-panel"
+              onClick={() => setIsPasteCvOpen((current) => !current)}
+              className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[#FBFAF8]"
+            >
+              <span>
+                <span className="block text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Paste CV text</span>
+                <span className="mt-1 block text-[11px] text-[#142334]/55">
+                  {cvText.trim() ? `${wordCount} words pasted` : 'Optional — expand when you need to paste a CV'}
+                </span>
+              </span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#8C7466]">
+                {isPasteCvOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </span>
+            </button>
+            {isPasteCvOpen && (
+              <div id="paste-cv-text-panel" className="border-t border-[#E4D8CB] p-3">
+                <textarea
+                  value={cvText}
+                  onChange={(event) => setCvText(event.target.value)}
+                  rows={13}
+                  placeholder="Paste the CV text here..."
+                  className="min-h-[330px] w-full rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3 text-[14px] leading-relaxed text-[#142334] outline-none transition placeholder:text-[#A09086] focus:border-[#BFA490] focus:ring-2 focus:ring-[#BFA490]/25"
+                />
+                <span className="mt-2 block text-[11px] font-medium text-[#142334]/50">{wordCount} words</span>
+              </div>
+            )}
+          </div>
 
           <label className="grid gap-2">
             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">
@@ -699,7 +841,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             className="inline-flex h-12 items-center justify-center gap-2 rounded-[8px] bg-[#142334] px-5 text-[12px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:bg-[#D8C8BB] disabled:text-[#142334]/45"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
-            {busy ? 'Analysing CV...' : 'Analyze CV'}
+            {busy ? 'Analysing CV...' : result ? 'Re-analyze' : 'Analyze CV'}
           </button>
         </div>
       </div>
@@ -716,6 +858,12 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 <ClipboardCheck className="h-4 w-4" />
                 {copied ? 'Copied' : 'Copy report'}
               </button>
+              {onPrepareSession && (
+                <button type="button" onClick={onPrepareSession} className="studio-secondary-button">
+                  <Sparkles className="h-4 w-4" />
+                  Prepare session
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void exportReport('pdf')}
@@ -763,7 +911,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 </span>
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Snapshot</p>
-                  <p className="mt-2 text-[15px] leading-relaxed text-[#142334]/78">{result.snapshot}</p>
+                  <p className="mt-2 text-[15px] leading-[1.7] text-[#142334]/78">{renderRichText(result.snapshot)}</p>
                 </div>
               </div>
             </div>
@@ -783,10 +931,15 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8C7466]">Recruiter read</p>
                   <h3 className="mt-2 font-serif text-[24px] leading-tight">{result.recruiterRead.headline}</h3>
-                  <p className="mt-3 text-[14px] leading-relaxed text-[#142334]/76">{result.recruiterRead.firstImpression}</p>
-                  <p className="mt-3 rounded-[8px] bg-[#FFF5F2] px-3 py-2 text-[13px] leading-relaxed text-[#7A2F22]">
-                    {result.recruiterRead.possibleConcern}
+                  <p className="mt-3 text-[14px] leading-[1.7] text-[#142334]/76">
+                    {renderRichText(result.recruiterRead.firstImpression)}
                   </p>
+                  <div className="mt-3 rounded-[8px] bg-[#E4D8CB] px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#142334]/70">Possible concern</p>
+                    <p className="mt-1.5 text-[13px] leading-[1.65] text-[#142334]">
+                      {renderRichText(result.recruiterRead.possibleConcern)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -806,8 +959,13 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
             )}
 
             <div className="grid gap-4">
-              <DetailList title="Priority fixes" items={result.priorityFixes} />
-              <DetailList title="Evidence gaps" items={result.evidenceGaps} />
+              <DetailList title="Priority fixes" items={result.priorityFixes} fixLabel="Do this" />
+              <DetailList
+                title="Evidence gaps"
+                items={result.evidenceGaps}
+                detailLabel="What is missing"
+                fixLabel="How to prove it"
+              />
             </div>
 
             {result.rewriteSamples.length > 0 && (
@@ -817,12 +975,22 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   {result.rewriteSamples.map((item, index) => (
                     <div key={`${item.after}-${index}`} className="rounded-[8px] bg-white p-4 text-[#142334]">
                       {item.before && (
-                        <p className="rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/58">
-                          {item.before}
+                        <div className="rounded-[8px] bg-[#F8F6F4] px-3 py-2.5">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">Before</p>
+                          <p className="mt-1.5 text-[12px] leading-[1.65] text-[#142334]/58">{item.before}</p>
+                        </div>
+                      )}
+                      <div className="mt-3 rounded-[8px] bg-[#E4D8CB] px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#142334]/70">After</p>
+                        <p className="mt-1.5 text-[14px] font-semibold leading-[1.65] text-[#142334]">
+                          {renderRichText(item.after)}
+                        </p>
+                      </div>
+                      {item.why && (
+                        <p className="mt-2.5 border-l-2 border-[#E4D8CB] pl-3 text-[12px] leading-[1.65] text-[#142334]/58">
+                          {renderRichText(item.why)}
                         </p>
                       )}
-                      <p className="mt-3 text-[14px] font-semibold leading-relaxed text-[#142334]">{item.after}</p>
-                      {item.why && <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">{item.why}</p>}
                     </div>
                   ))}
                 </div>
@@ -836,7 +1004,7 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   {result.atsNotes.map((item) => (
                     <li key={item} className="flex gap-2">
                       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#C9AD98]" />
-                      <span>{item}</span>
+                      <span>{renderRichText(item)}</span>
                     </li>
                   ))}
                 </ul>
@@ -847,19 +1015,21 @@ export default function CvAnalyzerDashboard({ adminKey }: { adminKey: string }) 
                   {result.interviewAngles.map((item) => (
                     <li key={item} className="flex gap-2">
                       <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-[#C9AD98]" />
-                      <span>{item}</span>
+                      <span>{renderRichText(item)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
 
-            <DetailList title="Next actions" items={result.nextActions} />
+            <DetailList title="Next actions" items={result.nextActions} detailLabel="Do this" detailTone="action" />
 
             <div className="rounded-[8px] bg-[#C9AD98] p-4 text-[#142334]">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#142334]/62">Recommended coaching move</p>
               <h3 className="mt-2 font-serif text-[27px] leading-tight">{result.recommendedCoachMove.label}</h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/72">{result.recommendedCoachMove.reason}</p>
+              <p className="mt-2 text-[13px] leading-[1.65] text-[#142334]/72">
+                {renderRichText(result.recommendedCoachMove.reason)}
+              </p>
             </div>
 
             <div className="rounded-[8px] border border-white/12 bg-white/[0.08] p-4">

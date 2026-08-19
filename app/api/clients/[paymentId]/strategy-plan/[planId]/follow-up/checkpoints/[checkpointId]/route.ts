@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import { normalizeClientStrategyCheckpointOutcome } from '@/lib/client-strategy-follow-up';
 import {
   getClientStrategyFollowUpState,
-  getClientStrategyThemeReport,
   saveClientStrategyCheckpointOutcome,
 } from '@/lib/client-strategy-follow-up-store';
 import { getClientStrategyPlan } from '@/lib/client-strategy-store';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { setClientStrategyFulfillmentItem } from '@/lib/client-strategy-fulfillment';
 
 export async function PUT(
   request: Request,
@@ -44,9 +44,20 @@ export async function PUT(
     }
 
     const checkpoint = await saveClientStrategyCheckpointOutcome(checkpointId, outcome);
-    const themeReport = await getClientStrategyThemeReport();
+    if (checkpoint.status === 'done') {
+      const itemKey = checkpoint.key === 'whatsapp_day_10_14'
+        ? 'whatsapp_follow_up_completed'
+        : 'teams_follow_up_completed';
+      await setClientStrategyFulfillmentItem({
+        paymentId,
+        serviceSlug: plan.serviceSlug,
+        key: itemKey,
+        completed: true,
+        source: 'system',
+      }).catch(() => null);
+    }
     revalidatePath('/resources/career-diagnostic/submissions');
-    return NextResponse.json({ checkpoint, themeReport });
+    return NextResponse.json({ checkpoint });
   } catch {
     console.error('Strategy checkpoint outcome save failed.');
     return NextResponse.json({ error: 'Could not save the checkpoint outcome.' }, { status: 500 });

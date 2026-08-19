@@ -3,7 +3,6 @@ import {
   aggregateClientStrategyThemes,
   type ClientStrategyCheckpointOutcome,
   type ClientStrategyCheckpointStatus,
-  type ClientStrategyProgressStatus,
   type ClientStrategyThemeKey,
 } from '@/lib/client-strategy-follow-up';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
@@ -34,9 +33,9 @@ export type ClientStrategyCheckpoint = {
   label: string;
   dueAt: string;
   status: ClientStrategyCheckpointStatus;
-  progressStatus: ClientStrategyProgressStatus | null;
   notes: string;
-  themes: ClientStrategyThemeKey[];
+  windowLabel: string;
+  isLegacy: boolean;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -67,8 +66,8 @@ type CheckpointRow = {
   checkpoint_key: string;
   label: string;
   due_at: string;
-  status: ClientStrategyCheckpointStatus;
-  progress_status: ClientStrategyProgressStatus | null;
+  status: string;
+  progress_status: string | null;
   notes: string;
   theme_keys: ClientStrategyThemeKey[];
   completed_at: string | null;
@@ -101,6 +100,21 @@ function normalizeDelivery(row: DeliveryRow): ClientStrategyPlanDelivery {
 }
 
 function normalizeCheckpoint(row: CheckpointRow): ClientStrategyCheckpoint {
+  const status: ClientStrategyCheckpointStatus = row.status === 'completed'
+    ? 'done'
+    : row.status === 'skipped'
+      ? 'not_done'
+      : row.status === 'done' || row.status === 'not_done'
+        ? row.status
+        : 'pending';
+  const windowLabel = row.checkpoint_key === 'teams_day_14'
+    ? 'Around Day 14'
+    : row.checkpoint_key === 'whatsapp_day_10_14'
+      ? 'Days 10–14'
+      : row.checkpoint_key === 'teams_day_28_30'
+        ? 'Days 28–30'
+        : 'Legacy schedule';
+
   return {
     id: row.id,
     planId: row.plan_id,
@@ -109,10 +123,10 @@ function normalizeCheckpoint(row: CheckpointRow): ClientStrategyCheckpoint {
     key: row.checkpoint_key,
     label: row.label,
     dueAt: row.due_at,
-    status: row.status,
-    progressStatus: row.progress_status,
+    status,
     notes: row.notes || '',
-    themes: row.theme_keys || [],
+    windowLabel,
+    isLegacy: !['teams_day_14', 'whatsapp_day_10_14', 'teams_day_28_30'].includes(row.checkpoint_key),
     completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -215,6 +229,27 @@ export async function completeClientStrategyPlanDelivery(deliveryId: string, pro
   return normalizeDelivery(data as DeliveryRow);
 }
 
+export async function recordManualClientStrategyPlanDelivery(input: {
+  planId: string;
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  deliveredAt: string;
+}) {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .rpc('record_manual_client_strategy_plan_delivery', {
+      p_plan_id: input.planId,
+      p_recipient_email: input.recipientEmail,
+      p_recipient_name: input.recipientName,
+      p_subject: input.subject,
+      p_delivered_at: input.deliveredAt,
+    })
+    .single();
+  if (error) throw new Error(error.message);
+  return normalizeDelivery(data as DeliveryRow);
+}
+
 export async function failClientStrategyPlanDelivery(deliveryId: string, errorCode: string) {
   const supabase = createSupabaseServiceClient();
   const { data, error } = await supabase
@@ -234,12 +269,11 @@ export async function saveClientStrategyCheckpointOutcome(
 ) {
   const supabase = createSupabaseServiceClient();
   const { data, error } = await supabase
-    .rpc('save_client_strategy_checkpoint_outcome', {
+    .rpc('save_client_strategy_follow_up', {
       p_checkpoint_id: checkpointId,
+      p_due_at: outcome.dueAt,
       p_status: outcome.status,
-      p_progress_status: outcome.progressStatus,
       p_notes: outcome.notes,
-      p_theme_keys: outcome.themes,
     })
     .single();
 

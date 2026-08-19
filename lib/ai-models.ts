@@ -10,6 +10,12 @@ export type AiModelOption = {
    * without the disable instead of being rejected.
    */
   requiresReasoning?: boolean;
+  /**
+   * Whether the endpoint accepts image content. Image requests fall back to a capable model
+   * when the configured one is text only, so an attachment never fails on model choice alone.
+   * Verify these against the provider before relying on them.
+   */
+  supportsVision?: boolean;
 };
 
 export const ZAI_TEST_MODEL = 'glm-5.2';
@@ -17,15 +23,17 @@ export const DEFAULT_OPENROUTER_PRIMARY_MODEL = 'z-ai/glm-5.2';
 export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'z-ai/glm-5.2';
 
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
-  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 61, inputPrice: 5.0, outputPrice: 25.0 },
-  { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 59, inputPrice: 5.0, outputPrice: 30.0 },
-  { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56, inputPrice: 1.25, outputPrice: 7.5 },
-  { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 57, inputPrice: 2.6, outputPrice: 13.0 },
-  { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875, requiresReasoning: true },
-  { value: 'x-ai/grok-4.5', label: 'x-ai/grok-4.5', intelligence: 54, inputPrice: 2.0, outputPrice: 6.0 },
+  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 63.1, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true },
+  { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 60.9, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true },
+  { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 59.7, inputPrice: 2.6, outputPrice: 13.0, supportsVision: true },
+  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40 },
+  { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 59, inputPrice: 5.0, outputPrice: 30.0, supportsVision: true },
+  { value: 'meta/muse-spark-1.2', label: 'meta/muse-spark-1.2', intelligence: 56.8, inputPrice: 1.25, outputPrice: 4.25, supportsVision: true },
+  { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56, inputPrice: 1.25, outputPrice: 7.5, supportsVision: true },
+  { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875, requiresReasoning: true, supportsVision: true },
   { value: 'deepseek/deepseek-v4-flash-0731', label: 'deepseek/deepseek-v4-flash-0731', intelligence: 52, inputPrice: 0.0786, outputPrice: 0.1572 },
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 51, inputPrice: 0.49, outputPrice: 1.54 },
-  { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3', intelligence: 44, inputPrice: 0.22, outputPrice: 1.2 },
+  { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3', intelligence: 44, inputPrice: 0.22, outputPrice: 1.2, supportsVision: true },
   { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro', intelligence: 42, inputPrice: 0.44, outputPrice: 0.87 },
 ];
 
@@ -45,4 +53,23 @@ const reasoningMandatoryModels = new Set(
 
 export function modelRequiresReasoning(model: unknown) {
   return typeof model === 'string' && reasoningMandatoryModels.has(model);
+}
+
+const visionCapableModels = new Set(
+  OPENROUTER_MODEL_OPTIONS.filter((option) => option.supportsVision).map((option) => option.value),
+);
+
+export function modelSupportsVision(model: unknown) {
+  return typeof model === 'string' && visionCapableModels.has(model);
+}
+
+/**
+ * Used when an image is attached but the configured model cannot read images. The cheapest
+ * capable model wins, because this only ever fires for the high-volume secondary-model tools
+ * and the list is ordered by intelligence rather than price.
+ */
+export function getFallbackVisionModel() {
+  return OPENROUTER_MODEL_OPTIONS
+    .filter((option) => option.supportsVision)
+    .sort((a, b) => (a.inputPrice + a.outputPrice) - (b.inputPrice + b.outputPrice))[0]?.value || null;
 }

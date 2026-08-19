@@ -1,30 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Loader2, Save } from 'lucide-react';
-import FilterDropdown from '@/components/FilterDropdown';
-import {
-  CLIENT_STRATEGY_THEME_OPTIONS,
-  type ClientStrategyProgressStatus,
-  type ClientStrategyThemeKey,
-} from '@/lib/client-strategy-follow-up';
+import { CalendarDays, CheckCircle2, Clock3, Loader2, Save, XCircle } from 'lucide-react';
+import type { ClientStrategyCheckpointStatus } from '@/lib/client-strategy-follow-up';
 import type { ClientStrategyCheckpoint } from '@/lib/client-strategy-follow-up-store';
+import AutoGrowTextarea from '@/components/career-tools/AutoGrowTextarea';
 
-const PROGRESS_OPTIONS = [
-  { value: 'on_track', label: 'On track' },
-  { value: 'partly_on_track', label: 'Partly on track' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'complete', label: 'Complete' },
-];
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-ZA', {
-    day: 'numeric',
-    month: 'short',
+function dateInputValue(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     timeZone: 'Africa/Johannesburg',
-  }).format(new Date(value));
+  }).format(date);
 }
+
+const STATUS_OPTIONS: Array<{
+  value: ClientStrategyCheckpointStatus;
+  label: string;
+  icon: typeof Clock3;
+}> = [
+  { value: 'pending', label: 'Pending', icon: Clock3 },
+  { value: 'done', label: 'Done', icon: CheckCircle2 },
+  { value: 'not_done', label: 'Not done', icon: XCircle },
+];
 
 export default function ClientStrategyCheckpointCard({
   adminKey,
@@ -37,31 +38,21 @@ export default function ClientStrategyCheckpointCard({
   paymentId: string;
   planId: string;
   checkpoint: ClientStrategyCheckpoint;
-  onSaved: (checkpoint: ClientStrategyCheckpoint, themeReport: Array<{ key: string; label: string; clientCount: number }>) => void;
+  onSaved: (checkpoint: ClientStrategyCheckpoint) => void;
 }) {
-  const [progressStatus, setProgressStatus] = useState<ClientStrategyProgressStatus>(
-    checkpoint.progressStatus || 'on_track',
-  );
+  const [status, setStatus] = useState<ClientStrategyCheckpointStatus>(checkpoint.status);
+  const [dueDate, setDueDate] = useState(dateInputValue(checkpoint.dueAt));
   const [notes, setNotes] = useState(checkpoint.notes);
-  const [themes, setThemes] = useState<ClientStrategyThemeKey[]>(checkpoint.themes);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  function toggleTheme(theme: ClientStrategyThemeKey) {
-    setThemes((current) => current.includes(theme)
-      ? current.filter((item) => item !== theme)
-      : current.length < 5 ? [...current, theme] : current);
-    setMessage('');
-  }
-
-  async function save(status: 'completed' | 'skipped') {
-    if (isSaving) return;
-    if (status === 'skipped' && !window.confirm('Skip this checkpoint and clear its progress themes?')) return;
-
+  async function save() {
+    if (isSaving || !dueDate) return;
     setIsSaving(true);
     setError('');
     setMessage('');
+
     try {
       const response = await fetch(
         `/api/clients/${encodeURIComponent(paymentId)}/strategy-plan/${encodeURIComponent(planId)}/follow-up/checkpoints/${encodeURIComponent(checkpoint.id)}`,
@@ -71,115 +62,118 @@ export default function ClientStrategyCheckpointCard({
           body: JSON.stringify({
             key: adminKey,
             status,
-            progressStatus: status === 'completed' ? progressStatus : null,
+            dueAt: new Date(`${dueDate}T10:00:00+02:00`).toISOString(),
             notes,
-            themes: status === 'completed' ? themes : [],
           }),
         },
       );
       const data = await response.json().catch(() => null) as {
         checkpoint?: ClientStrategyCheckpoint;
-        themeReport?: Array<{ key: string; label: string; clientCount: number }>;
         error?: string;
       } | null;
-      if (!response.ok || !data?.checkpoint) throw new Error(data?.error || 'Could not save this outcome.');
-      onSaved(data.checkpoint, data.themeReport || []);
-      setThemes(data.checkpoint.themes);
+      if (!response.ok || !data?.checkpoint) {
+        throw new Error(data?.error || 'Could not save this follow-up.');
+      }
+
+      onSaved(data.checkpoint);
+      setStatus(data.checkpoint.status);
+      setDueDate(dateInputValue(data.checkpoint.dueAt));
       setNotes(data.checkpoint.notes);
-      setMessage(status === 'skipped' ? 'Checkpoint marked as skipped.' : 'Outcome saved separately from the approved plan.');
+      setMessage('Follow-up details saved.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this outcome.');
+      setError(caught instanceof Error ? caught.message : 'Could not save this follow-up.');
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <article className="rounded-[8px] border border-[#E4D8CB] bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="rounded-[8px] border border-[#D8C8BB] bg-white p-5">
+      <header className="flex flex-col gap-3 border-b border-[#E4D8CB] pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="font-serif text-[22px] text-[#142334]">{checkpoint.label}</p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#8C7466]">Due {formatDate(checkpoint.dueAt)}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">{checkpoint.windowLabel}</p>
+          <h5 className="mt-2 font-serif text-[25px] leading-tight text-[#142334]">{checkpoint.label}</h5>
+          {checkpoint.isLegacy && (
+            <p className="mt-2 text-[12px] leading-relaxed text-[#6B6B6B]">Legacy follow-up record retained from the earlier schedule.</p>
+          )}
         </div>
-        <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${
-          checkpoint.status === 'completed'
+        <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${
+          status === 'done'
             ? 'bg-[#EAF2EB] text-[#466B4D]'
-            : checkpoint.status === 'skipped'
+            : status === 'not_done'
               ? 'bg-[#F0EDE9] text-[#6B6B6B]'
               : 'bg-[#FFF4DB] text-[#76541D]'
         }`}>
-          {checkpoint.status}
+          {status === 'not_done' ? 'Not done' : status}
         </span>
-      </div>
+      </header>
 
-      <div className="mt-4 grid gap-4">
-        <div className="max-w-xs">
-          <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">Progress</label>
-          <FilterDropdown
-            name={`checkpoint-progress-${checkpoint.id}`}
-            value={progressStatus}
-            onChange={(value) => { setProgressStatus(value as ClientStrategyProgressStatus); setMessage(''); }}
-            ariaLabel={`Progress for ${checkpoint.label}`}
-            options={PROGRESS_OPTIONS}
+      <div className="mt-5 grid gap-5">
+        <label htmlFor={`checkpoint-date-${checkpoint.id}`} className="grid gap-2">
+          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">
+            <CalendarDays className="h-4 w-4" /> Agreed date
+          </span>
+          <input
+            id={`checkpoint-date-${checkpoint.id}`}
+            type="date"
+            value={dueDate}
+            onChange={(event) => { setDueDate(event.target.value); setMessage(''); }}
+            className="h-12 rounded-[8px] border border-[#D8C8BB] bg-[#FBFAF8] px-4 text-[15px] text-[#142334] outline-none transition focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
           />
-        </div>
+          <span className="text-[12px] leading-relaxed text-[#6B6B6B]">The window is guidance. Adjust this to the date agreed with the client.</span>
+        </label>
 
-        <div>
-          <label htmlFor={`checkpoint-notes-${checkpoint.id}`} className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">Outcome notes</label>
-          <textarea
-            id={`checkpoint-notes-${checkpoint.id}`}
-            value={notes}
-            maxLength={4000}
-            onChange={(event) => { setNotes(event.target.value); setMessage(''); }}
-            placeholder="What moved, what stalled, and what support is needed next?"
-            className="mt-2 min-h-28 w-full resize-y rounded-[8px] border border-[#D8C8BB] bg-[#FBFAF8] px-3 py-3 text-[13px] leading-relaxed text-[#142334] outline-none transition focus:border-[#8C7466] focus:ring-2 focus:ring-[#C9AD98]/30"
-          />
-          <p className="mt-1 text-right text-[10px] text-[#6B6B6B]">{notes.length}/4000</p>
-        </div>
-
-        <fieldset>
-          <legend className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">Learning themes, up to 5</legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {CLIENT_STRATEGY_THEME_OPTIONS.map((theme) => {
-              const checked = themes.includes(theme.key);
+        <fieldset className="grid gap-2">
+          <legend className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">Status</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {STATUS_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const selected = status === option.value;
               return (
-                <label key={theme.key} className="flex cursor-pointer items-center gap-2 rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] text-[#142334]">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!checked && themes.length >= 5}
-                    onChange={() => toggleTheme(theme.key)}
-                    className="h-4 w-4 accent-[#466B4D]"
-                  />
-                  {theme.label}
-                </label>
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => { setStatus(option.value); setMessage(''); }}
+                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border px-3 text-[11px] font-bold uppercase tracking-[0.1em] transition ${
+                    selected
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#D8C8BB] bg-white text-[#142334] hover:border-[#8C7466]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {option.label}
+                </button>
               );
             })}
           </div>
         </fieldset>
 
+        <label htmlFor={`checkpoint-notes-${checkpoint.id}`} className="grid gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">Notes</span>
+          <AutoGrowTextarea
+            id={`checkpoint-notes-${checkpoint.id}`}
+            value={notes}
+            maxLength={4000}
+            onChange={(event) => { setNotes(event.target.value); setMessage(''); }}
+            placeholder="What was followed up, what changed, and what—if anything—needs attention?"
+            className="min-h-32 w-full rounded-[8px] border border-[#D8C8BB] bg-[#FBFAF8] px-4 py-3 text-[15px] leading-relaxed text-[#142334] outline-none transition focus:border-[#142334] focus:ring-2 focus:ring-[#C9AD98]/30"
+          />
+          <span className="text-right text-[11px] text-[#6B6B6B]">{notes.length}/4000</span>
+        </label>
+
         {error && <p role="alert" className="text-[12px] font-semibold text-[#7A2F22]">{error}</p>}
         {message && <p role="status" className="inline-flex items-center gap-2 text-[12px] font-semibold text-[#466B4D]"><CheckCircle2 className="h-4 w-4" />{message}</p>}
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => void save('skipped')}
-            className="h-10 rounded-[8px] border border-[#D8C8BB] px-4 text-[10px] font-bold uppercase tracking-[0.11em] text-[#6B6B6B] disabled:opacity-50"
-          >
-            Mark skipped
-          </button>
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => void save('completed')}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[#142334] px-4 text-[10px] font-bold uppercase tracking-[0.11em] text-white transition hover:bg-[#466B4D] disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {checkpoint.status === 'completed' ? 'Update outcome' : 'Save outcome'}
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={isSaving || !dueDate}
+          onClick={() => void save()}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] bg-[#142334] px-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#466B4D] disabled:cursor-not-allowed disabled:opacity-45 sm:justify-self-end"
+        >
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {isSaving ? 'Saving...' : 'Save follow-up'}
+        </button>
       </div>
     </article>
   );

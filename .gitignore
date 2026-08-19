@@ -12,3 +12,10 @@ tsconfig.tsbuildinfo
 /handy-arrows/
 test-results/
 scratch/
+
+# Local scratch: page renders and build scripts for PDF assembly
+tmp/
+# Rendered PDF output, regenerated from the docs/ sources
+output/
+# Supabase CLI machine-local state
+supabase/.temp/

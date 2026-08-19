@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getManualClientIntakeFields,
-  manualClientRequiresCv,
   normalizeManualClientEngagement,
 } from '../lib/manual-client-engagement.ts';
 
@@ -34,18 +33,42 @@ const cvRevamp = {
   ],
 };
 
+const validCareerClarityIntake = {
+  cvNoted: 'Noted',
+  currentRole: 'Operations coordinator considering a move.',
+  clarityQuestion: 'Whether to target operations or project roles.',
+  previousAttempts: 'Applied broadly without tailoring the CV.',
+  stuckScale: '4',
+  skillStrength: 'Colleagues come to me to untangle broken processes.',
+};
+
 test('adds service-aware manual questions for the two strategy services', () => {
+  // These mirror the live Cal.com booking questions, so a manual engagement collects the same
+  // answers the AI tools expect to read later.
   assert.deepEqual(
     getManualClientIntakeFields(careerClarity).map((field) => field.name),
-    ['currentRole', 'desiredOutcome', 'biggestBlocker', 'decisionNeeded'],
+    ['cvNoted', 'currentRole', 'clarityQuestion', 'previousAttempts', 'stuckScale', 'skillStrength', 'additionalInfo'],
   );
   assert.deepEqual(
     getManualClientIntakeFields(glowUp).map((field) => field.name),
-    ['currentRole', 'targetRole', 'linkedinUrl', 'interviewHistory', 'biggestChallenge', 'thirtyDayOutcome'],
+    ['cvNoted', 'linkedinUrl', 'targetRole', 'interviewHistory', 'jobSearchAttempts', 'biggestChallenge', 'additionalInfo'],
   );
-  assert.equal(manualClientRequiresCv(careerClarity), true);
-  assert.equal(manualClientRequiresCv(glowUp), true);
-  assert.equal(manualClientRequiresCv(linkedIn), false);
+});
+
+test('the stuck scale is a 1 to 5 radio, matching the booking form', () => {
+  const stuckScale = getManualClientIntakeFields(careerClarity).find((field) => field.name === 'stuckScale');
+  assert.ok(stuckScale, 'career clarity must ask how stuck the client feels');
+  assert.equal(stuckScale.type, 'radio');
+  assert.deepEqual(stuckScale.options, ['1', '2', '3', '4', '5']);
+});
+
+test('only the closing catch-all question is optional', () => {
+  for (const service of [careerClarity, glowUp]) {
+    const optional = getManualClientIntakeFields(service)
+      .filter((field) => !field.required)
+      .map((field) => field.name);
+    assert.ok(optional.includes('additionalInfo'), `${service.slug} should not force the catch-all answer`);
+  }
 });
 
 test('reuses existing service questions without duplicating identity fields', () => {
@@ -68,10 +91,7 @@ test('normalizes a verified manual strategy engagement', () => {
     paymentVerified: true,
     isTest: 'true',
     intake: {
-      currentRole: 'Operations coordinator considering a move.',
-      desiredOutcome: 'Choose a realistic next direction.',
-      biggestBlocker: 'Unsure how experience transfers.',
-      decisionNeeded: 'Whether to target operations or project roles.',
+      ...validCareerClarityIntake,
       ignored: 'must not be stored',
     },
   }, careerClarity);
@@ -92,20 +112,16 @@ test('rejects unverified payments and incomplete questionnaire answers', () => {
     paymentMethod: 'cash',
     amount: 800,
     paidAt: '2026-07-18T10:00:00+02:00',
-    intake: {
-      currentRole: 'Operations coordinator.',
-      desiredOutcome: 'Choose a direction.',
-      biggestBlocker: 'Positioning.',
-      decisionNeeded: 'Which role family to target.',
-    },
+    intake: { ...validCareerClarityIntake },
   };
 
   assert.throws(
     () => normalizeManualClientEngagement(base, careerClarity),
     /Confirm that the payment has been verified/,
   );
+  const [firstRequired] = getManualClientIntakeFields(careerClarity).filter((field) => field.required);
   assert.throws(
     () => normalizeManualClientEngagement({ ...base, paymentVerified: true, intake: {} }, careerClarity),
-    /current role and career situation.*required/i,
+    (error) => error.message.includes(firstRequired.label) && error.message.includes('is required'),
   );
 });
