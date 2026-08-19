@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Loader2, MailCheck, Send, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, FileCheck2, Loader2, MailCheck, Send, ShieldCheck } from 'lucide-react';
 import ClientStrategyCheckpointCard from '@/components/career-tools/ClientStrategyCheckpointCard';
 import { buildDashboardAuthUrl } from '@/lib/dashboard-auth-url';
 import type {
@@ -10,13 +10,11 @@ import type {
 } from '@/lib/client-strategy-follow-up-store';
 import type { ClientStrategyPlanRecord } from '@/lib/client-strategy-plan';
 
-type ThemeReportItem = { key: string; label: string; clientCount: number };
 type FollowUpResponse = {
   recipient?: { email: string; name: string } | null;
   delivery?: ClientStrategyPlanDelivery | null;
   checkpoints?: ClientStrategyCheckpoint[];
   subject?: string;
-  themeReport?: ThemeReportItem[];
   error?: string;
 };
 
@@ -47,6 +45,8 @@ export default function ClientStrategyFollowUpPanel({
   const [data, setData] = useState<FollowUpResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [manualSentDate, setManualSentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -79,7 +79,7 @@ export default function ClientStrategyFollowUpPanel({
   async function sendPlan() {
     if (isTest || !data?.recipient?.email || isSending) return;
     const confirmed = window.confirm(
-      `Send the approved plan to ${data.recipient.name} at ${data.recipient.email}? This will create the follow-up checkpoints.`,
+      `Send the approved plan to ${data.recipient.name} at ${data.recipient.email}? This will create the agreed follow-up contacts.`,
     );
     if (!confirmed) return;
 
@@ -95,7 +95,7 @@ export default function ClientStrategyFollowUpPanel({
       const result = await response.json().catch(() => null) as FollowUpResponse | null;
       if (!response.ok) throw new Error(result?.error || 'Could not send the approved plan.');
       setData(result);
-      setMessage('Brevo accepted the approved plan and the follow-up schedule is active.');
+      setMessage('Brevo accepted the approved plan. Review and adjust the follow-up dates below.');
       onDelivered();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not send the approved plan.');
@@ -104,11 +104,39 @@ export default function ClientStrategyFollowUpPanel({
     }
   }
 
-  function checkpointSaved(checkpoint: ClientStrategyCheckpoint, themeReport: ThemeReportItem[]) {
+  async function recordManualDelivery() {
+    if (!data?.recipient?.email || isRecording) return;
+    if (!window.confirm(`Confirm that you emailed the approved client pack to ${data.recipient.email}? This starts the follow-up schedule.`)) return;
+    setIsRecording(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key: adminKey,
+          confirm: true,
+          mode: 'manual_email',
+          deliveredAt: new Date(`${manualSentDate}T12:00:00+02:00`).toISOString(),
+        }),
+      });
+      const result = await response.json().catch(() => null) as FollowUpResponse | null;
+      if (!response.ok) throw new Error(result?.error || 'Could not record the manual email.');
+      setData(result);
+      setMessage('Manual email recorded. Review and agree the follow-up dates below.');
+      onDelivered();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not record the manual email.');
+    } finally {
+      setIsRecording(false);
+    }
+  }
+
+  function checkpointSaved(checkpoint: ClientStrategyCheckpoint) {
     setData((current) => current ? {
       ...current,
       checkpoints: (current.checkpoints || []).map((item) => item.id === checkpoint.id ? checkpoint : item),
-      themeReport,
     } : current);
   }
 
@@ -118,6 +146,8 @@ export default function ClientStrategyFollowUpPanel({
 
   const delivery = data?.delivery;
   const canSend = !isTest && plan.status === 'approved' && delivery?.status !== 'sent' && delivery?.status !== 'sending';
+  const currentCheckpoints = (data?.checkpoints || []).filter((checkpoint) => !checkpoint.isLegacy);
+  const visibleCheckpoints = currentCheckpoints.length ? currentCheckpoints : (data?.checkpoints || []);
 
   return (
     <section className="mt-5 border-t border-[#E4D8CB] pt-6" aria-labelledby={`delivery-title-${plan.id}`}>
@@ -141,21 +171,36 @@ export default function ClientStrategyFollowUpPanel({
           </div>
 
           {canSend && (
-            <button
-              type="button"
-              disabled={isSending || !data?.recipient?.email}
-              onClick={() => void sendPlan()}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#466B4D] px-5 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#142334] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {isSending ? 'Sending...' : delivery?.status === 'failed' ? 'Retry approved plan' : 'Send approved plan'}
-            </button>
+            <div className="grid gap-2 sm:grid-cols-[150px_auto]">
+              <label className="grid gap-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[#8C7466]">
+                Date emailed
+                <input type="date" value={manualSentDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setManualSentDate(event.target.value)} className="h-10 rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[12px] text-[#142334]" />
+              </label>
+              <button
+                type="button"
+                disabled={isRecording || !data?.recipient?.email}
+                onClick={() => void recordManualDelivery()}
+                className="inline-flex h-11 self-end items-center justify-center gap-2 rounded-[8px] bg-[#466B4D] px-4 text-[10px] font-bold uppercase tracking-[0.12em] text-white disabled:opacity-45"
+              >
+                {isRecording ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
+                Record manual email
+              </button>
+              <button
+                type="button"
+                disabled={isSending || !data?.recipient?.email}
+                onClick={() => void sendPlan()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[#466B4D] bg-white px-4 text-[9px] font-bold uppercase tracking-[0.1em] text-[#466B4D] sm:col-span-2"
+              >
+                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {isSending ? 'Sending...' : delivery?.status === 'failed' ? 'Retry through Brevo' : 'Send through Brevo instead'}
+              </button>
+            </div>
           )}
         </div>
 
         {delivery?.status === 'sent' && delivery.deliveredAt && (
           <p className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-[#466B4D]">
-            <MailCheck className="h-4 w-4" /> Sent through Brevo on {formatDateTime(delivery.deliveredAt)}
+            <MailCheck className="h-4 w-4" /> {delivery.provider === 'manual_email' ? 'Manual email recorded' : 'Sent through Brevo'} on {formatDateTime(delivery.deliveredAt)}
           </p>
         )}
         {delivery?.status === 'sending' && (
@@ -175,17 +220,19 @@ export default function ClientStrategyFollowUpPanel({
         {message && <p role="status" className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-[#466B4D]"><CheckCircle2 className="h-4 w-4" />{message}</p>}
       </div>
 
-      {(data?.checkpoints?.length || 0) > 0 && (
+      {visibleCheckpoints.length > 0 && (
         <div className="mt-6">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Progress checkpoints</p>
-              <h4 className="mt-2 font-serif text-[26px] text-[#142334]">Record what happened</h4>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Follow-up contacts</p>
+              <h4 className="mt-2 font-serif text-[30px] text-[#142334]">Agree the dates, then record the outcome</h4>
             </div>
-            <p className="hidden max-w-sm text-right text-[11px] leading-relaxed text-[#6B6B6B] md:block">Outcomes sit beside the approved plan. They never rewrite the client-facing recommendations.</p>
+            <p className="hidden max-w-sm text-right text-[12px] leading-relaxed text-[#6B6B6B] md:block">
+              The suggested window is guidance. Save the actual agreed date, then mark the contact done or not done with a short note.
+            </p>
           </div>
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            {data?.checkpoints?.map((checkpoint) => (
+            {visibleCheckpoints.map((checkpoint) => (
               <ClientStrategyCheckpointCard
                 key={`${checkpoint.id}-${checkpoint.updatedAt}`}
                 adminKey={adminKey}
@@ -198,23 +245,6 @@ export default function ClientStrategyFollowUpPanel({
           </div>
         </div>
       )}
-
-      <div className="mt-6 rounded-[8px] border border-[#E4D8CB] bg-[#FBFAF8] p-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Privacy-safe client themes</p>
-        <h4 className="mt-2 font-serif text-[24px] text-[#142334]">Patterns worth learning from</h4>
-        <p className="mt-2 max-w-2xl text-[11px] leading-relaxed text-[#6B6B6B]">A theme appears only when at least three distinct clients share it. This view contains counts only, with no client names or outcome notes.</p>
-        {(data?.themeReport?.length || 0) > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {data?.themeReport?.map((theme) => (
-              <span key={theme.key} className="rounded-full bg-[#EAF2EB] px-3 py-2 text-[11px] font-semibold text-[#466B4D]">
-                {theme.label}: {theme.clientCount} clients
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-[12px] font-semibold text-[#8C7466]">No theme has reached the three-client privacy threshold yet.</p>
-        )}
-      </div>
     </section>
   );
 }

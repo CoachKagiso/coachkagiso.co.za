@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUrl } from '@/lib/env';
+import { createSupabaseReadRetryFetch } from '@/lib/supabase-read-retry';
 
 export function createSupabaseServiceClient() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -9,6 +10,9 @@ export function createSupabaseServiceClient() {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+    },
+    global: {
+      fetch: createSupabaseReadRetryFetch(),
     },
   });
 }

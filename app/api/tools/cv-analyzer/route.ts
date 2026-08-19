@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import {
+  buildCvCoachMoveLabelUnion,
+  buildCvCoachMoveRulesPrompt,
+  isCvCoachMoveLabel,
+} from '@/lib/buying-flow';
 import { extractTextFromCvFile } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
+import { getClientCvSource, saveClientCvAnalysisReport, saveClientCvVersion } from '@/lib/client-cv-store';
+import { getClientLiveIntake } from '@/lib/client-intake-store';
+import { loadClientStrategyCvText } from '@/lib/client-strategy-cv-server';
+import { sanitizeClientStrategyIntake } from '@/lib/client-strategy-cv';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import {
+  REPORT_EMPHASIS_RULES,
+  REPORT_PLAIN_LANGUAGE_RULES,
+  renderReportRuleBlock,
+} from '@/lib/report-language-rules';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +30,6 @@ const cvGoals = [
 ] as const;
 const seniorityLevels = ['early', 'mid', 'senior', 'executive'] as const;
 const analyzerModes = ['simple', 'advanced'] as const;
-const coachMoveLabels = [
-  '48-Hour CV Review',
-  'CV Revamp',
-  'Cover Letter',
-  'LinkedIn Profile',
-  'CV + LinkedIn + Cover Letter Bundle',
-] as const;
 const MAX_CV_CHARS = 60000;
 const MAX_CONTEXT_CHARS = 16000;
 
@@ -94,6 +101,11 @@ ANALYSIS STANDARD
 - If impact evidence is missing, name it as a gap and show how to rewrite without inventing facts.
 - Keep feedback direct, practical, and useful for a coaching session.
 
+${renderReportRuleBlock('PLAIN LANGUAGE STANDARD', REPORT_PLAIN_LANGUAGE_RULES)}
+- Worked example: "the CV is unlikely to survive an ATS (the software that filters CVs before a person reads them)".
+
+${renderReportRuleBlock('EMPHASIS', REPORT_EMPHASIS_RULES)}
+
 SENSITIVE DATA RULES
 If the CV contains any of the following, flag it immediately in the first atsNotes entry and advise removal:
 - RSA ID number (13-digit number, or any national ID)
@@ -158,7 +170,7 @@ ATS/Readability:
 - 0-24: Likely unparseable by ATS. Heavy design, image-based, or severely non-standard formatting.
 
 OUTPUT RULES
-Respond only with valid JSON. No markdown. No code fences. Use this exact shape:
+Respond only with valid JSON. No code fences. The only formatting mark permitted inside a string value is the bold mark described in EMPHASIS. Use this exact shape:
 All score values must be integers from 0 to 100. Do not use a 1-10 scale.
 {
   "snapshot": "2-3 sentence high-level read of the CV's current positioning.",
@@ -204,7 +216,7 @@ All score values must be integers from 0 to 100. Do not use a 1-10 scale.
     }
   ],
   "recommendedCoachMove": {
-    "label": "Must be exactly one of: '48-Hour CV Review' | 'CV Revamp' | 'Cover Letter' | 'LinkedIn Profile' | 'CV + LinkedIn + Cover Letter Bundle'",
+    "label": "Must be exactly one of: ${buildCvCoachMoveLabelUnion()}",
     "reason": "Why this is the right service for this person's situation."
   }
 }
@@ -218,13 +230,9 @@ REWRITE SAMPLE RULES:
 - The "after" field must only use facts already in the CV. Use [brackets] for numbers the person needs to fill in.
 
 RECOMMENDED COACH MOVE RULES:
-You MUST choose exactly one of these five real Coach Kagiso services:
-1. "48-Hour CV Review" (R150) - Choose this when the CV is mostly okay but needs a professional eye to identify specific fixes. Best for people close to applying.
-2. "CV Revamp" (R400) - Choose this when the CV needs a full rewrite. Best for career pivots, outdated formats, or people who have been applying without results.
-3. "Cover Letter" (R150) - Choose this when the CV is solid but the person needs a tailored letter for a specific application.
-4. "LinkedIn Profile" (R350) - Choose this when the CV is strong but the online presence does not match or support it.
-5. "CV + LinkedIn + Cover Letter Bundle" (R750) - Choose this when the person needs all three: full CV rewrite, LinkedIn alignment, and a cover letter.
-Do NOT invent or recommend services that are not in this list. Do NOT recommend "coaching," "consulting," "discovery calls," or "mentoring."
+You MUST choose exactly one of these real Coach Kagiso services, using the label exactly as written:
+${buildCvCoachMoveRulesPrompt()}
+Do NOT invent or recommend services that are not in this list. Do NOT invent prices. Do NOT recommend "coaching," "consulting," "discovery calls," or "mentoring."
 `.trim();
 }
 
@@ -235,6 +243,7 @@ function buildCvAnalyzerUserPrompt({
   contextNotes,
   goal,
   seniority,
+  intakeData,
 }: {
   analysisMode: AnalyzerMode;
   cvText: string;
@@ -242,6 +251,7 @@ function buildCvAnalyzerUserPrompt({
   contextNotes: string;
   goal: CvGoalContext;
   seniority: SeniorityContext;
+  intakeData: Record<string, unknown> | null;
 }) {
   const goalLabel = goal === 'auto_infer' ? 'Auto-infer from CV' : goal;
   const seniorityLabel = seniority === 'auto_infer' ? 'Auto-infer from CV' : seniority;
@@ -254,6 +264,7 @@ function buildCvAnalyzerUserPrompt({
     targetRole ? `Target role or job description:\n${targetRole}` : 'Target role or job description: Not provided',
     contextNotes ? `Kagiso context notes:\n${contextNotes}` : 'Kagiso context notes: Not provided',
     `</analysis_context>`,
+    intakeData ? `<client_intake>\n${JSON.stringify(intakeData)}\n</client_intake>` : '',
     '',
     `<cv_text>`,
     cvText,
@@ -292,7 +303,7 @@ function normalizeAnalyzerResult(value: unknown) {
     interviewAngles: stringList(record.interviewAngles, 3),
     nextActions: objectList(record.nextActions, 3, { title: '', detail: '' }),
     recommendedCoachMove: {
-      label: includesValue(coachMoveLabels, compactString(recommendedCoachMove.label))
+      label: isCvCoachMoveLabel(compactString(recommendedCoachMove.label))
         ? compactString(recommendedCoachMove.label)
         : '',
       reason: compactString(recommendedCoachMove.reason),
@@ -310,6 +321,7 @@ export async function POST(request: Request) {
   let rawGoal = '';
   let rawSeniority = '';
   let cvFile: File | null = null;
+  let paymentId = '';
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -321,6 +333,7 @@ export async function POST(request: Request) {
       rawAnalysisMode = String(formData.get('analysisMode') || 'simple');
       rawGoal = String(formData.get('goal') || '');
       rawSeniority = String(formData.get('seniority') || '');
+      paymentId = compactString(formData.get('paymentId'));
       const uploadedFile = formData.get('cvFile');
       cvFile = uploadedFile instanceof File ? uploadedFile : null;
     } else {
@@ -332,6 +345,7 @@ export async function POST(request: Request) {
       rawAnalysisMode = String(body?.analysisMode || 'simple');
       rawGoal = String(body?.goal || '');
       rawSeniority = String(body?.seniority || '');
+      paymentId = compactString(body?.paymentId);
     }
   } catch {
     return NextResponse.json({ error: 'Could not read CV analyzer input.' }, { status: 400 });
@@ -356,8 +370,44 @@ export async function POST(request: Request) {
     ? rawSeniority
     : 'auto_infer';
 
+  let intakeData: Record<string, unknown> | null = null;
+  let clientCvPath: string | null = null;
+  let clientCvFileName: string | null = null;
+
+  if (paymentId) {
+    try {
+      const source = await getClientCvSource(paymentId);
+      if (source) {
+        clientCvPath = source.storagePath;
+        clientCvFileName = source.fileName;
+      }
+
+      const liveIntake = await getClientLiveIntake(paymentId);
+      intakeData = liveIntake.hasIntake
+        ? sanitizeClientStrategyIntake(liveIntake.formData)
+        : null;
+
+      if (!cvFile && !cvText.trim() && source) {
+        const loaded = await loadClientStrategyCvText(source);
+        if (loaded.included) {
+          cvText = loaded.text;
+        } else {
+          return NextResponse.json({ error: loaded.issue || 'The saved CV could not be read.' }, { status: 400 });
+        }
+      }
+    } catch (error) {
+      console.error('Client CV source load failed:', error instanceof Error ? error.message : 'unknown error');
+      return NextResponse.json({ error: 'Could not load the selected client context or CV.' }, { status: 400 });
+    }
+  }
+
   if (cvFile) {
     try {
+      if (paymentId) {
+        const saved = await saveClientCvVersion({ paymentId, file: cvFile, source: 'analyzer' });
+        clientCvPath = saved.source.storagePath;
+        clientCvFileName = saved.source.fileName;
+      }
       cvText = await extractTextFromCvFile(cvFile);
     } catch (error) {
       return NextResponse.json(
@@ -401,13 +451,14 @@ export async function POST(request: Request) {
               contextNotes,
               goal: resolvedGoal,
               seniority: resolvedSeniority,
+              intakeData,
             }),
           },
         ],
         max_tokens: 4096,
         temperature: 0.45,
         response_format: { type: 'json_object' },
-      })),
+      }, { zeroRetention: true })),
     });
   } catch (error) {
     console.error(`${runtime.provider} CV analyzer network error:`, error);
@@ -436,7 +487,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The analyzer returned an incomplete report. Try again.' }, { status: 500 });
     }
 
-    return NextResponse.json({ result });
+    let savedReport: { id: string; createdAt: string } | null = null;
+    if (paymentId) {
+      let report;
+      try {
+        report = await saveClientCvAnalysisReport({
+          paymentId,
+          report: result,
+          analysisMode,
+          targetRole,
+          cvFileName: clientCvFileName,
+          cvPath: clientCvPath,
+        });
+      } catch (error) {
+        console.error('CV analyzer report save failed:', error instanceof Error ? error.message : 'unknown error');
+        return NextResponse.json({ error: 'The analysis completed, but the report could not be saved.' }, { status: 500 });
+      }
+      savedReport = { id: report.id, createdAt: report.created_at };
+    }
+
+    return NextResponse.json({ result, savedReport });
   } catch (error) {
     console.error('CV analyzer parse error:', error);
     return NextResponse.json({ error: 'AI service returned an unreadable report. Try again.' }, { status: 500 });

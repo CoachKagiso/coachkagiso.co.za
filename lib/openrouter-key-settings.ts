@@ -16,7 +16,12 @@ export function mergeOpenRouterKeyForSave(currentValue: unknown, nextValue: unkn
   const next = asConfigRecord(nextValue);
   const submittedKey = typeof next.openrouter_api_key === 'string' ? next.openrouter_api_key.trim() : '';
   const savedKey = typeof current.openrouter_api_key === 'string' ? current.openrouter_api_key.trim() : '';
-  const { openrouter_api_key_configured: _configured, ...persistedNext } = next;
+  // Both *_configured flags are derived server-side for display. Never persist them.
+  const {
+    openrouter_api_key_configured: _configured,
+    zai_api_key_configured: _zaiConfigured,
+    ...persistedNext
+  } = next;
 
   return {
     ...persistedNext,

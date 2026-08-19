@@ -48,75 +48,109 @@ export type ManualClientServiceDefinition = {
 const bookingIntakeFields: Record<'career-clarity' | 'glow-up-vip', IntakeField[]> = {
   'career-clarity': [
     {
+      name: 'cvNoted',
+      label:
+        'Please email your CV to hello@coachkagiso.co.za after booking — subject line: Your Name — Career Clarity (type "Noted" to confirm)',
+      type: 'text',
+      required: true,
+      maxLength: 100,
+      placeholder: 'Noted',
+    },
+    {
       name: 'currentRole',
-      label: 'What is their current role and career situation?',
+      label: "What's your current role and how long have you been in it?",
       type: 'textarea',
       required: true,
       maxLength: 1200,
     },
     {
-      name: 'desiredOutcome',
-      label: 'What would they like to leave the session clear about?',
+      name: 'clarityQuestion',
+      label: "What's the one thing you want clarity on from this session?",
       type: 'textarea',
       required: true,
       maxLength: 1200,
     },
     {
-      name: 'biggestBlocker',
-      label: 'What feels most stuck or uncertain right now?',
+      name: 'previousAttempts',
+      label: "What have you already tried that hasn't worked?",
       type: 'textarea',
       required: true,
       maxLength: 1200,
     },
     {
-      name: 'decisionNeeded',
-      label: 'What decision or next move are they trying to make?',
+      name: 'stuckScale',
+      label:
+        'On a scale of 1–5, how stuck do you feel right now? (1 = general sense of direction, 5 = completely stuck)',
+      type: 'radio',
+      required: true,
+      options: ['1', '2', '3', '4', '5'],
+    },
+    {
+      name: 'skillStrength',
+      label:
+        "What's one thing you're genuinely good at, or that people come to you for, at work?",
       type: 'textarea',
       required: true,
       maxLength: 1200,
+    },
+    {
+      name: 'additionalInfo',
+      label: 'Anything else I should know before we speak?',
+      type: 'textarea',
+      maxLength: 2000,
     },
   ],
   'glow-up-vip': [
     {
-      name: 'currentRole',
-      label: 'What is their current role and career situation?',
-      type: 'textarea',
+      name: 'cvNoted',
+      label:
+        'Please email your CV to hello@coachkagiso.co.za after booking — subject line: Your Name — Glow Up VIP (type "Noted" to confirm)',
+      type: 'text',
       required: true,
-      maxLength: 1200,
-    },
-    {
-      name: 'targetRole',
-      label: 'What role, industry, or career move are they targeting?',
-      type: 'textarea',
-      required: true,
-      maxLength: 1200,
+      maxLength: 100,
+      placeholder: 'Noted',
     },
     {
       name: 'linkedinUrl',
-      label: 'LinkedIn profile URL',
+      label: 'What is your LinkedIn profile URL? (optional)',
       type: 'url',
       maxLength: 240,
     },
     {
+      name: 'targetRole',
+      label: 'What role or industry are you targeting?',
+      type: 'textarea',
+      required: true,
+      maxLength: 1200,
+    },
+    {
       name: 'interviewHistory',
-      label: 'What has their recent application or interview experience been?',
+      label:
+        'How many interviews have you had in the last 6 months, and what feedback have you received?',
+      type: 'textarea',
+      required: true,
+      maxLength: 1600,
+    },
+    {
+      name: 'jobSearchAttempts',
+      label:
+        "What have you tried in your job search so far (networking, applications, referrals), and what's worked or not worked?",
       type: 'textarea',
       required: true,
       maxLength: 1600,
     },
     {
       name: 'biggestChallenge',
-      label: 'What is the biggest challenge they want support with?',
+      label: 'What is your biggest career blocker right now?',
       type: 'textarea',
       required: true,
       maxLength: 1200,
     },
     {
-      name: 'thirtyDayOutcome',
-      label: 'What should be different by the end of the 30 days?',
+      name: 'additionalInfo',
+      label: 'Anything else I should know before we start?',
       type: 'textarea',
-      required: true,
-      maxLength: 1200,
+      maxLength: 2000,
     },
   ],
 };
@@ -156,14 +190,6 @@ export function getManualClientIntakeFields(service: ManualClientServiceDefiniti
   }
 
   return service.fields.filter((field) => !IDENTITY_FIELD_NAMES.has(field.name));
-}
-
-export function manualClientRequiresCv(service: ManualClientServiceDefinition) {
-  return Boolean(
-    service.requiresCvUpload ||
-      service.slug === 'career-clarity' ||
-      service.slug === 'glow-up-vip',
-  );
 }
 
 export function normalizeManualClientEngagement(

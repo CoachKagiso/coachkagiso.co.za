@@ -5,6 +5,7 @@ import { getCanonicalDiagnosticArchetypeName } from '@/lib/diagnostic-archetype-
 import { getContactEmail } from '@/lib/env';
 import { getSastDateKey } from '@/lib/follow-up-utils';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { DIAGNOSTIC_CONTEXT_CONSENT_VERSION } from '@/lib/client-diagnostic-context';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E'] as const;
 const QUESTION_COUNT = 10;
@@ -28,6 +29,8 @@ type DiagnosticPayload = {
     service?: string;
     href?: string;
   };
+  coachingContextConsent?: boolean;
+  coachingContextConsentVersion?: string | null;
 };
 
 function isValidEmail(email: string) {
@@ -226,6 +229,13 @@ export async function POST(request: Request) {
       ...archetype,
       name: archetypeName,
     };
+    const coachingContextConsent = payload.coachingContextConsent === true;
+    const coachingContextConsentVersion = coachingContextConsent
+      ? String(payload.coachingContextConsentVersion || '')
+      : null;
+    if (coachingContextConsent && coachingContextConsentVersion !== DIAGNOSTIC_CONTEXT_CONSENT_VERSION) {
+      return NextResponse.json({ error: 'The coaching-context consent version is invalid.' }, { status: 400 });
+    }
 
     const normalisedScore = OPTION_KEYS.reduce<Record<OptionKey, number>>(
       (acc, key) => {
@@ -245,6 +255,9 @@ export async function POST(request: Request) {
       archetype_name: archetypeName,
       archetype_payload: canonicalArchetype,
       next_follow_up_at: getSastDateKey(),
+      coaching_context_consent: coachingContextConsent,
+      coaching_context_consent_at: coachingContextConsent ? new Date().toISOString() : null,
+      coaching_context_consent_version: coachingContextConsentVersion,
     };
 
     const { error } = await supabase.from('diagnostic_submissions').insert(submissionPayload);

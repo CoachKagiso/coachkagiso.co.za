@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callToolAi, extractToolJsonObject } from '@/lib/content/tools-ai';
+import { callToolAi, resolveToolAiRuntime, extractToolJsonObject } from '@/lib/content/tools-ai';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
 
-const AI_API_KEY_ENV = 'ZAI_API_KEY';
 const contentPillars = ['career_growth', 'leadership', 'personal_brand', 'mentorship'] as const;
 const painPointSources = ['inbound', 'manual'] as const;
 const sessionStrategies = ['four_pillar_integrated', 'pillar_deep_dive', 'custom_mix'] as const;
@@ -876,9 +875,9 @@ function ensureFollowUpAssets(result: FollowUpAssetsResult, stageOne: StageOnePl
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env[AI_API_KEY_ENV];
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI service not configured. Add ZAI_API_KEY to the server environment variables.' }, { status: 503 });
+  const runtime = await resolveToolAiRuntime();
+  if (!runtime) {
+    return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
   }
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
@@ -899,7 +898,7 @@ export async function POST(req: NextRequest) {
   try {
     const systemPrompt = buildSessionPlannerSystemPrompt();
     const stageOneText = await callToolAi({
-      apiKey,
+      runtime,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: buildStageOnePrompt(input) },
@@ -912,7 +911,7 @@ export async function POST(req: NextRequest) {
 
     const [runSheetSettled, speakerNotesSettled, followUpAssetsSettled] = await Promise.allSettled([
       callToolAi({
-        apiKey,
+        runtime,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: buildRunSheetPrompt(input, stageOne) },
@@ -922,7 +921,7 @@ export async function POST(req: NextRequest) {
         needsVision: false,
       }),
       callToolAi({
-        apiKey,
+        runtime,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: buildSpeakerNotesPrompt(input, stageOne) },
@@ -932,7 +931,7 @@ export async function POST(req: NextRequest) {
         needsVision: false,
       }),
       callToolAi({
-        apiKey,
+        runtime,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: buildFollowUpAssetsPrompt(input, stageOne) },

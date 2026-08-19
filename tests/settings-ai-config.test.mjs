@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave } from '../lib/openrouter-key-settings.ts';
+import { SECONDARY_MODEL_TOOLS } from '../lib/zai-pinned-tools.ts';
 
 const savedConfig = {
   primary_model: 'z-ai/glm-5.2',
@@ -35,4 +36,22 @@ test('replaces the saved OpenRouter key only when a new key is supplied', () => 
 test('detects that a saved OpenRouter key exists without exposing it', () => {
   assert.equal(hasConfiguredOpenRouterKey(savedConfig), true);
   assert.equal(hasConfiguredOpenRouterKey({ openrouter_api_key: '' }), false);
+});
+
+test('never persists the server-derived Z.ai configured flag', () => {
+  const saved = mergeOpenRouterKeyForSave(savedConfig, {
+    ...savedConfig,
+    zai_api_key_configured: true,
+  });
+
+  assert.equal('zai_api_key_configured' in saved, false);
+});
+
+test('every secondary-model tool is listed with a stable id and a dashboard location', () => {
+  assert.equal(SECONDARY_MODEL_TOOLS.length, 6);
+  assert.equal(new Set(SECONDARY_MODEL_TOOLS.map((tool) => tool.id)).size, 6);
+  for (const tool of SECONDARY_MODEL_TOOLS) {
+    assert.ok(tool.label.trim(), `${tool.id} needs a label`);
+    assert.ok(tool.where.trim(), `${tool.id} needs a dashboard location`);
+  }
 });

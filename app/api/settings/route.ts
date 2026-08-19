@@ -15,7 +15,9 @@ export async function GET(request: Request) {
 
   const supabase = createSupabaseServiceClient();
   const settings = await loadSettings(supabase);
-  return NextResponse.json({ settings: stripSecretsFromSettings(settings) });
+  return NextResponse.json({
+    settings: stripSecretsFromSettings(settings),
+  });
 }
 
 export async function POST(request: Request) {

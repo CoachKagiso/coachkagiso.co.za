@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
 import { isContentPillar } from '@/lib/content-studio';
+import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 
 export const dynamic = 'force-dynamic';
 
-const AI_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
-const AI_MODEL = 'glm-5.2';
 
 const RESEARCH_PROCESSING_PROMPT = `
 You are a research analyst for Kagiso Shabangu, a South African Career Development and Personal Brand Coach.
@@ -68,9 +67,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = process.env.ZAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI service not configured.' }, { status: 503 });
+  const runtime = await resolveAiRuntimeConfig({ simpleMode: true });
+  if (!runtime) {
+    return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
   }
 
   const title = String(body?.title ?? '').trim();
@@ -118,14 +117,11 @@ export async function POST(request: Request) {
   let aiProcessed = false;
 
   try {
-    const aiResponse = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    const aiResponse = await fetch(`${runtime.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
+      headers: runtime.headers,
+      body: JSON.stringify(buildAiRequestBody(runtime, {
+        model: runtime.model,
         messages: [
           { role: 'system', content: RESEARCH_PROCESSING_PROMPT },
           {
@@ -136,8 +132,7 @@ export async function POST(request: Request) {
         max_tokens: 900,
         temperature: 0.2,
         response_format: { type: 'json_object' },
-        thinking: { type: 'disabled' },
-      }),
+      })),
     });
 
     if (aiResponse.ok) {
