@@ -848,7 +848,7 @@ export default function LeadEmailModal({
                   )}
                   {isMasterclassBookingsOpenTemplate(selectedTemplateId) && (
                     <p className="rounded-[8px] border border-[#F59E0B] bg-[#FEF3C7] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#92400E]">
-                      This is the manual trigger email. Only send when July bookings are confirmed live.
+                      This is the manual trigger email for the waitlist. Only send when you want to update the list on the paused Masterclass.
                     </p>
                   )}
 

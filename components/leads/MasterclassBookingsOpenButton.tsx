@@ -19,7 +19,7 @@ export default function MasterclassBookingsOpenButton({
     if (eligibleCount <= 0 || state === 'sending') return;
 
     const confirmed = window.confirm(
-      `Send the bookings-open email to ${eligibleCount} masterclass waitlist lead${eligibleCount === 1 ? '' : 's'}?`,
+      `Send the waitlist update email to ${eligibleCount} masterclass waitlist lead${eligibleCount === 1 ? '' : 's'}?`,
     );
     if (!confirmed) return;
 
@@ -33,15 +33,15 @@ export default function MasterclassBookingsOpenButton({
         body: JSON.stringify({ key: adminKey }),
       });
       const data = (await response.json().catch(() => ({}))) as { sentCount?: number; error?: string };
-      if (!response.ok) throw new Error(data.error || 'Could not send bookings-open emails.');
+      if (!response.ok) throw new Error(data.error || 'Could not send waitlist update emails.');
 
       setState('sent');
-      setMessage(`Sent ${data.sentCount || 0} bookings-open email${data.sentCount === 1 ? '' : 's'}.`);
+      setMessage(`Sent ${data.sentCount || 0} waitlist update email${data.sentCount === 1 ? '' : 's'}.`);
       router.refresh();
       window.setTimeout(() => setState('idle'), 2500);
     } catch (error) {
       setState('error');
-      setMessage(error instanceof Error ? error.message : 'Could not send bookings-open emails.');
+      setMessage(error instanceof Error ? error.message : 'Could not send waitlist update emails.');
     }
   }
 
@@ -54,7 +54,7 @@ export default function MasterclassBookingsOpenButton({
         className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] bg-[#142334] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334] disabled:cursor-not-allowed disabled:opacity-55"
       >
         {state === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        Send bookings open
+        Send waitlist update
       </button>
       <span className={`text-[12px] leading-relaxed ${state === 'error' ? 'text-[#A24E37]' : 'text-[#6B6B6B]'}`}>
         {message || `${eligibleCount} eligible waitlist lead${eligibleCount === 1 ? '' : 's'}`}

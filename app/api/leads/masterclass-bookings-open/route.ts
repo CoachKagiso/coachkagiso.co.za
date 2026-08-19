@@ -40,14 +40,14 @@ function plainTextToEmailHtml(value: string) {
   return `<div style="font-family:Arial,sans-serif;font-size:15px;color:#142334;line-height:1.7;max-width:560px;">${paragraphs}</div>`;
 }
 
-function injectTemplate(value: string, firstName: string) {
+function injectTemplate(value: string, firstName: string, bookingKey: string) {
   return value
     .split('{{firstName}}')
     .join(firstName)
     .split('[BOOKING LINK]')
-    .join(getBookingLink('Saturday Masterclass'))
+    .join(getBookingLink(bookingKey))
     .split('[REGISTRATION PAGE LINK]')
-    .join(getBookingLink('Saturday Masterclass'));
+    .join(getBookingLink(bookingKey));
 }
 
 function isMissingSourceColumn(message?: string) {
@@ -90,8 +90,8 @@ export async function POST(request: Request) {
 
   for (const lead of leads) {
     const firstName = getFirstName(lead.first_name);
-    const subject = injectTemplate(template.subject, firstName);
-    const text = injectTemplate(template.body, firstName);
+    const subject = injectTemplate(template.subject, firstName, template.bookingKey);
+    const text = injectTemplate(template.body, firstName, template.bookingKey);
 
     const brevoResult = await sendTransactionalEmail({
       to: [{ email: lead.email, name: lead.first_name || lead.email }],
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
         serviceInterest:
           typeof lead.archetype_payload === 'object' && lead.archetype_payload && 'service' in lead.archetype_payload
             ? String(lead.archetype_payload.service || '')
-            : 'Saturday Masterclass',
+            : template.recommendedService,
         sentAt,
         origin: 'dashboard',
         externalProvider: brevoResult?.messageId ? 'brevo' : null,
