@@ -42,7 +42,7 @@ Almost every defect below is a symptom of that mismatch:
 | 4 | Fidelity loss on "Open in Design Studio" | 2 | **Done** |
 | 9 | Design Studio layout shell | 2 | **Done** |
 | 10 | Carousel DNA extraction from uploaded PDF | 3 | **Done** — migration pending |
-| 8 | Remove image background | 3 | Next |
+| 8 | Remove image background | 3 | **Built** — cut-out not yet seen end to end |
 
 Tier 1 = correctness and daily relief. Tier 2 = the template/document model.
 Tier 3 = new capability.
@@ -50,6 +50,41 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Remove background (item 8)
+
+Select an image layer, cut its background out. Runs entirely in the browser via
+`@imgly/background-removal`: no API key, no per-image cost, and **the image is
+never uploaded anywhere** — only the model is downloaded. The library is
+imported lazily so the WASM bundle never loads on a normal page view.
+
+The result is registered as a **new** asset (`<name> (cut out)`) rather than
+overwriting the original, so the untouched image stays in the library and the
+swap is an ordinary undoable layer edit rather than a destructive library
+mutation. SVGs are refused with an explanation — they are already transparent
+shapes.
+
+**Two things testing forced.**
+
+Progress is reported *per resource*, not overall: each of the ~26 model chunks
+counts from 0 to its own total. Rendering that single ratio made the bar jump
+backwards — 76% then 35%. Completed chunks are counted instead, shown as
+"(N of M parts)".
+
+A chunk failed with `ERR_HTTP2_PROTOCOL_ERROR` and left the download stalled
+with **no rejection**, which would have parked the user on a frozen progress bar
+indefinitely. A watchdog now fails loudly after four minutes without progress
+and explains that completed chunks are cached, so a retry usually finishes.
+
+**Not verified: a completed cut-out.** The model download from the library's CDN
+was too slow and flaky from the dev environment to finish — chunks were taking
+36–38 seconds each. The library loads, the progress callback fires, and the
+failure paths were exercised, but the output image has not been seen. Needs one
+real run.
+
+If the CDN is slow in practice, `NEXT_PUBLIC_BG_REMOVAL_PUBLIC_PATH` switches
+the download to a self-hosted copy of `@imgly/background-removal-data` without
+a code change.
 
 ### 2026-08-20 — Carousel DNA, built on Transform (item 10)
 
