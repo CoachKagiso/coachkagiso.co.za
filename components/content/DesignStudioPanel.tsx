@@ -67,6 +67,14 @@ import {
 } from '@/lib/content/carousel-template-registry';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
+import {
+  DESIGN_TEMPLATE_LEGACY_STORAGE_KEY,
+  deleteDesignTemplateRecord,
+  loadDesignTemplates,
+  persistLocalFallbackTemplates,
+  saveDesignTemplate,
+  updateDesignTemplateRecord,
+} from '@/lib/content/design-template-client';
 
 type DesignFormat = 'social_graphic' | 'carousel' | 'presentation';
 type DesignLayerType = 'text' | 'asset' | 'shape';
@@ -419,7 +427,9 @@ const DESIGN_STORAGE_KEY = 'coach-kagiso-design-studio-v3-manifesto';
 const BRAND_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-brand-assets';
 const DELETED_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-deleted-assets';
 const LEGACY_HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
-const DESIGN_TEMPLATES_STORAGE_KEY = 'coach-kagiso-design-studio-v1-templates';
+// CHANGE O: templates now live in Supabase. The legacy key is still read once so
+// anything already saved in this browser is uploaded rather than lost.
+const DESIGN_TEMPLATES_STORAGE_KEY = DESIGN_TEMPLATE_LEGACY_STORAGE_KEY;
 const CONTENT_VAULT_COLLAPSED_STORAGE_KEY = 'coach-kagiso-design-studio-v1-content-vault-collapsed';
 const DESIGN_LAYER_CLIPBOARD_TEXT = 'Coach Kagiso Design Studio layer selection';
 export const DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY = 'coach-kagiso-design-studio-v1-pending-import';
@@ -2231,21 +2241,12 @@ export type DesignCtaTemplateSummary = {
   updatedAt: string;
 };
 
-function readStoredDesignTemplates(): DesignTemplateRecord[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(DESIGN_TEMPLATES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record));
-  } catch {
-    return [];
-  }
-}
-
-export function readDesignCtaTemplateSummaries(): DesignCtaTemplateSummary[] {
-  return readStoredDesignTemplates()
+// CHANGE O: reads through the templates API (with its localStorage fallback)
+// rather than straight from browser storage.
+export async function readDesignCtaTemplateSummaries(adminKey?: string): Promise<DesignCtaTemplateSummary[]> {
+  const result = await loadDesignTemplates(adminKey);
+  return result.templates
+    .filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record))
     .filter((record) => getDesignTemplateKind(record) === 'cta')
     .map((record) => ({
       id: record.id,
@@ -2254,10 +2255,6 @@ export function readDesignCtaTemplateSummaries(): DesignCtaTemplateSummary[] {
       height: record.height,
       updatedAt: record.updatedAt,
     }));
-}
-
-function findStoredDesignTemplateById(id: string): DesignTemplateRecord | null {
-  return readStoredDesignTemplates().find((record) => record.id === id) || null;
 }
 
 function isDesignStudioCarouselImport(value: unknown): value is DesignStudioCarouselImport {
@@ -2656,11 +2653,11 @@ function buildCustomCtaPage(
   draft: DesignStudioCarouselDraftInput,
   dimensions: { width: number; height: number },
   pageIndex: number,
+  ctaRecord: DesignTemplateRecord | null,
 ): DesignPage | null {
-  if (!draft.customCtaTemplateId) return null;
-  const ctaRecord = findStoredDesignTemplateById(draft.customCtaTemplateId);
-  const ctaPage = ctaRecord?.document.pages[0];
-  if (!ctaRecord || !ctaPage) return null;
+  if (!draft.customCtaTemplateId || !ctaRecord) return null;
+  const ctaPage = ctaRecord.document.pages[0];
+  if (!ctaPage) return null;
 
   const resized = resizeDesignCanvas(
     cloneDesignDocument({ ...ctaRecord.document, pages: [ctaPage] }),
@@ -2678,12 +2675,16 @@ function buildCustomCtaPage(
   };
 }
 
-function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftInput, templateRecord?: DesignTemplateRecord | null) {
+function createDesignDocumentFromCarouselDraft(
+  draft: DesignStudioCarouselDraftInput,
+  templateRecord?: DesignTemplateRecord | null,
+  ctaTemplateRecord?: DesignTemplateRecord | null,
+) {
   const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
   const dimensions = getCarouselExportDimensions(aspectOption);
   const template = getCarouselTemplateOption(draft.template);
   const matchingTemplate = templateRecord && templateRecord.document.pages.length > 0 ? templateRecord : null;
-  const customCtaPage = buildCustomCtaPage(draft, dimensions, draft.slides.length);
+  const customCtaPage = buildCustomCtaPage(draft, dimensions, draft.slides.length, ctaTemplateRecord || null);
 
   if (matchingTemplate) {
     const normalizedTemplateDocument = resizeDesignCanvas(
@@ -6319,12 +6320,16 @@ function DesignCanvas({
 }
 
 export default function DesignStudioPanel({
+  adminKey,
   carouselImports = [],
   textImports = [],
   vaultImports = [],
   importRequest = null,
   onImportRequestHandled,
 }: {
+  // CHANGE O: templates are a server resource now, so the panel needs the same
+  // dashboard key the rest of the studio uses.
+  adminKey?: string;
   carouselImports?: DesignStudioCarouselImport[];
   textImports?: DesignStudioTextImport[];
   vaultImports?: DesignStudioVaultImport[];
@@ -6362,6 +6367,8 @@ export default function DesignStudioPanel({
   // CHANGE M: save dialog (name + kind), and the gallery's kind filter.
   const [templateDraft, setTemplateDraft] = useState<{ name: string; kind: DesignTemplateKind } | null>(null);
   const [templateKindFilter, setTemplateKindFilter] = useState<DesignTemplateKind | 'all'>('all');
+  const [templatesUseLocalFallback, setTemplatesUseLocalFallback] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
   const [templateMessage, setTemplateMessage] = useState('');
   const [canvasZoom, setCanvasZoom] = useState(100);
@@ -6574,35 +6581,44 @@ export default function DesignStudioPanel({
     window.localStorage.setItem(DELETED_ASSETS_STORAGE_KEY, JSON.stringify(deletedAssetIds));
   }, [deletedAssetIds, deletedAssetsLoaded]);
 
+  // CHANGE O: load templates from Supabase, migrating anything still held in
+  // this browser. Falls back to localStorage if the API cannot be reached -
+  // most likely because the design_templates migration has not been applied.
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const raw = window.localStorage.getItem(DESIGN_TEMPLATES_STORAGE_KEY);
-      if (!raw) {
-        setDesignTemplatesLoaded(true);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(raw) as unknown;
-        setDesignTemplates(Array.isArray(parsed) ? parsed.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record)) : []);
-      } catch {
-        window.localStorage.removeItem(DESIGN_TEMPLATES_STORAGE_KEY);
-      } finally {
-        setDesignTemplatesLoaded(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, []);
+    let cancelled = false;
 
+    void (async () => {
+      const result = await loadDesignTemplates(adminKey);
+      if (cancelled) return;
+
+      setDesignTemplates(
+        result.templates.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record)),
+      );
+      setTemplatesUseLocalFallback(result.usedLocalFallback);
+      setDesignTemplatesLoaded(true);
+
+      if (result.usedLocalFallback) {
+        setTemplateMessage(
+          `Templates are saved in this browser only - the templates service is unreachable (${result.error}). Apply the design_templates migration to sync them.`,
+        );
+      } else if (result.migratedCount > 0) {
+        setTemplateMessage(
+          `Moved ${result.migratedCount} template${result.migratedCount === 1 ? '' : 's'} from this browser into your account. They are now available on any device.`,
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey]);
+
+  // Only the degraded path writes to localStorage now; the Supabase copy is
+  // otherwise authoritative.
   useEffect(() => {
-    if (!designTemplatesLoaded) return;
-    try {
-      window.localStorage.setItem(DESIGN_TEMPLATES_STORAGE_KEY, JSON.stringify(designTemplates));
-    } catch {
-      window.setTimeout(() => {
-        setTemplateMessage('Template storage is full. Remove an older template, then save again.');
-      }, 0);
-    }
-  }, [designTemplates, designTemplatesLoaded]);
+    if (!designTemplatesLoaded || !templatesUseLocalFallback) return;
+    persistLocalFallbackTemplates(designTemplates);
+  }, [designTemplates, designTemplatesLoaded, templatesUseLocalFallback]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -6645,6 +6661,13 @@ export default function DesignStudioPanel({
       : designTemplates.filter((template) => getDesignTemplateKind(template) === templateKindFilter)
   ), [designTemplates, templateKindFilter]);
 
+  // CHANGE O: the custom CTA template comes from the loaded set, not storage.
+  const findCtaTemplateRecord = useCallback((draft: DesignStudioCarouselDraftInput) => (
+    draft.customCtaTemplateId
+      ? designTemplates.find((template) => template.id === draft.customCtaTemplateId) || null
+      : null
+  ), [designTemplates]);
+
   const getPreferredImportedCarouselTemplateRecord = useCallback((draft: DesignStudioCarouselDraftInput) => {
     const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
     const dimensions = getCarouselExportDimensions(aspectOption);
@@ -6680,7 +6703,7 @@ export default function DesignStudioPanel({
 
   const importCarouselDraftFromRequest = useCallback((source: DesignStudioCarouselImport) => {
     const templateRecord = getPreferredImportedCarouselTemplateRecord(source.draft);
-    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord);
+    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord, findCtaTemplateRecord(source.draft));
     replaceImportedDesignDocument(
       nextDesign,
       templateRecord
@@ -7177,7 +7200,7 @@ export default function DesignStudioPanel({
   }
 
   function importCarouselDraft(source: DesignStudioCarouselImport, templateRecord = getPreferredCarouselTemplateRecord(source.draft)) {
-    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord);
+    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord, findCtaTemplateRecord(source.draft));
     replaceDesignDocument(
       nextDesign,
       templateRecord
@@ -7205,16 +7228,6 @@ export default function DesignStudioPanel({
     replaceDesignDocument(createBlankDesignDocument(design.format, design.width, design.height), 'Blank design started.');
   }
 
-  function persistDesignTemplates(records: DesignTemplateRecord[]) {
-    try {
-      window.localStorage.setItem(DESIGN_TEMPLATES_STORAGE_KEY, JSON.stringify(records));
-      return true;
-    } catch {
-      setTemplateMessage('Template storage is full. Delete an older template, then save again.');
-      return false;
-    }
-  }
-
   // CHANGE M: opens the save dialog. window.prompt could only collect a name,
   // and a template now also needs a kind.
   function openSaveTemplateDialog() {
@@ -7224,51 +7237,85 @@ export default function DesignStudioPanel({
     });
   }
 
-  function saveCurrentDesignAsTemplate(rawName: string, kind: DesignTemplateKind) {
+  async function saveCurrentDesignAsTemplate(rawName: string, kind: DesignTemplateKind) {
     const name = rawName.trim();
-    if (!name) return;
+    if (!name || templateBusy) return;
 
     const now = new Date().toISOString();
-    const id = createDesignId('template');
+    const localId = createDesignId('template');
     const templateDocument: DesignDocument = {
       ...cloneDesignDocument(design),
       id: createDesignId('template-doc'),
       title: name,
-      templateSourceId: id,
+      templateSourceId: localId,
       templateSourceName: name,
       templateUpdatedAt: now,
     };
-    const record: DesignTemplateRecord = {
-      id,
-      name,
-      kind,
-      format: design.format,
-      width: design.width,
-      height: design.height,
-      sourceCarouselTemplate: design.carouselTemplate,
-      sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
-      document: templateDocument,
-      createdAt: now,
-      updatedAt: now,
-    };
 
-    const nextTemplates = [record, ...designTemplates];
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
-    updateDesign((current) => ({
-      ...current,
-      templateSourceId: id,
-      templateSourceName: record.name,
-      templateUpdatedAt: now,
-    }), { recordHistory: false });
-    setTemplateDraft(null);
-    setTemplateMessage(
-      `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()} and will stay in Saved templates on this browser.`,
-    );
+    setTemplateBusy(true);
+    try {
+      // CHANGE O: Supabase assigns the id, so the design points at the stored
+      // record rather than a locally-invented one. Carousel drafts reference CTA
+      // templates by that id, so it has to be the durable one.
+      let record: DesignTemplateRecord;
+
+      if (templatesUseLocalFallback) {
+        record = {
+          id: localId,
+          name,
+          kind,
+          format: design.format,
+          width: design.width,
+          height: design.height,
+          sourceCarouselTemplate: design.carouselTemplate,
+          sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+          document: templateDocument,
+          createdAt: now,
+          updatedAt: now,
+        };
+      } else {
+        const saved = await saveDesignTemplate<DesignDocument>(
+          {
+            name,
+            kind,
+            format: design.format,
+            width: design.width,
+            height: design.height,
+            sourceCarouselTemplate: design.carouselTemplate ?? null,
+            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe ?? null,
+            document: templateDocument,
+          },
+          adminKey,
+        );
+        record = {
+          ...saved,
+          format: design.format,
+          document: { ...saved.document, templateSourceId: saved.id, templateSourceName: saved.name },
+        } as DesignTemplateRecord;
+      }
+
+      setDesignTemplates((current) => [record, ...current]);
+      updateDesign((current) => ({
+        ...current,
+        templateSourceId: record.id,
+        templateSourceName: record.name,
+        templateUpdatedAt: record.updatedAt,
+      }), { recordHistory: false });
+      setTemplateDraft(null);
+      setTemplateMessage(
+        templatesUseLocalFallback
+          ? `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()} in this browser only - the templates service is unreachable.`
+          : `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()}.`,
+      );
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not save this template.');
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
-  function updateCurrentTemplate() {
-    if (!activeTemplateRecord) return;
+  async function updateCurrentTemplate() {
+    if (!activeTemplateRecord || templateBusy) return;
     const confirmed = window.confirm(`Update "${activeTemplateRecord.name}" with this design?`);
     if (!confirmed) return;
 
@@ -7280,24 +7327,45 @@ export default function DesignStudioPanel({
       templateSourceName: activeTemplateRecord.name,
       templateUpdatedAt: now,
     };
-    const nextTemplates = designTemplates.map((template) => (
-      template.id === activeTemplateRecord.id
-        ? {
-            ...template,
+
+    setTemplateBusy(true);
+    try {
+      if (!templatesUseLocalFallback) {
+        await updateDesignTemplateRecord<DesignDocument>(
+          activeTemplateRecord.id,
+          {
             format: design.format,
             width: design.width,
             height: design.height,
-            sourceCarouselTemplate: design.carouselTemplate,
-            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+            sourceCarouselTemplate: design.carouselTemplate ?? null,
+            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe ?? null,
             document: nextDocument,
-            updatedAt: now,
-          }
-        : template
-    ));
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
-    updateDesign((current) => ({ ...current, templateUpdatedAt: now }), { recordHistory: false });
-    setTemplateMessage(`"${activeTemplateRecord.name}" updated and saved.`);
+          },
+          adminKey,
+        );
+      }
+
+      setDesignTemplates((current) => current.map((template) => (
+        template.id === activeTemplateRecord.id
+          ? {
+              ...template,
+              format: design.format,
+              width: design.width,
+              height: design.height,
+              sourceCarouselTemplate: design.carouselTemplate,
+              sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+              document: nextDocument,
+              updatedAt: now,
+            }
+          : template
+      )));
+      updateDesign((current) => ({ ...current, templateUpdatedAt: now }), { recordHistory: false });
+      setTemplateMessage(`"${activeTemplateRecord.name}" updated and saved.`);
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not update this template.');
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
   function loadTemplateRecord(template: DesignTemplateRecord) {
@@ -7311,12 +7379,28 @@ export default function DesignStudioPanel({
     replaceDesignDocument(nextDesign, `Loaded "${template.name}".`);
   }
 
-  function deleteTemplateRecord(template: DesignTemplateRecord) {
-    const confirmed = window.confirm(`Delete "${template.name}" from saved templates?`);
+  async function deleteTemplateRecord(template: DesignTemplateRecord) {
+    if (templateBusy) return;
+    const confirmed = window.confirm(
+      getDesignTemplateKind(template) === 'cta'
+        ? `Delete "${template.name}"? Any carousel draft using it as a custom CTA will lose that closing slide.`
+        : `Delete "${template.name}" from saved templates?`,
+    );
     if (!confirmed) return;
-    const nextTemplates = designTemplates.filter((item) => item.id !== template.id);
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
+
+    setTemplateBusy(true);
+    try {
+      if (!templatesUseLocalFallback) {
+        await deleteDesignTemplateRecord(template.id, adminKey);
+      }
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not delete this template.');
+      setTemplateBusy(false);
+      return;
+    }
+    setTemplateBusy(false);
+
+    setDesignTemplates((current) => current.filter((item) => item.id !== template.id));
     if (design.templateSourceId === template.id) {
       updateDesign((current) => ({
         ...current,
