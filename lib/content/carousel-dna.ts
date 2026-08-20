@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { carouselLayoutRecipeOptions } from '@/lib/content/carousel-template-registry';
 
 // Reference decks analysed in Transform. Structure only - the extraction prompt
 // forbids reproducing source wording, and nothing here stores the deck itself.
@@ -39,12 +40,9 @@ export type CarouselDnaItem = {
 const SELECT_COLUMNS =
   'id, label, source_name, slide_count, layout_recipe, slide_arc, framework, created_at, updated_at';
 
-const allowedRecipes = new Set([
-  'authority_framework',
-  'guided_shift',
-  'diagnostic_reframe',
-  'narrative_launch',
-]);
+// Derived from the registry for the same reason the extractor's whitelist is:
+// a hand-written copy of this list is what let an invalid value through before.
+const allowedRecipes: Set<string> = new Set(carouselLayoutRecipeOptions.map((option) => option.value));
 
 function isMissingCarouselDnaTable(message?: string) {
   return Boolean(
