@@ -20,6 +20,7 @@ import {
   type EmailTemplateId,
 } from '@/lib/email-templates';
 import { buildRecoveryEmailDraft, type SequenceRepairAction } from '@/lib/email-sequence-repair';
+import { plainTextToEmailHtml } from '@/lib/email-template-render';
 import {
   getScheduledSendSummary,
   getSendWindowGuidance,
@@ -117,26 +118,6 @@ function fitEmailBodyTextarea(textarea: HTMLTextAreaElement) {
   const minHeight = window.matchMedia('(min-width: 768px)').matches ? 480 : 320;
   textarea.style.height = 'auto';
   textarea.style.height = `${Math.max(minHeight, textarea.scrollHeight)}px`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function plainTextToEmailHtml(value: string) {
-  const paragraphs = value
-    .split(/\r?\n\r?\n+/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-    .map((chunk) => `<p style="margin: 0 0 16px;">${escapeHtml(chunk).replace(/\r?\n/g, '<br>')}</p>`)
-    .join('');
-
-  return `<div style="font-family: Arial, sans-serif; font-size: 15px; color: #142334; line-height: 1.7; max-width: 560px;">${paragraphs}</div>`;
 }
 
 function getScheduleConfirmationText(confirmation: ScheduleConfirmation) {

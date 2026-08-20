@@ -512,8 +512,10 @@ export function buildAssistantDashboardContext(input: {
 
 export function getSuggestedQuestions(context: AssistantDashboardContext): string[] {
   const suggestions: string[] = [];
+  // A backlog outranks everything else, so this one goes first and survives the slice below.
+  if (context.overdueFollowUps > 0) suggestions.push('Schedule the overdue emails');
   if (context.goals.activeCount > 0) suggestions.push('What should I do next to move my goals?');
-  if (context.masterclass.waitlistCount > 0) suggestions.push('What should the masterclass cover?');
+  // The masterclass suggestion is intentionally absent: the masterclass is paused.
   if (context.emailContext.inboundRepliesTotal > 0) suggestions.push('Summarise recent inbound replies');
   if (context.followUpsDueToday > 0) suggestions.push('Who needs a follow-up today?');
   if (context.hotLeadsCount > 0) suggestions.push('Who are my hottest leads right now?');
@@ -915,5 +917,15 @@ For recommendations: { "type": "recommendation", "message": "One sentence framin
 For email drafts: { "type": "email_draft", "message": "One sentence framing", "draft": { "to": "email", "toName": "FirstName", "subject": "Subject", "body": "Full body", "templateId": "template_id", "leadId": "uuid" } }
 
 For content drafts: { "type": "content_draft", "message": "One sentence framing", "draft": { "platform": "linkedin", "contentType": "text_post", "content": "Full content" } }
+
+For a follow-up email batch: { "type": "email_batch", "message": "One sentence framing", "batch": { "leadIds": ["uuid", "uuid"], "note": "Anything Kagiso should know before approving" } }
+
+EMAIL BACKLOG RULES:
+- When a getEmailBacklog snapshot is present, use it for anything about what is overdue, due today, or piling up. Quote the real counts and names. Never estimate.
+- Use "email_batch" when Kagiso asks you to schedule, queue, clear, or catch up on overdue or due follow-up emails.
+- Only include leadIds the snapshot marks as ready to schedule. Never include a BLOCKED lead: name those separately in the message so Kagiso can handle them by hand.
+- Do not write the email copy for a batch. Each lead's next sequence template is applied automatically, and the send times are spread across the recommended sending windows.
+- Nothing is scheduled until Kagiso approves the batch. Say so, and never claim you have sent or scheduled anything.
+- If Kagiso asks for one specific lead rather than the backlog, use "email_draft" as usual.
 `;
 }

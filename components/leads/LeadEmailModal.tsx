@@ -12,8 +12,6 @@ import {
   getEmailSequenceDots,
   getEmailSequenceTotal,
   getEmailTemplateOptionLabel,
-  getBookingLink,
-  getDownloadLink,
   getEmailTemplate,
   getTemplateIdForLeadStage,
   isMasterclassBookingsOpenTemplate,
@@ -28,6 +26,7 @@ import {
   type EmailTemplateGuardrailLead,
 } from '@/lib/email-template-guardrails';
 import { buildRecoveryEmailDraft, type SequenceRepairAction } from '@/lib/email-sequence-repair';
+import { getTemplateFirstName, injectTemplateTokens, plainTextToEmailHtml } from '@/lib/email-template-render';
 import {
   getScheduledSendSummary,
   getSendWindowGuidance,
@@ -78,7 +77,7 @@ type ScheduleConfirmation = {
 };
 
 function getFirstName(lead: LeadEmailModalLead) {
-  return lead.firstName.trim().split(/\s+/)[0] || 'there';
+  return getTemplateFirstName(lead);
 }
 
 function getModalHeader(lead: LeadEmailModalLead) {
@@ -88,33 +87,6 @@ function getModalHeader(lead: LeadEmailModalLead) {
   return lead.archetype?.trim() || lead.serviceInterest?.trim() || 'Diagnostic Lead';
 }
 
-function getBookingUrlForLead(lead: LeadEmailModalLead, templateId: EmailTemplateId) {
-  const service = lead.serviceInterest.toLowerCase();
-  if (service.includes('glow')) return getBookingLink('Glow Up VIP Package');
-  if (service.includes('masterclass')) return getBookingLink('Saturday Masterclass');
-  if (service.includes('bundle')) return getBookingLink('CV + LinkedIn Bundle');
-  if (service.includes('linkedin')) return getBookingLink('LinkedIn Optimisation');
-  if (service.includes('clarity')) return getBookingLink('Career Clarity Session');
-  if (service.includes('cv revamp')) return getBookingLink('CV Revamp');
-  return getBookingLink(getEmailTemplate(templateId).bookingKey);
-}
-
-function getDownloadUrlForLead(lead: LeadEmailModalLead, templateId: EmailTemplateId) {
-  if (lead.downloadLink) return lead.downloadLink;
-  const template = getEmailTemplate(templateId);
-  return template.downloadKey ? getDownloadLink(template.downloadKey) : '';
-}
-
-function injectTemplate(value: string, lead: LeadEmailModalLead, templateId: EmailTemplateId) {
-  return value
-    .split('{{firstName}}')
-    .join(getFirstName(lead))
-    .split('[BOOKING LINK]')
-    .join(getBookingUrlForLead(lead, templateId))
-    .split('[DOWNLOAD LINK]')
-    .join(getDownloadUrlForLead(lead, templateId));
-}
-
 function prepareTemplateDraft(
   template: DraftTemplate,
   lead: LeadEmailModalLead,
@@ -122,8 +94,8 @@ function prepareTemplateDraft(
   guardrail?: EmailTemplateGuardrail | null,
 ) {
   const injected = {
-    subject: injectTemplate(template.subject, lead, templateId),
-    body: injectTemplate(template.body, lead, templateId),
+    subject: injectTemplateTokens(template.subject, lead, templateId),
+    body: injectTemplateTokens(template.body, lead, templateId),
   };
 
   if (guardrail?.sequenceGap.detected && guardrail.sequenceGap.firstTemplateId === templateId) {
@@ -134,26 +106,6 @@ function prepareTemplateDraft(
   }
 
   return injected;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function plainTextToEmailHtml(value: string) {
-  const paragraphs = value
-    .split(/\r?\n\r?\n+/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-    .map((chunk) => `<p style="margin: 0 0 16px;">${escapeHtml(chunk).replace(/\r?\n/g, '<br>')}</p>`)
-    .join('');
-
-  return `<div style="font-family: Arial, sans-serif; font-size: 15px; color: #142334; line-height: 1.7; max-width: 560px;">${paragraphs}</div>`;
 }
 
 function getScheduleConfirmationText(confirmation: ScheduleConfirmation) {

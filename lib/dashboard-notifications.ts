@@ -7,6 +7,7 @@ export const dashboardNotificationEventTypes = [
   'payment_confirmed',
   'intake_submitted',
   'cal_booking',
+  'email_backlog_due',
 ] as const;
 
 export type DashboardNotificationEventType = (typeof dashboardNotificationEventTypes)[number];
@@ -53,6 +54,7 @@ const eventSettingsKeyMap: Record<DashboardNotificationEventType, keyof Notifica
   payment_confirmed: 'payment_confirmed',
   intake_submitted: 'intake_submitted',
   cal_booking: 'cal_booking',
+  email_backlog_due: 'follow_up_due',
 };
 
 const dashboardNotificationSelect =

@@ -59,12 +59,14 @@ const eventTypeLabels: Record<DashboardNotificationEventType, string> = {
   payment_confirmed: 'Payment',
   intake_submitted: 'Intake',
   cal_booking: 'Cal.com',
+  email_backlog_due: 'Email backlog',
 };
 
 function getEventNotificationTone(eventType: DashboardNotificationEventType): NotificationTone {
   if (eventType === 'payment_confirmed' || eventType === 'intake_submitted' || eventType === 'cal_booking') {
     return 'today';
   }
+  if (eventType === 'email_backlog_due') return 'overdue';
   if (eventType === 'masterclass_reservation') return 'warm';
   return 'neutral';
 }
