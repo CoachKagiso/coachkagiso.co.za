@@ -874,3 +874,153 @@ export function buildCarouselTemplatePromptBlock(value: CarouselTemplate, layout
     `PNG export rule: ${template.exportRules.png}`,
   ].join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// CHANGE P: shared slide geometry and sizing.
+//
+// Three lanes draw the same slide: the HTML preview (which the PNG export
+// rasterises), the react-pdf vector document, and Design Studio's layer canvas.
+// Each used to carry its own numbers, so "Open in Design Studio" produced a
+// visibly different slide from the one in the preview - different margins,
+// different type sizes, different composition choices.
+//
+// These are the preview-baseline values at CAROUSEL_PREVIEW_BASE_WIDTH. Any lane
+// rendering at a different width multiplies by (targetWidth / base). The PDF lane
+// keeps its own tuned page padding on purpose; everything else reads from here.
+// ---------------------------------------------------------------------------
+
+export const CAROUSEL_PREVIEW_BASE_WIDTH = 600;
+
+export const carouselLayoutMetrics = {
+  /** Outer frame padding on a standard slide. */
+  outerPadding: 40,
+  /** Cover slides get slightly wider side margins. */
+  coverSidePadding: 53,
+  /** Vertical guard rails keeping headline and body clear of the frame edges. */
+  safeBandY: 140,
+  /** Gap between the header row and the content column. */
+  headerGap: 16,
+  brandFontSize: 13,
+  counterFontSize: 13.3,
+  eyebrowFontSize: 12,
+  bodyFontSize: 17,
+  ctaFontSize: 15,
+  /** Leading applied to headline text when measuring stacked height. */
+  headlineLineHeight: 1.08,
+  bodyLineHeight: 1.5,
+} as const;
+
+export function getCarouselLayoutScale(targetWidth: number) {
+  return targetWidth / CAROUSEL_PREVIEW_BASE_WIDTH;
+}
+
+export type CarouselSlideTextInput = {
+  headline: string;
+  body: string;
+  cta?: string;
+  composition?: CarouselComposition;
+};
+
+export function getCarouselSlideBodyPoints(body: string, limit = 4) {
+  return body
+    .split(/\n+|;\s+|(?<=\.)\s+/)
+    .map((point) => point.trim().replace(/\.$/, ''))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+export function getCarouselSlideTextStats(slide: CarouselSlideTextInput) {
+  const headlineWords = slide.headline.trim().split(/\s+/).filter(Boolean).length;
+  const bodyWords = slide.body.trim().split(/\s+/).filter(Boolean).length;
+  const totalChars = `${slide.headline} ${slide.body} ${slide.cta || ''}`.trim().length;
+
+  return {
+    headlineWords,
+    bodyWords,
+    totalChars,
+    density: totalChars > 260 || bodyWords > 44 ? 'dense' : totalChars > 160 || bodyWords > 26 ? 'medium' : 'light',
+  };
+}
+
+export function normalizeCarouselCompositionForRole(
+  value: unknown,
+  role: CarouselSlideRole,
+): CarouselComposition {
+  const raw = typeof value === 'string' ? value : '';
+  const allowed = getCarouselCompositionOptionsForRole(role).map((option) => option.value);
+  return isCarouselComposition(raw) && allowed.includes(raw) ? raw : 'auto';
+}
+
+export function resolveCarouselComposition(
+  slide: CarouselSlideTextInput,
+  role: CarouselSlideRole,
+  template: CarouselTemplateOption,
+  bodyPoints: string[],
+): CarouselComposition {
+  const selected = normalizeCarouselCompositionForRole(slide.composition, role);
+  if (selected !== 'auto') return selected;
+
+  const stats = getCarouselSlideTextStats(slide);
+
+  if (role === 'cover') {
+    if (stats.headlineWords <= 6 && stats.bodyWords <= 18 && template.value === 'bold_diagnostic') return 'bold_claim';
+    if (stats.headlineWords > 10 || stats.bodyWords > 28) return 'quiet_intro';
+    return 'editorial_cover';
+  }
+
+  if (role === 'cta') {
+    const actionText = `${slide.headline} ${slide.body} ${slide.cta || ''}`.toLowerCase();
+    if (actionText.includes('save') || actionText.includes('share')) return 'save_share_close';
+    if (slide.cta || stats.bodyWords <= 18) return 'direct_action';
+    return 'soft_reflection';
+  }
+
+  if (role === 'proof') {
+    if (stats.bodyWords > 30) return 'example_note';
+    if (stats.headlineWords <= 6 && stats.bodyWords <= 18) return 'credibility_cue';
+    return 'evidence_card';
+  }
+
+  if (role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule') {
+    if (bodyPoints.length >= 3 && stats.density !== 'dense') return 'card_grid';
+    if (stats.density === 'dense') return 'side_rail';
+    return 'numbered_stack';
+  }
+
+  if (stats.bodyWords > 34) return 'note_card';
+  if (slide.body.includes(':') || slide.body.toLowerCase().includes('not ')) return 'contrast_block';
+  return 'quote_panel';
+}
+
+export function getCarouselHeadlineSize(
+  composition: CarouselComposition,
+  stats: ReturnType<typeof getCarouselSlideTextStats>,
+) {
+  // Brand type scale at 1080x1350: cover 96-110px, inner 72-84px. These are the
+  // preview baseline; each lane scales by its own width ratio.
+  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 53 : 61;
+  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 53 : 59;
+  if (composition === 'quiet_intro') return 53;
+  if (composition === 'direct_action') return 44;
+  if (composition === 'save_share_close') return 42;
+  if (composition === 'credibility_cue') return 42;
+  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 40;
+  return stats.headlineWords > 9 ? 40 : 46;
+}
+
+/**
+ * The size actually rendered, after the cover bump and the Career Notes
+ * adjustment. The preview applied these inline while Design Studio did not,
+ * which left covers a step smaller on import. Both lanes now call this.
+ */
+export function getCarouselResolvedHeadlineSize(
+  composition: CarouselComposition,
+  stats: ReturnType<typeof getCarouselSlideTextStats>,
+  options: { isCover: boolean; template: CarouselTemplate },
+) {
+  const base = getCarouselHeadlineSize(composition, stats);
+  const isCareerNotes = options.template === 'editorial_career_notes';
+  if (options.isCover) return Math.min(base + (isCareerNotes ? 8 : 6), 61);
+  if (isCareerNotes) return Math.min(base + 4, 46);
+  return base;
+}

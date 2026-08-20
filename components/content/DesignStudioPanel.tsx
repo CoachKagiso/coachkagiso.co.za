@@ -56,7 +56,13 @@ import {
 } from 'lucide-react';
 import {
   getCarouselAspectRatioOption,
+  carouselLayoutMetrics,
   getCarouselExportDimensions,
+  getCarouselResolvedHeadlineSize,
+  getCarouselLayoutScale,
+  getCarouselSlideBodyPoints,
+  getCarouselSlideTextStats,
+  resolveCarouselComposition,
   getCarouselLayoutRecipeOption,
   getCarouselTemplateOption,
   type CarouselAspectRatio,
@@ -2402,18 +2408,47 @@ function buildCarouselDesignPage(
 ): DesignPage {
   const template = getCarouselTemplateOption(draft.template);
   const palette = template.palette;
-  const margin = Math.round(width * 0.078);
-  const contentWidth = width - margin * 2;
   const isCover = index === 0 || slide.role === 'cover';
   const isClose = index === total - 1 || slide.role === 'cta';
   const roleLabel = getCarouselRoleLabel(slide.role, index, draft.layoutRecipe, total);
   const bodyText = getCarouselDraftVisualBody(slide);
   const ctaText = getCarouselDraftVisualCta(slide, index, total);
-  const headlineSize = isCover ? Math.round(height * 0.064) : Math.round(height * 0.052);
-  const bodyTop = isCover ? Math.round(height * 0.62) : Math.round(height * 0.48);
-  const bodyHeight = isCover ? Math.round(height * 0.18) : Math.round(height * 0.28);
-  const panelY = Math.max(bodyTop - 28, margin + 260);
   const mutedInk = palette.foreground === '#FFFFFF' ? '#FFFFFF' : palette.muted;
+
+  // CHANGE P: geometry now comes from the shared preview baseline rather than
+  // this function's own fractions of the canvas. `margin` used to be
+  // width * 0.078 (84px at 1080) while the preview used 40 preview-units
+  // (72px at 1080), and the headline was a fraction of height rather than the
+  // brand type scale - which is why a deck opened in Design Studio did not look
+  // like the deck in the preview.
+  const scale = getCarouselLayoutScale(width);
+  const px = (previewValue: number) => Math.round(previewValue * scale);
+
+  const sidePadding = isCover
+    ? px(carouselLayoutMetrics.coverSidePadding)
+    : px(carouselLayoutMetrics.outerPadding);
+  const margin = px(carouselLayoutMetrics.outerPadding);
+  const contentWidth = width - sidePadding * 2;
+
+  // Same composition decision the preview makes, so the type scale below lands
+  // on the same size for the same slide.
+  const bodyPoints = getCarouselSlideBodyPoints(slide.body);
+  const composition = resolveCarouselComposition(slide, slide.role, template, bodyPoints);
+  const stats = getCarouselSlideTextStats(slide);
+  const headlineSize = px(getCarouselResolvedHeadlineSize(composition, stats, { isCover, template: draft.template }));
+
+  // Stack the content column top-down inside the safe band instead of pinning
+  // each block to a fraction of the canvas. This mirrors how the preview's flex
+  // column flows, so blocks keep their relative rhythm at any frame size.
+  const safeTop = px(carouselLayoutMetrics.safeBandY);
+  const headlineTop = safeTop;
+  const headlineLines = Math.max(1, Math.ceil(stats.headlineWords / (isCover ? 3.2 : 4.2)));
+  const headlineHeight = Math.round(headlineSize * carouselLayoutMetrics.headlineLineHeight * headlineLines);
+  const bodyFontSize = px(carouselLayoutMetrics.bodyFontSize);
+  const bodyLines = Math.max(1, Math.ceil(stats.bodyWords / 7));
+  const bodyHeight = Math.round(bodyFontSize * carouselLayoutMetrics.bodyLineHeight * bodyLines);
+  const panelY = headlineTop + headlineHeight + px(28);
+  const bodyTop = panelY + px(20);
 
   const layers: DesignLayer[] = [
     createCarouselShapeLayer({
@@ -2433,12 +2468,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Brand',
       text: 'COACH KAGISO',
-      x: margin,
-      y: margin + 34,
+      x: sidePadding,
+      y: margin + px(19),
       width: Math.round(contentWidth * 0.45),
-      height: 44,
+      height: px(24),
       fontFamily: 'sans',
-      fontSize: 24,
+      fontSize: px(carouselLayoutMetrics.brandFontSize),
       fontWeight: 800,
       color: palette.accent,
       lineHeight: 1,
@@ -2450,12 +2485,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Page number',
       text: `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`,
-      x: width - margin - 188,
-      y: margin + 34,
-      width: 188,
-      height: 38,
+      x: width - sidePadding - px(104),
+      y: margin + px(19),
+      width: px(104),
+      height: px(21),
       fontFamily: 'sans',
-      fontSize: 20,
+      fontSize: px(carouselLayoutMetrics.counterFontSize),
       fontWeight: 700,
       color: mutedInk,
       lineHeight: 1,
@@ -2466,12 +2501,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Slide role',
       text: roleLabel,
-      x: margin,
-      y: margin + 108,
-      width: Math.min(380, contentWidth),
-      height: 54,
+      x: sidePadding,
+      y: margin + px(60),
+      width: Math.min(px(211), contentWidth),
+      height: px(30),
       fontFamily: 'sans',
-      fontSize: 20,
+      fontSize: px(carouselLayoutMetrics.eyebrowFontSize),
       fontWeight: 800,
       color: palette.chipText,
       lineHeight: 1,
@@ -2487,10 +2522,10 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Headline',
       text: normalizeDesignText(slide.headline, draft.title),
-      x: margin,
-      y: isCover ? Math.round(height * 0.25) : Math.round(height * 0.23),
+      x: sidePadding,
+      y: headlineTop,
       width: contentWidth,
-      height: isCover ? Math.round(height * 0.29) : Math.round(height * 0.22),
+      height: headlineHeight,
       fontFamily: 'serif',
       fontSize: headlineSize,
       fontWeight: 800,
@@ -2506,10 +2541,10 @@ function buildCarouselDesignPage(
       createCarouselShapeLayer({
         id: createDesignId('shape'),
         name: 'Body panel',
-        x: margin,
+        x: sidePadding,
         y: panelY,
         width: contentWidth,
-        height: bodyHeight + 52,
+        height: bodyHeight + px(30),
         fillColor: palette.panel,
         strokeColor: palette.border,
         strokeWidth: 2,
@@ -2520,12 +2555,12 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'Body',
         text: bodyText,
-        x: margin + 44,
-        y: panelY + 36,
-        width: contentWidth - 88,
+        x: sidePadding + px(24),
+        y: bodyTop,
+        width: contentWidth - px(48),
         height: bodyHeight,
         fontFamily: 'sans',
-        fontSize: isCover ? 34 : 32,
+        fontSize: bodyFontSize,
         fontWeight: 600,
         color: template.value === 'bold_diagnostic' ? palette.foreground : '#142334',
         lineHeight: 1.26,
@@ -2541,7 +2576,7 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'Visual note',
         text: slide.visualSuggestion.trim(),
-        x: margin,
+        x: sidePadding,
         y: height - margin - 168,
         width: contentWidth,
         height: 72,
@@ -2562,7 +2597,7 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'CTA',
         text: ctaText,
-        x: margin,
+        x: sidePadding,
         y: height - margin - 104,
         width: contentWidth,
         height: 64,
@@ -6710,7 +6745,10 @@ export default function DesignStudioPanel({
         ? `Opened ${source.label} with "${templateRecord.name}".`
         : `Opened ${source.label} as editable carousel pages.`,
     );
-  }, [getPreferredImportedCarouselTemplateRecord, replaceImportedDesignDocument]);
+    // findCtaTemplateRecord depends on the loaded template set; without it here
+    // this callback would close over an empty list on first render and drop the
+    // custom CTA slide.
+  }, [findCtaTemplateRecord, getPreferredImportedCarouselTemplateRecord, replaceImportedDesignDocument]);
 
   const importTextDraftFromRequest = useCallback((source: DesignStudioTextImport) => {
     const templateRecord = getPreferredImportedTextTemplateRecord();
