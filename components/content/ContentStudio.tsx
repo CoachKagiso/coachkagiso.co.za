@@ -145,6 +145,15 @@ type CreatePlatform = CarouselPlatform;
 type TopicSource = 'manual' | 'signal' | 'brief';
 type CreatePillarFocus = ContentPillar | 'auto';
 type CarouselExportMode = 'pdf' | 'png';
+// CHANGE J: export resolution is now a user choice. 1x is the LinkedIn/Instagram
+// native frame, 2x and 3x oversample for retina feeds and reuse in decks.
+type CarouselExportScale = 1 | 2 | 3;
+const carouselExportScaleOptions: { value: CarouselExportScale; label: string; description: string }[] = [
+  { value: 1, label: '1x', description: 'Native frame. Smallest files.' },
+  { value: 2, label: '2x', description: 'Retina sharp. Best default.' },
+  { value: 3, label: '3x', description: 'Maximum detail. Large files.' },
+];
+const DEFAULT_CAROUSEL_EXPORT_SCALE: CarouselExportScale = 2;
 type AiMode =
   | 'signal_brief'
   | 'auto_topic'
@@ -10069,15 +10078,22 @@ async function captureCarouselSlideCanvas(
   element: HTMLElement,
   dimensions: { width: number; height: number },
   html2canvas: typeof import('html2canvas').default,
+  pixelScale: CarouselExportScale = DEFAULT_CAROUSEL_EXPORT_SCALE,
 ) {
   const fonts = getCarouselExportFontFamilies();
   const rect = element.getBoundingClientRect();
   const layoutWidth = Math.max(1, Math.ceil(rect.width));
   const layoutHeight = Math.max(1, Math.round(layoutWidth * (dimensions.height / dimensions.width)));
-  // CHANGE A1: capture at 2x the export dimensions (e.g. 2160x2700 for the
-  // 1080x1350 LinkedIn export) so the PNG is sharp. Never downscale below
-  // dimensions; only upscale when the layout is smaller than the target.
-  const scale = Math.max(2, dimensions.width / layoutWidth) * 2;
+  // CHANGE J: capture straight to the requested output resolution.
+  //
+  // The previous version oversampled to 4x the layout width and then resampled
+  // the result back down to exactly `dimensions` at the end of this function,
+  // which capped every PNG at 1080px wide and threw the extra detail away. The
+  // target is now dimensions * pixelScale, and html2canvas is asked for exactly
+  // that scale, so no resampling is needed in the common case.
+  const targetWidth = Math.round(dimensions.width * pixelScale);
+  const targetHeight = Math.round(dimensions.height * pixelScale);
+  const scale = targetWidth / layoutWidth;
   const captureId = `carousel-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
@@ -10160,17 +10176,29 @@ async function captureCarouselSlideCanvas(
     exportHost.remove();
   }
 
-  if (captured.width === dimensions.width && captured.height === dimensions.height) return captured;
+  // CHANGE J: only resample when html2canvas could not hit the target exactly
+  // (sub-pixel rounding on odd layout widths). Never resample down to the 1x
+  // frame — that was the bug that made every export look soft at 200%.
+  if (captured.width === targetWidth && captured.height === targetHeight) return captured;
 
   const resized = document.createElement('canvas');
-  resized.width = dimensions.width;
-  resized.height = dimensions.height;
+  resized.width = targetWidth;
+  resized.height = targetHeight;
   const context = resized.getContext('2d');
   if (!context) throw new Error('Could not prepare the carousel export canvas.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  context.drawImage(captured, 0, 0, dimensions.width, dimensions.height);
+  context.drawImage(captured, 0, 0, targetWidth, targetHeight);
+  releaseCarouselExportCanvas(captured);
   return resized;
+}
+
+// CHANGE J: a 3x LinkedIn frame is 3240x4050 (~52MB of RGBA). Holding ten of
+// those at once will crash a tab, so every export path frees each canvas as
+// soon as its bytes have been handed to a blob or the PDF.
+function releaseCarouselExportCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
 function canvasToPngBlob(canvas: HTMLCanvasElement) {
@@ -10723,6 +10751,43 @@ function CarouselStudioPanel({
     message: string;
     tone: 'info' | 'error';
   } | null>(null);
+  // CHANGE J/K: export resolution and slide selection.
+  const [exportPixelScale, setExportPixelScale] = useState<CarouselExportScale>(DEFAULT_CAROUSEL_EXPORT_SCALE);
+  const [selectedExportIndexes, setSelectedExportIndexes] = useState<Set<number>>(
+    () => new Set(renderedDeck.map((_, index) => index)),
+  );
+  const deckLength = renderedDeck.length;
+  const deckSelectionKey = `${activeRecordId || 'placeholder'}:${deckLength}`;
+  const lastDeckSelectionKeyRef = useRef(deckSelectionKey);
+
+  // Selecting a different draft, or adding/removing slides, resets the export
+  // selection to the whole deck. Without this a stale index could point past
+  // the end of a shorter deck.
+  useEffect(() => {
+    if (lastDeckSelectionKeyRef.current === deckSelectionKey) return;
+    lastDeckSelectionKeyRef.current = deckSelectionKey;
+    setSelectedExportIndexes(new Set(Array.from({ length: deckLength }, (_, index) => index)));
+  }, [deckSelectionKey, deckLength]);
+
+  const selectedExportCount = selectedExportIndexes.size;
+  const isWholeDeckSelected = selectedExportCount === deckLength && deckLength > 0;
+
+  function toggleExportSlide(index: number) {
+    setSelectedExportIndexes((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function selectAllExportSlides() {
+    setSelectedExportIndexes(new Set(Array.from({ length: deckLength }, (_, index) => index)));
+  }
+
+  function clearExportSlideSelection() {
+    setSelectedExportIndexes(new Set());
+  }
   const [draftHistory, setDraftHistory] = useState<CarouselDraftHistoryState>({
     recordId: null,
     originalDraft: null,
@@ -10753,13 +10818,30 @@ function CarouselStudioPanel({
   async function exportCarousel(mode: CarouselExportMode) {
     if (!latestDraft) return;
 
+    // CHANGE K: export only the slides the user ticked. `selectedExportIndexes`
+    // holds positions in `renderedDeck`; the original slide number travels with
+    // each entry so a single-slide export is still named "-slide-03".
+    const exportTargets = renderedDeck
+      .map((slide, index) => ({ slide, index }))
+      .filter(({ index }) => selectedExportIndexes.has(index));
+
+    if (exportTargets.length === 0) {
+      setExportState({
+        busy: false,
+        mode,
+        message: 'Pick at least one slide to export.',
+        tone: 'error',
+      });
+      return;
+    }
+
     // CHANGE H: export the filtered deck only (empty slides are dropped from
     // the preview), so the PDF page count matches what the audience sees.
-    const elements = exportSlideFrameRefs.current
-      .slice(0, renderedDeck.length)
+    const elements = exportTargets
+      .map(({ index }) => exportSlideFrameRefs.current[index])
       .filter((element): element is HTMLElement => Boolean(element));
 
-    if (elements.length !== renderedDeck.length) {
+    if (elements.length !== exportTargets.length) {
       setExportState({
         busy: false,
         mode,
@@ -10771,19 +10853,25 @@ function CarouselStudioPanel({
 
     const dimensions = displayedExportDimensions;
     const baseName = getCarouselExportBaseName(latestDraft, displayedAspectOption);
+    const isPartialExport = exportTargets.length !== renderedDeck.length;
+    const partialSuffix = isPartialExport && exportTargets.length === 1
+      ? `-slide-${String(exportTargets[0].index + 1).padStart(2, '0')}`
+      : isPartialExport
+        ? `-${exportTargets.length}-slides`
+        : '';
 
     try {
       setExportState({
         busy: true,
         mode,
-        message: mode === 'pdf' ? 'Preparing LinkedIn PDF...' : 'Preparing PNG frames...',
+        message: mode === 'pdf' ? 'Preparing LinkedIn PDF...' : `Preparing PNG frames at ${exportPixelScale}x...`,
         tone: 'info',
       });
 
       if (mode === 'pdf') {
         // CHANGE I: vector PDF via @react-pdf/renderer. Text stays selectable and
         // crisp at 200%/400%. PNG export path (2x raster) is untouched.
-        const pdfSlides: CarouselPdfSlide[] = renderedDeck.map((slide, index) => {
+        const pdfSlides: CarouselPdfSlide[] = exportTargets.map(({ slide, index }) => {
           const role = slide.role || getDefaultCarouselSlideRole(displayedLayoutRecipe, index, renderedDeck.length);
           const composition = slide.composition === 'auto' ? 'note_card' : slide.composition;
           const baseSize = getCarouselHeadlineSize(composition as CarouselComposition, getCarouselSlideTextStats(slide));
@@ -10800,20 +10888,20 @@ function CarouselStudioPanel({
         });
 
         let blob: Blob;
+        // CHANGE J: the raster fallback used to be silent (console.warn only),
+        // so a soft PDF looked identical to a sharp one from the outside. Track
+        // it and say so in the UI.
+        let rasterFallbackReason: string | null = null;
         try {
           blob = await renderCarouselPdfBlob(pdfSlides, displayedTemplateOption);
         } catch (pdfError) {
           // CHANGE I fallback: if the vector document fails to render, fall
-          // back to the 2x raster capture embedded page-for-page so export
-          // never blocks.
-          console.warn('Vector PDF failed, falling back to raster:', pdfError instanceof Error ? pdfError.message : String(pdfError));
+          // back to the raster capture embedded page-for-page so export never
+          // blocks.
+          rasterFallbackReason = pdfError instanceof Error ? pdfError.message : String(pdfError);
+          console.warn('Vector PDF failed, falling back to raster:', rasterFallbackReason);
           const html2canvas = (await import('html2canvas')).default;
           await waitForCarouselExportFonts(elements[0]);
-          const canvases: HTMLCanvasElement[] = [];
-          for (const [index, element] of elements.entries()) {
-            setExportState({ busy: true, mode, message: `Capturing slide ${index + 1} of ${elements.length}...`, tone: 'info' });
-            canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
-          }
           const { default: jsPDF } = await import('jspdf');
           const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
           const rasterPdf = new jsPDF({
@@ -10823,38 +10911,54 @@ function CarouselStudioPanel({
             compress: true,
             hotfixes: ['px_scaling'],
           });
-          canvases.forEach((canvas, index) => {
-            if (index > 0) rasterPdf.addPage([dimensions.width, dimensions.height], orientation);
+          for (const [position, element] of elements.entries()) {
+            setExportState({ busy: true, mode, message: `Capturing slide ${position + 1} of ${elements.length}...`, tone: 'info' });
+            const canvas = await captureCarouselSlideCanvas(element, dimensions, html2canvas, exportPixelScale);
+            if (position > 0) rasterPdf.addPage([dimensions.width, dimensions.height], orientation);
+            // The page stays at 1x px while the image carries pixelScale times
+            // the detail, so the embedded bitmap is oversampled, not stretched.
             rasterPdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
-          });
+            releaseCarouselExportCanvas(canvas);
+          }
           blob = rasterPdf.output('blob');
         }
-        downloadBlob(blob, `${baseName}.pdf`);
-        setExportState({ busy: false, mode, message: `Downloaded ${renderedDeck.length}-page vector PDF.`, tone: 'info' });
+        downloadBlob(blob, `${baseName}${partialSuffix}.pdf`);
+        setExportState({
+          busy: false,
+          mode,
+          message: rasterFallbackReason
+            ? `Downloaded ${exportTargets.length}-page PDF as a ${exportPixelScale}x image fallback - the vector renderer failed (${rasterFallbackReason}). Text will not stay crisp past 200%.`
+            : `Downloaded ${exportTargets.length}-page vector PDF.`,
+          tone: rasterFallbackReason ? 'error' : 'info',
+        });
         return;
       }
 
-      // CHANGE A1: PNG path keeps the 2x raster capture (correct for feed images).
+      // CHANGE J/K: capture, download and free one frame at a time so a 3x
+      // export of a ten-slide deck never holds half a gigabyte of canvases.
       const html2canvas = (await import('html2canvas')).default;
-      const canvases: HTMLCanvasElement[] = [];
       await waitForCarouselExportFonts(elements[0]);
 
-      for (const [index, element] of elements.entries()) {
+      for (const [position, element] of elements.entries()) {
+        const slideNumber = exportTargets[position].index + 1;
         setExportState({
           busy: true,
           mode,
-          message: `Rendering slide ${index + 1} of ${elements.length}...`,
+          message: `Rendering slide ${slideNumber} (${position + 1} of ${elements.length}) at ${exportPixelScale}x...`,
           tone: 'info',
         });
-        canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
+        const canvas = await captureCarouselSlideCanvas(element, dimensions, html2canvas, exportPixelScale);
+        const blob = await canvasToPngBlob(canvas);
+        releaseCarouselExportCanvas(canvas);
+        downloadBlob(blob, `${baseName}-slide-${String(slideNumber).padStart(2, '0')}@${exportPixelScale}x.png`);
       }
 
-      setExportState({ busy: true, mode, message: 'Downloading PNG frames...', tone: 'info' });
-      for (const [index, canvas] of canvases.entries()) {
-        const blob = await canvasToPngBlob(canvas);
-        downloadBlob(blob, `${baseName}-slide-${String(index + 1).padStart(2, '0')}.png`);
-      }
-      setExportState({ busy: false, mode, message: `Downloaded ${canvases.length} PNG frames.`, tone: 'info' });
+      setExportState({
+        busy: false,
+        mode,
+        message: `Downloaded ${elements.length} PNG frame${elements.length === 1 ? '' : 's'} at ${dimensions.width * exportPixelScale}x${dimensions.height * exportPixelScale}.`,
+        tone: 'info',
+      });
     } catch (error) {
       setExportState({
         busy: false,
@@ -11106,6 +11210,100 @@ function CarouselStudioPanel({
           </div>
         )}
 
+        {/* CHANGE J/K: export controls - resolution and which slides go out. */}
+        <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Export settings</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                PDF is vector and always sharp. Resolution applies to PNG frames.
+              </p>
+            </div>
+            <Badge className="bg-[#F5F3EE] text-[#8C7466]">
+              {displayedExportDimensions.width * exportPixelScale} x {displayedExportDimensions.height * exportPixelScale}
+            </Badge>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {carouselExportScaleOptions.map((option) => {
+              const isSelected = exportPixelScale === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setExportPixelScale(option.value)}
+                  disabled={isExporting}
+                  title={option.description}
+                  className={`rounded-full border px-4 py-1.5 text-[12px] font-bold transition disabled:opacity-50 ${
+                    isSelected
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {deckLength > 0 && (
+            <div className="mt-4 border-t border-[#E4D8CB] pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">
+                  Slides to export
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllExportSlides}
+                    disabled={isExporting || isWholeDeckSelected}
+                    className="text-[11px] font-bold text-[#8C7466] underline underline-offset-2 disabled:opacity-40"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearExportSlideSelection}
+                    disabled={isExporting || selectedExportCount === 0}
+                    className="text-[11px] font-bold text-[#8C7466] underline underline-offset-2 disabled:opacity-40"
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {renderedDeck.map((slide, index) => {
+                  const isSelected = selectedExportIndexes.has(index);
+                  return (
+                    <button
+                      key={`export-pick-${slide.id}`}
+                      type="button"
+                      onClick={() => toggleExportSlide(index)}
+                      disabled={isExporting}
+                      aria-pressed={isSelected}
+                      title={slide.headline || `Slide ${index + 1}`}
+                      className={`rounded-[8px] border px-3 py-1.5 text-[12px] font-bold tabular-nums transition disabled:opacity-50 ${
+                        isSelected
+                          ? 'border-[#142334] bg-[#142334] text-white'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/55 hover:border-[#C9AD98] hover:bg-white'
+                      }`}
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[12px] text-[#142334]/58">
+                {selectedExportCount === 0
+                  ? 'No slides selected.'
+                  : isWholeDeckSelected
+                    ? `Exporting the full ${deckLength}-slide deck.`
+                    : `Exporting ${selectedExportCount} of ${deckLength} slides.`}
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="mt-5 flex flex-wrap gap-3">
           <button type="button" onClick={onStartDraft} className="studio-primary-button">
             Start from Content Studio <ChevronRight className="h-4 w-4" />
@@ -11124,20 +11322,24 @@ function CarouselStudioPanel({
           <button
             type="button"
             onClick={() => void exportCarousel('pdf')}
-            disabled={!latestDraft || isExporting}
+            disabled={!latestDraft || isExporting || selectedExportCount === 0}
             className="studio-secondary-button"
           >
             {isExporting && exportState?.mode === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            Export PDF
+            {isWholeDeckSelected || selectedExportCount === 0
+              ? 'Export PDF'
+              : `Export PDF (${selectedExportCount})`}
           </button>
           <button
             type="button"
             onClick={() => void exportCarousel('png')}
-            disabled={!latestDraft || isExporting}
+            disabled={!latestDraft || isExporting || selectedExportCount === 0}
             className="studio-ghost-button"
           >
             {isExporting && exportState?.mode === 'png' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export PNGs
+            {isWholeDeckSelected || selectedExportCount === 0
+              ? `Export PNGs (${exportPixelScale}x)`
+              : `Export ${selectedExportCount} PNG${selectedExportCount === 1 ? '' : 's'} (${exportPixelScale}x)`}
           </button>
         </div>
         {exportState?.message && (
