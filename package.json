@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@calcom/embed-react": "^1.5.3",
+    "@imgly/background-removal": "^1.7.0",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.105.1",
     "@thednp/dommatrix": "^3.0.4",

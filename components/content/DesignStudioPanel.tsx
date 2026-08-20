@@ -38,6 +38,7 @@ import {
   RefreshCcw,
   RotateCw,
   Save,
+  Scissors,
   Search,
   SendToBack,
   SlidersHorizontal,
@@ -6418,6 +6419,10 @@ export default function DesignStudioPanel({
   const [templateKindFilter, setTemplateKindFilter] = useState<DesignTemplateKind | 'all'>('all');
   const [templatesUseLocalFallback, setTemplatesUseLocalFallback] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
+  // CHANGE U: background removal runs in the browser and can take a while on
+  // first use while the model downloads, so it needs its own progress state.
+  const [backgroundRemovalBusy, setBackgroundRemovalBusy] = useState(false);
+  const [backgroundRemovalStatus, setBackgroundRemovalStatus] = useState('');
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
   const [templateMessage, setTemplateMessage] = useState('');
   const [canvasZoom, setCanvasZoom] = useState(100);
@@ -8185,6 +8190,57 @@ export default function DesignStudioPanel({
     patchLayer(layer.id, patch);
   }
 
+  // CHANGE U: cut the background out of a placed image.
+  //
+  // The result is registered as a NEW asset rather than overwriting the
+  // original, so the untouched image stays in the library and the change is a
+  // normal undoable layer edit rather than a destructive library mutation.
+  async function removeSelectedLayerBackground(layer: DesignAssetLayer) {
+    const asset = assetLibrary[layer.assetId];
+    if (!asset || backgroundRemovalBusy) return;
+
+    if (isSvgDesignAsset(asset)) {
+      setAssetLibraryMessage('SVG assets have no background to remove - they are already transparent shapes.');
+      return;
+    }
+
+    setBackgroundRemovalBusy(true);
+    setBackgroundRemovalStatus('Preparing the cut-out...');
+    try {
+      const { removeImageBackground } = await import('@/lib/content/background-removal');
+      const cutOutSrc = await removeImageBackground(asset.src, (progress) => {
+        setBackgroundRemovalStatus(
+          progress.ratio === null
+            ? progress.label
+            : `${progress.label} ${Math.round(progress.ratio * 100)}%`,
+        );
+      });
+
+      const size = await getImageNaturalSize(cutOutSrc);
+      const cutOutAsset: DesignAsset = {
+        id: createDesignId('brand-asset'),
+        name: `${asset.name} (cut out)`,
+        src: cutOutSrc,
+        category: 'Brand assets',
+        custom: true,
+        recolorable: false,
+        naturalWidth: size?.width,
+        naturalHeight: size?.height,
+      };
+
+      setBrandAssets((current) => [cutOutAsset, ...current]);
+      patchLayer(layer.id, { assetId: cutOutAsset.id, name: cutOutAsset.name } as Partial<DesignLayer>);
+      setAssetLibraryMessage(`Background removed. "${cutOutAsset.name}" was added to your assets.`);
+    } catch (error) {
+      setAssetLibraryMessage(
+        error instanceof Error ? `Could not remove the background: ${error.message}` : 'Could not remove the background.',
+      );
+    } finally {
+      setBackgroundRemovalBusy(false);
+      setBackgroundRemovalStatus('');
+    }
+  }
+
   function changeAssetLayerAsset(layer: DesignAssetLayer, assetId: DesignAssetId) {
     const asset = assetLibrary[assetId];
     if (!asset) return;
@@ -9863,6 +9919,27 @@ export default function DesignStudioPanel({
                               ))}
                             </select>
                           </label>
+
+                          {/* CHANGE U: cut the background out of a placed photo.
+                              Runs in this browser - the image is never uploaded. */}
+                          <div className="grid gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void removeSelectedLayerBackground(selectedLayer)}
+                              disabled={selectedLayer.locked || backgroundRemovalBusy}
+                              className="flex min-h-9 items-center justify-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#FBFAF8] disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              {backgroundRemovalBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Scissors className="h-3.5 w-3.5" />
+                              )}
+                              Remove background
+                            </button>
+                            {backgroundRemovalBusy && backgroundRemovalStatus && (
+                              <p className="text-[11px] leading-relaxed text-[#142334]/58">{backgroundRemovalStatus}</p>
+                            )}
+                          </div>
                           {selectedAsset?.groupedLayers?.length ? (
                             <button
                               type="button"
