@@ -11197,13 +11197,51 @@ function CarouselStudioPanel({
           };
         });
 
+        // CHANGE W: append the custom CTA slide as real vector pages. It is a
+        // design document rather than a carousel slide, so it is built by the
+        // design renderer and scaled to the deck's frame, then handed to the
+        // carousel document as trailing pages - one PDF, nothing rasterised.
+        let ctaPages: React.ReactNode = null;
+        let ctaNotice = '';
+        if (latestDraft.customCtaTemplateId && !isPartialExport) {
+          try {
+            const [{ loadCtaTemplatePdfInput }, { buildDesignPdfPages, scaleDesignPdfInput, getVectorExportBlocker }] =
+              await Promise.all([
+                import('@/components/content/DesignStudioPanel'),
+                import('@/components/content/DesignPdfDocument'),
+              ]);
+            const ctaInput = await loadCtaTemplatePdfInput(latestDraft.customCtaTemplateId, adminKey);
+            if (!ctaInput) {
+              ctaNotice = ' The custom CTA template is no longer saved, so it was left out.';
+            } else {
+              const ctaFonts = ctaInput.pages.flatMap((page) =>
+                page.layers.filter((layer) => layer.type === 'text').map((layer) => layer.fontFamily || ''),
+              );
+              const blocker = getVectorExportBlocker(ctaFonts);
+              if (blocker) {
+                ctaNotice = ` The custom CTA was left out: ${blocker}.`;
+              } else {
+                ctaPages = buildDesignPdfPages(
+                  scaleDesignPdfInput(ctaInput, dimensions.width, dimensions.height),
+                  'cta',
+                );
+              }
+            }
+          } catch (ctaError) {
+            console.warn('Could not append the custom CTA slide:', ctaError);
+            ctaNotice = ' The custom CTA slide could not be rendered, so it was left out.';
+          }
+        } else if (latestDraft.customCtaTemplateId && isPartialExport) {
+          ctaNotice = ' The custom CTA is only added when you export the whole deck.';
+        }
+
         let blob: Blob;
         // CHANGE J: the raster fallback used to be silent (console.warn only),
         // so a soft PDF looked identical to a sharp one from the outside. Track
         // it and say so in the UI.
         let rasterFallbackReason: string | null = null;
         try {
-          blob = await renderCarouselPdfBlob(pdfSlides, displayedTemplateOption);
+          blob = await renderCarouselPdfBlob(pdfSlides, displayedTemplateOption, ctaPages);
         } catch (pdfError) {
           // CHANGE I fallback: if the vector document fails to render, fall
           // back to the raster capture embedded page-for-page so export never
@@ -11238,7 +11276,7 @@ function CarouselStudioPanel({
           mode,
           message: rasterFallbackReason
             ? `Downloaded ${exportTargets.length}-page PDF as a ${exportPixelScale}x image fallback - the vector renderer failed (${rasterFallbackReason}). Text will not stay crisp past 200%.`
-            : `Downloaded ${exportTargets.length}-page vector PDF.`,
+            : `Downloaded ${exportTargets.length + (ctaPages ? 1 : 0)}-page vector PDF${ctaPages ? ', custom CTA included' : ''}.${ctaNotice}`,
           tone: rasterFallbackReason ? 'error' : 'info',
         });
         return;
@@ -11528,7 +11566,7 @@ function CarouselStudioPanel({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Custom CTA slide</p>
                 <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-[#142334]/58">
                   Your own closing slide - follow, promo, or masterclass - kept separate from the CTA this post argues for.
-                  It is appended as the last slide when you open the deck in Design Studio.
+                  It is appended as the last slide of the exported PDF, and when you open the deck in Design Studio.
                 </p>
               </div>
               {selectedCtaTemplate && <Badge className="bg-[#142334] text-white">On</Badge>}
@@ -11588,8 +11626,8 @@ function CarouselStudioPanel({
 
             {selectedCtaTemplate && (
               <p className="mt-3 text-[12px] leading-relaxed text-[#142334]/58">
-                Deck exports from here stay at {deckLength} slides. The CTA slide is added when you open this draft in
-                Design Studio, so export from there to include it.
+                PDF export gives you {deckLength + 1} pages - the deck plus this CTA, drawn as vector.
+                PNG frames stay at {deckLength}, since the CTA is a design page rather than a carousel slide.
               </p>
             )}
           </div>
