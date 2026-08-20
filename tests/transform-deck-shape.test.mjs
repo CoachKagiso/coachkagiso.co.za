@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildDeckShapeSection } from '../lib/content/transform-deck-shape.ts';
+import { buildDeckShapeSection, buildTemplateRequestSection } from '../lib/content/transform-deck-shape.ts';
 import { CAROUSEL_SLIDE_ROLES } from '../lib/content/carousel-template-registry.ts';
 
 test('a text post carries no deck shape, so Stage 2 sees nothing extra', () => {
@@ -57,4 +57,40 @@ test('an unknown role still renders rather than vanishing from the arc', () => {
   // if anything ever reaches it unrecognised.
   const section = buildDeckShapeSection({ slideCount: 2, slideArc: ['cover', 'insight'] });
   assert.match(section, /2\. insight/);
+});
+
+test('mechanism fields reach the rebuild prompt', () => {
+  const section = buildDeckShapeSection({
+    slideCount: 9,
+    slideArc: ['cover', 'step', 'cta'],
+    hookTechnique: 'Consensus Bias -> Information Gap',
+    intraSlideLoop: ['Principle', 'Bold rule', 'Punchline'],
+    pacing: { sentence: '4-12 words', breath: 'Double break', close: 'Under 6 words' },
+    valueMethod: 'Deconstructed swipe file.',
+    ctaLayers: ['Share - low effort', 'Follow - humour disarms'],
+    emotionalArc: { start: 'Frustrated', middle: 'Capable', end: 'Included' },
+  });
+
+  assert.match(section, /Consensus Bias -> Information Gap/);
+  assert.match(section, /Principle -> Bold rule -> Punchline/);
+  assert.match(section, /Sentence: 4-12 words/);
+  assert.match(section, /1\. Share - low effort/);
+  assert.match(section, /Frustrated -> Capable -> Included/);
+});
+
+test('the rebuild is reminded it never saw the source', () => {
+  const section = buildDeckShapeSection({ slideCount: 3, slideArc: ['cover', 'step', 'cta'] });
+  assert.match(section, /you have never seen the source/);
+});
+
+test('a text post asks for no template', () => {
+  assert.equal(buildTemplateRequestSection({}), '');
+  assert.equal(buildTemplateRequestSection({ valueMethod: 'anything' }), '');
+});
+
+test('a deck asks for a bracketed mould after the finished piece', () => {
+  const section = buildTemplateRequestSection({ slideCount: 9, slideArc: ['cover', 'step', 'cta'] });
+  assert.match(section, /--- REUSABLE TEMPLATE ---/);
+  assert.match(section, /square-bracket placeholder/);
+  assert.match(section, /no sentence from any source deck/);
 });

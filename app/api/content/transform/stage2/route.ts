@@ -2,25 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
-import { buildDeckShapeSection } from '@/lib/content/transform-deck-shape';
+import {
+  buildDeckShapeSection,
+  buildTemplateRequestSection,
+  type DeckShape,
+} from '@/lib/content/transform-deck-shape';
 
 export const dynamic = 'force-dynamic';
 
-type ExtractedFramework = {
+// The carousel half is DeckShape itself, so a field added to the extraction can
+// never be silently dropped here by a type that forgot to declare it.
+type ExtractedFramework = DeckShape & {
   hookPattern?: string;
   emotionalTension?: string;
   storyStructure?: string;
   ctaStyle?: string;
   formatLogic?: string;
   suggestedPillar?: string;
-  // Present only when the source was a carousel deck. Stage 1 constrains the arc
-  // and recipe to the registry vocabulary precisely so they can be replayed here.
-  slideCount?: number;
-  slideArc?: string[];
-  layoutRecipe?: string;
-  copyDensity?: string;
-  visualPattern?: string;
-  whatMakesItWork?: string;
 };
 
 function optionalString(value: unknown) {
@@ -92,7 +90,7 @@ BUILD RULES:
 - If the user specified a platform, follow it and infer the strongest format for that platform
 - If no platform is specified, infer both the strongest platform and strongest format from the structural framework
 - State at the top: PLATFORM: [platform] | PILLAR: [pillar] | WRITING REGISTER: [register]
-`;
+${buildTemplateRequestSection(framework)}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -145,7 +143,7 @@ export async function POST(req: NextRequest) {
           },
           { role: 'user', content: buildStage2UserPrompt(framework, platform, contentType, subType, targetPillar, targetRegister, userDirection, calendarContext) },
         ],
-        max_tokens: 1800,
+        max_tokens: 3000,
         temperature: 0.75,
       })),
     });

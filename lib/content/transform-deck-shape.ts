@@ -14,6 +14,12 @@ export type DeckShape = {
   copyDensity?: string;
   visualPattern?: string;
   whatMakesItWork?: string;
+  hookTechnique?: string;
+  intraSlideLoop?: string[];
+  pacing?: { sentence?: string; breath?: string; close?: string };
+  valueMethod?: string;
+  ctaLayers?: string[];
+  emotionalArc?: { start?: string; middle?: string; end?: string };
 };
 
 /**
@@ -62,6 +68,29 @@ export function buildDeckShapeSection(framework: DeckShape): string {
   if (framework.copyDensity) {
     lines.push(`Copy density on inner slides: ${framework.copyDensity}`);
   }
+  if (framework.hookTechnique) {
+    lines.push(`Opening technique to reproduce with your own material: ${framework.hookTechnique}`);
+  }
+  if (framework.intraSlideLoop?.length) {
+    lines.push(`Repeat this beat pattern on every inner slide: ${framework.intraSlideLoop.join(' -> ')}`);
+  }
+  if (framework.pacing?.sentence || framework.pacing?.breath || framework.pacing?.close) {
+    lines.push('Pacing rules to hold:');
+    if (framework.pacing.sentence) lines.push(`  Sentence: ${framework.pacing.sentence}`);
+    if (framework.pacing.breath) lines.push(`  Breath: ${framework.pacing.breath}`);
+    if (framework.pacing.close) lines.push(`  Slide close: ${framework.pacing.close}`);
+  }
+  if (framework.valueMethod) {
+    lines.push(`How value is delivered: ${framework.valueMethod}`);
+  }
+  if (framework.ctaLayers?.length) {
+    lines.push('Closing layers, in order:');
+    lines.push(framework.ctaLayers.map((layer, index) => `  ${index + 1}. ${layer}`).join('\n'));
+  }
+  const arcBeats = [framework.emotionalArc?.start, framework.emotionalArc?.middle, framework.emotionalArc?.end].filter(Boolean);
+  if (arcBeats.length > 0) {
+    lines.push(`Emotional arc to move the reader through: ${arcBeats.join(' -> ')}`);
+  }
   if (framework.visualPattern) {
     lines.push(`Visual rhythm: ${framework.visualPattern}`);
   }
@@ -72,6 +101,36 @@ export function buildDeckShapeSection(framework: DeckShape): string {
   lines.push(
     'If the rebuild is a carousel, follow this arc slide for slide. If it is any other format, use the arc as the order of ideas rather than as slides.',
   );
+  lines.push(
+    'Everything above describes how the source deck was built. None of it is the source\'s wording, and you have never seen the source. Reproduce the mechanism with Kagiso\'s own material.',
+  );
 
   return `\n${lines.join('\n')}\n`;
+}
+
+/**
+ * Asks Stage 2 for the reusable fill-in template alongside the finished deck.
+ *
+ * The template is generated here, not in Stage 1, and that placement is the
+ * whole firewall: Stage 1 extracts mechanism and never quotes, so by the time a
+ * mould is written the source's sentences are already gone. Punching holes in
+ * the source instead would produce a template that reads as the original
+ * author's deck with the nouns swapped.
+ *
+ * Returns an empty string when there is no deck shape, so a text-post rebuild is
+ * unaffected.
+ */
+export function buildTemplateRequestSection(framework: DeckShape): string {
+  const arc = Array.isArray(framework.slideArc) ? framework.slideArc.filter(Boolean) : [];
+  if (arc.length === 0 && !framework.slideCount) return '';
+
+  return `
+ALSO RETURN A REUSABLE TEMPLATE:
+After the finished piece, add a section headed exactly "--- REUSABLE TEMPLATE ---".
+Under it, write the same deck as a blank mould Kagiso can reuse for any future topic.
+- One block per slide, headed "SLIDE n - role" using the arc roles above.
+- Write the connecting words in Kagiso's voice, and replace every topic-specific noun, example, and claim with a square-bracket placeholder that says what belongs there, for example [THE ADVICE EVERYONE REPEATS] or [YOUR OWN EXAMPLE - 8 WORDS MAX].
+- The template must carry no sentence from the finished piece above that names its topic, and no sentence from any source deck.
+- Hold the pacing rules and the beat pattern in the template itself, so the shape survives when the brackets are filled.
+`;
 }
