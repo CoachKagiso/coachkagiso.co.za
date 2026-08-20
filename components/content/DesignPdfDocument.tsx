@@ -298,32 +298,76 @@ function AssetLayer({ layer }: { layer: DesignPdfLayer }) {
   );
 }
 
+/**
+ * The pages on their own, so they can be appended to another document - a
+ * carousel deck plus a custom CTA slide, for instance - rather than only
+ * standing alone.
+ */
+export function buildDesignPdfPages(design: DesignPdfInput, keyPrefix = 'design') {
+  registerDesignPdfFonts();
+  return design.pages.map((page, pageIndex) => (
+    <Page
+      key={`${keyPrefix}-${page.id}-${pageIndex}`}
+      size={{ width: design.width, height: design.height }}
+      style={{ position: 'relative', backgroundColor: page.background || '#FFFFFF' }}
+    >
+      {page.layers
+        .filter((layer) => layer.visible)
+        .map((layer) => (
+          <LayerFrame key={layer.id} layer={layer}>
+            {layer.type === 'text' ? (
+              <TextLayer layer={layer} />
+            ) : layer.type === 'shape' ? (
+              <ShapeLayer layer={layer} />
+            ) : (
+              <AssetLayer layer={layer} />
+            )}
+          </LayerFrame>
+        ))}
+    </Page>
+  ));
+}
+
+/**
+ * Rescales a design to another frame, preserving aspect ratio and centring what
+ * is left over. A CTA template designed at one size has to sit flush with the
+ * deck it is appended to, and stretching it would distort the artwork.
+ */
+export function scaleDesignPdfInput(
+  design: DesignPdfInput,
+  targetWidth: number,
+  targetHeight: number,
+): DesignPdfInput {
+  if (design.width === targetWidth && design.height === targetHeight) return design;
+
+  const scale = Math.min(targetWidth / design.width, targetHeight / design.height);
+  const offsetX = (targetWidth - design.width * scale) / 2;
+  const offsetY = (targetHeight - design.height * scale) / 2;
+  const size = (value: number | undefined) => (typeof value === 'number' ? value * scale : value);
+
+  return {
+    width: targetWidth,
+    height: targetHeight,
+    pages: design.pages.map((page) => ({
+      ...page,
+      layers: page.layers.map((layer) => ({
+        ...layer,
+        x: layer.x * scale + offsetX,
+        y: layer.y * scale + offsetY,
+        width: layer.width * scale,
+        height: layer.height * scale,
+        fontSize: size(layer.fontSize),
+        padding: size(layer.padding),
+        borderRadius: size(layer.borderRadius),
+        strokeWidth: size(layer.strokeWidth),
+        letterSpacing: size(layer.letterSpacing),
+      })),
+    })),
+  };
+}
+
 function DesignPdfDocument({ design }: { design: DesignPdfInput }) {
-  return (
-    <Document>
-      {design.pages.map((page) => (
-        <Page
-          key={page.id}
-          size={{ width: design.width, height: design.height }}
-          style={{ position: 'relative', backgroundColor: page.background || '#FFFFFF' }}
-        >
-          {page.layers
-            .filter((layer) => layer.visible)
-            .map((layer) => (
-              <LayerFrame key={layer.id} layer={layer}>
-                {layer.type === 'text' ? (
-                  <TextLayer layer={layer} />
-                ) : layer.type === 'shape' ? (
-                  <ShapeLayer layer={layer} />
-                ) : (
-                  <AssetLayer layer={layer} />
-                )}
-              </LayerFrame>
-            ))}
-        </Page>
-      ))}
-    </Document>
-  );
+  return <Document>{buildDesignPdfPages(design)}</Document>;
 }
 
 export async function renderDesignPdfBlob(design: DesignPdfInput): Promise<Blob> {

@@ -74,6 +74,7 @@ import {
 } from '@/lib/content/carousel-template-registry';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
+import type { DesignPdfInput } from '@/components/content/DesignPdfDocument';
 import {
   DESIGN_DOCUMENT_LEGACY_STORAGE_KEY,
   clearLocalDesignMirror,
@@ -2276,6 +2277,109 @@ export async function readDesignCtaTemplateSummaries(adminKey?: string): Promise
       height: record.height,
       updatedAt: record.updatedAt,
     }));
+}
+
+/**
+ * CHANGE W: the full CTA template, converted to the shape the vector PDF
+ * renderer draws. Carousel Studio needs this to append the CTA as a real page
+ * in its own export, rather than only when the deck is opened in Design Studio.
+ *
+ * SVG assets are rasterised here because React PDF cannot read them; the rest
+ * of the page stays vector.
+ */
+/**
+ * Built-in assets plus whatever brand assets this browser holds. The component
+ * merges these in state; a module-level export has to read the stored copy.
+ */
+function readAssetLibrarySnapshot(): Record<string, DesignAsset> {
+  if (typeof window === 'undefined') return designAssetLibrary;
+  try {
+    const raw = window.localStorage.getItem(BRAND_ASSETS_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (!Array.isArray(parsed)) return designAssetLibrary;
+    const custom = parsed.filter((asset): asset is DesignAsset => isDesignAsset(asset));
+    return custom.reduce<Record<string, DesignAsset>>(
+      (acc, asset) => ({ ...acc, [asset.id]: asset }),
+      { ...designAssetLibrary },
+    );
+  } catch {
+    return designAssetLibrary;
+  }
+}
+
+export async function loadCtaTemplatePdfInput(
+  templateId: string,
+  adminKey?: string,
+): Promise<DesignPdfInput | null> {
+  const result = await loadDesignTemplates(adminKey);
+  const record = result.templates
+    .filter((item): item is DesignTemplateRecord => isDesignTemplateRecord(item))
+    .find((item) => item.id === templateId);
+
+  const page = record?.document.pages[0];
+  if (!record || !page) return null;
+
+  const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
+  const assets = readAssetLibrarySnapshot();
+  const layers = [];
+
+  for (const layer of page.layers) {
+    const base = {
+      id: layer.id,
+      type: layer.type,
+      x: layer.x,
+      y: layer.y,
+      width: layer.width,
+      height: layer.height,
+      rotation: layer.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      flipX: layer.flipX,
+      flipY: layer.flipY,
+      borderRadius: getLayerBaseBorderRadius(layer),
+    };
+
+    if (layer.type === 'text') {
+      layers.push({
+        ...base,
+        text: layer.text,
+        fontFamily: layer.fontFamily,
+        fontSize: layer.fontSize,
+        fontWeight: layer.fontWeight,
+        color: layer.color,
+        lineHeight: layer.lineHeight,
+        textAlign: layer.textAlign,
+        backgroundColor: layer.backgroundColor,
+        padding: layer.padding,
+        letterSpacing: layer.letterSpacing,
+        textTransform: layer.textTransform,
+        textDecoration: layer.textDecoration,
+        fontStyle: layer.fontStyle,
+      });
+    } else if (layer.type === 'shape') {
+      layers.push({
+        ...base,
+        shape: layer.shape,
+        fillColor: layer.fillColor,
+        strokeColor: layer.strokeColor,
+        strokeWidth: layer.strokeWidth,
+      });
+    } else {
+      const asset = assets[layer.assetId];
+      const imageSrc = asset
+        ? (isSvgDesignAsset(asset)
+            ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
+            : asset.src)
+        : undefined;
+      layers.push({ ...base, imageSrc, fit: layer.fit });
+    }
+  }
+
+  return {
+    width: record.width,
+    height: record.height,
+    pages: [{ id: page.id, background: page.background, layers }],
+  };
 }
 
 function isDesignStudioCarouselImport(value: unknown): value is DesignStudioCarouselImport {
