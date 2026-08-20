@@ -46,6 +46,7 @@ const funnelActivityLabels: Record<DashboardNotificationEventType, string> = {
   payment_confirmed: 'Payment',
   intake_submitted: 'Intake',
   cal_booking: 'Cal.com',
+  email_backlog_due: 'Email backlog',
 };
 
 function formatDate(value: string) {

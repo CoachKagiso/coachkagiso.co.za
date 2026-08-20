@@ -48,6 +48,15 @@ type AssistantResult =
       meta?: AssistantResponseMeta;
     }
   | {
+      type: 'email_batch';
+      message: string;
+      batch: {
+        leadIds: string[];
+        note: string;
+      };
+      meta?: AssistantResponseMeta;
+    }
+  | {
       type: 'content_draft';
       message: string;
       draft: {
@@ -176,6 +185,24 @@ function normalizeAssistantResult(value: unknown): AssistantResult | null {
         body,
         templateId: cleanString(draft.templateId, 120),
         leadId: cleanString(draft.leadId, 120),
+      },
+    };
+  }
+
+  if (type === 'email_batch' && result.batch && typeof result.batch === 'object') {
+    const batch = result.batch as Record<string, unknown>;
+    const leadIds = Array.isArray(batch.leadIds)
+      ? Array.from(new Set(batch.leadIds.map((leadId) => cleanString(leadId, 120)).filter(Boolean))).slice(0, 40)
+      : [];
+
+    if (leadIds.length === 0) return { type: 'answer', message };
+
+    return {
+      type,
+      message,
+      batch: {
+        leadIds,
+        note: cleanString(batch.note, 400),
       },
     };
   }

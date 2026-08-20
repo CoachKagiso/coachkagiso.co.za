@@ -2,6 +2,7 @@ import { listClientOperations, type ClientOperation } from '@/lib/client-operati
 import { listContentBacklogItems, type ContentBacklogItem } from '@/lib/content-studio';
 import { listMergedCalendarEvents } from '@/lib/dashboard-calendar';
 import { listDiagnosticSubmissions, type DiagnosticSubmission } from '@/lib/diagnostic-submissions';
+import { buildEmailBacklog, type EmailBacklogItem } from '@/lib/email-backlog';
 import { listInboundEmailReplies, type InboundEmailReply } from '@/lib/inbound-email-replies';
 import { leadSourceLabels, type DiagnosticLeadSource } from '@/lib/lead-sources';
 import { SafeFetchError, fetchPublicUrl, readBoundedText } from '@/lib/safe-fetch';
@@ -27,6 +28,7 @@ type AccessRequest = {
   wantsPayments: boolean;
   wantsBookings: boolean;
   wantsExternalUrls: boolean;
+  wantsBacklog: boolean;
 };
 
 const localTimeZone = 'Africa/Johannesburg';
@@ -132,6 +134,10 @@ function parseAccessRequest(message: string): AccessRequest {
     wantsPayments: /\bpayment|paid|payfast|revenue|finance|checkout|intake|delivery|client operations?\b/i.test(message),
     wantsBookings: /\bbooking|bookings|calendar|cal\.com|session|appointment|masterclass date|schedule/i.test(message),
     wantsExternalUrls: urls.length > 0 || /\blink|website|external url|page/i.test(message),
+    wantsBacklog:
+      /\boverdue|email backlog|behind on|due today|what(?:'s| is) due|outstanding|follow-?ups? due|catch up|clear the (?:queue|backlog)|pending emails?|schedule (?:the )?(?:overdue|due|follow-?up|backlog)/i.test(
+        message,
+      ),
   };
 }
 
@@ -386,6 +392,45 @@ async function buildLiveMailboxBlock(request: AccessRequest): Promise<AccessBloc
   };
 }
 
+function formatBacklogItem(item: EmailBacklogItem) {
+  return [
+    `- ${item.firstName} <${item.email}> [leadId: ${item.leadId}]`,
+    `  ${item.urgencyLabel}; due ${item.nextFollowUpAt}; source: ${item.sourceLabel}; archetype: ${item.archetype}`,
+    item.blocked
+      ? `  BLOCKED: ${item.blockedReason} Kagiso has to handle this one in the lead email modal.`
+      : `  Ready to schedule: ${item.stageLabel} (template ${item.templateId}); subject: ${item.subject}`,
+  ].join('\n');
+}
+
+async function buildEmailBacklogBlock(request: AccessRequest): Promise<AccessBlock | null> {
+  if (!request.wantsBacklog) return null;
+
+  const backlog = await buildEmailBacklog().catch((error) => ({
+    error: error instanceof Error ? error.message : 'Unknown backlog error',
+  }));
+
+  if ('error' in backlog) {
+    return {
+      name: 'getEmailBacklog',
+      description: 'Read-only follow-up email backlog.',
+      content: `Backlog lookup failed: ${backlog.error}`,
+    };
+  }
+
+  return {
+    name: 'getEmailBacklog',
+    description:
+      'Read-only follow-up email backlog: every lead whose next follow-up is overdue, due today, or due tomorrow, with the next template already resolved. Nothing here has been sent or scheduled.',
+    content: [
+      `Backlog generated ${formatDateTime(backlog.generatedAt)} (today is ${backlog.today}).`,
+      `Overdue: ${backlog.counts.overdue}; due today: ${backlog.counts.dueToday}; due tomorrow: ${backlog.counts.dueTomorrow}.`,
+      `Ready to schedule: ${backlog.counts.sendable}; blocked and needing Kagiso by hand: ${backlog.counts.blocked}; oldest is ${backlog.oldestDaysOverdue} day(s) overdue.`,
+      '',
+      ...backlog.items.slice(0, 40).map(formatBacklogItem),
+    ].join('\n'),
+  };
+}
+
 async function buildVaultAccessBlock(request: AccessRequest): Promise<AccessBlock | null> {
   if (!request.wantsVault) return null;
   const items = await listContentBacklogItems();
@@ -522,6 +567,7 @@ export async function buildAssistantAccessContext(
     buildLeadAccessBlock(request),
     buildEmailAccessBlock(request),
     buildLiveMailboxBlock(request),
+    buildEmailBacklogBlock(request),
     buildVaultAccessBlock(request),
     buildPaymentAccessBlock(request),
     buildBookingAccessBlock(request, adminKey),

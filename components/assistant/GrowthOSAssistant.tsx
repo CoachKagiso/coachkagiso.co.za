@@ -38,6 +38,12 @@ import {
   type AssistantSavedConversation,
 } from '@/lib/assistant-preferences';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { plainTextToEmailHtml } from '@/lib/email-template-render';
+import {
+  DEFAULT_BACKLOG_EMAILS_PER_WINDOW,
+  describeScheduledSend,
+  planBacklogSendSchedule,
+} from '@/lib/email-send-windows';
 import { buildDashboardAuthUrl, getDashboardLegacyKey } from '@/lib/dashboard-auth-url';
 
 type AssistantRecommendationItem = {
@@ -61,6 +67,39 @@ type EmailDraft = {
   leadId: string;
 };
 
+type EmailBatchProposal = {
+  leadIds: string[];
+  note: string;
+};
+
+type BacklogItem = {
+  leadId: string;
+  firstName: string;
+  email: string;
+  archetype: string;
+  sourceLabel: string;
+  urgency: 'overdue' | 'today' | 'tomorrow';
+  urgencyLabel: string;
+  daysOverdue: number;
+  stageLabel: string;
+  subject: string;
+  blocked: boolean;
+  blockedReason: string;
+};
+
+type BacklogResponse = {
+  items?: BacklogItem[];
+  error?: string;
+};
+
+type BatchCardState = {
+  status: 'loading' | 'ready' | 'error' | 'done';
+  items: BacklogItem[];
+  excluded: Record<string, boolean>;
+  error?: string;
+  summary?: string;
+};
+
 type ContentDraft = {
   platform: string;
   contentType: string;
@@ -71,6 +110,7 @@ type AssistantResponse =
   | { type: 'answer'; message: string; meta?: AssistantResponseMeta }
   | { type: 'recommendation'; message: string; items: AssistantRecommendationItem[]; meta?: AssistantResponseMeta }
   | { type: 'email_draft'; message: string; draft: EmailDraft; meta?: AssistantResponseMeta }
+  | { type: 'email_batch'; message: string; batch: EmailBatchProposal; meta?: AssistantResponseMeta }
   | { type: 'content_draft'; message: string; draft: ContentDraft; meta?: AssistantResponseMeta };
 
 type AssistantMessage = {
@@ -198,21 +238,23 @@ function containAssistantWheel<T extends HTMLElement>(event: WheelEvent<T>) {
   el.scrollTop += deltaY;
 }
 
-function plainTextToEmailHtml(value: string) {
-  const escaped = value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-  const paragraphs = escaped
-    .split(/\r?\n\r?\n+/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-    .map((chunk) => `<p style="margin: 0 0 16px;">${chunk.replace(/\r?\n/g, '<br>')}</p>`)
-    .join('');
+const ASSISTANT_INPUT_MIN_HEIGHT = 40;
+const ASSISTANT_INPUT_MAX_HEIGHT = 200;
+/** Past this height the composer is tall enough that the suggestion chips are in the way. */
+const ASSISTANT_INPUT_TALL_HEIGHT = 72;
 
-  return `<div style="font-family: Arial, sans-serif; font-size: 15px; color: #142334; line-height: 1.7; max-width: 560px;">${paragraphs}</div>`;
+function fitAssistantInput(textarea: HTMLTextAreaElement) {
+  textarea.style.height = 'auto';
+  // scrollHeight excludes the borders, but box-sizing is border-box, so without
+  // adding them back the last line loses a pixel or two off the bottom.
+  const styles = getComputedStyle(textarea);
+  const borders = parseFloat(styles.borderTopWidth) + parseFloat(styles.borderBottomWidth);
+  const content = textarea.scrollHeight + (Number.isFinite(borders) ? borders : 0);
+  const next = Math.min(Math.max(content, ASSISTANT_INPUT_MIN_HEIGHT), ASSISTANT_INPUT_MAX_HEIGHT);
+  textarea.style.height = `${next}px`;
+  // Only let the textarea scroll once it has actually hit the ceiling.
+  textarea.style.overflowY = content > ASSISTANT_INPUT_MAX_HEIGHT ? 'auto' : 'hidden';
+  return next;
 }
 
 function getFirstDraftLine(value: string) {
@@ -260,6 +302,8 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
   const [editingEmailCards, setEditingEmailCards] = useState<Record<string, boolean>>({});
   const [emailEdits, setEmailEdits] = useState<Record<string, EmailDraftEdit>>({});
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
+  const [batchCards, setBatchCards] = useState<Record<string, BatchCardState>>({});
+  const [inputHeight, setInputHeight] = useState(ASSISTANT_INPUT_MIN_HEIGHT);
   const [assistantPreferences, setAssistantPreferences] = useState<AssistantPreferences>(DEFAULT_ASSISTANT_PREFERENCES);
   const [conversationStore, setConversationStore] = useState<AssistantConversationStore>(DEFAULT_ASSISTANT_CONVERSATIONS);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -770,6 +814,255 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
     }
   }
 
+  // Keep the composer sized to its content. Width changes with the panel, so a
+  // re-fit on open/expand keeps a wrapped message from being clipped.
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    setInputHeight(fitAssistantInput(textarea));
+  }, [input, isOpen, isExpanded]);
+
+  // A proposed batch arrives as lead ids only. The details are pulled from the
+  // backlog endpoint so the card always shows current, server-resolved stages.
+  useEffect(() => {
+    const pendingBatchCards = messages.filter(
+      (message) => message.response?.type === 'email_batch' && !batchCards[message.id],
+    );
+
+    for (const message of pendingBatchCards) {
+      if (message.response?.type !== 'email_batch') continue;
+      void loadBatchCard(message.id, message.response.batch.leadIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, batchCards]);
+
+  async function loadBatchCard(messageId: string, leadIds: string[]) {
+    setBatchCards((current) => ({
+      ...current,
+      [messageId]: { status: 'loading', items: [], excluded: {} },
+    }));
+
+    try {
+      const response = await fetch(`/api/email/backlog?key=${encodeURIComponent(adminKey)}`);
+      const data = (await response.json().catch(() => ({}))) as BacklogResponse;
+      if (!response.ok) throw new Error(data.error || 'Backlog unavailable.');
+
+      const byId = new Map((data.items || []).map((item) => [item.leadId, item]));
+      const items = leadIds
+        .map((leadId) => byId.get(leadId))
+        .filter((item): item is BacklogItem => Boolean(item && !item.blocked));
+
+      setBatchCards((current) => ({
+        ...current,
+        [messageId]: { status: 'ready', items, excluded: {} },
+      }));
+    } catch (error) {
+      setBatchCards((current) => ({
+        ...current,
+        [messageId]: {
+          status: 'error',
+          items: [],
+          excluded: {},
+          error: error instanceof Error ? error.message : 'Could not load the backlog.',
+        },
+      }));
+    }
+  }
+
+  async function handleApproveBatch(messageId: string) {
+    const card = batchCards[messageId];
+    if (!card || card.status !== 'ready' || busyActionId) return;
+
+    const included = card.items.filter((item) => !card.excluded[item.leadId]);
+    if (included.length === 0) {
+      appendAssistantAnswer('Every lead in that batch is excluded. Nothing to schedule.');
+      return;
+    }
+
+    setBusyActionId(messageId);
+    try {
+      const response = await fetch('/api/email/backlog/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: adminKey,
+          items: included.map((item) => ({ leadId: item.leadId })),
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        scheduled?: number;
+        skipped?: number;
+        results?: Array<{ firstName: string; status: string; reason?: string; scheduledAt: string | null }>;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error || 'Scheduling failed.');
+
+      const skippedNotes = (data.results || [])
+        .filter((result) => result.status === 'skipped')
+        .map((result) => `${result.firstName || 'A lead'}: ${result.reason || 'skipped'}`);
+
+      setBatchCards((current) => ({
+        ...current,
+        [messageId]: {
+          ...card,
+          status: 'done',
+          summary: `${data.scheduled || 0} scheduled${data.skipped ? `, ${data.skipped} skipped` : ''}.`,
+        },
+      }));
+
+      appendAssistantAnswer(
+        [
+          `${data.scheduled || 0} follow-up email${data.scheduled === 1 ? '' : 's'} scheduled. Each lead moved to contacted and the next follow-up date is set.`,
+          skippedNotes.length ? `Skipped:\n- ${skippedNotes.join(`\n- `)}` : '',
+        ]
+          .filter(Boolean)
+          .join(`\n\n`),
+      );
+      router.refresh();
+    } catch (error) {
+      appendAssistantAnswer(
+        error instanceof Error ? `Nothing was scheduled. ${error.message}` : 'Nothing was scheduled. Try again.',
+      );
+    } finally {
+      setBusyActionId(null);
+    }
+  }
+
+  function renderEmailBatchCard(messageId: string, batch: EmailBatchProposal) {
+    if (removedActionCards[messageId]) return null;
+
+    const card = batchCards[messageId];
+    if (!card || card.status === 'loading') {
+      return (
+        <div className="mt-3 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-4 text-[13px] text-[#6B6B6B]">
+          Checking the backlog for these {batch.leadIds.length} leads...
+        </div>
+      );
+    }
+
+    if (card.status === 'error') {
+      return (
+        <div className="mt-3 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-4 text-[13px] text-[#DC2626]">
+          {card.error}
+        </div>
+      );
+    }
+
+    if (card.status === 'done') {
+      return (
+        <div className="mt-3 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-4 text-[13px] text-[#142334]">
+          {card.summary}
+        </div>
+      );
+    }
+
+    if (card.items.length === 0) {
+      return (
+        <div className="mt-3 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-4 text-[13px] text-[#6B6B6B]">
+          None of those leads are still ready to schedule. Refresh the backlog and ask again.
+        </div>
+      );
+    }
+
+    const included = card.items.filter((item) => !card.excluded[item.leadId]);
+    const plan = planBacklogSendSchedule(included.length, new Date(), DEFAULT_BACKLOG_EMAILS_PER_WINDOW);
+    const planByLeadId = new Map(included.map((item, index) => [item.leadId, plan[index]]));
+
+    return (
+      <div className="mt-3 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-4 text-[#142334] shadow-[0_10px_22px_rgba(20,35,52,0.08)]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8C7466]">Follow-up batch</p>
+            <p className="mt-2 text-[14px] font-semibold leading-snug">
+              {included.length} email{included.length === 1 ? '' : 's'} ready to schedule
+            </p>
+          </div>
+          <Sparkles className="h-4 w-4 shrink-0 text-[#C9AD98]" />
+        </div>
+
+        {batch.note && <p className="mt-2 text-[12px] leading-relaxed text-[#6B6B6B]">{batch.note}</p>}
+
+        <ul className="mt-3 grid gap-2">
+          {card.items.map((item) => {
+            const excluded = Boolean(card.excluded[item.leadId]);
+            const scheduledAt = planByLeadId.get(item.leadId);
+
+            return (
+              <li
+                key={item.leadId}
+                className={`rounded-[8px] border border-[#E4D8CB] bg-white p-3 transition ${excluded ? 'opacity-50' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold leading-snug">{item.firstName}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-[#6B6B6B]">{item.email}</p>
+                    <p className="mt-1 text-[11px] text-[#6B6B6B]">
+                      {item.stageLabel} &middot; {item.sourceLabel}
+                    </p>
+                    {!excluded && scheduledAt && (
+                      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8C7466]">
+                        Sends {describeScheduledSend(scheduledAt)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-[0.1em] ${
+                        item.urgency === 'overdue'
+                          ? 'text-[#DC2626]'
+                          : item.urgency === 'today'
+                            ? 'text-[#A16207]'
+                            : 'text-[#6B7280]'
+                      }`}
+                    >
+                      {item.urgencyLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBatchCards((current) => ({
+                          ...current,
+                          [messageId]: {
+                            ...card,
+                            excluded: { ...card.excluded, [item.leadId]: !excluded },
+                          },
+                        }))
+                      }
+                      className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:text-[#142334]"
+                    >
+                      {excluded ? 'Add back' : 'Skip'}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleApproveBatch(messageId)}
+            disabled={busyActionId === messageId || included.length === 0}
+            className="rounded-full bg-[#142334] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#1e3347] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busyActionId === messageId ? 'Scheduling' : `Approve & schedule ${included.length}`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRemovedActionCards((current) => ({ ...current, [messageId]: true }))}
+            className="px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B] transition hover:text-[#142334]"
+          >
+            Discard
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-[#6B6B6B]">
+          Emails go out in your sending windows. Nothing sends until you approve.
+        </p>
+      </div>
+    );
+  }
+
   function renderEmailDraftCard(messageId: string, draft: EmailDraft) {
     if (removedActionCards[messageId]) return null;
 
@@ -928,9 +1221,10 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
   }
 
   const transcript = formatConversationTranscript(messages);
+  // A navy edge plus a deeper shadow keeps the panel from melting into the cream dashboard behind it.
   const panelClassName = isExpanded
-    ? 'fixed inset-3 z-40 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-[16px] border border-[#E4D8CB] bg-white shadow-[0_18px_60px_rgba(20,35,52,0.22)] transition duration-200 md:inset-6 md:max-h-[calc(100vh-48px)]'
-    : 'fixed bottom-[88px] right-4 z-40 flex h-[min(680px,calc(100vh-116px))] w-[min(560px,calc(100vw-32px))] origin-bottom-right flex-col overflow-hidden rounded-[16px] border border-[#E4D8CB] bg-white shadow-[0_8px_32px_rgba(0,0,0,0.12)] transition duration-200 md:right-6';
+    ? 'fixed inset-3 z-40 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white shadow-[0_24px_70px_rgba(20,35,52,0.32)] transition duration-200 md:inset-6 md:max-h-[calc(100vh-48px)]'
+    : 'fixed bottom-[88px] right-4 z-40 flex h-[min(680px,calc(100vh-116px))] w-[min(560px,calc(100vw-32px))] origin-bottom-right flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white shadow-[0_18px_50px_rgba(20,35,52,0.28)] transition duration-200 md:right-6';
   const visiblePanelClassName = isOpen
     ? 'translate-y-0 scale-100 opacity-100'
     : 'pointer-events-none translate-y-4 scale-[0.98] opacity-0';
@@ -1101,7 +1395,11 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
             <div className="flex h-full flex-col items-center justify-center text-center">
               <Sparkles className="h-6 w-6 text-[#C9AD98]" />
               <p className="mt-4 font-serif text-[24px] leading-none text-[#142334]">What do you need?</p>
-              <div className="mt-5 flex max-w-[330px] flex-wrap justify-center gap-2">
+              <div
+                className={`mt-5 flex max-w-[330px] flex-wrap justify-center gap-2 ${
+                  inputHeight >= ASSISTANT_INPUT_TALL_HEIGHT ? 'hidden' : ''
+                }`}
+              >
                 {suggestions.map((suggestion) => (
                   <button
                     key={suggestion}
@@ -1153,6 +1451,7 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
                           </div>
                         )}
                         {message.response?.type === 'email_draft' && renderEmailDraftCard(message.id, message.response.draft)}
+                        {message.response?.type === 'email_batch' && renderEmailBatchCard(message.id, message.response.batch)}
                         {message.response?.type === 'content_draft' && renderContentDraftCard(message.id, message.response.draft)}
                         <button
                           type="button"
@@ -1268,7 +1567,8 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
               }}
               rows={1}
               placeholder="Ask anything or request a draft..."
-              className="max-h-[120px] min-h-10 flex-1 resize-none rounded-[8px] border border-transparent bg-[#F8F5F2] px-3 py-2.5 text-[14px] leading-relaxed text-[#142334] outline-none transition focus:border-[#C9AD98] focus:bg-white"
+              style={{ height: `${inputHeight}px` }}
+              className="flex-1 resize-none overflow-hidden rounded-[8px] border border-transparent bg-[#F8F5F2] px-3 py-2.5 text-[14px] leading-relaxed text-[#142334] outline-none transition focus:border-[#C9AD98] focus:bg-white"
             />
             <button
               type="button"

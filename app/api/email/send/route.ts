@@ -1,63 +1,14 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { validateLeadEmailTemplateSelection } from '@/lib/email-template-guardrails';
-import { hasSentEmailTemplateAlreadySent, recordSentEmail } from '@/lib/sent-emails';
-import { createSupabaseServiceClient } from '@/lib/supabase-server';
+import { dispatchLeadEmail } from '@/lib/lead-email-dispatch';
 
 export const dynamic = 'force-dynamic';
-
-function isEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
 
 function getScheduledAt(value: string) {
   if (!value) return null;
   const scheduledAt = new Date(value);
   if (Number.isNaN(scheduledAt.getTime())) return null;
   return scheduledAt;
-}
-
-async function validateTemplateGuardrails(leadId: string, toEmail: string, templateId: string) {
-  if (!leadId || !templateId) return null;
-
-  const supabase = createSupabaseServiceClient();
-  const { data: lead, error: leadError } = await supabase
-    .from('diagnostic_submissions')
-    .select('id, email, archetype_name, archetype_key, source, lead_status, follow_up_count, last_contacted_at, sequence_repair_status')
-    .eq('id', leadId)
-    .maybeSingle();
-
-  if (leadError) throw new Error(leadError.message);
-  if (!lead) return null;
-
-  let query = supabase
-    .from('sent_emails')
-    .select('template_id')
-    .not('template_id', 'is', null);
-
-  const cleanLeadEmail = String(lead.email || toEmail || '').trim().toLowerCase();
-  if (cleanLeadEmail) {
-    query = query.or(`lead_id.eq.${leadId},to_email.eq.${cleanLeadEmail}`);
-  } else {
-    query = query.eq('lead_id', leadId);
-  }
-
-  const { data: sentRows, error: sentError } = await query.order('sent_at', { ascending: true }).limit(100);
-  if (sentError) throw new Error(sentError.message);
-
-  return validateLeadEmailTemplateSelection({
-    lead: {
-      archetypeName: lead.archetype_name,
-      archetypeKey: lead.archetype_key,
-      followUpCount: lead.follow_up_count,
-      leadStatus: lead.lead_status,
-      lastContactedAt: lead.last_contacted_at,
-      source: lead.source,
-      sequenceRepairStatus: lead.sequence_repair_status,
-    },
-    sentTemplateIds: (sentRows || []).map((row) => row.template_id as string | null),
-    templateId,
-  });
 }
 
 export async function POST(request: Request) {
@@ -68,109 +19,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const to = String(body?.to || '').trim();
-  const toName = String(body?.toName || '').trim();
-  const subject = String(body?.subject || '').trim();
-  const htmlContent = String(body?.htmlContent || '').trim();
-  const plainTextBody = String(body?.plainTextBody || '').trim();
-  const leadId = String(body?.leadId || '').trim();
-  const templateId = String(body?.templateId || '').trim();
-  const archetype = String(body?.archetype || '').trim();
-  const serviceInterest = String(body?.serviceInterest || '').trim();
   const scheduledAtInput = String(body?.scheduledAt || '').trim();
   const scheduledAt = getScheduledAt(scheduledAtInput);
-  const apiKey = process.env.BREVO_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Brevo is not configured.' }, { status: 500 });
-  }
-
-  if (!isEmail(to) || !subject || !htmlContent) {
-    return NextResponse.json({ error: 'Recipient, subject, and email body are required.' }, { status: 400 });
-  }
 
   if (scheduledAtInput && !scheduledAt) {
     return NextResponse.json({ error: 'Scheduled send time is invalid.' }, { status: 400 });
   }
 
-  if (scheduledAt && scheduledAt.getTime() <= Date.now()) {
-    return NextResponse.json({ error: 'Scheduled send time must be in the future.' }, { status: 400 });
-  }
-
-  if (templateId) {
-    const guardrail = await validateTemplateGuardrails(leadId, to, templateId);
-    if (guardrail && !guardrail.valid) {
-      return NextResponse.json({ error: guardrail.message }, { status: 409 });
-    }
-
-    const duplicateTemplate = await hasSentEmailTemplateAlreadySent({
-      leadId: leadId || null,
-      toEmail: to,
-      templateId,
-    });
-
-    if (duplicateTemplate) {
-      return NextResponse.json(
-        { error: 'This template has already been sent to this lead. Choose the next template before sending again.' },
-        { status: 409 }
-      );
-    }
-  }
-
-  const brevoPayload: Record<string, unknown> = {
-    sender: {
-      name: 'Kagiso Shabangu',
-      email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@coachkagiso.co.za',
-    },
-    to: [{ email: to, name: toName || to }],
-    subject,
-    htmlContent,
-  };
-
-  if (scheduledAt) {
-    brevoPayload.scheduledAt = scheduledAt.toISOString();
-  }
-
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      'api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(brevoPayload),
+  const result = await dispatchLeadEmail({
+    to: String(body?.to || ''),
+    toName: String(body?.toName || '').trim(),
+    subject: String(body?.subject || ''),
+    htmlContent: String(body?.htmlContent || ''),
+    plainTextBody: String(body?.plainTextBody || '').trim(),
+    leadId: String(body?.leadId || '').trim(),
+    templateId: String(body?.templateId || '').trim(),
+    archetype: String(body?.archetype || '').trim(),
+    serviceInterest: String(body?.serviceInterest || '').trim(),
+    scheduledAt,
   });
 
-  if (!response.ok) {
-    console.error('Brevo send failed', {
-      status: response.status,
-      body: await response.text().catch(() => ''),
-    });
-    return NextResponse.json({ error: 'Email failed to send. Try again.' }, { status: 500 });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const brevoResult = (await response.json().catch(() => ({}))) as { messageId?: string };
-
-  try {
-    await recordSentEmail({
-      leadId: leadId || null,
-      toEmail: to,
-      toName: toName || to,
-      subject,
-      body: plainTextBody || htmlContent,
-      templateId: templateId || null,
-      archetype: archetype || null,
-      serviceInterest: serviceInterest || null,
-      sentAt: new Date().toISOString(),
-      scheduledAt: scheduledAt?.toISOString() || null,
-      origin: 'dashboard',
-      externalProvider: brevoResult.messageId ? 'brevo' : null,
-      externalMessageId: brevoResult.messageId || null,
-      deliveryStatus: scheduledAt ? 'scheduled' : 'sent',
-    });
-  } catch (error) {
-    console.error('Sent email log write failed', error);
-  }
-
-  return NextResponse.json({ success: true, scheduledAt: scheduledAt?.toISOString() || null });
+  return NextResponse.json({ success: true, scheduledAt: result.scheduledAt });
 }

@@ -162,6 +162,7 @@ const funnelActivityLabels: Record<DashboardNotificationEventType, string> = {
   payment_confirmed: 'Payment',
   intake_submitted: 'Intake',
   cal_booking: 'Cal.com',
+  email_backlog_due: 'Email backlog',
 };
 const contentSignalByArchetype = {
   A: 'career plateau frustration',
@@ -553,6 +554,7 @@ function getFunnelActivityPriority(activity: DashboardEventNotification) {
     payment_confirmed: 92,
     intake_submitted: 94,
     cal_booking: 88,
+    email_backlog_due: 90,
   };
   const unreadBoost = activity.status === 'unread' ? 8 : 0;
   const agePenalty = Math.min(20, daysSince(activity.createdAt) * 3);
