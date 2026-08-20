@@ -53,6 +53,31 @@ Tier 3 = new capability.
 
 ## Changelog
 
+### 2026-08-20 — Daughter Hand embeds in vector PDFs
+
+Daughter Hand shipped as woff2 only, so any deck using the "Follow CTA -
+Masterclass" template had its CTA dropped from the vector export.
+
+Converted with `wawoff2` (installed `--no-save` — a one-off asset conversion,
+not a dependency). The source is CFF, so the woff2 decompresses straight to a
+`.otf`: 28,448 → 40,612 bytes with `cmap`, `head`, `hhea`, `hmtx`, `maxp`,
+`name`, `post`, `OS/2`, `GDEF`, `GPOS`, `GSUB` intact. `daughterHand` moved from
+`nonEmbeddableFonts` into `embeddableBrandFonts`.
+
+Verified by re-exporting the real deck with that CTA selected: **10 pages,
+`DaughterHandRegular` among the embedded subsets**, final page extracting as
+real text. The same export previously reported *"The custom CTA was left out"*.
+
+**Worth an eyeball:** a `Helvetica-Bold` resource also appears in that PDF, and
+did not in an export using only Inter and Playfair. The intended faces are all
+embedded and the text extracts correctly, so this is most likely a fallback for
+characters the brand face lacks rather than a whole run rendering wrong — but I
+did not confirm which glyphs use it.
+
+**Still woff/woff2 only, so still blocked from vector export:** `alohaLover`,
+`bableya`, `heroIn`, `kaliebLuxury`. Same conversion works for any of them whose
+source is CFF or glyf.
+
 ### 2026-08-20 — The custom CTA now ships in the carousel PDF
 
 The custom CTA is a design document, not a carousel slide, so Carousel Studio's
