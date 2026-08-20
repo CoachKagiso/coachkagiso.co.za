@@ -6411,6 +6411,11 @@ export default function DesignStudioPanel({
   // width. Persisted because it is a working preference, not a transient state.
   const [isCanvasFocusMode, setIsCanvasFocusMode] = useState(false);
   const canvasViewportRef = useRef<HTMLElement | null>(null);
+  // CHANGE R: the header holds Save and the export buttons, but it scrolls away
+  // as soon as you are working on the canvas. Watch it, and float a compact bar
+  // with the same essential actions whenever it is off-screen.
+  const headerActionsRef = useRef<HTMLDivElement | null>(null);
+  const [areHeaderActionsVisible, setAreHeaderActionsVisible] = useState(true);
   const [canvasGuides, setCanvasGuides] = useState<DesignCanvasGuides>({
     grid: true,
     safeArea: true,
@@ -8164,13 +8169,27 @@ export default function DesignStudioPanel({
     // on a portrait frame, smaller than the 60-65% that was being set by hand.
     const ratio = availableWidth / design.width;
     setCanvasZoom(clamp(Math.floor(ratio * 100), MIN_CANVAS_ZOOM, MAX_CANVAS_ZOOM));
-  }, [design.width, design.height]);
+    // Width-only fit, so height is deliberately not a dependency.
+  }, [design.width]);
 
   // Fit whenever the frame changes or the panels are collapsed, so the canvas
   // uses whatever room it has just been given.
   useEffect(() => {
     fitCanvasZoom();
   }, [fitCanvasZoom, isCanvasFocusMode]);
+
+  useEffect(() => {
+    const node = headerActionsRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setAreHeaderActionsVisible(entry.isIntersecting),
+      // A sliver counts as visible, so the floating bar does not flicker in and
+      // out while the header is half on-screen.
+      { threshold: 0, rootMargin: '-8px 0px 0px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   function setCanvasAspectRatio(width: number, height: number) {
     updateDesign((current) => resizeDesignCanvas(current, width, height));
@@ -8386,6 +8405,80 @@ export default function DesignStudioPanel({
         </div>
       )}
 
+      {/* CHANGE R: floating action bar. Appears only once the header actions
+          have scrolled out of view, so Save and the exports stay reachable
+          without scrolling back up. Reset is deliberately not here - it is
+          destructive and does not belong one stray click away. */}
+      {!areHeaderActionsVisible && (
+        <div
+          role="toolbar"
+          aria-label="Design actions"
+          className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-full border border-[#E4D8CB] bg-white/95 p-1.5 shadow-[0_18px_45px_rgba(20,35,52,0.18)] backdrop-blur-md md:bottom-8"
+        >
+          <span className="hidden px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466] sm:inline">
+            {activePage.name}
+          </span>
+          <button
+            type="button"
+            onClick={saveDesign}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:bg-[#F8F6F4]"
+          >
+            <Save className="h-3.5 w-3.5" />
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportPdf()}
+            disabled={exportState?.busy}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {exportState?.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportPng()}
+            disabled={exportState?.busy}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#142334] px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#22384f] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {exportState?.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            PNG {exportPixelScale}x
+          </button>
+          <span className="mx-0.5 h-5 w-px bg-[#E4D8CB]" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={undoDesignChange}
+            disabled={!canUndo}
+            title="Undo"
+            aria-label="Undo"
+            className="grid min-h-9 min-w-9 place-items-center rounded-full text-[#142334]/70 transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={redoDesignChange}
+            disabled={!canRedo}
+            title="Redo"
+            aria-label="Redo"
+            className="grid min-h-9 min-w-9 place-items-center rounded-full text-[#142334]/70 transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCanvasFocusMode((current) => !current)}
+            aria-pressed={isCanvasFocusMode}
+            title={isCanvasFocusMode ? 'Show the side panels' : 'Hide the side panels'}
+            className={`min-h-9 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+              isCanvasFocusMode ? 'bg-[#142334] text-white' : 'text-[#142334]/70 hover:bg-[#F8F6F4]'
+            }`}
+          >
+            Focus
+          </button>
+        </div>
+      )}
+
       <div className="grid w-full min-w-0 gap-4">
         <div className="rounded-[8px] bg-white p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -8396,7 +8489,7 @@ export default function DesignStudioPanel({
                 Start with the Manifesto Note Graphic, then use the same page and layer engine for carousel and presentation formats.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div ref={headerActionsRef} className="flex flex-wrap items-center gap-2">
               {/* CHANGE L: export resolution, matching Carousel Studio. */}
               <div
                 className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-[#F8F6F4] p-1"
