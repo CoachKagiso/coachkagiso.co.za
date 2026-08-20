@@ -45,6 +45,8 @@ import { OutputPanel, OutputWithActions } from '@/components/content/shared/Outp
 import { EditorialCalendarTab } from '@/components/content/tabs/EditorialCalendarTab';
 import DesignStudioPanel, {
   DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY,
+  readDesignCtaTemplateSummaries,
+  type DesignCtaTemplateSummary,
   type DesignStudioCarouselImport,
   type DesignStudioImportRequest,
   type DesignStudioTextImport,
@@ -456,6 +458,11 @@ type CarouselDraftPayload = {
   slides: CarouselSlide[];
   accessibilityNote?: string;
   createdAt: string;
+  // CHANGE N: Kagiso's own closing slide - a follow or promo message that is
+  // deliberately separate from the CTA the content itself argues for. Designed
+  // in Design Studio, chosen here, appended as the final page on import.
+  customCtaTemplateId?: string;
+  customCtaTemplateName?: string;
 };
 
 type CarouselDraftRecord = {
@@ -3010,6 +3017,14 @@ function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem)
     slides,
     accessibilityNote: multilineString(rawDraft.accessibilityNote ?? rawDraft.accessibility_note),
     createdAt: compactString(rawDraft.createdAt ?? rawDraft.created_at) || item?.createdAt || new Date().toISOString(),
+    // CHANGE N: survives the vault round-trip. The AI never sets these - they
+    // are Kagiso's choice in Carousel Studio.
+    ...(compactString(rawDraft.customCtaTemplateId)
+      ? { customCtaTemplateId: compactString(rawDraft.customCtaTemplateId) }
+      : {}),
+    ...(compactString(rawDraft.customCtaTemplateName)
+      ? { customCtaTemplateName: compactString(rawDraft.customCtaTemplateName) }
+      : {}),
   };
 }
 
@@ -10772,6 +10787,34 @@ function CarouselStudioPanel({
   const selectedExportCount = selectedExportIndexes.size;
   const isWholeDeckSelected = selectedExportCount === deckLength && deckLength > 0;
 
+  // CHANGE N: custom CTA templates designed in Design Studio. Read on mount
+  // because they live in that panel's browser storage, not in the vault.
+  const [ctaTemplates, setCtaTemplates] = useState<DesignCtaTemplateSummary[]>([]);
+  useEffect(() => {
+    setCtaTemplates(readDesignCtaTemplateSummaries());
+  }, [activeRecordId]);
+
+  const selectedCtaTemplateId = latestDraft?.customCtaTemplateId || null;
+  const selectedCtaTemplate = selectedCtaTemplateId
+    ? ctaTemplates.find((template) => template.id === selectedCtaTemplateId) || null
+    : null;
+  // The chosen template may have been deleted in Design Studio since.
+  const isCtaTemplateMissing = Boolean(selectedCtaTemplateId && !selectedCtaTemplate);
+
+  function chooseCustomCta(template: DesignCtaTemplateSummary | null) {
+    if (!latestRecord || !latestDraft || isSavingLatest) return;
+    const nextDraft: CarouselDraftPayload = { ...latestDraft };
+    if (template) {
+      nextDraft.customCtaTemplateId = template.id;
+      nextDraft.customCtaTemplateName = template.name;
+    } else {
+      delete nextDraft.customCtaTemplateId;
+      delete nextDraft.customCtaTemplateName;
+    }
+    if (areCarouselDraftsEqual(latestDraft, nextDraft)) return;
+    onDraftSave(latestRecord, nextDraft);
+  }
+
   function toggleExportSlide(index: number) {
     setSelectedExportIndexes((current) => {
       const next = new Set(current);
@@ -11207,6 +11250,81 @@ function CarouselStudioPanel({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* CHANGE N: custom closing slide, designed in Design Studio. */}
+        {latestDraft && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Custom CTA slide</p>
+                <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-[#142334]/58">
+                  Your own closing slide - follow, promo, or masterclass - kept separate from the CTA this post argues for.
+                  It is appended as the last slide when you open the deck in Design Studio.
+                </p>
+              </div>
+              {selectedCtaTemplate && <Badge className="bg-[#142334] text-white">On</Badge>}
+            </div>
+
+            {ctaTemplates.length === 0 ? (
+              <p className="mt-3 rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/62">
+                No custom CTA templates yet. Design one in Design Studio, then use{' '}
+                <span className="font-bold">Save as template</span> and choose{' '}
+                <span className="font-bold">Custom CTA</span>. It will show up here.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => chooseCustomCta(null)}
+                  disabled={isSavingLatest}
+                  aria-pressed={!selectedCtaTemplateId}
+                  className={`rounded-[8px] border px-3 py-2 text-[12px] font-bold transition disabled:opacity-50 ${
+                    !selectedCtaTemplateId
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/60 hover:border-[#C9AD98] hover:bg-white'
+                  }`}
+                >
+                  None
+                </button>
+                {ctaTemplates.map((template) => {
+                  const isSelected = selectedCtaTemplateId === template.id;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => chooseCustomCta(template)}
+                      disabled={isSavingLatest}
+                      aria-pressed={isSelected}
+                      title={`${template.width} x ${template.height}`}
+                      className={`rounded-[8px] border px-3 py-2 text-[12px] font-bold transition disabled:opacity-50 ${
+                        isSelected
+                          ? 'border-[#142334] bg-[#142334] text-white'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                      }`}
+                    >
+                      {template.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {isCtaTemplateMissing && (
+              <div className="mt-3">
+                <Notice tone="error">
+                  {`"${latestDraft.customCtaTemplateName || 'The chosen CTA'}" is no longer in Design Studio's saved templates. Pick another, or choose None.`}
+                </Notice>
+              </div>
+            )}
+
+            {selectedCtaTemplate && (
+              <p className="mt-3 text-[12px] leading-relaxed text-[#142334]/58">
+                Deck exports from here stay at {deckLength} slides. The CTA slide is added when you open this draft in
+                Design Studio, so export from there to include it.
+              </p>
+            )}
           </div>
         )}
 
