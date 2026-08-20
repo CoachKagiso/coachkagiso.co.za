@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { buildDeckShapeSection } from '@/lib/content/transform-deck-shape';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,20 @@ type ExtractedFramework = {
   ctaStyle?: string;
   formatLogic?: string;
   suggestedPillar?: string;
+  // Present only when the source was a carousel deck. Stage 1 constrains the arc
+  // and recipe to the registry vocabulary precisely so they can be replayed here.
+  slideCount?: number;
+  slideArc?: string[];
+  layoutRecipe?: string;
+  copyDensity?: string;
+  visualPattern?: string;
+  whatMakesItWork?: string;
 };
 
 function optionalString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
+
 
 function buildStage2UserPrompt(
   framework: ExtractedFramework,
@@ -67,6 +77,7 @@ Story structure: ${framework.storyStructure}
 CTA style: ${framework.ctaStyle}
 Format logic: ${framework.formatLogic}
 ${framework.suggestedPillar ? `Suggested pillar: ${framework.suggestedPillar}` : ''}
+${buildDeckShapeSection(framework)}
 
 TARGET:
 ${targetSection}
