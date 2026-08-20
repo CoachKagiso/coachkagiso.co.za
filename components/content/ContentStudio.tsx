@@ -9326,6 +9326,11 @@ function CarouselSlideFrame({
               marginBottom: 'auto',
               marginTop: 'auto',
               padding: exportDimensions ? `0 ${exportSize(12)}` : '0 12px',
+              // CHANGE G (safe bands): hard 140px guard rails so headline/body
+              // can never bleed into the top/bottom furniture rows, even when the
+              // deck runs long.
+              paddingTop: exportDimensions ? exportSize(140) : '140px',
+              paddingBottom: exportDimensions ? exportSize(140) : '140px',
             }}
           >
             {stageEyebrow && (
@@ -9396,6 +9401,11 @@ function CarouselSlideFrame({
           </div>
 
           {renderFooter()}
+          {/*
+            CHANGE G note: overflow auto-shrink (one type step) is consciously
+            deferred — preview-only amber badge for now. Revisit if export
+            clipping reports increase.
+          */}
           {overflowFlag && (
             <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold text-amber-800">
               Text may clip — shorten or shrink
@@ -9736,16 +9746,16 @@ function CarouselSlideFrame({
                       width: exportDimensions ? exportSize(24) : undefined,
                     }}
                   />
-                  <p
-                    className="font-bold uppercase"
-                    style={{
-                      color: palette.accent,
-                      fontSize: exportDimensions ? exportSize(12.2) : '12px',
-                      letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
-                    }}
-                  >
-                    {composition === 'example_note' ? 'Example' : 'Proof cue'}
-                  </p>
+                   <p
+                     className="font-bold uppercase"
+                     style={{
+                       color: palette.accent,
+                       fontSize: exportDimensions ? exportSize(12.2) : '12px',
+                       letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
+                     }}
+                   >
+                     {composition === 'example_note' ? 'Example' : 'Why it holds'}
+                   </p>
                 </div>
                 <p
                   className="mt-3 font-semibold leading-relaxed"
