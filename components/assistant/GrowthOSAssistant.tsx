@@ -1221,10 +1221,15 @@ export function GrowthOSAssistant({ adminKey, initialContext }: GrowthOSAssistan
   }
 
   const transcript = formatConversationTranscript(messages);
-  // A navy edge plus a deeper shadow keeps the panel from melting into the cream dashboard behind it.
+  // Keeps the panel from melting into the cream dashboard behind it: a 1px navy edge
+  // plus a layered shadow. The first layer has no offset so it haloes every side —
+  // a purely downward shadow leaves the top and left edges, the ones actually seen
+  // against the page, with nothing.
+  const panelShadow =
+    'shadow-[0_0_0_1px_rgba(20,35,52,0.06),0_0_18px_rgba(20,35,52,0.14),0_14px_36px_rgba(20,35,52,0.20)]';
   const panelClassName = isExpanded
-    ? 'fixed inset-3 z-40 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white shadow-[0_24px_70px_rgba(20,35,52,0.32)] transition duration-200 md:inset-6 md:max-h-[calc(100vh-48px)]'
-    : 'fixed bottom-[88px] right-4 z-40 flex h-[min(680px,calc(100vh-116px))] w-[min(560px,calc(100vw-32px))] origin-bottom-right flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white shadow-[0_18px_50px_rgba(20,35,52,0.28)] transition duration-200 md:right-6';
+    ? `fixed inset-3 z-40 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white ${panelShadow} transition duration-200 md:inset-6 md:max-h-[calc(100vh-48px)]`
+    : `fixed bottom-[88px] right-4 z-40 flex h-[min(680px,calc(100vh-116px))] w-[min(560px,calc(100vw-32px))] origin-bottom-right flex-col overflow-hidden rounded-[16px] border border-[#142334] bg-white ${panelShadow} transition duration-200 md:right-6`;
   const visiblePanelClassName = isOpen
     ? 'translate-y-0 scale-100 opacity-100'
     : 'pointer-events-none translate-y-4 scale-[0.98] opacity-0';
