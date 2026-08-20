@@ -366,11 +366,19 @@ export async function POST(req: NextRequest) {
   // already works for single screenshots.
   if (isCarousel) {
     const slideTexts: string[] = [];
+    // Tracked rather than inferred from the joined text: a placeholder line is
+    // indistinguishable from real copy once the deck is assembled, and a deck
+    // read from half its slides must not look like a clean extraction.
+    let unreadableSlides = 0;
+    let readableCharacters = 0;
 
     for (const [index, slide] of slideImages.entries()) {
       try {
         const ocrResult = await extractTextFromImage(slide.base64, slide.mediaType, runtime);
-        slideTexts.push(`SLIDE ${index + 1}:\n${ocrResult.text.trim() || '(no readable copy on this slide)'}`);
+        const slideText = ocrResult.text.trim();
+        if (slideText) readableCharacters += slideText.length;
+        else unreadableSlides += 1;
+        slideTexts.push(`SLIDE ${index + 1}:\n${slideText || '(no readable copy on this slide)'}`);
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'OCR_FAILED';
         if (reason === 'VISION_UNAVAILABLE') {
@@ -379,32 +387,63 @@ export async function POST(req: NextRequest) {
             { status: 503 },
           );
         }
+        unreadableSlides += 1;
         slideTexts.push(`SLIDE ${index + 1}:\n(this slide could not be read)`);
       }
     }
 
     const deckText = slideTexts.join('\n\n');
-    const readableCharacters = deckText.replace(/SLIDE \d+:/g, '').replace(/\(.*?\)/g, '').trim().length;
+    // The floor scales with the deck. Thirty characters across twelve slides is
+    // not a readable deck, it is noise on one slide. Counting OCR output
+    // directly also avoids the old regex, which stripped every parenthesised
+    // span and so ate legitimate slide copy along with the placeholders.
+    const requiredCharacters = MIN_TEXT_LENGTH * Math.max(1, Math.ceil(slideImages.length / 3));
 
-    if (readableCharacters < MIN_TEXT_LENGTH) {
+    if (readableCharacters < requiredCharacters) {
       return NextResponse.json(
         { error: 'No readable slide copy was found in this deck. If it is an image-only carousel there is no structure to extract.' },
         { status: 422 },
       );
     }
 
+    if (unreadableSlides >= slideImages.length) {
+      return NextResponse.json(
+        { error: 'None of the slides could be read. Try exporting the PDF again at a higher quality.' },
+        { status: 422 },
+      );
+    }
+
     try {
       const raw = await extractCarouselStructure(deckText, slideImages.length, runtime);
-      const framework = normaliseCarouselFramework(raw, slideImages.length, (role) => console.warn(`Carousel arc: unrecognised role "${role}" coerced to "step".`));
+      const unknownRoles: string[] = [];
+      const framework = normaliseCarouselFramework(raw, slideImages.length, (role) => {
+        console.warn(`Carousel arc: unrecognised role "${role}" coerced to "step".`);
+        unknownRoles.push(role);
+      });
 
-      if (!framework.hasExtractableStructure || !framework.storyStructure) {
+      // Matches the text path, which has always required all five. The carousel
+      // path accepted a deck on storyStructure alone, so four empty fields could
+      // reach the panel looking like a successful extraction.
+      const missing = (['hookPattern', 'emotionalTension', 'storyStructure', 'ctaStyle', 'formatLogic'] as const)
+        .filter((field) => !framework[field]);
+
+      if (!framework.hasExtractableStructure || missing.length > 0) {
         return NextResponse.json(
           { error: 'This deck does not have a structure that can be extracted.' },
           { status: 422 },
         );
       }
 
-      return NextResponse.json({ framework });
+      // Surfaced so the panel can say the analysis is partial rather than
+      // presenting an arc built from a deck it only half read.
+      return NextResponse.json({
+        framework,
+        warnings: {
+          unreadableSlides,
+          totalSlides: slideImages.length,
+          unknownRoles,
+        },
+      });
     } catch (error) {
       console.error('Carousel structure extraction failed:', error);
       return NextResponse.json({ error: 'Could not extract the structure from this deck.' }, { status: 502 });

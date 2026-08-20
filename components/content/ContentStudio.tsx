@@ -442,6 +442,13 @@ type ExtractedFramework = {
   copyDensity?: string;
   visualPattern?: string;
   whatMakesItWork?: string;
+  // Mechanism: how the deck works, rather than what it is about.
+  hookTechnique?: string;
+  intraSlideLoop?: string[];
+  pacing?: { sentence?: string; breath?: string; close?: string };
+  valueMethod?: string;
+  ctaLayers?: string[];
+  emotionalArc?: { start?: string; middle?: string; end?: string };
   // Written by Stage 2 and filed in the Vault, never kept in Transform.
   fillInTemplate?: string;
 };
@@ -3337,6 +3344,87 @@ function trapWheel(e: React.WheelEvent<HTMLElement>) {
   e.stopPropagation();
 }
 
+/** The machine-readable half of a carousel extraction, kept visible but compact. */
+function getDeckSpecEntries(framework: ExtractedFramework) {
+  const entries: { label: string; value: string }[] = [];
+  if (framework.slideCount) entries.push({ label: 'Slide count', value: String(framework.slideCount) });
+  if (framework.layoutRecipe) {
+    entries.push({
+      label: 'Closest recipe',
+      value: getCarouselLayoutRecipeOption(framework.layoutRecipe as CarouselLayoutRecipe).label,
+    });
+  }
+  if (framework.copyDensity) {
+    entries.push({ label: 'Copy density', value: framework.copyDensity.replace(/^./, (c) => c.toUpperCase()) });
+  }
+  if (framework.suggestedPillar) entries.push({ label: 'Suggested pillar', value: framework.suggestedPillar });
+  return entries;
+}
+
+type MechanicsCard = {
+  title: string;
+  lead?: string;
+  body?: string;
+  beats?: string[];
+  rows?: { label: string; value: string }[];
+};
+
+/**
+ * The mechanics teardown. Cards are dropped when the extraction did not produce
+ * that layer, so an older saved framework renders what it has rather than a
+ * column of empty headings.
+ */
+function getMechanicsCards(framework: ExtractedFramework): MechanicsCard[] {
+  const cards: MechanicsCard[] = [];
+
+  if (framework.hookTechnique || framework.hookPattern) {
+    const [lead, ...rest] = (framework.hookTechnique || '').split(/\.\s+/);
+    cards.push({
+      title: 'Hook technique',
+      lead: framework.hookTechnique ? lead : undefined,
+      body: framework.hookTechnique ? rest.join('. ') || undefined : framework.hookPattern,
+    });
+  }
+
+  if (framework.storyStructure || framework.intraSlideLoop?.length) {
+    cards.push({
+      title: 'Structure pattern',
+      lead: framework.storyStructure,
+      beats: framework.intraSlideLoop,
+    });
+  }
+
+  const pacingRows = [
+    framework.pacing?.sentence ? { label: 'Sentence', value: framework.pacing.sentence } : null,
+    framework.pacing?.breath ? { label: 'Breath', value: framework.pacing.breath } : null,
+    framework.pacing?.close ? { label: 'Close', value: framework.pacing.close } : null,
+  ].filter((row): row is { label: string; value: string } => Boolean(row));
+  if (pacingRows.length > 0) cards.push({ title: 'Pacing', rows: pacingRows });
+
+  if (framework.valueMethod) cards.push({ title: 'Value delivery', lead: framework.valueMethod });
+
+  if (framework.ctaLayers?.length) {
+    cards.push({
+      title: 'CTA structure',
+      rows: framework.ctaLayers.map((layer, index) => ({ label: `Layer ${index + 1}`, value: layer })),
+    });
+  } else if (framework.ctaStyle) {
+    cards.push({ title: 'CTA structure', lead: framework.ctaStyle });
+  }
+
+  const arcBeats = [framework.emotionalArc?.start, framework.emotionalArc?.middle, framework.emotionalArc?.end]
+    .filter((beat): beat is string => Boolean(beat));
+  if (arcBeats.length > 0) {
+    cards.push({ title: 'Emotional arc', lead: arcBeats.join(' → '), beats: undefined });
+  } else if (framework.emotionalTension) {
+    cards.push({ title: 'Emotional tension', lead: framework.emotionalTension });
+  }
+
+  if (framework.visualPattern) cards.push({ title: 'Visual pattern', body: framework.visualPattern });
+
+  return cards;
+}
+
 function getFrameworkRows(framework: ExtractedFramework) {
   return [
     { label: 'Hook pattern', value: framework.hookPattern },
@@ -5436,7 +5524,9 @@ export default function ContentStudio({
       const draft = buildCarouselDraftFromAiOutput(result, selection, topic.trim(), 'auto');
       setGeneratedCarouselDraft(draft);
       setGeneratedPost(formatCarouselDraftForOutput(draft));
-      openGeneratedCarouselDraftInDesign();
+      // Persists the finished deck and switches to Carousel Studio with it
+      // selected, so the studio opens on the built draft rather than a canvas.
+      await saveCarouselDraftToBacklog(draft);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not build a deck from this template.');
     } finally {
@@ -7765,14 +7855,98 @@ function TransformFlow({
               </div>
               <Badge className="bg-white text-[#6B6B6B]">{selectedInput.label}</Badge>
             </div>
-            <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
-              {getFrameworkRows(framework).map((row) => (
-                <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
-                  <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
-                  <span className="leading-relaxed text-[#142334]">{row.value}</span>
+            {/* A deck gets the spec strip, the arc and the mechanics cards. A
+                text post or screenshot has no arc, so it keeps the plain rows. */}
+            {framework.slideCount ? (
+              <>
+                <dl className="mt-4 grid gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
+                  {getDeckSpecEntries(framework).map((entry) => (
+                    <div key={entry.label} className="bg-white px-3 py-2.5">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{entry.label}</dt>
+                      <dd className="mt-1 text-[13px] font-medium text-[#142334]">{entry.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {framework.slideArc && framework.slideArc.length > 0 && (
+                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">Slide arc</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {framework.slideArc.map((role, index) => {
+                        const label = carouselSlideRoleLabels[role as CarouselSlideRole];
+                        return (
+                          <span
+                            key={`${role}-${index}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              label
+                                ? 'border border-[#E4D8CB] bg-[#F5F3EE] text-[#142334]'
+                                : 'border border-dashed border-[#B4571F] bg-white text-[#B4571F]'
+                            }`}
+                          >
+                            <span className="font-medium text-[#A09086]">{index + 1}</span>
+                            {label || `${role} !`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-col gap-2">
+                  {getMechanicsCards(framework).map((card, index) => (
+                    <article key={card.title} className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
+                      <h5 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[#F5F3EE] text-[10px] font-semibold text-[#142334]">
+                          {index + 1}
+                        </span>
+                        {card.title}
+                      </h5>
+                      {card.lead && (
+                        <p className="mt-1.5 font-serif text-[17px] leading-snug text-[#142334]">{card.lead}</p>
+                      )}
+                      {card.body && (
+                        <p className="mt-1.5 text-[13px] leading-relaxed text-[#142334]/80">{card.body}</p>
+                      )}
+                      {card.beats && card.beats.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {card.beats.map((beat, beatIndex) => (
+                            <span key={`${beat}-${beatIndex}`} className="rounded-[6px] border border-[#E4D8CB] bg-[#F5F3EE] px-2.5 py-1 text-[11px] font-semibold text-[#142334]">
+                              {beat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {card.rows && card.rows.length > 0 && (
+                        <div className="mt-2 grid gap-1.5">
+                          {card.rows.map((row) => (
+                            <div key={row.label} className="grid gap-2 text-[12px] sm:grid-cols-[78px_1fr]">
+                              <span className="pt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">{row.label}</span>
+                              <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {framework.whatMakesItWork && (
+                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] border-l-[3px] border-l-[#142334] bg-white px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">What makes it work</p>
+                    <p className="mt-1 font-serif text-[15px] leading-snug text-[#142334]">{framework.whatMakesItWork}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
+                {getFrameworkRows(framework).map((row) => (
+                  <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
+                    <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
+                    <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Templates are not kept in Transform. Rebuilding writes the mould,
                 and this files it in the Vault, which is where it is reused from. */}
