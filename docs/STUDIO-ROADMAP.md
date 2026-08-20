@@ -20,8 +20,9 @@ Almost every defect below is a symptom of that mismatch:
 - Nothing returns from Design Studio — `importCarouselDraft` calls
   `replaceDesignDocument` and the result carries no reference to the backlog item
   it came from.
-- Design Studio holds exactly one design, in `localStorage`, on one browser
-  (`DESIGN_STORAGE_KEY`). The content half is in Supabase.
+- ~~Design Studio holds exactly one design, in `localStorage`, on one browser.~~
+  Fixed 2026-08-20: designs are rows in `design_documents`, and more than one
+  can exist at a time.
 - Three renderers draw the same slide: `CarouselSlideFrame` (HTML → PNG),
   `CarouselPdfDocument` (react-pdf vector), and Design Studio's layer canvas.
   Each has its own layout maths, so a fix in one does not reach the others.
@@ -49,6 +50,46 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — The working design moved to Supabase
+
+Design Studio kept exactly one design in localStorage under
+`coach-kagiso-design-studio-v3-manifesto`: one browser, no second device, and a
+cleared site wiped the work. It also meant importing a second carousel replaced
+the first outright with no way back.
+
+Designs are now rows in `design_documents`. Save writes to Supabase and mirrors
+locally, so an unreachable API cannot cost work — the message says plainly when
+only the local copy was written. A **Saved designs** list opens or deletes
+previous work. Listing uses a summary query that omits the `document` column,
+since a full design carries every page and layer and the list never renders it.
+
+**The safety property.** `replaceDesignDocument` and
+`replaceImportedDesignDocument` both clear `currentDesignId`, so opening a
+template, starting blank, or importing a carousel creates a *new* record on the
+next Save rather than overwriting what was open. Reset detaches too — it starts
+a new design rather than deleting the stored one. Deleting the open design
+clears the id rather than leaving it pointing at a row that is gone.
+
+**A race found during verification.** Loading the saved design is async, and a
+pending carousel import applies almost immediately on mount — so the in-flight
+fetch resolved afterwards and replaced the freshly imported deck with the last
+saved design. After importing a 9-slide deck and saving, the row still held the
+previous `social_graphic` design. Both replace paths now set
+`documentClaimedRef`, and the loader refuses to apply a document once anything
+has claimed the canvas.
+
+Also memoised `selectSingleLayer`. As a plain function it changed identity every
+render, which would have made the new loading effect refetch the design list on
+*every* render.
+
+Verified against the live table: save creates a row and re-saving updates it
+rather than duplicating; importing a carousel keeps the 9-page deck and saves as
+a second row with both designs coexisting; reload restores the latest design
+from Supabase with the list populated.
+
+Still local-only: brand assets (`BRAND_ASSETS_STORAGE_KEY`) and the deleted-asset
+list.
 
 ### 2026-08-20 — Canvas room: a real fit, and focus mode (item 9)
 
