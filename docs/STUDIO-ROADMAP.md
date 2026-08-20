@@ -26,6 +26,8 @@ Almost every defect below is a symptom of that mismatch:
 - Three renderers draw the same slide: `CarouselSlideFrame` (HTML → PNG),
   `CarouselPdfDocument` (react-pdf vector), and Design Studio's layer canvas.
   Each has its own layout maths, so a fix in one does not reach the others.
+  Narrowed 2026-08-20: geometry is now shared via the registry, and Design
+  Studio's PDF is vector rather than a photograph of the canvas.
 
 ---
 
@@ -35,7 +37,7 @@ Almost every defect below is a symptom of that mismatch:
 |---|---|---|---|
 | 1 | PNG/PDF export quality | 1 | **Done** |
 | 3 | Export selected slides only | 1 | **Done** |
-| 7 | Design Studio export drift + blur | 1 | **Mostly done** — see caveat |
+| 7 | Design Studio export drift + blur | 1 | **Done** — vector PDF lane |
 | 6 | Save-as-template, incl. CTA kind | 2 | **Done** |
 | 5 | Custom CTA slide | 2 | **Done** |
 | 2 | Design template gallery | 2 | Partial — kinds, filter, badges and Supabase storage shipped; thumbnails outstanding |
@@ -50,6 +52,50 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Vector PDF from the layer model
+
+Design Studio exported by photographing the canvas with html2canvas. That is why
+exports were soft, why rotated layers drifted, and why the viewport could clip
+them. The layer model is already a scene graph, so it can be drawn as real PDF
+objects instead.
+
+`components/content/DesignPdfDocument.tsx` renders pages to React PDF
+primitives: `Text` for text (React PDF wraps, so no manual line breaking),
+`View` for rectangles, circles and lines, `Svg`/`Polygon` for triangles,
+diamonds, hexagons and stars, `Image` for assets. **Rotation and flips are exact
+transforms about the box centre** — the part html2canvas approximated.
+
+SVG assets are rasterised to PNG first (`lib/content/svg-raster.ts`), since
+React PDF's `Image` cannot read SVG. Only that artwork becomes a bitmap, at
+1024px minimum so it is not the weak link; the rest of the page stays vector.
+
+**The honest part: fonts.** React PDF embeds TTF/OTF only. Five brand faces are
+OTF and are registered; six are woff/woff2 and cannot be.
+`getVectorExportBlocker` detects a design using one of those and deliberately
+falls back to raster, rather than silently substituting a font and shipping a
+PDF that looks wrong in a way you would not notice until it was printed.
+
+**Verified** on a real 9-page design:
+
+| | Vector (new) | Raster (old) |
+|---|---|---|
+| Embedded fonts | 3 subsets | 0 |
+| Image XObjects | 0 | 1 |
+| Extracted text | "COACH KAGISO 01 / 09 TENSION Your experience is not enough. 15 years. An MBA…" | `-- 1 of 1 --` |
+| File size | 40KB | 478KB |
+
+The old export had no text at all — it was a picture of text.
+
+**Retires three caveats for the PDF lane:** blur, rotation drift, and viewport
+clipping. PNG export stays raster, which is inherent to the format, so a layer
+that is both rotated *and* flipped can still drift in a PNG.
+
+**Now unblocked, not yet done:** the custom CTA slide in Carousel Studio's own
+export. `renderDesignPdfBlob` can draw a design page as vector, so the remaining
+work is composing carousel slides and a CTA design page into one document —
+either by merging blobs or by having `CarouselPdfDocument` export its pages for
+reuse rather than a whole `Document`.
 
 ### 2026-08-20 — Remove background (item 8)
 
