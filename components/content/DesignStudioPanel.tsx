@@ -326,9 +326,44 @@ type DesignStudioPendingImport =
       source: DesignStudioTextImport;
     };
 
+// CHANGE M: templates now declare what they are for.
+//
+// "deck" templates skin a whole carousel on import. "cover" templates style a
+// single opening slide. "cta" templates are the closing slide Kagiso appends to
+// a deck - his own follow/promo message, which is deliberately different from
+// the CTA the content itself argues for.
+type DesignTemplateKind = 'deck' | 'cover' | 'cta';
+
+const designTemplateKindOptions: {
+  value: DesignTemplateKind;
+  label: string;
+  description: string;
+}[] = [
+  { value: 'deck', label: 'Deck template', description: 'Skins a whole carousel when a draft is opened in Design Studio.' },
+  { value: 'cover', label: 'Cover template', description: 'Styles the opening slide on its own.' },
+  { value: 'cta', label: 'Custom CTA', description: 'A closing slide you can append to any carousel from Carousel Studio.' },
+];
+
+const DEFAULT_DESIGN_TEMPLATE_KIND: DesignTemplateKind = 'deck';
+
+function isDesignTemplateKind(value: unknown): value is DesignTemplateKind {
+  return value === 'deck' || value === 'cover' || value === 'cta';
+}
+
+// Templates saved before kinds existed have no `kind`; they were all whole-deck
+// designs, so they normalise to "deck".
+function getDesignTemplateKind(record: Pick<DesignTemplateRecord, 'kind'>): DesignTemplateKind {
+  return isDesignTemplateKind(record.kind) ? record.kind : DEFAULT_DESIGN_TEMPLATE_KIND;
+}
+
+function getDesignTemplateKindOption(kind: DesignTemplateKind) {
+  return designTemplateKindOptions.find((option) => option.value === kind) || designTemplateKindOptions[0];
+}
+
 type DesignTemplateRecord = {
   id: string;
   name: string;
+  kind?: DesignTemplateKind;
   format: DesignFormat;
   width: number;
   height: number;
@@ -6245,6 +6280,9 @@ export default function DesignStudioPanel({
   const [exportState, setExportState] = useState<ExportState | null>(null);
   const [exportPixelScale, setExportPixelScale] = useState<DesignExportScale>(DEFAULT_DESIGN_EXPORT_SCALE);
   const [designTemplates, setDesignTemplates] = useState<DesignTemplateRecord[]>([]);
+  // CHANGE M: save dialog (name + kind), and the gallery's kind filter.
+  const [templateDraft, setTemplateDraft] = useState<{ name: string; kind: DesignTemplateKind } | null>(null);
+  const [templateKindFilter, setTemplateKindFilter] = useState<DesignTemplateKind | 'all'>('all');
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
   const [templateMessage, setTemplateMessage] = useState('');
   const [canvasZoom, setCanvasZoom] = useState(100);
@@ -6521,24 +6559,32 @@ export default function DesignStudioPanel({
     setCanvasZoom(100);
   }, []);
 
+  // CHANGE M: gallery contents after the kind filter.
+  const visibleDesignTemplates = useMemo(() => (
+    templateKindFilter === 'all'
+      ? designTemplates
+      : designTemplates.filter((template) => getDesignTemplateKind(template) === templateKindFilter)
+  ), [designTemplates, templateKindFilter]);
+
   const getPreferredImportedCarouselTemplateRecord = useCallback((draft: DesignStudioCarouselDraftInput) => {
     const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
     const dimensions = getCarouselExportDimensions(aspectOption);
-    return designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    // CHANGE M: only whole-deck templates may skin an imported carousel. A
+    // single-slide CTA or cover template would otherwise be stretched across
+    // every slide in the deck.
+    const deckTemplates = designTemplates.filter((template) => (
+      template.format === 'carousel' && getDesignTemplateKind(template) === 'deck'
+    ));
+    return deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template &&
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel'
-    )) || null;
+    )) || deckTemplates[0] || null;
   }, [designTemplates]);
 
   const getPreferredImportedTextTemplateRecord = useCallback(() => (
@@ -7038,13 +7084,15 @@ export default function DesignStudioPanel({
   function getPreferredCarouselTemplateRecord(draft: DesignStudioCarouselDraftInput) {
     const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
     const dimensions = getCarouselExportDimensions(aspectOption);
-    return designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    // CHANGE M: deck-kind templates only - see the imported-record matcher.
+    const deckTemplates = designTemplates.filter((template) => (
+      template.format === 'carousel' && getDesignTemplateKind(template) === 'deck'
+    ));
+    return deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template &&
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template
     )) || null;
   }
@@ -7088,24 +7136,33 @@ export default function DesignStudioPanel({
     }
   }
 
-  function saveCurrentDesignAsTemplate() {
-    const fallbackName = design.templateSourceName || design.title || 'Design template';
-    const name = window.prompt('Template name', fallbackName);
-    if (!name?.trim()) return;
+  // CHANGE M: opens the save dialog. window.prompt could only collect a name,
+  // and a template now also needs a kind.
+  function openSaveTemplateDialog() {
+    setTemplateDraft({
+      name: design.templateSourceName || design.title || 'Design template',
+      kind: design.format === 'carousel' ? 'deck' : DEFAULT_DESIGN_TEMPLATE_KIND,
+    });
+  }
+
+  function saveCurrentDesignAsTemplate(rawName: string, kind: DesignTemplateKind) {
+    const name = rawName.trim();
+    if (!name) return;
 
     const now = new Date().toISOString();
     const id = createDesignId('template');
     const templateDocument: DesignDocument = {
       ...cloneDesignDocument(design),
       id: createDesignId('template-doc'),
-      title: name.trim(),
+      title: name,
       templateSourceId: id,
-      templateSourceName: name.trim(),
+      templateSourceName: name,
       templateUpdatedAt: now,
     };
     const record: DesignTemplateRecord = {
       id,
-      name: name.trim(),
+      name,
+      kind,
       format: design.format,
       width: design.width,
       height: design.height,
@@ -7125,7 +7182,10 @@ export default function DesignStudioPanel({
       templateSourceName: record.name,
       templateUpdatedAt: now,
     }), { recordHistory: false });
-    setTemplateMessage(`"${record.name}" saved and will stay in Saved templates on this browser.`);
+    setTemplateDraft(null);
+    setTemplateMessage(
+      `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()} and will stay in Saved templates on this browser.`,
+    );
   }
 
   function updateCurrentTemplate() {
@@ -8020,6 +8080,84 @@ export default function DesignStudioPanel({
 
   return (
     <section data-hide-custom-cursor className="w-full min-w-0 pb-10">
+      {/* CHANGE M: save-as-template dialog. Collects the name and the kind. */}
+      {templateDraft && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#142334]/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save design as template"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setTemplateDraft(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-[8px] bg-white p-5 shadow-xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Save as template</p>
+            <h3 className="mt-2 font-serif text-[26px] leading-tight text-[#142334]">Name it and say what it is for</h3>
+
+            <label className="mt-4 block">
+              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/60">Template name</span>
+              <input
+                autoFocus
+                value={templateDraft.name}
+                onChange={(event) => setTemplateDraft((current) => (
+                  current ? { ...current, name: event.target.value } : current
+                ))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && templateDraft.name.trim()) {
+                    saveCurrentDesignAsTemplate(templateDraft.name, templateDraft.kind);
+                  }
+                  if (event.key === 'Escape') setTemplateDraft(null);
+                }}
+                className="mt-1 w-full rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-3 py-2 text-[14px] text-[#142334] outline-none focus:border-[#142334]"
+                placeholder="Manifesto CTA - follow"
+              />
+            </label>
+
+            <div className="mt-4 grid gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/60">What is it for?</span>
+              {designTemplateKindOptions.map((option) => {
+                const isSelected = templateDraft.kind === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setTemplateDraft((current) => (
+                      current ? { ...current, kind: option.value } : current
+                    ))}
+                    aria-pressed={isSelected}
+                    className={`rounded-[8px] border p-3 text-left transition ${
+                      isSelected
+                        ? 'border-[#142334] bg-[#142334] text-white'
+                        : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">{option.label}</span>
+                    <span className={`mt-1 block text-[12px] leading-relaxed ${isSelected ? 'text-white/70' : 'text-[#142334]/60'}`}>
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setTemplateDraft(null)} className="studio-ghost-button">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => saveCurrentDesignAsTemplate(templateDraft.name, templateDraft.kind)}
+                disabled={!templateDraft.name.trim()}
+                className="studio-primary-button"
+              >
+                Save template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid w-full min-w-0 gap-4">
         <div className="rounded-[8px] bg-white p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -8111,7 +8249,7 @@ export default function DesignStudioPanel({
                   <Plus className="h-4 w-4" />
                   Blank design
                 </button>
-                <button type="button" onClick={saveCurrentDesignAsTemplate} className="studio-secondary-button">
+                <button type="button" onClick={openSaveTemplateDialog} className="studio-secondary-button">
                   <Save className="h-4 w-4" />
                   Save as template
                 </button>
@@ -8200,8 +8338,32 @@ export default function DesignStudioPanel({
                     {designTemplates.length}
                   </span>
                 </div>
+                {/* CHANGE M: filter the gallery by what a template is for. */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(['all', ...designTemplateKindOptions.map((option) => option.value)] as const).map((value) => {
+                    const isSelected = templateKindFilter === value;
+                    const count = value === 'all'
+                      ? designTemplates.length
+                      : designTemplates.filter((template) => getDesignTemplateKind(template) === value).length;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTemplateKindFilter(value)}
+                        aria-pressed={isSelected}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition ${
+                          isSelected
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/60 hover:border-[#C9AD98] hover:bg-white'
+                        }`}
+                      >
+                        {value === 'all' ? 'All' : getDesignTemplateKindOption(value).label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {designTemplates.slice(0, 8).map((template) => (
+                  {visibleDesignTemplates.slice(0, 8).map((template) => (
                     <div
                       key={template.id}
                       className={`group relative rounded-[8px] border bg-[#F8F6F4] p-3 transition ${
@@ -8216,6 +8378,18 @@ export default function DesignStudioPanel({
                           {template.format === 'carousel' && template.sourceCarouselTemplate
                             ? getCarouselTemplateOption(template.sourceCarouselTemplate).label
                             : template.format.replace(/_/g, ' ')}
+                        </span>
+                        {/* CHANGE M: what this template is for. */}
+                        <span
+                          className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                            getDesignTemplateKind(template) === 'cta'
+                              ? 'bg-[#142334] text-white'
+                              : getDesignTemplateKind(template) === 'cover'
+                                ? 'bg-[#C9AD98] text-[#142334]'
+                                : 'bg-[#F5F3EE] text-[#8C7466]'
+                          }`}
+                        >
+                          {getDesignTemplateKindOption(getDesignTemplateKind(template)).label}
                         </span>
                       </button>
                       <div className="mt-3 grid grid-cols-2 gap-2">
