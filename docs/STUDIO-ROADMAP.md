@@ -41,8 +41,8 @@ Almost every defect below is a symptom of that mismatch:
 | 2 | Design template gallery | 2 | Partial — kinds, filter, badges and Supabase storage shipped; thumbnails outstanding |
 | 4 | Fidelity loss on "Open in Design Studio" | 2 | **Done** |
 | 9 | Design Studio layout shell | 2 | **Done** |
-| 10 | Carousel DNA extraction from uploaded PDF | 3 | Next |
-| 8 | Remove image background | 3 | Planned |
+| 10 | Carousel DNA extraction from uploaded PDF | 3 | **Done** — migration pending |
+| 8 | Remove image background | 3 | Next |
 
 Tier 1 = correctness and daily relief. Tier 2 = the template/document model.
 Tier 3 = new capability.
@@ -50,6 +50,62 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Carousel DNA, built on Transform (item 10)
+
+Kagiso pushed back on building this standalone, and he was right. Stage 1 was
+already a structural extractor with vision, OCR, and an explicit "NEVER
+reproduce the source wording" guardrail. A carousel is the same job across N
+slides, so this extends Transform rather than sitting beside it — roughly a
+third of the originally planned work, with no new AI route, upload path, or
+vision plumbing.
+
+**How it works.** A third input type (Text / Image / **Carousel PDF**).
+`lib/content/carousel-pdf-reader.ts` renders the deck to page images in the
+browser — server-side rasterising would need `node-canvas`, a heavy native
+dependency, and the multipart upload already existed. Capped at 12 pages,
+~1000px, white-filled so transparent pages do not rasterise black. Stage 1 OCRs
+each slide, then reads the arc from the assembled deck: keeping structure
+extraction a *text* call means no model has to hold twelve images at once.
+
+The carousel schema extends the existing framework with `slideCount`,
+`slideArc`, `layoutRecipe`, `copyDensity`, `visualPattern` and
+`whatMakesItWork`. The arc and recipe use the vocabulary from
+`carousel-template-registry`, so the DNA reads back into the generator rather
+than being a report to retype.
+
+Analysed decks are saved to a new `carousel_dna` table and can be reloaded into
+Stage 2 without re-uploading. Its own table on purpose: vault items fall through
+to `ideas`, which is hard deleted after 60 days.
+
+**A pre-existing bug this uncovered.** `extractTextFromImage` only used the
+pinned GLM vision models when the provider is `zai`. On OpenRouter it used
+`runtime.model` unconditionally, so OCR against a text-only configured model
+(currently `deepseek-v4-flash`) failed with *"No endpoints found that support
+image input"*. That broke the **existing screenshot upload**, not just
+carousels. It now uses the vision-capable fallback the catalogue already
+provides, the same way `tools-ai.ts` does.
+
+**Verified** against a real 9-slide LinkedIn deck — 200 in 63s:
+
+| Field | Value |
+|---|---|
+| slideArc | cover → reframe ×3 → framework → step ×2 → proof → cta |
+| layoutRecipe | `guided_shift` |
+| copyDensity | `medium` |
+
+Exactly nine entries in order, valid registry values, no source wording
+reproduced. The PDF reader was verified separately on an 8-page deck (8 pages,
+~44KB per JPEG).
+
+**Outstanding:** the `carousel_dna` migration needs applying. Suggested angles
+from a reference were not built — Stage 2 already rebuilds from a framework, so
+that path works today; a dedicated angle list would be an addition, not a gap.
+
+**Known limitation:** pdf.js rendering relies on `requestAnimationFrame`, which
+does not fire while the tab is hidden. Switching tabs mid-render stalls it until
+you return. Same class as the Design Studio export hang fixed in `e1386f0`, but
+it recovers on its own rather than hanging forever.
 
 ### 2026-08-20 — The working design moved to Supabase
 
