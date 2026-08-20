@@ -74,6 +74,18 @@ import {
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
 import {
+  DESIGN_DOCUMENT_LEGACY_STORAGE_KEY,
+  clearLocalDesignMirror,
+  createSavedDesign,
+  deleteSavedDesign,
+  fetchSavedDesign,
+  listSavedDesigns,
+  readLocalDesignMirror,
+  updateSavedDesign,
+  writeLocalDesignMirror,
+  type DesignDocumentSummaryRecord,
+} from '@/lib/content/design-document-client';
+import {
   DESIGN_TEMPLATE_LEGACY_STORAGE_KEY,
   deleteDesignTemplateRecord,
   loadDesignTemplates,
@@ -429,7 +441,9 @@ type DesignPatchOptions = {
   recordHistory?: boolean;
 };
 
-const DESIGN_STORAGE_KEY = 'coach-kagiso-design-studio-v3-manifesto';
+// CHANGE S: retained only as the offline mirror key; the design itself lives
+// in Supabase now. See lib/content/design-document-client.ts.
+const DESIGN_STORAGE_KEY = DESIGN_DOCUMENT_LEGACY_STORAGE_KEY;
 const BRAND_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-brand-assets';
 const DELETED_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-deleted-assets';
 const LEGACY_HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
@@ -6410,6 +6424,12 @@ export default function DesignStudioPanel({
   // CHANGE Q: focus mode hides both side columns so the artboard gets the full
   // width. Persisted because it is a working preference, not a transient state.
   const [isCanvasFocusMode, setIsCanvasFocusMode] = useState(false);
+  // CHANGE S: the design being edited is now a row. `currentDesignId` is null
+  // for a design that has never been saved, which is what makes Save create a
+  // new row rather than overwriting whatever was open before.
+  const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
+  const [savedDesigns, setSavedDesigns] = useState<DesignDocumentSummaryRecord[]>([]);
+  const [designSaveBusy, setDesignSaveBusy] = useState(false);
   const canvasViewportRef = useRef<HTMLElement | null>(null);
   // CHANGE R: the header holds Save and the export buttons, but it scrolls away
   // as soon as you are working on the canvas. Watch it, and float a compact bar
@@ -6540,30 +6560,69 @@ export default function DesignStudioPanel({
     return () => document.removeEventListener('selectionchange', onSelectionChange);
   }, [selectedLayer]);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(DESIGN_STORAGE_KEY);
-    if (!raw) return;
-    let timeoutId: number | null = null;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!isDesignDocument(parsed)) return;
-      timeoutId = window.setTimeout(() => {
-        const emptyHistory: DesignHistory = { past: [], future: [] };
-        designRef.current = parsed;
-        designHistoryRef.current = emptyHistory;
-        activePageIdRef.current = parsed.pages[0]?.id || 'page-1';
-        setDesign(parsed);
-        setDesignHistory(emptyHistory);
-        setActivePageId(activePageIdRef.current);
-        selectSingleLayer(parsed.pages[0]?.layers.find((layer) => !layer.locked)?.id || null);
-      }, 0);
-    } catch {
-      window.localStorage.removeItem(DESIGN_STORAGE_KEY);
-    }
-    return () => {
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
+  // CHANGE S: memoised because the design-loading effect depends on it. As a
+  // plain function it changed identity every render, which would have made that
+  // effect re-run - and refetch the design list - on every single render.
+  const selectSingleLayer = useCallback((id: string | null) => {
+    selectedLayerIdRef.current = id;
+    selectedLayerIdsRef.current = id ? [id] : [];
+    setSelectedLayerIdState(id);
+    setSelectedLayerIds(selectedLayerIdsRef.current);
   }, []);
+
+  // CHANGE S: open the most recently saved design from Supabase, falling back to
+  // the local mirror when the API is unreachable (most likely the
+  // design_documents migration has not been applied yet).
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyDocument = (parsed: DesignDocument, id: string | null) => {
+      if (cancelled) return;
+      const emptyHistory: DesignHistory = { past: [], future: [] };
+      designRef.current = parsed;
+      designHistoryRef.current = emptyHistory;
+      activePageIdRef.current = parsed.pages[0]?.id || 'page-1';
+      setDesign(parsed);
+      setDesignHistory(emptyHistory);
+      setActivePageId(activePageIdRef.current);
+      selectSingleLayer(parsed.pages[0]?.layers.find((layer) => !layer.locked)?.id || null);
+      setCurrentDesignId(id);
+    };
+
+    const applyLocalMirror = () => {
+      const local = readLocalDesignMirror();
+      if (isDesignDocument(local)) applyDocument(local, null);
+    };
+
+    void (async () => {
+      try {
+        const designs = await listSavedDesigns(adminKey);
+        if (cancelled) return;
+        setSavedDesigns(designs);
+
+        if (designs.length === 0) {
+          // Nothing saved server-side yet: keep whatever is in this browser so
+          // work in progress is not thrown away by the move.
+          applyLocalMirror();
+          return;
+        }
+
+        const latest = await fetchSavedDesign(designs[0].id, adminKey);
+        if (cancelled) return;
+        if (isDesignDocument(latest.document)) {
+          applyDocument(latest.document, latest.id);
+        } else {
+          applyLocalMirror();
+        }
+      } catch {
+        applyLocalMirror();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, selectSingleLayer]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -6679,6 +6738,11 @@ export default function DesignStudioPanel({
   }, [isVaultPanelCollapsed, vaultPanelPreferenceLoaded]);
 
   const replaceImportedDesignDocument = useCallback((nextDesign: DesignDocument, message: string) => {
+    // CHANGE S: an imported deck is a new design. Detaching from the saved row
+    // means the next Save creates its own record instead of overwriting
+    // whatever was open - which is how importing a second carousel used to
+    // destroy the first with no way back.
+    setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
     const emptyHistory: DesignHistory = { past: [], future: [] };
@@ -6850,13 +6914,6 @@ export default function DesignStudioPanel({
       return acc;
     }, {});
   }, [assetSearchTerms, brandAssets, deletedAssetIds]);
-
-  function selectSingleLayer(id: string | null) {
-    selectedLayerIdRef.current = id;
-    selectedLayerIdsRef.current = id ? [id] : [];
-    setSelectedLayerIdState(id);
-    setSelectedLayerIds(selectedLayerIdsRef.current);
-  }
 
   function selectLayer(id: string | null, additive = false) {
     if (!id) {
@@ -7151,7 +7208,7 @@ export default function DesignStudioPanel({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activePage.id, selectedLayers, undoDesignChange, redoDesignChange]);
+  }, [activePage.id, selectedLayers, undoDesignChange, redoDesignChange, selectSingleLayer]);
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
@@ -7211,6 +7268,9 @@ export default function DesignStudioPanel({
   }
 
   function replaceDesignDocument(nextDesign: DesignDocument, message: string) {
+    // See replaceImportedDesignDocument. openSavedDesign re-attaches the id
+    // straight after calling this.
+    setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
     const emptyHistory: DesignHistory = { past: [], future: [] };
@@ -8124,9 +8184,68 @@ export default function DesignStudioPanel({
     patchLayer(layer.id, patch as Partial<DesignLayer>);
   }
 
-  function saveDesign() {
-    window.localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(designRef.current));
-    setSaveMessage('Design saved on this browser.');
+  // CHANGE S: save to Supabase, mirroring locally so an unreachable API cannot
+  // cost work. Creates a row the first time, updates it after that.
+  async function saveDesign() {
+    if (designSaveBusy) return;
+    const snapshot = designRef.current;
+    writeLocalDesignMirror(snapshot);
+    setDesignSaveBusy(true);
+    setSaveMessage('Saving...');
+
+    try {
+      const payload = {
+        title: snapshot.title || 'Untitled design',
+        format: snapshot.format,
+        width: snapshot.width,
+        height: snapshot.height,
+        document: snapshot as unknown,
+      };
+      const saved = currentDesignId
+        ? await updateSavedDesign(currentDesignId, payload, adminKey)
+        : await createSavedDesign(payload, adminKey);
+
+      setCurrentDesignId(saved.id);
+      setSavedDesigns((current) => {
+        const without = current.filter((item) => item.id !== saved.id);
+        const { document: _document, ...summary } = saved;
+        return [summary, ...without];
+      });
+      setSaveMessage('Design saved to your account.');
+    } catch (error) {
+      setSaveMessage(
+        `Saved in this browser only - ${error instanceof Error ? error.message : 'the designs service is unreachable'}.`,
+      );
+    } finally {
+      setDesignSaveBusy(false);
+    }
+  }
+
+  async function openSavedDesign(summary: DesignDocumentSummaryRecord) {
+    if (designSaveBusy) return;
+    try {
+      const record = await fetchSavedDesign(summary.id, adminKey);
+      if (!isDesignDocument(record.document)) throw new Error('That saved design could not be read.');
+      replaceDesignDocument(record.document, `Opened "${summary.title}".`);
+      setCurrentDesignId(record.id);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Could not open that design.');
+    }
+  }
+
+  async function deleteSavedDesignRecord(summary: DesignDocumentSummaryRecord) {
+    if (designSaveBusy) return;
+    if (!window.confirm(`Delete "${summary.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteSavedDesign(summary.id, adminKey);
+      setSavedDesigns((current) => current.filter((item) => item.id !== summary.id));
+      // The open design is now unsaved rather than silently pointing at a row
+      // that no longer exists, so the next Save creates a fresh one.
+      if (currentDesignId === summary.id) setCurrentDesignId(null);
+      setSaveMessage(`"${summary.title}" deleted.`);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Could not delete that design.');
+    }
   }
 
   function resetDesign() {
@@ -8136,7 +8255,10 @@ export default function DesignStudioPanel({
     setActivePageId(nextDesign.pages[0].id);
     selectSingleLayer('main-headline');
     setSaveMessage('');
-    window.localStorage.removeItem(DESIGN_STORAGE_KEY);
+    // Detach from the saved row: Reset starts a new design, it does not wipe
+    // the one already stored.
+    setCurrentDesignId(null);
+    clearLocalDesignMirror();
   }
 
   function toggleCanvasGuide(key: keyof DesignCanvasGuides) {
@@ -8648,6 +8770,68 @@ export default function DesignStudioPanel({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* CHANGE S: saved designs. Before this, Design Studio held exactly
+                one design and an import replaced it outright. */}
+            {savedDesigns.length > 0 && (
+              <div className="mt-4 rounded-[8px] bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel>Saved designs</FieldLabel>
+                  <span className="rounded-full bg-[#F5F3EE] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">
+                    {savedDesigns.length}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  {savedDesigns.slice(0, 6).map((summary) => {
+                    const isCurrent = currentDesignId === summary.id;
+                    return (
+                      <div
+                        key={summary.id}
+                        className={`rounded-[8px] border bg-[#F8F6F4] p-3 transition ${
+                          isCurrent
+                            ? 'border-[#142334] outline outline-2 outline-[#C9AD98]'
+                            : 'border-[#E4D8CB] hover:border-[#C9AD98] hover:bg-white'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void openSavedDesign(summary)}
+                          className="block w-full text-left"
+                        >
+                          <span className="block truncate text-[12px] font-bold text-[#142334]">{summary.title}</span>
+                          <span className="mt-1 block truncate text-[11px] text-[#142334]/55">
+                            {summary.width} x {summary.height} - {summary.format.replace(/_/g, ' ')}
+                          </span>
+                        </button>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void openSavedDesign(summary)}
+                            disabled={isCurrent}
+                            className="min-h-8 rounded-[8px] border border-[#E4D8CB] bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#FBFAF8] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteSavedDesignRecord(summary)}
+                            className="flex min-h-8 items-center justify-center gap-1 rounded-[8px] border border-red-100 bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-[#142334]/55">
+                  {currentDesignId
+                    ? 'Save updates the highlighted design.'
+                    : 'This design has not been saved yet - Save will create a new one.'}
+                </p>
               </div>
             )}
 
