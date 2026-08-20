@@ -28,6 +28,9 @@ const BASE = typeof window !== 'undefined' ? window.location.origin : '';
 
 /** Brand faces available as OTF/TTF, so embeddable in a PDF. */
 const embeddableBrandFonts: Record<string, string> = {
+  // Converted from the shipped woff2 with wawoff2; the source is CFF, so it
+  // decompresses straight to a .otf React PDF can embed.
+  daughterHand: '/fonts/brand/daughter-hand.otf',
   linebrush: '/fonts/brand/linebrush.otf',
   mibrush: '/fonts/brand/mibrush-regular.otf',
   simpleNotes: '/fonts/brand/simple-notes-regular.otf',
@@ -42,7 +45,6 @@ const embeddableBrandFonts: Record<string, string> = {
 const nonEmbeddableFonts = new Set([
   'alohaLover',
   'bableya',
-  'daughterHand',
   'heroIn',
   'kaliebLuxury',
   'hand', // Comic Sans / system fallback - not ours to embed.
