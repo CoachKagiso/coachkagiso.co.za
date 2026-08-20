@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, type AiRuntimeConfig, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { getFallbackVisionModel, modelSupportsVision } from '@/lib/ai-models';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,8 @@ const AI_VISION_MODEL = 'GLM-4.6V-Flash';
 const AI_VISION_FALLBACK_MODEL = 'glm-4.5v';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 30;
+// CHANGE T: matches MAX_CAROUSEL_PDF_PAGES on the client.
+const MAX_CAROUSEL_SLIDES = 12;
 
 const STAGE1_SYSTEM_PROMPT = `
 You are a structural analyst. Your ONLY job is to extract the structural pattern from content. You must NEVER reproduce the source wording, ideas, or subject matter.
@@ -46,6 +49,64 @@ Rules:
 - If the image is a logo, icon, brand mark, decoration, photograph, or graphic with no readable sentence-level text, return {"text": "", "hasText": false}
 - Single words, brand names, or short labels do NOT count as content text — only return hasText:true if there is a post, caption, article, slide, or paragraph of readable text
 - A logo with a brand name underneath is NOT content text`;
+
+// CHANGE T: carousel decks are a sequence, not a single artefact. The structural
+// fields above still apply to the deck as a whole; these add the shape of the
+// arc, expressed in the vocabulary the generator already speaks (slide roles and
+// layout recipes from carousel-template-registry), so the extracted DNA can be
+// fed straight back in rather than read and retyped.
+const CAROUSEL_STAGE1_SYSTEM_PROMPT = `
+You are a structural analyst reading a LinkedIn carousel deck slide by slide. Your ONLY job is to extract the structural pattern. You must NEVER reproduce the source wording, ideas, or subject matter.
+
+Output ONLY valid JSON with no other text:
+
+{
+  "hookPattern": "How does the cover slide open? One sentence. (question / bold claim / statistic / scene / uncomfortable truth / reversal)",
+  "emotionalTension": "What problem, fear, or frustration does the deck activate? One sentence naming the specific emotion.",
+  "storyStructure": "How does the deck move from cover to close? One sentence describing the arc.",
+  "ctaStyle": "How does the final slide close? One sentence. (soft ask / direct ask / reflection prompt / next-step instruction / follow prompt)",
+  "formatLogic": "Why does the carousel format suit this content? One sentence covering pacing, slide count, or how the idea is chunked.",
+  "suggestedPillar": "Which pillar does this structure fit? One sentence: name the pillar (Career Growth & Strategy / Leadership & People Development / Personal Brand & Visibility / Mentorship & Community) and why.",
+  "slideCount": number of slides you were given,
+  "slideArc": ["one role per slide, in order, chosen ONLY from: cover, reframe, framework, step, checklist, rule, proof, insight, cta"],
+  "layoutRecipe": "Which recipe best matches the arc? Choose ONE: authority_framework / guided_shift / diagnostic_reframe / narrative_launch",
+  "copyDensity": "How much copy sits on a typical inner slide? One of: light / medium / dense",
+  "visualPattern": "What does the deck do visually across slides? One sentence on layout rhythm, emphasis, or repetition. Describe the pattern, never the brand.",
+  "whatMakesItWork": "The single strongest structural choice in this deck, and why it holds attention. One or two sentences.",
+  "hasExtractableStructure": true | false
+}
+
+LENGTH RULE: 1-2 sentences per text field. Under 220 words total.
+
+CRITICAL RULES:
+- Output ONLY the JSON object above
+- NEVER reproduce any wording from the source
+- NEVER include the subject matter - only the structural pattern
+- slideArc must have exactly one entry per slide you were given, in order
+- If the slides carry no readable copy, set hasExtractableStructure to false and leave text fields empty
+`;
+
+function normaliseCarouselFramework(value: Record<string, unknown>, slideCount: number) {
+  const allowedRoles = new Set(['cover', 'reframe', 'framework', 'step', 'checklist', 'rule', 'proof', 'insight', 'cta']);
+  const allowedRecipes = new Set(['authority_framework', 'guided_shift', 'diagnostic_reframe', 'narrative_launch']);
+  const rawArc = Array.isArray(value.slideArc) ? value.slideArc : [];
+  const slideArc = rawArc
+    .map((role) => String(role || '').trim().toLowerCase())
+    .filter((role) => allowedRoles.has(role))
+    .slice(0, slideCount);
+  const rawDensity = String(value.copyDensity || '').trim().toLowerCase();
+  const rawRecipe = String(value.layoutRecipe || '').trim().toLowerCase();
+
+  return {
+    ...normaliseFramework(value),
+    slideCount,
+    slideArc,
+    layoutRecipe: allowedRecipes.has(rawRecipe) ? rawRecipe : '',
+    copyDensity: ['light', 'medium', 'dense'].includes(rawDensity) ? rawDensity : '',
+    visualPattern: String(value.visualPattern || '').trim(),
+    whatMakesItWork: String(value.whatMakesItWork || '').trim(),
+  };
+}
 
 function normaliseFramework(value: Record<string, unknown>) {
   return {
@@ -108,12 +169,26 @@ async function extractTextFromImage(imageBase64: string, imageMediaType: string,
     },
   ];
 
+  // CHANGE T: on OpenRouter this used runtime.model unconditionally, so an OCR
+  // pass against a text-only configured model (currently deepseek-v4-flash)
+  // failed with "No endpoints found that support image input". That broke the
+  // existing screenshot upload, not just carousels. Use the vision-capable
+  // fallback the catalogue already provides, the same way tools-ai.ts does.
+  const openRouterVisionAttempts = () => {
+    const attemptList: { model: string; retries: number }[] = [];
+    if (modelSupportsVision(runtime.model)) attemptList.push({ model: runtime.model, retries: 2 });
+    const fallback = getFallbackVisionModel();
+    if (fallback && fallback !== runtime.model) attemptList.push({ model: fallback, retries: 2 });
+    if (attemptList.length === 0) throw new Error('VISION_UNAVAILABLE');
+    return attemptList;
+  };
+
   const attempts = runtime.provider === 'zai'
     ? [
         { model: AI_VISION_MODEL, retries: 3 },
         { model: AI_VISION_FALLBACK_MODEL, retries: 1 },
       ]
-    : [{ model: runtime.model, retries: 2 }];
+    : openRouterVisionAttempts();
 
   for (const attempt of attempts) {
     for (let index = 0; index < attempt.retries; index += 1) {
@@ -128,6 +203,10 @@ async function extractTextFromImage(imageBase64: string, imageMediaType: string,
           continue;
         }
         if (isTemporaryOverload && attempt.model === AI_VISION_MODEL) {
+          break;
+        }
+        if (response.status === 404 && index >= attempt.retries - 1) {
+          // The endpoint cannot take images at all; retrying it is pointless.
           break;
         }
         if (response.status === 401 || response.status === 403 || response.status === 429) {
@@ -181,17 +260,73 @@ async function extractStructureFromText(textContent: string, runtime: AiRuntimeC
   return extractJsonObject(content);
 }
 
+async function extractCarouselStructure(
+  slideText: string,
+  slideCount: number,
+  runtime: AiRuntimeConfig,
+): Promise<Record<string, unknown>> {
+  const response = await callAi(
+    runtime,
+    runtime.model,
+    [
+      { role: 'system', content: CAROUSEL_STAGE1_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `CAROUSEL DECK (${slideCount} slides):\n${slideText}\n\nRead this deck and extract its structural framework.`,
+      },
+    ],
+    900,
+    0.2,
+  );
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    console.error(`Carousel structure extraction error ${response.status}:`, responseText);
+    throw new Error('STRUCTURE_EXTRACTION_FAILED');
+  }
+
+  const data = JSON.parse(responseText) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content?.trim() || '{}';
+  return extractJsonObject(content);
+}
+
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') ?? '';
   let key = '';
   let textContent = '';
   let imageBase64 = '';
   let imageMediaType = '';
+  let isCarousel = false;
+  const slideImages: { base64: string; mediaType: string }[] = [];
 
   try {
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       key = String(formData.get('key') || '');
+      // CHANGE T: a carousel arrives as many page images under `slides`, while a
+      // single screenshot still arrives under `image`. Both use the same
+      // multipart path that already worked.
+      const slideFiles = formData.getAll('slides').filter((entry): entry is File => entry instanceof File);
+      if (slideFiles.length > 0) {
+        isCarousel = true;
+        if (slideFiles.length > MAX_CAROUSEL_SLIDES) {
+          return NextResponse.json(
+            { error: `Carousels are analysed up to ${MAX_CAROUSEL_SLIDES} slides.` },
+            { status: 400 },
+          );
+        }
+        for (const slideFile of slideFiles) {
+          if (!['image/jpeg', 'image/png', 'image/webp'].includes(slideFile.type)) {
+            return NextResponse.json({ error: 'Carousel slides must be JPEG, PNG, or WebP.' }, { status: 400 });
+          }
+          if (slideFile.size > MAX_IMAGE_BYTES) {
+            return NextResponse.json({ error: 'Each slide must be 10MB or smaller.' }, { status: 400 });
+          }
+          const bytes = await slideFile.arrayBuffer();
+          slideImages.push({ base64: Buffer.from(bytes).toString('base64'), mediaType: slideFile.type });
+        }
+      }
+
       const imageFile = formData.get('image');
 
       if (imageFile instanceof File) {
@@ -225,8 +360,59 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AI service not configured. Add the active provider API key in Settings.' }, { status: 503 });
   }
 
-  if (!imageBase64 && !textContent) {
+  if (!imageBase64 && !textContent && slideImages.length === 0) {
     return NextResponse.json({ error: 'Paste source content first.' }, { status: 400 });
+  }
+
+  // CHANGE T: carousel path. Each slide is OCR'd to text, then the arc is read
+  // from the assembled deck. Keeping structure extraction a text call means no
+  // model has to hold twelve images at once, and it reuses the OCR pass that
+  // already works for single screenshots.
+  if (isCarousel) {
+    const slideTexts: string[] = [];
+
+    for (const [index, slide] of slideImages.entries()) {
+      try {
+        const ocrResult = await extractTextFromImage(slide.base64, slide.mediaType, runtime);
+        slideTexts.push(`SLIDE ${index + 1}:\n${ocrResult.text.trim() || '(no readable copy on this slide)'}`);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'OCR_FAILED';
+        if (reason === 'VISION_UNAVAILABLE') {
+          return NextResponse.json(
+            { error: 'The vision service is unavailable right now. Try again shortly.' },
+            { status: 503 },
+          );
+        }
+        slideTexts.push(`SLIDE ${index + 1}:\n(this slide could not be read)`);
+      }
+    }
+
+    const deckText = slideTexts.join('\n\n');
+    const readableCharacters = deckText.replace(/SLIDE \d+:/g, '').replace(/\(.*?\)/g, '').trim().length;
+
+    if (readableCharacters < MIN_TEXT_LENGTH) {
+      return NextResponse.json(
+        { error: 'No readable slide copy was found in this deck. If it is an image-only carousel there is no structure to extract.' },
+        { status: 422 },
+      );
+    }
+
+    try {
+      const raw = await extractCarouselStructure(deckText, slideImages.length, runtime);
+      const framework = normaliseCarouselFramework(raw, slideImages.length);
+
+      if (!framework.hasExtractableStructure || !framework.storyStructure) {
+        return NextResponse.json(
+          { error: 'This deck does not have a structure that can be extracted.' },
+          { status: 422 },
+        );
+      }
+
+      return NextResponse.json({ framework });
+    } catch (error) {
+      console.error('Carousel structure extraction failed:', error);
+      return NextResponse.json({ error: 'Could not extract the structure from this deck.' }, { status: 502 });
+    }
   }
 
   if (imageBase64 && !imageMediaType.startsWith('image/')) {

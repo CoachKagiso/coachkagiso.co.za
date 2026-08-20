@@ -15,6 +15,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  Layers3,
   Lightbulb,
   Link2,
   Loader2,
@@ -366,7 +367,9 @@ type SessionPlannerPresentationOutput = {
   generatedAt: string;
 };
 type HookType = 'text_post' | 'spoken_video' | 'visual' | 'visual_spoken';
-type TransformInputType = 'text' | 'image';
+// CHANGE T: 'carousel' uploads a LinkedIn carousel PDF. Stage 1 already
+// extracts structure from a screenshot; a deck is the same job across N slides.
+type TransformInputType = 'text' | 'image' | 'carousel';
 type AiPromptSelection = Pick<CreateSelection, 'contentType' | 'subType' | 'angle' | 'angleRegister'>;
 type SmartPulseKey = 'platform' | 'content' | 'angle' | 'topic';
 type SmartSuggestState =
@@ -430,6 +433,14 @@ type ExtractedFramework = {
   ctaStyle: string;
   formatLogic: string;
   suggestedPillar?: string;
+  // CHANGE T: only present when the source was a carousel deck. The arc and
+  // recipe use the registry vocabulary so the DNA can drive the generator.
+  slideCount?: number;
+  slideArc?: string[];
+  layoutRecipe?: string;
+  copyDensity?: string;
+  visualPattern?: string;
+  whatMakesItWork?: string;
 };
 
 export type CarouselSlide = {
@@ -1147,6 +1158,13 @@ const transformInputTypes: {
     label: 'Image',
     description: 'Upload a screenshot or image',
     inputLabel: 'Upload a screenshot',
+    placeholder: '',
+  },
+  {
+    value: 'carousel',
+    label: 'Carousel PDF',
+    description: 'Upload a LinkedIn carousel',
+    inputLabel: 'Upload a carousel PDF',
     placeholder: '',
   },
 ];
@@ -3301,6 +3319,7 @@ function sortVaultRecordsByExpiry(items: ContentBacklogItem[]) {
 
 function getTransformInputIcon(inputType: TransformInputType, className = 'h-4 w-4') {
   if (inputType === 'image') return <ImageIcon className={className} />;
+  if (inputType === 'carousel') return <Layers3 className={className} />;
   return <FileText className={className} />;
 }
 
@@ -3322,6 +3341,16 @@ function getFrameworkRows(framework: ExtractedFramework) {
     { label: 'CTA style', value: framework.ctaStyle },
     { label: 'Format logic', value: framework.formatLogic },
     ...(framework.suggestedPillar ? [{ label: 'Suggested pillar', value: framework.suggestedPillar }] : []),
+    ...(framework.slideCount ? [{ label: 'Slide count', value: String(framework.slideCount) }] : []),
+    ...(framework.slideArc?.length
+      ? [{ label: 'Slide arc', value: framework.slideArc.map((role) => carouselSlideRoleLabels[role as CarouselSlideRole] || role).join(' -> ') }]
+      : []),
+    ...(framework.layoutRecipe
+      ? [{ label: 'Closest recipe', value: getCarouselLayoutRecipeOption(framework.layoutRecipe as CarouselLayoutRecipe).label }]
+      : []),
+    ...(framework.copyDensity ? [{ label: 'Copy density', value: framework.copyDensity }] : []),
+    ...(framework.visualPattern ? [{ label: 'Visual pattern', value: framework.visualPattern }] : []),
+    ...(framework.whatMakesItWork ? [{ label: 'What makes it work', value: framework.whatMakesItWork }] : []),
   ];
 }
 
@@ -3811,6 +3840,12 @@ export default function ContentStudio({
   const [alchemyImageName, setAlchemyImageName] = useState('');
   const [alchemyImageSize, setAlchemyImageSize] = useState(0);
   const [alchemyImageUrl, setAlchemyImageUrl] = useState('');
+  // CHANGE T: carousel PDF upload. The rendered page images are held until
+  // extraction so a re-run does not need to re-render the PDF.
+  const [alchemyDeckFile, setAlchemyDeckFile] = useState<File | null>(null);
+  const [alchemyDeckPages, setAlchemyDeckPages] = useState<{ pageNumber: number; blob: Blob }[]>([]);
+  const [alchemyDeckNotice, setAlchemyDeckNotice] = useState('');
+  const [alchemyDeckReading, setAlchemyDeckReading] = useState(false);
   const [alchemyUrlOpen, setAlchemyUrlOpen] = useState(false);
   const [alchemyFramework, setAlchemyFramework] = useState<ExtractedFramework | null>(null);
   const [alchemyOutput, setAlchemyOutput] = useState('');
@@ -4150,7 +4185,9 @@ export default function ContentStudio({
   const alchemyOutputPlatform = alchemyTargetPlatform !== 'auto' ? createPlatformToContentPlatform[alchemyTargetPlatform] : defaultOutputPlatform;
   const hasAlchemyInput = alchemyInputType === 'image'
     ? Boolean(alchemyImageFile || alchemyImageBase64)
-    : Boolean(alchemySource.trim());
+    : alchemyInputType === 'carousel'
+      ? alchemyDeckPages.length > 0
+      : Boolean(alchemySource.trim());
   const canExtractAlchemy = hasAlchemyInput;
   const canRebuildAlchemy = Boolean(alchemyFramework);
   const selectedCreateType = findContentTypeOption(createSelection);
@@ -5260,6 +5297,141 @@ export default function ContentStudio({
     setCreateError(null);
   }
 
+  // CHANGE T2: analysed decks are kept as a reusable swipe file. The framework
+  // is transient in Transform's own flow, so without this the analysis is spent
+  // the moment a rebuild happens.
+  const [dnaReferences, setDnaReferences] = useState<{
+    id: string;
+    label: string;
+    slideCount: number;
+    layoutRecipe: string | null;
+    slideArc: string[];
+    framework: ExtractedFramework;
+  }[]>([]);
+  const [dnaSaving, setDnaSaving] = useState(false);
+
+  const fetchDnaReferences = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/content/carousel-dna?key=${encodeURIComponent(adminKey)}`);
+      const data = (await response.json().catch(() => ({}))) as { references?: typeof dnaReferences };
+      return response.ok && data.references ? data.references : null;
+    } catch {
+      // A missing reference list must not block the Transform flow.
+      return null;
+    }
+  }, [adminKey]);
+
+  const loadDnaReferences = useCallback(async () => {
+    const references = await fetchDnaReferences();
+    if (references) setDnaReferences(references);
+  }, [fetchDnaReferences]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const references = await fetchDnaReferences();
+      if (!cancelled && references) setDnaReferences(references);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDnaReferences]);
+
+  async function saveDnaReference() {
+    if (!alchemyFramework || dnaSaving) return;
+    const suggested = alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
+    const label = window.prompt('Name this reference structure', suggested);
+    if (!label?.trim()) return;
+
+    setDnaSaving(true);
+    try {
+      await requestJson('/api/content/carousel-dna', 'POST', {
+        key: adminKey,
+        label: label.trim(),
+        sourceName: alchemyDeckFile?.name || null,
+        slideCount: alchemyFramework.slideCount || 0,
+        layoutRecipe: alchemyFramework.layoutRecipe || null,
+        slideArc: alchemyFramework.slideArc || [],
+        framework: alchemyFramework,
+      });
+      await loadDnaReferences();
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not save this reference.');
+    } finally {
+      setDnaSaving(false);
+    }
+  }
+
+  function useDnaReference(reference: (typeof dnaReferences)[number]) {
+    // Drop the saved framework back into Stage 2's input. Rebuilding from a
+    // reference is the same operation as rebuilding from a fresh analysis.
+    setAlchemyFramework(reference.framework);
+    setAlchemyStage('extracted');
+    setAlchemyOutput('');
+    setAlchemyCritique(null);
+    setCreateError(null);
+  }
+
+  async function deleteDnaReference(id: string) {
+    if (!window.confirm('Delete this reference structure?')) return;
+    try {
+      await requestJson('/api/content/carousel-dna', 'DELETE', { key: adminKey, id });
+      setDnaReferences((current) => current.filter((item) => item.id !== id));
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not delete this reference.');
+    }
+  }
+
+  // CHANGE T: render the uploaded deck to page images in the browser. Doing it
+  // here rather than at extraction time means the slide count is visible before
+  // any AI spend, and a retry does not re-render the PDF.
+  async function selectAlchemyDeckFile(file: File | null) {
+    setAlchemyDeckFile(null);
+    setAlchemyDeckPages([]);
+    setAlchemyDeckNotice('');
+    setAlchemyFramework(null);
+    setAlchemyOutput('');
+    setAlchemyStage('idle');
+    setAlchemyCritique(null);
+    setCreateError(null);
+
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setCreateError('Upload the carousel as a PDF. That is what LinkedIn serves when you download a document post.');
+      return;
+    }
+    if (file.size > 40 * 1024 * 1024) {
+      setCreateError('That PDF is over 40MB. Export it smaller and try again.');
+      return;
+    }
+
+    setAlchemyDeckReading(true);
+    try {
+      const { readCarouselPdfPages, MAX_CAROUSEL_PDF_PAGES } = await import('@/lib/content/carousel-pdf-reader');
+      const result = await readCarouselPdfPages(file);
+      if (result.pages.length === 0) throw new Error('That PDF has no readable pages.');
+
+      setAlchemyDeckFile(file);
+      setAlchemyDeckPages(result.pages);
+      setAlchemyDeckNotice(
+        result.truncated
+          ? `${result.totalPages} slides found - the first ${MAX_CAROUSEL_PDF_PAGES} will be analysed.`
+          : `${result.pages.length} slide${result.pages.length === 1 ? '' : 's'} ready to analyse.`,
+      );
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not read that PDF.');
+    } finally {
+      setAlchemyDeckReading(false);
+    }
+  }
+
+  function clearAlchemyDeck() {
+    setAlchemyDeckFile(null);
+    setAlchemyDeckPages([]);
+    setAlchemyDeckNotice('');
+  }
+
   function selectAlchemyInputType(inputType: TransformInputType) {
     setAlchemyInputType(inputType);
     resetAlchemyFlow();
@@ -5340,7 +5512,18 @@ export default function ContentStudio({
     try {
       let data: { framework: ExtractedFramework };
 
-      if (alchemyInputType === 'image') {
+      if (alchemyInputType === 'carousel') {
+        if (alchemyDeckPages.length === 0) throw new Error('Upload a carousel PDF first.');
+        const formData = new FormData();
+        formData.append('key', adminKey);
+        alchemyDeckPages.forEach((page) => {
+          formData.append('slides', new File([page.blob], `slide-${page.pageNumber}.jpg`, { type: 'image/jpeg' }));
+        });
+        const response = await fetch('/api/content/transform/stage1', { method: 'POST', body: formData });
+        const parsed = (await response.json().catch(() => ({}))) as { framework?: ExtractedFramework; error?: string };
+        if (!response.ok || !parsed.framework) throw new Error(parsed.error || 'Could not extract the structure.');
+        data = { framework: parsed.framework };
+      } else if (alchemyInputType === 'image') {
         if (alchemyImageFile) {
           const formData = new FormData();
           formData.append('key', adminKey);
@@ -5368,6 +5551,7 @@ export default function ContentStudio({
 
       setAlchemySource('');
       clearAlchemyImage();
+      clearAlchemyDeck();
       setAlchemyFramework(data.framework);
       setAlchemyStage('extracted');
     } catch (error) {
@@ -5883,6 +6067,16 @@ export default function ContentStudio({
 
             {studioMode === 'transform' && (
               <TransformFlow
+                dnaReferences={dnaReferences}
+                dnaSaving={dnaSaving}
+                onSaveDnaReference={() => void saveDnaReference()}
+                onUseDnaReference={useDnaReference}
+                onDeleteDnaReference={(id) => void deleteDnaReference(id)}
+                deckPageCount={alchemyDeckPages.length}
+                deckFileName={alchemyDeckFile?.name || ''}
+                deckNotice={alchemyDeckNotice}
+                deckReading={alchemyDeckReading}
+                onDeckSelect={(file) => void selectAlchemyDeckFile(file)}
                 inputTypes={transformInputTypes}
                 inputType={alchemyInputType}
                 selectedInput={selectedAlchemyInput}
@@ -7029,6 +7223,16 @@ function SmartSuggestPanel({
 }
 
 function TransformFlow({
+  dnaReferences,
+  dnaSaving,
+  onSaveDnaReference,
+  onUseDnaReference,
+  onDeleteDnaReference,
+  deckPageCount,
+  deckFileName,
+  deckNotice,
+  deckReading,
+  onDeckSelect,
   inputTypes,
   inputType,
   selectedInput,
@@ -7075,6 +7279,25 @@ function TransformFlow({
   onDirectionChange,
   onRebuildModeChange,
 }: {
+  // CHANGE T2: saved reference structures.
+  dnaReferences: {
+    id: string;
+    label: string;
+    slideCount: number;
+    layoutRecipe: string | null;
+    slideArc: string[];
+    framework: ExtractedFramework;
+  }[];
+  dnaSaving: boolean;
+  onSaveDnaReference: () => void;
+  onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
+  onDeleteDnaReference: (id: string) => void;
+  // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
+  deckPageCount: number;
+  deckFileName: string;
+  deckNotice: string;
+  deckReading: boolean;
+  onDeckSelect: (file: File | null) => void;
   inputTypes: typeof transformInputTypes;
   inputType: TransformInputType;
   selectedInput: (typeof transformInputTypes)[number];
@@ -7176,9 +7399,99 @@ function TransformFlow({
           </div>
         </section>
 
+        {/* CHANGE T2: previously analysed decks, reusable without re-uploading. */}
+        {dnaReferences.length > 0 && (
+          <section className="rounded-[8px] bg-white p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Reference structures</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                  Decks you have already analysed. Reuse one to rebuild in your voice without uploading again.
+                </p>
+              </div>
+              <Badge className="bg-[#F5F3EE] text-[#8C7466]">{dnaReferences.length} saved</Badge>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {dnaReferences.slice(0, 6).map((reference) => (
+                <div key={reference.id} className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3">
+                  <p className="truncate text-[13px] font-bold text-[#142334]">{reference.label}</p>
+                  <p className="mt-1 truncate text-[11px] text-[#142334]/55">
+                    {reference.slideCount} slides
+                    {reference.layoutRecipe
+                      ? ` - ${getCarouselLayoutRecipeOption(reference.layoutRecipe as CarouselLayoutRecipe).label}`
+                      : ''}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onUseDnaReference(reference)}
+                      className="min-h-8 rounded-[8px] border border-[#E4D8CB] bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98]"
+                    >
+                      Use
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDnaReference(reference.id)}
+                      className="flex min-h-8 items-center justify-center gap-1 rounded-[8px] border border-red-100 bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="rounded-[8px] bg-white p-5">
           <TransformStepHeader number="02" title={selectedInput.inputLabel} description="The source material is used only for Stage 1, then cleared before the rebuild." />
-          {inputType === 'image' ? (
+          {inputType === 'carousel' ? (
+            <div className="mt-4">
+              <input
+                id={inputId}
+                type="file"
+                accept="application/pdf"
+                className="sr-only"
+                onChange={(event) => onDeckSelect(event.target.files?.[0] || null)}
+              />
+              {deckPageCount === 0 ? (
+                <label
+                  htmlFor={inputId}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed border-[#C9AD98] bg-[#F8F6F4] px-6 py-10 text-center transition hover:border-[#142334] hover:bg-white"
+                >
+                  {deckReading ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-[#8C7466]" />
+                  ) : (
+                    <Layers3 className="h-6 w-6 text-[#8C7466]" />
+                  )}
+                  <span className="text-[13px] font-bold text-[#142334]">
+                    {deckReading ? 'Reading the deck...' : 'Upload a carousel PDF'}
+                  </span>
+                  <span className="max-w-md text-[12px] leading-relaxed text-[#142334]/58">
+                    Download a LinkedIn document post as PDF and drop it here. Slides are read in this browser, then only
+                    the structure is extracted - never the wording.
+                  </span>
+                </label>
+              ) : (
+                <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-[#142334]">{deckFileName}</p>
+                      <p className="mt-1 text-[12px] text-[#142334]/58">{deckNotice}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onDeckSelect(null)}
+                      className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466] underline underline-offset-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : inputType === 'image' ? (
             <div className="mt-4">
               <input
                 id={inputId}
@@ -7295,6 +7608,20 @@ function TransformFlow({
                 </div>
               ))}
             </div>
+
+            {/* CHANGE T2: keep this structure for reuse. Without it the analysis
+                is spent on a single rebuild. */}
+            {framework.slideCount ? (
+              <button
+                type="button"
+                onClick={onSaveDnaReference}
+                disabled={dnaSaving}
+                className="studio-secondary-button mt-4 w-fit"
+              >
+                {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
+                Save as reference structure
+              </button>
+            ) : null}
 
             <div className="mt-5 flex items-center gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
               <button
