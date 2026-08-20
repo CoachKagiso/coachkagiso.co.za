@@ -9,22 +9,50 @@ export type CarouselTemplate =
   | 'soft_diagnostic_cards'
   | 'bold_diagnostic'
   | 'signature_narrative';
-export type CarouselSlideRole =
-  | 'cover'
-  | 'reframe'
-  | 'framework'
-  | 'step'
-  | 'proof'
-  | 'cta'
-  | 'mirror'
-  | 'checklist'
-  | 'reflection'
-  | 'diagnosis'
-  | 'myth'
-  | 'cost'
-  | 'rule'
-  | 'sign'
-  | 'turn';
+// The canonical slide-role vocabulary. Anything that validates, prompts for, or
+// renders a role reads this array rather than repeating the list, so the
+// extractor can never offer a role the generator refuses (it previously offered
+// "insight", which is not a role, and it reached the UI unlabelled).
+export const CAROUSEL_SLIDE_ROLES = [
+  'cover',
+  'reframe',
+  'framework',
+  'step',
+  'proof',
+  'cta',
+  'mirror',
+  'checklist',
+  'reflection',
+  'diagnosis',
+  'myth',
+  'cost',
+  'rule',
+  'sign',
+  'turn',
+] as const;
+
+export type CarouselSlideRole = (typeof CAROUSEL_SLIDE_ROLES)[number];
+
+// One line per role, written for the extraction model rather than the UI. Typed
+// as a full Record so adding a role to the array above fails the build until it
+// is described here — that is what stops the two lists drifting apart again.
+export const CAROUSEL_SLIDE_ROLE_GLOSSES: Record<CarouselSlideRole, string> = {
+  cover: 'the opening slide that carries the hook',
+  reframe: 'shifts how the reader sees the problem',
+  framework: 'names or lays out a model',
+  step: 'one numbered action or principle in a sequence',
+  proof: 'evidence, example, or result that backs a claim',
+  cta: 'the closing ask',
+  mirror: 'reflects the reader’s situation back at them',
+  checklist: 'a list of checks, criteria, or signals',
+  reflection: 'invites the reader to pause and consider',
+  diagnosis: 'names what is actually going wrong',
+  myth: 'states a common belief in order to break it',
+  cost: 'what the mistake costs, or what avoiding it prevents',
+  rule: 'a sharp prescriptive rule to follow',
+  sign: 'an indicator the reader can spot',
+  turn: 'a pivot in the narrative',
+};
 export type CarouselComposition =
   | 'auto'
   | 'editorial_cover'
