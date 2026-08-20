@@ -5946,6 +5946,7 @@ export default function ContentStudio({
 
         {activeWorkspace === 'carousel' && (
           <CarouselStudioPanel
+            adminKey={adminKey}
             key={`carousel-${selectedCarouselDraftId || carouselDraftRecords[0]?.item.id || 'empty'}`}
             drafts={carouselDraftRecords}
             defaultAspectRatio={createSelection.carouselAspectRatio}
@@ -5980,6 +5981,7 @@ export default function ContentStudio({
 
         {activeWorkspace === 'design' && (
           <DesignStudioPanel
+            adminKey={adminKey}
             carouselImports={designCarouselImports}
             textImports={designTextImports}
             vaultImports={designVaultImports}
@@ -10661,6 +10663,7 @@ function CarouselDeckQualityPanel({
 }
 
 function CarouselStudioPanel({
+  adminKey,
   drafts,
   defaultAspectRatio,
   defaultTemplate,
@@ -10679,6 +10682,8 @@ function CarouselStudioPanel({
   onDraftSelect,
   onStartDraft,
 }: {
+  // CHANGE O: custom CTA templates are fetched from the templates API.
+  adminKey?: string;
   drafts: CarouselDraftRecord[];
   defaultAspectRatio: CarouselAspectRatio;
   defaultTemplate: CarouselTemplate;
@@ -10791,8 +10796,14 @@ function CarouselStudioPanel({
   // because they live in that panel's browser storage, not in the vault.
   const [ctaTemplates, setCtaTemplates] = useState<DesignCtaTemplateSummary[]>([]);
   useEffect(() => {
-    setCtaTemplates(readDesignCtaTemplateSummaries());
-  }, [activeRecordId]);
+    let cancelled = false;
+    void readDesignCtaTemplateSummaries(adminKey).then((templates) => {
+      if (!cancelled) setCtaTemplates(templates);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRecordId, adminKey]);
 
   const selectedCtaTemplateId = latestDraft?.customCtaTemplateId || null;
   const selectedCtaTemplate = selectedCtaTemplateId
