@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, type AiRuntimeConfig, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { getFallbackVisionModel, modelSupportsVision } from '@/lib/ai-models';
+import {
+  CAROUSEL_SLIDE_ROLES,
+  CAROUSEL_SLIDE_ROLE_GLOSSES,
+  carouselLayoutRecipeOptions,
+} from '@/lib/content/carousel-template-registry';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +60,14 @@ Rules:
 // arc, expressed in the vocabulary the generator already speaks (slide roles and
 // layout recipes from carousel-template-registry), so the extracted DNA can be
 // fed straight back in rather than read and retyped.
+// Both the role menu the model is given and the whitelist its answer is checked
+// against are built from the registry, so they cannot disagree.
+const CAROUSEL_ROLE_MENU = CAROUSEL_SLIDE_ROLES
+  .map((role) => `${role} (${CAROUSEL_SLIDE_ROLE_GLOSSES[role]})`)
+  .join(', ');
+
+const CAROUSEL_RECIPE_MENU = carouselLayoutRecipeOptions.map((option) => option.value).join(' / ');
+
 const CAROUSEL_STAGE1_SYSTEM_PROMPT = `
 You are a structural analyst reading a LinkedIn carousel deck slide by slide. Your ONLY job is to extract the structural pattern. You must NEVER reproduce the source wording, ideas, or subject matter.
 
@@ -68,8 +81,8 @@ Output ONLY valid JSON with no other text:
   "formatLogic": "Why does the carousel format suit this content? One sentence covering pacing, slide count, or how the idea is chunked.",
   "suggestedPillar": "Which pillar does this structure fit? One sentence: name the pillar (Career Growth & Strategy / Leadership & People Development / Personal Brand & Visibility / Mentorship & Community) and why.",
   "slideCount": number of slides you were given,
-  "slideArc": ["one role per slide, in order, chosen ONLY from: cover, reframe, framework, step, checklist, rule, proof, insight, cta"],
-  "layoutRecipe": "Which recipe best matches the arc? Choose ONE: authority_framework / guided_shift / diagnostic_reframe / narrative_launch",
+  "slideArc": ["one role per slide, in order, chosen ONLY from: ${CAROUSEL_ROLE_MENU}. Use the role name only, not the description."],
+  "layoutRecipe": "Which recipe best matches the arc? Choose ONE: ${CAROUSEL_RECIPE_MENU}",
   "copyDensity": "How much copy sits on a typical inner slide? One of: light / medium / dense",
   "visualPattern": "What does the deck do visually across slides? One sentence on layout rhythm, emphasis, or repetition. Describe the pattern, never the brand.",
   "whatMakesItWork": "The single strongest structural choice in this deck, and why it holds attention. One or two sentences.",
@@ -87,12 +100,19 @@ CRITICAL RULES:
 `;
 
 function normaliseCarouselFramework(value: Record<string, unknown>, slideCount: number) {
-  const allowedRoles = new Set(['cover', 'reframe', 'framework', 'step', 'checklist', 'rule', 'proof', 'insight', 'cta']);
-  const allowedRecipes = new Set(['authority_framework', 'guided_shift', 'diagnostic_reframe', 'narrative_launch']);
+  const allowedRoles: Set<string> = new Set(CAROUSEL_SLIDE_ROLES);
+  const allowedRecipes: Set<string> = new Set(carouselLayoutRecipeOptions.map((option) => option.value));
   const rawArc = Array.isArray(value.slideArc) ? value.slideArc : [];
+  // The arc is positional - entry N describes slide N - so an unrecognised role
+  // is coerced to the generic inner role rather than dropped. Dropping used to
+  // shorten the array, which silently shifted every later slide's role by one.
   const slideArc = rawArc
     .map((role) => String(role || '').trim().toLowerCase())
-    .filter((role) => allowedRoles.has(role))
+    .map((role) => {
+      if (allowedRoles.has(role)) return role;
+      console.warn(`Carousel arc: unrecognised role "${role}" coerced to "step".`);
+      return 'step';
+    })
     .slice(0, slideCount);
   const rawDensity = String(value.copyDensity || '').trim().toLowerCase();
   const rawRecipe = String(value.layoutRecipe || '').trim().toLowerCase();
