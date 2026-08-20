@@ -1,13 +1,14 @@
 export type CarouselPlatform = 'linkedin' | 'instagram_facebook' | 'tiktok' | 'email_voice';
 export type CarouselSlideCount = 'auto' | 'quick' | 'full';
 export type CarouselAspectRatio = 'auto' | 'square_1_1' | 'portrait_4_5' | 'linkedin_document';
-export type CarouselLayoutRecipe = 'authority_framework' | 'guided_shift' | 'diagnostic_reframe';
+export type CarouselLayoutRecipe = 'authority_framework' | 'guided_shift' | 'diagnostic_reframe' | 'narrative_launch';
 export type CarouselTemplate =
   | 'editorial_authority'
   | 'editorial_career_notes'
   | 'warm_coaching'
   | 'soft_diagnostic_cards'
-  | 'bold_diagnostic';
+  | 'bold_diagnostic'
+  | 'signature_narrative';
 export type CarouselSlideRole =
   | 'cover'
   | 'reframe'
@@ -21,7 +22,9 @@ export type CarouselSlideRole =
   | 'diagnosis'
   | 'myth'
   | 'cost'
-  | 'rule';
+  | 'rule'
+  | 'sign'
+  | 'turn';
 export type CarouselComposition =
   | 'auto'
   | 'editorial_cover'
@@ -49,6 +52,89 @@ export type CarouselTemplatePalette = {
   border: string;
   chipBackground: string;
   chipText: string;
+};
+
+// Per-template furniture config for the slide renderer (CHANGE F of the Carousel Studio v2 brief).
+export type CarouselFurniture = {
+  wordmark: string;
+  wordmarkWeight: number;
+  wordmarkSize: number;
+  wordmarkTracking: string;
+  wordmarkColor: string;
+  counter: 'pill' | 'strip';
+  topRight?: { text: string; color: string };
+  footerDash: string;
+  footerLeft: string;
+  footerColor: string;
+  footerRight: string;
+  footerRightLast: string;
+  swipeCue: boolean;
+  handle: boolean;
+};
+
+// Audience-facing stage eyebrows per layout recipe (CHANGE E of the brief). The renderer
+// reads stageEyebrows[recipe][role] and never renders internal role/composition identifiers.
+export type CarouselStageEyebrows = Record<CarouselLayoutRecipe, Partial<Record<CarouselSlideRole, string>>>;
+
+export const carouselStageEyebrows: CarouselStageEyebrows = {
+  authority_framework: {
+    reframe: 'THE REFRAME',
+    framework: 'THE FRAMEWORK',
+    step: 'THE PRACTICE',
+    proof: 'THE COST',
+    cta: 'YOUR MOVE',
+  },
+  guided_shift: {
+    mirror: 'SOUND FAMILIAR?',
+    diagnosis: 'NAME IT',
+    reframe: 'THE SHIFT',
+    step: 'START SMALL',
+    reflection: 'REFLECT',
+    cta: 'YOUR MOVE',
+  },
+  diagnostic_reframe: {
+    diagnosis: 'THE HIDDEN PROBLEM',
+    myth: 'THE MISTAKE',
+    cost: 'THE COST',
+    rule: 'THE BETTER RULE',
+    step: 'THE MOVE',
+    cta: 'YOUR MOVE',
+  },
+  narrative_launch: {
+    sign: 'SIGN {n}',
+    turn: 'REFLECTION',
+    cta: 'JOIN US',
+  },
+};
+
+// Brand-canonical type stacks (Inter + Playfair Display) for html2canvas export clones.
+// Do not read CSS vars here: they resolve to off-brand Raleway / Noto Serif Display.
+export const CAROUSEL_EXPORT_FONT_SANS = 'Inter, "Helvetica Neue", Arial, sans-serif';
+export const CAROUSEL_EXPORT_FONT_SERIF = '"Playfair Display", Georgia, serif';
+
+const defaultCarouselFurniture: CarouselFurniture = {
+  wordmark: 'COACH KAGISO',
+  wordmarkWeight: 600,
+  wordmarkSize: 26,
+  wordmarkTracking: '0.18em',
+  wordmarkColor: '#142334',
+  counter: 'pill',
+  footerDash: '#C9AD98',
+  footerLeft: 'COACHKAGISO.COM',
+  footerColor: '#A09086',
+  footerRight: '@coach.kagiso  \u00B7  SWIPE ->',
+  footerRightLast: 'LINK IN COMMENTS',
+  swipeCue: true,
+  handle: false,
+};
+
+const signatureNarrativeFurniture: CarouselFurniture = {
+  ...defaultCarouselFurniture,
+  wordmark: 'COACHKAGISO',
+  wordmarkWeight: 700,
+  wordmarkTracking: '0.08em',
+  counter: 'strip',
+  topRight: { text: '@coach.kagiso', color: '#A09086' },
 };
 
 export type CarouselSlideCountOption = {
@@ -90,6 +176,7 @@ export type CarouselTemplateOption = {
   bestFor: string;
   description: string;
   palette: CarouselTemplatePalette;
+  furniture: CarouselFurniture;
   designDirection: {
     label: string;
     mood: string;
@@ -180,14 +267,23 @@ export const carouselAspectRatioOptions: CarouselAspectRatioOption[] = [
   {
     value: 'linkedin_document',
     label: 'LinkedIn PDF',
-    size: '1080 x 1398',
+    size: '1080 x 1350',
     description: 'Document-style portrait page for LinkedIn PDF carousel export.',
-    prompt: 'Design for a LinkedIn PDF document portrait frame, 1080 by 1398 pixels.',
-    cssRatio: '1080 / 1398',
+    prompt: 'Design for a LinkedIn PDF document portrait frame, 1080 by 1350 pixels.',
+    cssRatio: '4 / 5',
     exportWidth: 1080,
-    exportHeight: 1398,
+    exportHeight: 1350,
   },
 ];
+
+const narrativeLaunch: CarouselLayoutRecipeOption = {
+  value: 'narrative_launch',
+  label: 'Narrative Launch',
+  description: 'Hook -> Signs -> Personal turn -> Event CTA. A story-driven launch sequence.',
+  prompt: 'Structure the carousel as a story-driven launch: open with a big personal hook, show 2 to 4 signs the reader recognises, make a personal turn in Reflection-Friday register, then close with a warm event invitation.',
+  slideArc: ['Hook', 'Signs', 'Personal turn', 'CTA'],
+  slideTypes: ['cover', 'sign', 'turn', 'cta'],
+};
 
 export const carouselLayoutRecipeOptions: CarouselLayoutRecipeOption[] = [
   {
@@ -214,6 +310,7 @@ export const carouselLayoutRecipeOptions: CarouselLayoutRecipeOption[] = [
     slideArc: ['Hidden problem', 'Mistake', 'Cost', 'Better rule', 'Action', 'CTA'],
     slideTypes: ['cover', 'diagnosis', 'myth', 'cost', 'rule', 'cta'],
   },
+  narrativeLaunch,
 ];
 
 export const carouselCompositionOptions: CarouselCompositionOption[] = [
@@ -313,6 +410,8 @@ export const carouselCompositionsByRole: Record<CarouselSlideRole, CarouselCompo
   myth: ['auto', 'contrast_block', 'quote_panel', 'note_card'],
   cost: ['auto', 'evidence_card', 'contrast_block', 'note_card'],
   rule: ['auto', 'numbered_stack', 'side_rail', 'card_grid'],
+  sign: ['auto', 'note_card', 'example_note', 'quote_panel'],
+  turn: ['auto', 'soft_reflection', 'example_note'],
 };
 
 const authorityFramework = carouselLayoutRecipeOptions[0];
@@ -325,13 +424,14 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Editorial Authority',
     bestFor: 'LinkedIn authority decks',
     description: 'Refined, quiet, high-trust slides with strong editorial hierarchy.',
+    furniture: defaultCarouselFurniture,
     palette: {
-      background: '#FBFAF8',
+      background: '#E8E3DF',
       foreground: '#142334',
-      muted: '#6B6B6B',
+      muted: '#A09086',
       accent: '#C9AD98',
       panel: '#FFFFFF',
-      border: '#E4D8CB',
+      border: '#CDC6C3',
       chipBackground: '#142334',
       chipText: '#FFFFFF',
     },
@@ -345,12 +445,12 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Make each slide feel like a page from the same editorial deck.',
       ],
       tokens: {
-        background: '#FBFAF8',
+        background: '#E8E3DF',
         surface: '#FFFFFF',
         ink: '#142334',
-        muted: '#6B6B6B',
+        muted: '#A09086',
         accent: '#C9AD98',
-        border: '#E4D8CB',
+        border: '#CDC6C3',
       },
     },
     layoutRecipe: authorityFramework,
@@ -364,6 +464,8 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'One headline-level idea per slide.',
         'Use proof cues or lived examples when the topic allows it.',
         'End with a professional next step, not a loud sales push.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Never use internal template labels like role or composition names in slide copy.',
       ],
     },
     preview: {
@@ -380,16 +482,17 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     value: 'editorial_career_notes',
     label: 'Editorial Career Notes',
     bestFor: 'Premium career frameworks',
-    description: 'Print-inspired career-note slides with oversized serif type, fine rules, and hand-drawn movement cues.',
+    description: 'Print-inspired career-note slides with oversized serif type, fine rules, and Rodeo Dust movement cues.',
+    furniture: defaultCarouselFurniture,
     palette: {
-      background: '#F7F4EE',
+      background: '#E4D8CB',
       foreground: '#142334',
-      muted: '#6F6A61',
-      accent: '#9F5F4B',
-      panel: '#FFFCF6',
-      border: '#D8C8BB',
+      muted: '#A09086',
+      accent: '#C9AD98',
+      panel: '#FFFFFF',
+      border: '#A09086',
       chipBackground: '#142334',
-      chipText: '#F7F4EE',
+      chipText: '#FFFFFF',
     },
     designDirection: {
       label: 'Editorial career notes',
@@ -397,16 +500,16 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
       typography: 'Oversized serif headlines, compact sans metadata, and restrained body copy with wide margins.',
       posture: [
         'Use large quiet type as the primary design asset.',
-        'Add thin rules, corner frames, and subtle hand-drawn lines for movement.',
+        'Add thin rules, corner frames, and Rodeo Dust vector arrows and underlines for movement.',
         'Make the deck feel collectible, like a career note worth saving.',
       ],
       tokens: {
-        background: '#F7F4EE',
-        surface: '#FFFCF6',
+        background: '#E4D8CB',
+        surface: '#FFFFFF',
         ink: '#142334',
-        muted: '#6F6A61',
-        accent: '#9F5F4B',
-        border: '#D8C8BB',
+        muted: '#A09086',
+        accent: '#C9AD98',
+        border: '#A09086',
       },
     },
     layoutRecipe: authorityFramework,
@@ -420,6 +523,8 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Keep cover headlines strong enough to stand alone as a poster.',
         'Use numbered steps or short proof cues in the middle slides.',
         'End with a save-worthy roadmap, reflection, or calm professional CTA.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Never use internal template labels like role or composition names in slide copy.',
       ],
     },
     preview: {
@@ -437,14 +542,15 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Warm Coaching',
     bestFor: 'Instagram relationship posts',
     description: 'Soft, human, calm frames for reassurance, reflection, and trust.',
+    furniture: defaultCarouselFurniture,
     palette: {
-      background: '#F7EFE8',
+      background: '#E4D8CB',
       foreground: '#142334',
-      muted: '#7A6255',
-      accent: '#B98567',
-      panel: '#FFFDFC',
-      border: '#D9BDA9',
-      chipBackground: '#EBD8CB',
+      muted: '#A09086',
+      accent: '#C9AD98',
+      panel: '#FFFFFF',
+      border: '#CDC6C3',
+      chipBackground: '#C9AD98',
       chipText: '#142334',
     },
     designDirection: {
@@ -457,12 +563,12 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Make the reader feel seen, then give them one useful move.',
       ],
       tokens: {
-        background: '#F7EFE8',
-        surface: '#FFFDFC',
+        background: '#E4D8CB',
+        surface: '#FFFFFF',
         ink: '#142334',
-        muted: '#7A6255',
-        accent: '#B98567',
-        border: '#D9BDA9',
+        muted: '#A09086',
+        accent: '#C9AD98',
+        border: '#CDC6C3',
       },
     },
     layoutRecipe: guidedShift,
@@ -476,6 +582,8 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Use plain language and short body copy.',
         'Let the middle slides build relief through clarity.',
         'End with a reflective CTA or a soft invitation to reply.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Never use internal template labels like role or composition names in slide copy.',
       ],
     },
     preview: {
@@ -492,16 +600,17 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     value: 'soft_diagnostic_cards',
     label: 'Soft Diagnostic Cards',
     bestFor: 'Emotional diagnostic posts',
-    description: 'Soft textured diagnostic frames with speech-card layering, sage accents, and human note-like emphasis.',
+    description: 'Soft textured diagnostic frames with speech-card layering and human note-like emphasis.',
+    furniture: defaultCarouselFurniture,
     palette: {
-      background: '#6F866D',
-      foreground: '#FFF8ED',
-      muted: '#F5E9D8',
-      accent: '#C9AD98',
-      panel: '#FFF3E2',
-      border: 'rgba(255,248,237,0.72)',
-      chipBackground: '#FFF3E2',
-      chipText: '#577057',
+      background: '#E8E3DF',
+      foreground: '#142334',
+      muted: '#A09086',
+      accent: '#A09086',
+      panel: '#FFFFFF',
+      border: '#A09086',
+      chipBackground: '#E4D8CB',
+      chipText: '#142334',
     },
     designDirection: {
       label: 'Soft diagnostic cards',
@@ -510,15 +619,15 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
       posture: [
         'Use layered cards and speech-bubble shapes to make diagnostic copy feel conversational.',
         'Let one emotional sentence breathe before offering the practical reframe.',
-        'Use sage, cream, and warm accent tones without turning the whole deck beige.',
+        'Use Chai, Creme, and Rodeo Dust accents without turning the whole deck beige.',
       ],
       tokens: {
-        background: '#6F866D',
-        surface: '#FFF3E2',
-        ink: '#FFF8ED',
-        muted: '#F5E9D8',
-        accent: '#C9AD98',
-        border: 'rgba(255,248,237,0.72)',
+        background: '#E8E3DF',
+        surface: '#FFFFFF',
+        ink: '#142334',
+        muted: '#A09086',
+        accent: '#A09086',
+        border: '#A09086',
       },
     },
     layoutRecipe: guidedShift,
@@ -532,6 +641,9 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Keep card text short enough to feel like a note, not an essay.',
         'Use one strong reframe or question per slide.',
         'Close with a reflective prompt or low-pressure invitation.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Tension slides use the conviction-reframe pattern: name the comfortable default, then flip it as a risk.',
+        'Never use internal template labels like role or composition names in slide copy.',
       ],
     },
     preview: {
@@ -549,13 +661,14 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Bold Diagnostic',
     bestFor: 'Hooks, myths, sharp reframes',
     description: 'High-contrast, decisive slides for stopping the scroll and naming the problem.',
+    furniture: defaultCarouselFurniture,
     palette: {
       background: '#142334',
       foreground: '#FFFFFF',
-      muted: '#D8C8BB',
+      muted: '#CDC6C3',
       accent: '#C9AD98',
-      panel: '#FFFFFF',
-      border: 'rgba(255,255,255,0.18)',
+      panel: '#142334',
+      border: '#C9AD98',
       chipBackground: '#C9AD98',
       chipText: '#142334',
     },
@@ -570,11 +683,11 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
       ],
       tokens: {
         background: '#142334',
-        surface: '#20354D',
+        surface: '#142334',
         ink: '#FFFFFF',
-        muted: '#D8C8BB',
+        muted: '#CDC6C3',
         accent: '#C9AD98',
-        border: 'rgba(255,255,255,0.18)',
+        border: '#C9AD98',
       },
     },
     layoutRecipe: diagnosticReframe,
@@ -588,6 +701,9 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
         'Keep headlines short and high-impact.',
         'Do not overcrowd dark slides with dense body copy.',
         'End with a clear action or diagnostic question.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Tension slides use the conviction-reframe pattern: name the comfortable default, then flip it as a risk.',
+        'Never use internal template labels like role or composition names in slide copy.',
       ],
     },
     preview: {
@@ -598,6 +714,66 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     exportRules: {
       pdf: 'Keep high contrast intact when captured into LinkedIn PDF pages.',
       png: 'Avoid tiny text so each dark frame survives mobile compression.',
+    },
+  },
+  {
+    value: 'signature_narrative',
+    label: 'Signature Narrative',
+    bestFor: 'Launch & story decks',
+    description: 'Progress strip, handle, swipe cue, personal story beats, event CTA.',
+    furniture: signatureNarrativeFurniture,
+    palette: {
+      background: '#E8E3DF',
+      foreground: '#142334',
+      muted: '#A09086',
+      accent: '#C9AD98',
+      panel: '#FFFFFF',
+      border: '#CDC6C3',
+      chipBackground: '#142334',
+      chipText: '#FFFFFF',
+    },
+    designDirection: {
+      label: 'Signature narrative',
+      mood: 'Intimate, story-led, and launch-shaped. It should feel like a personal letter with a clear event ask at the end.',
+      typography: 'Large Playfair statements for hooks and turns, Inter 600 key lines inside short body blocks.',
+      posture: [
+        'Open with one big personal hook and a single-line sub.',
+        'Use 2 to 4 sign slides that name the pattern the reader recognises.',
+        'Turn personal in the Reflection-Friday register, then close with a warm event invitation.',
+      ],
+      tokens: {
+        background: '#E8E3DF',
+        surface: '#FFFFFF',
+        ink: '#142334',
+        muted: '#A09086',
+        accent: '#C9AD98',
+        border: '#CDC6C3',
+      },
+    },
+    layoutRecipe: narrativeLaunch,
+    promptBehavior: {
+      generation: [
+        'Structure the deck as a personal story: hook, signs the reader recognises, a personal turn, then a soft event CTA.',
+        'Sign slides: a Playfair headline plus two short body blocks with one Inter 600 key line.',
+        'Turn slides: first-person reflection in the Reflection-Friday register, e.g. "I had to learn this myself."',
+      ],
+      slideRules: [
+        'CTA slide: headline plus up to 4 emoji bullets (live-virtual-workshop, duration, capacity, outcome) and one footnote line for price and early-bird deadline.',
+        'Event date, price, and deadline are per-deck editable content; never hardcode dates or prices.',
+        'Use at most one em dash across the entire deck; prefer periods or commas.',
+        'Use her vocabulary sparingly: elevate, show up, stretch, pour into, hold space, intentional, visibility, "your career matters".',
+        'Avoid forbidden words: strategist, leverage, synergy, empowerment, manifestation, hustle.',
+        'Never use internal template labels like role or composition names in slide copy.',
+      ],
+    },
+    preview: {
+      eyebrow: 'Narrative launch',
+      headline: 'There are two others.',
+      body: 'A story-driven launch sequence with a personal hook, signs, turn, and event CTA.',
+    },
+    exportRules: {
+      pdf: 'Keep the progress strip and swipe cue crisp on every LinkedIn PDF page.',
+      png: 'Favor 4:5 portrait frames so the story blocks and event CTA stay readable.',
     },
   },
 ];
