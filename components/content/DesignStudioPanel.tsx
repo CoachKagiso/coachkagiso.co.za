@@ -8435,6 +8435,94 @@ export default function DesignStudioPanel({
     }
   }
 
+  // CHANGE V: build the vector export payload from the layer model.
+  //
+  // SVG assets are rasterised to PNG first: React PDF's <Image> cannot read SVG,
+  // and we are in the browser so a canvas conversion is cheap. Everything else -
+  // text, shapes, rotation - stays as real PDF objects.
+  async function buildVectorPdfInput(exportDesign: DesignDocument) {
+    const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
+    const imageCache = new Map<string, string>();
+
+    const resolveImage = async (asset: DesignAsset | undefined) => {
+      if (!asset) return undefined;
+      const cached = imageCache.get(asset.id);
+      if (cached) return cached;
+      const resolved = isSvgDesignAsset(asset)
+        ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
+        : asset.src;
+      if (resolved) imageCache.set(asset.id, resolved);
+      return resolved;
+    };
+
+    const pages = [];
+    for (const page of exportDesign.pages) {
+      const layers = [];
+      for (const layer of page.layers) {
+        const base = {
+          id: layer.id,
+          type: layer.type,
+          x: layer.x,
+          y: layer.y,
+          width: layer.width,
+          height: layer.height,
+          rotation: layer.rotation,
+          opacity: layer.opacity,
+          visible: layer.visible,
+          flipX: layer.flipX,
+          flipY: layer.flipY,
+          borderRadius: getLayerBaseBorderRadius(layer),
+        };
+
+        if (layer.type === 'text') {
+          layers.push({
+            ...base,
+            text: layer.text,
+            fontFamily: layer.fontFamily,
+            fontSize: layer.fontSize,
+            fontWeight: layer.fontWeight,
+            color: layer.color,
+            lineHeight: layer.lineHeight,
+            textAlign: layer.textAlign,
+            backgroundColor: layer.backgroundColor,
+            padding: layer.padding,
+            letterSpacing: layer.letterSpacing,
+            textTransform: layer.textTransform,
+            textDecoration: layer.textDecoration,
+            fontStyle: layer.fontStyle,
+          });
+        } else if (layer.type === 'shape') {
+          layers.push({
+            ...base,
+            shape: layer.shape,
+            fillColor: layer.fillColor,
+            strokeColor: layer.strokeColor,
+            strokeWidth: layer.strokeWidth,
+          });
+        } else {
+          layers.push({
+            ...base,
+            imageSrc: await resolveImage(assetLibrary[layer.assetId]),
+            fit: layer.fit,
+          });
+        }
+      }
+      pages.push({ id: page.id, background: page.background, layers });
+    }
+
+    return { width: exportDesign.width, height: exportDesign.height, pages };
+  }
+
+  function collectDesignFontFamilies(exportDesign: DesignDocument) {
+    const families: string[] = [];
+    exportDesign.pages.forEach((page) => {
+      page.layers.forEach((layer) => {
+        if (layer.type === 'text' && layer.visible) families.push(layer.fontFamily);
+      });
+    });
+    return families;
+  }
+
   async function exportPdf() {
     const exportDesign = designRef.current;
     if (!exportDesign.pages.length) {
@@ -8447,6 +8535,42 @@ export default function DesignStudioPanel({
       message: `Preparing ${exportDesign.pages.length}-page PDF export...`,
       tone: 'info',
     });
+
+    // CHANGE V: try the vector lane first. The layer model is a scene graph, so
+    // it can be drawn as real PDF objects - sharp at any zoom, exact rotations,
+    // and nothing clipped by the viewport. Raster stays as the fallback.
+    try {
+      const { getVectorExportBlocker, renderDesignPdfBlob } = await import('@/components/content/DesignPdfDocument');
+      const blocker = getVectorExportBlocker(collectDesignFontFamilies(exportDesign));
+
+      if (blocker) {
+        // A vector PDF with substituted fonts looks wrong in a way that is hard
+        // to notice until it is printed. Rasterising is the honest choice here.
+        setExportState({
+          busy: true,
+          message: `Using image export: ${blocker}.`,
+          tone: 'info',
+        });
+      } else {
+        setExportState({ busy: true, message: 'Rendering vector PDF...', tone: 'info' });
+        const input = await buildVectorPdfInput(exportDesign);
+        const blob = await renderDesignPdfBlob(input);
+        downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
+        setExportState({
+          busy: false,
+          message: `Vector PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}. Text stays sharp at any zoom.`,
+          tone: 'info',
+        });
+        return;
+      }
+    } catch (error) {
+      console.warn('Vector PDF failed, falling back to image export:', error);
+      setExportState({
+        busy: true,
+        message: 'Vector render failed - falling back to image export...',
+        tone: 'info',
+      });
+    }
 
     try {
       await waitForNextDesignPaint();
