@@ -180,13 +180,13 @@ body {
   display: grid;
 }
 
-.coach-dashboard-clean *,
-.coach-dashboard-clean *::before,
-.coach-dashboard-clean *::after {
+.coach-dashboard-clean *:not(.growth-os-assistant *),
+.coach-dashboard-clean *:not(.growth-os-assistant *)::before,
+.coach-dashboard-clean *:not(.growth-os-assistant *)::after {
   box-shadow: none !important;
 }
 
-.coach-dashboard-clean :where(.border, .border-t, .border-r, .border-b, .border-l) {
+.coach-dashboard-clean :where(.border, .border-t, .border-r, .border-b, .border-l):not(.growth-os-assistant *) {
   border-color: transparent !important;
 }
 
