@@ -4011,9 +4011,24 @@ function preloadAllDesignFonts() {
 }
 
 function waitForNextDesignPaint() {
+  // CHANGE L: requestAnimationFrame does not fire while the document is hidden,
+  // so switching to another tab part-way through an export left the whole
+  // pipeline waiting on a frame that would never arrive - the export sat on
+  // "Preparing..." forever with no error and no way out. Race the frame against
+  // a short timeout so a backgrounded tab still finishes.
   return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const timeoutId = window.setTimeout(finish, 250);
+
     window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve());
+      window.requestAnimationFrame(finish);
     });
   });
 }

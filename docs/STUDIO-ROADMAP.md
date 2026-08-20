@@ -103,6 +103,33 @@ messages now report the actual pixel dimensions produced, and PNG filenames carr
 the scale. Added `releaseDesignExportCanvas` and freed each canvas after its
 bytes reach a blob or the PDF.
 
+**Export hung forever in a background tab.**
+
+`waitForNextDesignPaint` awaited two `requestAnimationFrame` callbacks, which do
+not fire while `document.visibilityState === 'hidden'`. Switching to another tab
+part-way through an export left the pipeline waiting on a frame that would never
+arrive: the UI sat on "Preparing 1-page PDF export..." with no error and no way
+out. The frame is now raced against a 250ms timeout. Found while verifying the
+export in a backgrounded browser tab.
+
+**Verified end to end** against real exported files, not just the UI's own
+success messages:
+
+| Check | Result |
+|---|---|
+| Carousel PNG at 2x | 2160x2700 on disk (a pre-fix export from the same deck measured 1080x1350) |
+| Carousel PDF is vector | 5 embedded TrueType subsets (Inter x4, Playfair Display), 0 image XObjects |
+| Single-slide export | produced `-slide-03@2x.png` and `-slide-03.pdf`, numbered by original position |
+| Design PDF page size | MediaBox `0 0 810 1012.5` pt = exactly 1080x1350 px |
+| Design PDF image fit | content stream draws `810 0 0 1012.5 0 0 cm` — fills the page exactly, with a 2160x2700 bitmap inside it |
+
+Pre-fix, that last draw would have been 1620x2025 pt on an 810x1012.5 pt page —
+exactly 2x overflow, which is the top-left-quarter crop.
+
+**Not verified visually:** the recoloured-SVG asset position fix. It needs a
+design containing a textured or mask-recoloured asset, exported and eyeballed
+against the canvas.
+
 **Caveat — rotation drift is not fully solved.**
 
 Layers apply `transform: rotate()` on the bounds wrapper and, when flipped,
