@@ -53,6 +53,48 @@ Tier 3 = new capability.
 
 ## Changelog
 
+### 2026-08-20 — The custom CTA now ships in the carousel PDF
+
+The custom CTA is a design document, not a carousel slide, so Carousel Studio's
+export had to leave it out — you had to open the deck in Design Studio instead.
+The vector renderer removes that split: both lanes now produce React PDF pages,
+so they compose into one document without merging files or rasterising either.
+
+`buildDesignPdfPages` returns pages without a `Document` wrapper;
+`scaleDesignPdfInput` rescales a design to another frame preserving aspect ratio
+and centring the remainder, so a CTA designed at one size sits flush with the
+deck rather than being stretched. `CarouselPdfDocument` accepts `trailingPages`.
+`loadCtaTemplatePdfInput` resolves a saved template to the renderer's shape,
+reading the brand asset library from storage and rasterising SVG assets.
+
+**The font constraint bit immediately, and that is the point.** The existing
+"Follow CTA - Masterclass" template uses Daughter Hand, which is woff2-only, so
+the first real export reported:
+
+> Downloaded 9-page vector PDF. The custom CTA was left out: daughterHand is
+> only available as a web font, which cannot be embedded in a vector PDF.
+
+That is the guard working. To get that specific CTA into a vector PDF, its font
+has to be converted to OTF and added to `embeddableBrandFonts`.
+
+**Verified** with a CTA using embeddable fonts, against the real 9-slide deck:
+
+| Check | Result |
+|---|---|
+| Pages | 10 (9 deck + CTA) |
+| Last page text | `Follow for more career clarity. @coachkagiso` |
+| Image XObjects | 0 — the CTA is vector too |
+| Font subsets | 5, including PlayfairDisplay-Bold for the CTA headline |
+| Size | 42KB for the whole deck |
+
+Partial exports do not get the CTA, and the picker says so — it belongs to the
+whole deck, not to a three-slide subset. PNG frames stay at the deck count for
+the same reason.
+
+**Left in place:** a `Follow CTA (vector test)` template, as a working example
+of a CTA that exports as vector. Delete or edit it freely. The active draft
+currently points at it rather than the Daughter Hand one.
+
 ### 2026-08-20 — Vector PDF from the layer model
 
 Design Studio exported by photographing the canvas with html2canvas. That is why
@@ -91,11 +133,8 @@ The old export had no text at all — it was a picture of text.
 clipping. PNG export stays raster, which is inherent to the format, so a layer
 that is both rotated *and* flipped can still drift in a PNG.
 
-**Now unblocked, not yet done:** the custom CTA slide in Carousel Studio's own
-export. `renderDesignPdfBlob` can draw a design page as vector, so the remaining
-work is composing carousel slides and a CTA design page into one document —
-either by merging blobs or by having `CarouselPdfDocument` export its pages for
-reuse rather than a whole `Document`.
+**Now unblocked:** the custom CTA slide in Carousel Studio's own export — done
+the same day, see the entry above.
 
 ### 2026-08-20 — Remove background (item 8)
 
