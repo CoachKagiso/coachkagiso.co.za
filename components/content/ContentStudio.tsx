@@ -55,6 +55,8 @@ import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
 import {
+  CAROUSEL_EXPORT_FONT_SANS,
+  CAROUSEL_EXPORT_FONT_SERIF,
   DEFAULT_CAROUSEL_ASPECT_RATIO,
   DEFAULT_CAROUSEL_LAYOUT_RECIPE,
   DEFAULT_CAROUSEL_SLIDE_COUNT,
@@ -63,6 +65,7 @@ import {
   carouselAspectRatioOptions,
   carouselLayoutRecipeOptions,
   carouselSlideCountOptions,
+  carouselStageEyebrows,
   carouselTemplateOptions,
   getCarouselAspectRatioLabel,
   getCarouselAspectRatioOption,
@@ -79,6 +82,7 @@ import {
   isCarouselTemplate,
   type CarouselAspectRatio,
   type CarouselComposition,
+  type CarouselFurniture,
   type CarouselLayoutRecipe,
   type CarouselPlatform,
   type CarouselSlideCount,
@@ -419,6 +423,7 @@ type CarouselSlide = {
   body: string;
   cta?: string;
   visualSuggestion?: string;
+  footnote?: string;
 };
 
 type CarouselDraftPayload = {
@@ -2827,6 +2832,8 @@ const carouselSlideRoleLabels: Record<CarouselSlideRole, string> = {
   myth: 'Myth',
   cost: 'Cost',
   rule: 'Rule',
+  sign: 'Sign',
+  turn: 'Turn',
 };
 
 function normalizeCarouselComposition(value: unknown, role: CarouselSlideRole): CarouselComposition {
@@ -2839,6 +2846,14 @@ function getDefaultCarouselSlideRole(layoutRecipe: CarouselLayoutRecipe, index: 
   const recipe = getCarouselLayoutRecipeOption(layoutRecipe);
   if (index === 0) return recipe.slideTypes[0] || 'cover';
   if (index === totalSlides - 1) return recipe.slideTypes[recipe.slideTypes.length - 1] || 'cta';
+  // CHANGE D: narrative_launch distributes 2-4 sign slides across the middle,
+  // then the personal turns, instead of clamping onto a single repeated role.
+  if (layoutRecipe === 'narrative_launch') {
+    const middleCount = totalSlides - 2;
+    if (middleCount <= 0) return 'sign';
+    const signCount = Math.max(2, Math.min(4, Math.ceil(middleCount * 0.6)));
+    return index - 1 < signCount ? 'sign' : 'turn';
+  }
   const middleRoles = recipe.slideTypes.slice(1, -1);
   return middleRoles[Math.min(index - 1, middleRoles.length - 1)] || 'step';
 }
@@ -2863,6 +2878,7 @@ function normalizeCarouselSlide(
   const visualSuggestion = multilineString(
     record.visualSuggestion ?? record.visual_suggestion ?? record.visual ?? record.design ?? record.note,
   );
+  const footnote = compactString(record.footnote ?? record.foot_note ?? record.priceNote ?? record.price_note);
 
   if (!headline && !body) return null;
 
@@ -2874,6 +2890,7 @@ function normalizeCarouselSlide(
     body,
     ...(cta ? { cta } : {}),
     ...(visualSuggestion ? { visualSuggestion } : {}),
+    ...(footnote ? { footnote } : {}),
   };
 }
 
@@ -8582,14 +8599,17 @@ function resolveCarouselComposition(
 }
 
 function getCarouselHeadlineSize(composition: CarouselComposition, stats: ReturnType<typeof getCarouselSlideTextStats>) {
-  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 40 : 48;
-  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 36 : 42;
-  if (composition === 'quiet_intro') return 32;
-  if (composition === 'direct_action') return 38;
-  if (composition === 'save_share_close') return 34;
-  if (composition === 'credibility_cue') return 38;
-  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 30;
-  return stats.headlineWords > 9 ? 30 : 34;
+  // Brand type scale at 1080x1350 (CHANGE G): cover 96-110px, inner 72-84px.
+  // These values are the 600px studio-preview baseline; the export lane scales by
+  // exportScale (1080/600 = 1.8) to land on the brand sizes.
+  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 53 : 61;
+  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 53 : 59;
+  if (composition === 'quiet_intro') return 53;
+  if (composition === 'direct_action') return 44;
+  if (composition === 'save_share_close') return 42;
+  if (composition === 'credibility_cue') return 42;
+  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 40;
+  return stats.headlineWords > 9 ? 40 : 46;
 }
 
 type CarouselDeckQualityTone = 'ready' | 'watch' | 'fix';
@@ -8708,6 +8728,14 @@ function getDefaultCarouselSlideCopy(role: CarouselSlideRole, title: string) {
     rule: {
       headline: 'A better rule',
       body: 'If the action does not create clarity, feedback, or movement, it is probably not the next step.',
+    },
+    sign: {
+      headline: 'A sign you are on the right track',
+      body: 'You are already doing more than you give yourself credit for. Name one signal that proves it.',
+    },
+    turn: {
+      headline: 'The turn',
+      body: 'Change the frame and the next move becomes obvious. Choose the one shift that matters most today.',
     },
   };
 
@@ -9071,6 +9099,25 @@ function buildCarouselDeckQualityReport(
   };
 }
 
+function buildCarouselEyebrows(
+  slides: CarouselSlide[],
+  layoutRecipe: CarouselLayoutRecipe,
+  pillarLabel: string | null,
+): string[] {
+  // CHANGE E: audience-facing stage eyebrows only. The renderer never shows
+  // internal role/composition identifiers. Cover slides show the deck pillar
+  // name when provided, otherwise no eyebrow.
+  let signIndex = 0;
+  return slides.map((slide, index) => {
+    const role = slide.role || getDefaultCarouselSlideRole(layoutRecipe, index, slides.length);
+    if (role === 'cover') return pillarLabel || '';
+    if (role === 'sign') signIndex += 1;
+    const eyebrow = carouselStageEyebrows[layoutRecipe]?.[role];
+    if (!eyebrow) return '';
+    return eyebrow.replace('{n}', String(signIndex));
+  });
+}
+
 function CarouselSlideFrame({
   slide,
   index,
@@ -9080,6 +9127,7 @@ function CarouselSlideFrame({
   layoutRecipe,
   exportDimensions,
   frameRef,
+  eyebrow,
 }: {
   slide: CarouselSlide;
   index: number;
@@ -9089,29 +9137,32 @@ function CarouselSlideFrame({
   layoutRecipe?: ReturnType<typeof getCarouselLayoutRecipeOption>;
   exportDimensions?: { width: number; height: number };
   frameRef?: Ref<HTMLElement>;
+  eyebrow?: string;
 }) {
   const isBold = template.value === 'bold_diagnostic';
   const isCareerNotes = template.value === 'editorial_career_notes';
   const isSoftCards = template.value === 'soft_diagnostic_cards';
   const isWarm = template.value === 'warm_coaching' || isSoftCards;
   const isEditorial = template.value === 'editorial_authority' || isCareerNotes;
+  const isSignature = template.value === 'signature_narrative';
   const palette = template.palette;
+  const furniture = template.furniture;
   const role = slide.role || getDefaultCarouselSlideRole((layoutRecipe || template.layoutRecipe).value, index, total);
-  const roleLabel = carouselSlideRoleLabels[role];
+  const stageEyebrow = eyebrow ?? '';
   const bodyPoints = getCarouselSlideBodyPoints(slide.body);
   const textStats = getCarouselSlideTextStats(slide);
   const composition = resolveCarouselComposition(slide, role, template, bodyPoints);
-  const compositionOption = getCarouselCompositionOption(composition);
   const contrastPoints = bodyPoints.length > 1 ? bodyPoints : slide.body.split(/(?:\s+but\s+|\s+instead\s+|\s+not\s+)/i).map((point) => point.trim()).filter(Boolean).slice(0, 2);
   const isCover = role === 'cover';
   const isCta = role === 'cta';
   const headlineSize = getCarouselHeadlineSize(composition, textStats);
-  const coverHeadlineSize = Math.min(headlineSize + (isCareerNotes ? 14 : 6), isCareerNotes ? 64 : 52);
+  const coverHeadlineSize = Math.min(headlineSize + (isCareerNotes ? 8 : 6), 61);
   const resolvedHeadlineSize = isCover
     ? coverHeadlineSize
     : isCareerNotes
-      ? Math.min(headlineSize + 6, 42)
+      ? Math.min(headlineSize + 4, 46)
       : headlineSize;
+  const overflowFlag = !exportDimensions && (textStats.bodyWords > 58 || textStats.totalChars > 360);
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
   const exportFrameStyles = exportDimensions
@@ -9122,38 +9173,152 @@ function CarouselSlideFrame({
         maxWidth: `${exportDimensions.width}px`,
         minHeight: `${exportDimensions.height}px`,
         maxHeight: `${exportDimensions.height}px`,
-        padding: isCover ? `${exportSize(28)} ${exportSize(24)}` : exportSize(20),
+        padding: isCover ? `${exportSize(40)} ${exportSize(53)}` : exportSize(40),
       }
     : {};
+
+  const renderCounter = () => {
+    if (furniture.counter === 'strip') return null;
+    return (
+      <span
+        className="rounded-full font-semibold tabular-nums"
+        style={{
+          backgroundColor: palette.chipBackground,
+          color: palette.chipText,
+          fontSize: exportDimensions ? exportSize(13.3) : '13px',
+          padding: exportDimensions ? `${exportSize(5)} ${exportSize(13.3)}` : '5px 13px',
+          letterSpacing: exportDimensions ? exportSize(1.6) : '0.06em',
+        }}
+      >
+        {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+      </span>
+    );
+  };
+
+  const renderHeader = () => (
+    <div className="flex items-start justify-between" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
+      <div className="flex items-center gap-3" style={{ gap: exportDimensions ? exportSize(12) : '12px' }}>
+        <div>
+          <p
+            className="font-semibold uppercase"
+            style={{
+              color: furniture.wordmarkColor,
+              fontFamily: 'var(--font-sans)',
+              fontWeight: furniture.wordmarkWeight,
+              fontSize: exportDimensions ? exportSize(14.4) : '14px',
+              letterSpacing: exportDimensions ? exportSize(3.2) : '0.18em',
+            }}
+          >
+            {furniture.wordmark}
+          </p>
+          {stageEyebrow && (
+            <p
+              className="mt-1 font-semibold uppercase"
+              style={{
+                color: palette.accent,
+                fontFamily: 'var(--font-sans)',
+                fontSize: exportDimensions ? exportSize(14.4) : '14px',
+                letterSpacing: exportDimensions ? exportSize(3.2) : '0.14em',
+                marginTop: exportDimensions ? exportSize(4) : '4px',
+              }}
+            >
+              {stageEyebrow}
+            </p>
+          )}
+        </div>
+      </div>
+      {isSignature && furniture.topRight ? (
+        <p
+          className="font-semibold"
+          style={{
+            color: furniture.topRight.color,
+            fontFamily: 'var(--font-sans)',
+            fontSize: exportDimensions ? exportSize(13.3) : '13px',
+            letterSpacing: exportDimensions ? exportSize(1.3) : '0.05em',
+          }}
+        >
+          {furniture.topRight.text}
+        </p>
+      ) : (
+        renderCounter()
+      )}
+    </div>
+  );
+
+  const renderFooter = () => (
+    <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
+      {furniture.counter === 'strip' ? (
+        <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : '8px' }}>
+          {Array.from({ length: total }, (_, counterIndex) => {
+            const active = counterIndex === index;
+            return (
+              <div key={counterIndex} className="flex flex-col items-start">
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{
+                    color: active ? '#142334' : '#CDC6C3',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: exportDimensions ? exportSize(13.3) : '13px',
+                    letterSpacing: exportDimensions ? exportSize(1.3) : '0.05em',
+                  }}
+                >
+                  {String(counterIndex + 1).padStart(2, '0')}
+                </span>
+                <span
+                  className="mt-1 rounded-full"
+                  style={{
+                    backgroundColor: active ? '#C9AD98' : 'transparent',
+                    height: exportDimensions ? exportSize(4) : '4px',
+                    marginTop: exportDimensions ? exportSize(4) : '4px',
+                    width: exportDimensions ? exportSize(26.7) : '27px',
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : '8px' }}>
+          <span
+            className="rounded-full"
+            style={{
+              backgroundColor: furniture.footerDash,
+              height: exportDimensions ? exportSize(4.4) : '4px',
+              width: exportDimensions ? exportSize(26.7) : '27px',
+            }}
+          />
+          <p
+            className="font-semibold uppercase"
+            style={{
+              color: furniture.footerColor,
+              fontFamily: 'var(--font-sans)',
+              fontSize: exportDimensions ? exportSize(13.3) : '13px',
+              letterSpacing: exportDimensions ? exportSize(2.1) : '0.12em',
+            }}
+          >
+            {furniture.footerLeft}
+          </p>
+        </div>
+      )}
+      <p
+        className="font-semibold"
+        style={{
+          color: furniture.footerColor,
+          fontFamily: 'var(--font-sans)',
+          fontSize: exportDimensions ? exportSize(13.3) : '13px',
+          letterSpacing: exportDimensions ? exportSize(1.3) : '0.05em',
+        }}
+      >
+        {index === total - 1 ? furniture.footerRightLast : furniture.footerRight}
+      </p>
+    </div>
+  );
 
   const contentArea = (
     <>
       {isCover ? (
         <>
-          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
-            <div>
-              <p
-                className="text-[10px] font-bold uppercase tracking-[0.18em]"
-                style={{
-                  color: isBold ? 'rgba(255,255,255,0.58)' : isWarm ? palette.accent : palette.muted,
-                  fontSize: exportDimensions ? exportSize(10) : undefined,
-                }}
-              >
-                Coach Kagiso
-              </p>
-            </div>
-            <span
-              className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
-              style={{
-                backgroundColor: palette.chipBackground,
-                color: palette.chipText,
-                fontSize: exportDimensions ? exportSize(10) : undefined,
-                padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
-              }}
-            >
-              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-            </span>
-          </div>
+          {renderHeader()}
 
           <div
             className="my-auto w-full"
@@ -9163,17 +9328,17 @@ function CarouselSlideFrame({
               padding: exportDimensions ? `0 ${exportSize(12)}` : '0 12px',
             }}
           >
-            {slide.body && (
+            {stageEyebrow && (
               <p
-                className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+                className="font-semibold uppercase"
                 style={{
-                  color: isBold ? 'rgba(255,255,255,0.55)' : isWarm ? palette.accent : palette.accent,
-                  fontSize: exportDimensions ? exportSize(11) : undefined,
-                  letterSpacing: exportDimensions ? exportSize(3.2) : undefined,
-                  marginBottom: exportDimensions ? exportSize(8) : undefined,
+                  color: palette.accent,
+                  fontSize: exportDimensions ? exportSize(14.4) : '14px',
+                  letterSpacing: exportDimensions ? exportSize(3.2) : '0.2em',
+                  marginBottom: exportDimensions ? exportSize(12) : '8px',
                 }}
               >
-                {roleLabel}
+                {stageEyebrow}
               </p>
             )}
             <h3
@@ -9184,6 +9349,7 @@ function CarouselSlideFrame({
                 fontStyle: isSoftCards ? 'italic' : undefined,
                 letterSpacing: 0,
                 lineHeight: isCareerNotes ? 0.92 : 1.0,
+                maxWidth: exportDimensions ? `${42 * 14.4 * exportScale}px` : undefined,
               }}
             >
               {slide.headline}
@@ -9192,21 +9358,21 @@ function CarouselSlideFrame({
               className="mt-4 h-[3px] w-16 rounded-full"
               style={{
                 backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(3) : undefined,
+                height: exportDimensions ? exportSize(4) : undefined,
                 marginTop: exportDimensions ? exportSize(16) : undefined,
-                width: exportDimensions ? exportSize(64) : undefined,
+                width: exportDimensions ? exportSize(48) : undefined,
               }}
             />
             {slide.body && (
               isSoftCards ? (
                 <div
-                  className="mt-5 max-w-[42ch] rounded-[18px] px-5 py-4 text-center text-[13px] font-semibold leading-relaxed shadow-[0_12px_30px_rgba(20,35,52,0.12)]"
+                  className="mt-5 max-w-[42ch] rounded-[18px] px-5 py-4 text-center font-semibold leading-relaxed shadow-[0_12px_30px_rgba(20,35,52,0.12)]"
                   style={{
                     backgroundColor: palette.panel,
                     color: palette.chipText,
-                    fontSize: exportDimensions ? exportSize(13) : undefined,
+                    fontSize: exportDimensions ? exportSize(20) : '20px',
                     marginTop: exportDimensions ? exportSize(20) : undefined,
-                    maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                    maxWidth: exportDimensions ? `${42 * 20 * exportScale}px` : undefined,
                     padding: exportDimensions ? `${exportSize(16)} ${exportSize(20)}` : undefined,
                   }}
                 >
@@ -9214,92 +9380,31 @@ function CarouselSlideFrame({
                 </div>
               ) : (
                 <p
-                  className="mt-4 max-w-[42ch] text-[13px] font-medium leading-relaxed"
+                  className="mt-4 max-w-[42ch] font-normal leading-relaxed"
                   style={{
-                    color: isBold ? 'rgba(255,255,255,0.68)' : palette.muted,
-                    fontSize: exportDimensions ? exportSize(13) : undefined,
+                    color: isBold ? 'rgba(255,255,255,0.68)' : palette.foreground,
+                    fontSize: exportDimensions ? exportSize(20) : '20px',
                     marginTop: exportDimensions ? exportSize(16) : undefined,
-                    maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                    maxWidth: exportDimensions ? `${42 * 20 * exportScale}px` : undefined,
+                    lineHeight: 1.5,
                   }}
                 >
                   {slide.body}
                 </p>
               )
             )}
-            {slide.cta && (
-              <p
-                className="mt-4 max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
-                style={{
-                  color: isSoftCards ? palette.muted : palette.accent,
-                  transform: isSoftCards ? 'rotate(-2deg)' : undefined,
-                  fontSize: exportDimensions ? exportSize(11) : undefined,
-                  marginTop: exportDimensions ? exportSize(16) : undefined,
-                }}
-              >
-                {slide.cta}
-              </p>
-            )}
           </div>
 
-          <div
-            className="flex items-center gap-2"
-            style={{ gap: exportDimensions ? exportSize(8) : undefined }}
-          >
-            <span
-              className="h-1.5 w-10 rounded-full"
-              style={{
-                backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(6) : undefined,
-                width: exportDimensions ? exportSize(40) : undefined,
-              }}
-            />
-            <span
-              className="text-[9px] font-semibold uppercase tracking-[0.14em]"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.35)' : isWarm ? palette.accent : palette.muted,
-                fontSize: exportDimensions ? exportSize(9) : undefined,
-                opacity: isEditorial ? 0.5 : 1,
-              }}
-            >
-              coachkagiso.com
+          {renderFooter()}
+          {overflowFlag && (
+            <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold text-amber-800">
+              Text may clip — shorten or shrink
             </span>
-          </div>
+          )}
         </>
       ) : isCta ? (
         <>
-          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
-            <div>
-              <p
-                className="text-[10px] font-bold uppercase tracking-[0.18em]"
-                style={{
-                  color: isBold ? 'rgba(255,255,255,0.58)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(10) : undefined,
-                }}
-              >
-                Coach Kagiso
-              </p>
-              <div
-                className="mt-2 h-[2px] w-10 rounded-full"
-                style={{
-                  backgroundColor: palette.accent,
-                  height: exportDimensions ? exportSize(2) : undefined,
-                  marginTop: exportDimensions ? exportSize(8) : undefined,
-                  width: exportDimensions ? exportSize(40) : undefined,
-                }}
-              />
-            </div>
-            <span
-              className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
-              style={{
-                backgroundColor: palette.chipBackground,
-                color: palette.chipText,
-                fontSize: exportDimensions ? exportSize(10) : undefined,
-                padding: exportDimensions ? `${exportSize(4)} ${exportSize(12)}` : undefined,
-              }}
-            >
-              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-            </span>
-          </div>
+          {renderHeader()}
 
           <div
             className="my-auto w-full"
@@ -9317,12 +9422,13 @@ function CarouselSlideFrame({
                 {['Save', 'Share', 'Apply'].map((actionLabel) => (
                   <span
                     key={actionLabel}
-                    className="rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em]"
+                    className="rounded-full border font-bold uppercase"
                     style={{
                       borderColor: palette.border,
                       color: isBold ? 'rgba(255,255,255,0.65)' : palette.muted,
-                      fontSize: exportDimensions ? exportSize(9) : undefined,
-                      padding: exportDimensions ? `${exportSize(3)} ${exportSize(10)}` : undefined,
+                      fontSize: exportDimensions ? exportSize(12.2) : '12px',
+                      letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
+                      padding: exportDimensions ? `${exportSize(3)} ${exportSize(10)}` : '3px 10px',
                     }}
                   >
                     {actionLabel}
@@ -9344,31 +9450,32 @@ function CarouselSlideFrame({
               className="mt-3 h-[2px] w-12 rounded-full"
               style={{
                 backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(2) : undefined,
+                height: exportDimensions ? exportSize(3) : undefined,
                 marginTop: exportDimensions ? exportSize(12) : undefined,
                 width: exportDimensions ? exportSize(48) : undefined,
               }}
             />
             {slide.body && (
               <div
-                className="mt-5 max-w-[40ch] rounded-[8px] border p-4 text-[14px] font-medium leading-relaxed"
+                className="mt-5 max-w-[40ch] rounded-[8px] border p-4 leading-relaxed"
                 style={{
                   backgroundColor: composition === 'direct_action'
                     ? palette.accent
                     : isBold
                       ? 'rgba(255,255,255,0.08)'
                       : isWarm
-                        ? 'rgba(185,133,103,0.12)'
+                        ? 'rgba(201,173,152,0.12)'
                         : palette.panel,
                   borderColor: composition === 'direct_action' ? palette.accent : palette.border,
                   color: composition === 'direct_action'
                     ? '#142334'
                     : isBold
                       ? 'rgba(255,255,255,0.82)'
-                      : palette.muted,
-                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                      : palette.foreground,
+                  fontSize: exportDimensions ? exportSize(20) : '20px',
+                  lineHeight: 1.5,
                   marginTop: exportDimensions ? exportSize(20) : undefined,
-                  maxWidth: exportDimensions ? `${40 * 14 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${40 * 20 * exportScale}px` : undefined,
                   padding: exportDimensions ? exportSize(16) : undefined,
                 }}
               >
@@ -9377,76 +9484,36 @@ function CarouselSlideFrame({
             )}
             {slide.cta && (
               <p
-                className="mt-4 max-w-[30ch] text-[12px] font-bold uppercase tracking-[0.14em]"
+                className="mt-4 max-w-[30ch] font-bold uppercase"
                 style={{
                   color: palette.accent,
-                  fontSize: exportDimensions ? exportSize(12) : undefined,
+                  fontSize: exportDimensions ? exportSize(13.3) : '13px',
+                  letterSpacing: exportDimensions ? exportSize(2.1) : '0.14em',
                   marginTop: exportDimensions ? exportSize(16) : undefined,
                 }}
               >
                 {slide.cta}
               </p>
             )}
+            {slide.footnote && (
+              <p
+                className="mt-3 font-medium"
+                style={{
+                  color: palette.muted,
+                  fontSize: exportDimensions ? exportSize(13.3) : '13px',
+                  marginTop: exportDimensions ? exportSize(12) : undefined,
+                }}
+              >
+                {slide.footnote}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : undefined }}>
-            <span className="h-1.5 w-10 rounded-full" style={{ backgroundColor: palette.accent, height: exportDimensions ? exportSize(6) : undefined, width: exportDimensions ? exportSize(40) : undefined }} />
-            <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: isBold ? 'rgba(255,255,255,0.35)' : palette.muted, fontSize: exportDimensions ? exportSize(9) : undefined, opacity: isEditorial ? 0.5 : 1 }}>
-              coachkagiso.com
-            </span>
-          </div>
+          {renderFooter()}
         </>
       ) : (
         <>
-          <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : undefined }}>
-            <div className="flex items-center gap-3" style={{ gap: exportDimensions ? exportSize(12) : undefined }}>
-              <span
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold"
-                style={{
-                  backgroundColor: palette.accent,
-                  color: isBold ? '#142334' : palette.panel,
-                  fontSize: exportDimensions ? exportSize(10) : undefined,
-                  height: exportDimensions ? exportSize(28) : undefined,
-                  width: exportDimensions ? exportSize(28) : undefined,
-                }}
-              >
-                {index + 1}
-              </span>
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-[0.18em]"
-                  style={{
-                    color: isBold ? 'rgba(255,255,255,0.58)' : palette.muted,
-                    fontSize: exportDimensions ? exportSize(10) : undefined,
-                  }}
-                >
-                  Coach Kagiso
-                </p>
-                <p
-                  className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]"
-                  style={{
-                    color: isBold ? 'rgba(255,255,255,0.38)' : isWarm ? palette.accent : palette.muted,
-                    fontSize: exportDimensions ? exportSize(9) : undefined,
-                    opacity: isEditorial ? 0.55 : 1,
-                    marginTop: exportDimensions ? exportSize(2) : undefined,
-                  }}
-                >
-                  {roleLabel}
-                  {slide.composition === 'auto' ? ` / ${compositionOption.label}` : ''}
-                </p>
-              </div>
-            </div>
-            <span
-              className="text-[10px] font-bold tabular-nums"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.3)' : isWarm ? palette.accent : palette.muted,
-                fontSize: exportDimensions ? exportSize(10) : undefined,
-                opacity: isEditorial ? 0.45 : 1,
-              }}
-            >
-              {String(index + 1).padStart(2, '0')}/{String(total).padStart(2, '0')}
-            </span>
-          </div>
+          {renderHeader()}
 
           <div
             className="w-full"
@@ -9469,27 +9536,27 @@ function CarouselSlideFrame({
                 style={{
                   gap: exportDimensions ? exportSize(8) : undefined,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${44 * 13 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${44 * 20 * exportScale}px` : undefined,
                 }}
               >
                 {bodyPoints.map((point, pointIndex) => (
                   <div
                     key={`${slide.id}-card-${pointIndex}`}
-                    className="rounded-[8px] border p-3 text-[11px] font-semibold leading-snug md:text-[12px]"
+                    className="rounded-[8px] border p-3 font-semibold leading-snug"
                     style={{
                       backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : palette.panel,
                       borderColor: isBold ? 'rgba(255,255,255,0.12)' : palette.border,
                       color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                      fontSize: exportDimensions ? exportSize(12) : undefined,
+                      fontSize: exportDimensions ? exportSize(20) : '20px',
                       padding: exportDimensions ? exportSize(12) : undefined,
                       boxShadow: isBold ? 'none' : '0 1px 3px rgba(20,35,52,0.06)',
                     }}
                   >
                     <span
-                      className="mb-2 flex h-7 w-7 items-center justify-center rounded-full font-serif text-[14px] leading-none"
+                      className="mb-2 flex h-7 w-7 items-center justify-center rounded-full font-serif leading-none"
                       style={{
                         color: isBold ? palette.accent : palette.foreground,
-                        backgroundColor: isBold ? 'rgba(201,173,152,0.18)' : isWarm ? 'rgba(185,133,103,0.15)' : `${palette.accent}18`,
+                        backgroundColor: isBold ? 'rgba(201,173,152,0.18)' : isWarm ? 'rgba(201,173,152,0.15)' : `${palette.accent}18`,
                         fontFamily: 'var(--font-serif)',
                         fontSize: exportDimensions ? exportSize(14) : undefined,
                         height: exportDimensions ? exportSize(28) : undefined,
@@ -9505,27 +9572,27 @@ function CarouselSlideFrame({
               </div>
             ) : composition === 'numbered_stack' && bodyPoints.length > 1 ? (
               <ol
-                className="mt-4 grid max-w-[42ch] gap-2 text-[12px] font-semibold leading-relaxed md:text-[13px]"
+                className="mt-4 grid max-w-[42ch] gap-2 font-semibold leading-relaxed"
                 style={{
                   color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(13) : undefined,
+                  fontSize: exportDimensions ? exportSize(20) : '20px',
                   gap: exportDimensions ? exportSize(6) : undefined,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${42 * 13 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${42 * 20 * exportScale}px` : undefined,
                 }}
               >
                 {bodyPoints.map((point, pointIndex) => (
                   <li key={`${slide.id}-point-${pointIndex}`} className="flex items-start gap-3 rounded-[6px] p-2" style={{
-                    backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(185,133,103,0.06)' : 'transparent',
+                    backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(201,173,152,0.06)' : 'transparent',
                     gap: exportDimensions ? exportSize(12) : undefined,
                     padding: exportDimensions ? exportSize(8) : undefined,
                   }}>
                     <span
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-bold"
                       style={{
                         backgroundColor: palette.accent,
-                        color: isBold ? '#142334' : palette.panel,
-                        fontSize: exportDimensions ? exportSize(10) : undefined,
+                        color: '#142334',
+                        fontSize: exportDimensions ? exportSize(13.3) : '13px',
                         height: exportDimensions ? exportSize(24) : undefined,
                         width: exportDimensions ? exportSize(24) : undefined,
                       }}
@@ -9542,8 +9609,8 @@ function CarouselSlideFrame({
                 style={{
                   gap: exportDimensions ? exportSize(16) : undefined,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${44 * 14 * exportScale}px` : undefined,
-                  backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(185,133,103,0.06)' : 'transparent',
+                  maxWidth: exportDimensions ? `${44 * 20 * exportScale}px` : undefined,
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.04)' : isWarm ? 'rgba(201,173,152,0.06)' : 'transparent',
                   padding: exportDimensions ? exportSize(12) : undefined,
                 }}
               >
@@ -9555,10 +9622,10 @@ function CarouselSlideFrame({
                   }}
                 />
                 <p
-                  className="text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                  className="font-semibold leading-relaxed"
                   style={{
                     color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                    fontSize: exportDimensions ? exportSize(14) : undefined,
+                    fontSize: exportDimensions ? exportSize(20) : '20px',
                   }}
                 >
                   {slide.body}
@@ -9583,28 +9650,29 @@ function CarouselSlideFrame({
                         : isBold
                           ? 'rgba(201,173,152,0.15)'
                           : isWarm
-                            ? 'rgba(185,133,103,0.12)'
+                            ? 'rgba(201,173,152,0.12)'
                             : `${palette.accent}14`,
                       borderColor: pointIndex === 0 ? palette.border : palette.accent,
                       padding: exportDimensions ? exportSize(12) : undefined,
                     }}
                   >
                     <p
-                      className="text-[9px] font-bold uppercase tracking-[0.14em]"
+                      className="font-bold uppercase"
                       style={{
                         color: pointIndex === 0
                           ? isBold ? 'rgba(255,255,255,0.4)' : palette.muted
                           : palette.accent,
-                        fontSize: exportDimensions ? exportSize(9) : undefined,
+                        fontSize: exportDimensions ? exportSize(12.2) : '12px',
+                        letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
                       }}
                     >
                       {label}
                     </p>
                     <p
-                      className="mt-2 text-[12px] font-semibold leading-snug"
+                      className="mt-2 font-semibold leading-snug"
                       style={{
                         color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                        fontSize: exportDimensions ? exportSize(12) : undefined,
+                        fontSize: exportDimensions ? exportSize(16) : '16px',
                         marginTop: exportDimensions ? exportSize(8) : undefined,
                       }}
                     >
@@ -9615,13 +9683,13 @@ function CarouselSlideFrame({
               </div>
             ) : composition === 'quote_panel' && slide.body ? (
               <div
-                className="mt-4 relative max-w-[40ch] rounded-[8px] px-5 py-4 text-[14px] font-medium leading-relaxed md:text-[15px]"
+                className="mt-4 relative max-w-[40ch] rounded-[8px] px-5 py-4 font-medium leading-relaxed"
                 style={{
-                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(185,133,103,0.08)' : palette.panel,
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(201,173,152,0.08)' : palette.panel,
                   color: isBold ? 'rgba(255,255,255,0.82)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(15) : undefined,
+                  fontSize: exportDimensions ? exportSize(20) : '20px',
                   marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${40 * 15 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${40 * 20 * exportScale}px` : undefined,
                   padding: exportDimensions ? `${exportSize(16)} ${exportSize(20)}` : undefined,
                 }}
               >
@@ -9651,10 +9719,10 @@ function CarouselSlideFrame({
               <div
                 className="mt-4 max-w-[42ch] rounded-[8px] border p-4"
                 style={{
-                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(185,133,103,0.06)' : palette.panel,
+                  backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(201,173,152,0.06)' : palette.panel,
                   borderColor: composition === 'credibility_cue' ? palette.accent : isBold ? 'rgba(255,255,255,0.12)' : palette.border,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
-                  maxWidth: exportDimensions ? `${42 * 14 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${42 * 20 * exportScale}px` : undefined,
                   padding: exportDimensions ? exportSize(16) : undefined,
                   boxShadow: isBold ? 'none' : '0 1px 3px rgba(20,35,52,0.05)',
                 }}
@@ -9669,20 +9737,21 @@ function CarouselSlideFrame({
                     }}
                   />
                   <p
-                    className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                    className="font-bold uppercase"
                     style={{
                       color: palette.accent,
-                      fontSize: exportDimensions ? exportSize(10) : undefined,
+                      fontSize: exportDimensions ? exportSize(12.2) : '12px',
+                      letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
                     }}
                   >
                     {composition === 'example_note' ? 'Example' : 'Proof cue'}
                   </p>
                 </div>
                 <p
-                  className="mt-3 text-[13px] font-semibold leading-relaxed md:text-[14px]"
+                  className="mt-3 font-semibold leading-relaxed"
                   style={{
                     color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
-                    fontSize: exportDimensions ? exportSize(14) : undefined,
+                    fontSize: exportDimensions ? exportSize(20) : '20px',
                     marginTop: exportDimensions ? exportSize(12) : undefined,
                   }}
                 >
@@ -9691,12 +9760,12 @@ function CarouselSlideFrame({
               </div>
             ) : slide.body ? (
               <p
-                className="mt-3 max-w-[40ch] text-[13px] font-medium leading-relaxed md:text-[14px]"
+                className="mt-3 max-w-[40ch] font-medium leading-relaxed"
                 style={{
                   color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
-                  fontSize: exportDimensions ? exportSize(14) : undefined,
+                  fontSize: exportDimensions ? exportSize(20) : '20px',
                   marginTop: exportDimensions ? exportSize(12) : undefined,
-                  maxWidth: exportDimensions ? `${40 * 14 * exportScale}px` : undefined,
+                  maxWidth: exportDimensions ? `${40 * 20 * exportScale}px` : undefined,
                 }}
               >
                 {slide.body}
@@ -9704,10 +9773,11 @@ function CarouselSlideFrame({
             ) : null}
             {slide.cta && (
               <p
-                className="mt-4 max-w-[30ch] text-[11px] font-bold uppercase tracking-[0.14em]"
+                className="mt-4 max-w-[30ch] font-bold uppercase"
                 style={{
                   color: palette.accent,
-                  fontSize: exportDimensions ? exportSize(11) : undefined,
+                  fontSize: exportDimensions ? exportSize(13.3) : '13px',
+                  letterSpacing: exportDimensions ? exportSize(2.1) : '0.14em',
                   marginTop: exportDimensions ? exportSize(16) : undefined,
                 }}
               >
@@ -9716,26 +9786,7 @@ function CarouselSlideFrame({
             )}
           </div>
 
-          <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : undefined }}>
-            <span
-              className="h-1.5 w-10 rounded-full"
-              style={{
-                backgroundColor: palette.accent,
-                height: exportDimensions ? exportSize(6) : undefined,
-                width: exportDimensions ? exportSize(40) : undefined,
-              }}
-            />
-            <span
-              className="text-[9px] font-semibold uppercase tracking-[0.14em]"
-              style={{
-                color: isBold ? 'rgba(255,255,255,0.35)' : isWarm ? palette.accent : palette.muted,
-                fontSize: exportDimensions ? exportSize(9) : undefined,
-                opacity: isEditorial ? 0.5 : 1,
-              }}
-            >
-              coachkagiso.com
-            </span>
-          </div>
+          {renderFooter()}
         </>
       )}
     </>
@@ -9787,7 +9838,7 @@ function CarouselSlideFrame({
           aria-hidden="true"
           className={`absolute rounded-full ${exportDimensions ? '' : '-right-10 -top-10 h-32 w-32'}`}
           style={{
-            backgroundColor: 'rgba(185,133,103,0.15)',
+            backgroundColor: 'rgba(201,173,152,0.15)',
             height: exportDimensions ? exportSize(128) : undefined,
             right: exportDimensions ? `-${exportSize(40)}` : undefined,
             top: exportDimensions ? `-${exportSize(40)}` : undefined,
@@ -9801,7 +9852,7 @@ function CarouselSlideFrame({
             aria-hidden="true"
             className="absolute rounded-full"
             style={{
-              backgroundColor: 'rgba(185,133,103,0.18)',
+              backgroundColor: 'rgba(201,173,152,0.18)',
               height: exportDimensions ? exportSize(200) : '200px',
               right: exportDimensions ? `-${exportSize(60)}` : '-60px',
               top: exportDimensions ? `-${exportSize(60)}` : '-60px',
@@ -9811,7 +9862,7 @@ function CarouselSlideFrame({
           <div
             aria-hidden="true"
             className="absolute bottom-0 left-0 right-0 h-1/4"
-            style={{ background: 'linear-gradient(180deg, transparent, rgba(185,133,103,0.08))' }}
+            style={{ background: 'linear-gradient(180deg, transparent, rgba(201,173,152,0.08))' }}
           />
         </>
       )}
@@ -9926,7 +9977,7 @@ function CarouselSlideFrame({
     </article>
   );
 }
-const carouselMinSlides = 4;
+const carouselMinSlides = 5;
 const carouselMaxSlides = 10;
 
 function createBlankCarouselSlide(index: number, layoutRecipe: CarouselLayoutRecipe, totalSlides: number): CarouselSlide {
@@ -9960,6 +10011,7 @@ function sanitizeCarouselDraft(draft: CarouselDraftPayload, fallbackTitle: strin
         body: slide.body.trim(),
         ...(slide.cta?.trim() ? { cta: slide.cta.trim() } : {}),
         ...(slide.visualSuggestion?.trim() ? { visualSuggestion: slide.visualSuggestion.trim() } : {}),
+        ...(slide.footnote?.trim() ? { footnote: slide.footnote.trim() } : {}),
       };
     }),
   };
@@ -9974,10 +10026,12 @@ function areCarouselDraftsEqual(left: CarouselDraftPayload, right: CarouselDraft
 }
 
 function getCarouselExportFontFamilies() {
-  const rootStyles = getComputedStyle(document.documentElement);
+  // CHANGE F: brand font stacks for the export lane. These are canonical so the
+  // exported PNG/PDF always use Inter + Playfair Display regardless of what
+  // fonts the studio chrome happens to load.
   return {
-    sans: rootStyles.getPropertyValue('--font-sans').trim() || getComputedStyle(document.body).fontFamily || 'Raleway, Arial, sans-serif',
-    serif: rootStyles.getPropertyValue('--font-serif').trim() || 'Georgia, "Times New Roman", serif',
+    sans: CAROUSEL_EXPORT_FONT_SANS,
+    serif: CAROUSEL_EXPORT_FONT_SERIF,
   };
 }
 
@@ -9985,20 +10039,18 @@ async function waitForCarouselExportFonts(element: HTMLElement) {
   if (!('fonts' in document)) return;
 
   await document.fonts.ready;
-  const nodes = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
-  const fontRequests = new Set<string>();
 
-  nodes.forEach((node) => {
-    const styles = getComputedStyle(node);
-    if (!styles.fontFamily || !styles.fontSize) return;
-    fontRequests.add(`${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`);
-  });
+  const requests = [
+    `400 16px ${CAROUSEL_EXPORT_FONT_SANS}`,
+    `500 16px ${CAROUSEL_EXPORT_FONT_SANS}`,
+    `600 16px ${CAROUSEL_EXPORT_FONT_SANS}`,
+    `400 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
+    `500 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
+    `600 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
+    `700 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
+  ];
 
-  await Promise.all(
-    Array.from(fontRequests)
-      .slice(0, 40)
-      .map((request) => document.fonts.load(request).catch(() => null)),
-  );
+  await Promise.all(requests.map((request) => document.fonts.load(request).catch(() => null)));
   await document.fonts.ready;
 }
 
@@ -10011,8 +10063,10 @@ async function captureCarouselSlideCanvas(
   const rect = element.getBoundingClientRect();
   const layoutWidth = Math.max(1, Math.ceil(rect.width));
   const layoutHeight = Math.max(1, Math.round(layoutWidth * (dimensions.height / dimensions.width)));
-  const baseScale = dimensions.width / layoutWidth;
-  const scale = baseScale * 2;
+  // CHANGE A1: capture at 2x the export dimensions (e.g. 2160x2700 for the
+  // 1080x1350 LinkedIn export) so the PNG is sharp. Never downscale below
+  // dimensions; only upscale when the layout is smaller than the target.
+  const scale = Math.max(2, dimensions.width / layoutWidth) * 2;
   const captureId = `carousel-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
@@ -10614,19 +10668,43 @@ function CarouselStudioPanel({
     },
     {
       id: 'placeholder-2',
-      role: getDefaultCarouselSlideRole(displayedLayoutRecipe, 1, 3),
+      role: getDefaultCarouselSlideRole(displayedLayoutRecipe, 1, 5),
       composition: 'auto',
       headline: displayedLayoutRecipeOption.label,
       body: displayedLayoutRecipeOption.description,
     },
     {
       id: 'placeholder-3',
+      role: getDefaultCarouselSlideRole(displayedLayoutRecipe, 2, 5),
+      composition: 'auto',
+      headline: 'Every deck now respects the brand scale.',
+      body: 'Cover headlines, inner slides, and CTAs all follow the same type ramp.',
+    },
+    {
+      id: 'placeholder-4',
+      role: getDefaultCarouselSlideRole(displayedLayoutRecipe, 3, 5),
+      composition: 'auto',
+      headline: 'Signs, turns, and proof cues.',
+      body: 'The narrative recipes keep the audience inside the story until the last slide.',
+    },
+    {
+      id: 'placeholder-5',
       role: 'cta',
       composition: 'auto',
       headline: 'Export stays predictable.',
       body: displayedTemplateOption.exportRules.pdf,
     },
   ];
+  // CHANGE H: drop slides with no headline or body so the preview, counters,
+  // and exports all agree on the deck the audience actually sees.
+  const renderedDeck: CarouselSlide[] = renderedSlides.filter(
+    (slide) => slide.headline.trim() || slide.body.trim(),
+  );
+  const renderedEyebrows = buildCarouselEyebrows(
+    renderedDeck,
+    displayedLayoutRecipe,
+    latestDraft?.pillar ? pillarMeta[latestDraft.pillar].label : null,
+  );
   const exportSlideFrameRefs = useRef<Array<HTMLElement | null>>([]);
   const [exportState, setExportState] = useState<{
     busy: boolean;
@@ -10664,11 +10742,13 @@ function CarouselStudioPanel({
   async function exportCarousel(mode: CarouselExportMode) {
     if (!latestDraft) return;
 
+    // CHANGE H: export the filtered deck only (empty slides are dropped from
+    // the preview), so the PDF page count matches what the audience sees.
     const elements = exportSlideFrameRefs.current
-      .slice(0, latestDraft.slides.length)
+      .slice(0, renderedDeck.length)
       .filter((element): element is HTMLElement => Boolean(element));
 
-    if (elements.length !== latestDraft.slides.length) {
+    if (elements.length !== renderedDeck.length) {
       setExportState({
         busy: false,
         mode,
@@ -10707,19 +10787,21 @@ function CarouselStudioPanel({
         setExportState({ busy: true, mode, message: 'Building PDF...', tone: 'info' });
         const { jsPDF } = await import('jspdf');
         const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
-        const canvasWidth = canvases[0].width;
-        const canvasHeight = canvases[0].height;
+        // CHANGE A2: pages match the platform dimensions exactly (e.g.
+        // 1080x1350) instead of the 2x capture size, keeping the PDF tidy.
+        const pageWidth = dimensions.width;
+        const pageHeight = dimensions.height;
         const pdf = new jsPDF({
           orientation,
           unit: 'px',
-          format: [canvasWidth, canvasHeight],
+          format: [pageWidth, pageHeight],
           compress: true,
           hotfixes: ['px_scaling'],
         });
 
         canvases.forEach((canvas, index) => {
-          if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvasWidth, canvasHeight);
+          if (index > 0) pdf.addPage([pageWidth, pageHeight], orientation);
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
         });
         pdf.save(`${baseName}.pdf`);
         setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page PDF.`, tone: 'info' });
@@ -11035,15 +11117,16 @@ function CarouselStudioPanel({
           <Badge className="bg-white/10 text-white">HTML/CSS</Badge>
         </div>
         <div className="mt-5 grid gap-3">
-          {renderedSlides.map((slide, index) => (
+          {renderedDeck.map((slide, index) => (
             <CarouselSlideFrame
               key={slide.id}
               slide={slide}
               index={index}
-              total={renderedSlides.length}
+              total={renderedDeck.length}
               aspectOption={displayedAspectOption}
               template={displayedTemplateOption}
               layoutRecipe={displayedLayoutRecipeOption}
+              eyebrow={renderedEyebrows[index]}
             />
           ))}
         </div>
@@ -11058,16 +11141,17 @@ function CarouselStudioPanel({
             zIndex: -1,
           }}
         >
-          {latestDraft.slides.map((slide, index) => (
+          {renderedDeck.map((slide, index) => (
             <CarouselSlideFrame
               key={`export-${slide.id}`}
               slide={slide}
               index={index}
-              total={latestDraft.slides.length}
+              total={renderedDeck.length}
               aspectOption={displayedAspectOption}
               template={displayedTemplateOption}
               layoutRecipe={displayedLayoutRecipeOption}
               exportDimensions={displayedExportDimensions}
+              eyebrow={renderedEyebrows[index]}
               frameRef={(node) => {
                 exportSlideFrameRefs.current[index] = node;
               }}
