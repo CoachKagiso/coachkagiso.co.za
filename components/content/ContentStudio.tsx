@@ -54,7 +54,7 @@ import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
-import { renderCarouselPdfBlob, type CarouselPdfSlide } from '@/components/content/CarouselPdfDocument';
+import type { CarouselPdfSlide } from '@/components/content/CarouselPdfDocument';
 import {
   CAROUSEL_EXPORT_FONT_SANS,
   CAROUSEL_EXPORT_FONT_SERIF,
@@ -10781,8 +10781,9 @@ function CarouselStudioPanel({
       });
 
       if (mode === 'pdf') {
-        // CHANGE I: vector PDF via @react-pdf/renderer. Text stays selectable and
-        // crisp at 200%/400%. PNG export path (2x raster) is untouched.
+        // CHANGE I: vector PDF rendered server-side via /api/carousel-pdf using
+        // @react-pdf/renderer's renderToBuffer. Text stays selectable and crisp
+        // at 200%/400%. The PNG lane (2x raster) below is untouched.
         const pdfSlides: CarouselPdfSlide[] = renderedDeck.map((slide, index) => {
           const role = slide.role || getDefaultCarouselSlideRole(displayedLayoutRecipe, index, renderedDeck.length);
           const composition = slide.composition === 'auto' ? 'note_card' : slide.composition;
@@ -10801,9 +10802,30 @@ function CarouselStudioPanel({
 
         let blob: Blob;
         try {
-          blob = await renderCarouselPdfBlob(pdfSlides, displayedTemplateOption);
+          let vectorOk = false;
+          try {
+            const res = await fetch('/api/carousel-pdf', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ deck: pdfSlides, template: displayedTemplateOption }),
+            });
+            if (res.ok) {
+              const filename = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] || `${baseName}.pdf`;
+              blob = await res.blob();
+              if (blob.size > 0) {
+                vectorOk = true;
+                downloadBlob(blob, filename);
+              }
+            }
+          } catch {
+            vectorOk = false;
+          }
+          if (!vectorOk) {
+            throw new Error('Vector PDF unavailable, falling back to raster.');
+          }
+          setExportState({ busy: false, mode, message: `Downloaded ${renderedDeck.length}-page vector PDF.`, tone: 'info' });
         } catch (pdfError) {
-          // CHANGE I fallback: if the vector document fails to render, fall
+          // Fallback: if the vector document fails to render server-side, fall
           // back to the 2x raster capture embedded page-for-page so export
           // never blocks.
           console.warn('Vector PDF failed, falling back to raster:', pdfError instanceof Error ? pdfError.message : String(pdfError));
@@ -10828,9 +10850,9 @@ function CarouselStudioPanel({
             rasterPdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
           });
           blob = rasterPdf.output('blob');
+          downloadBlob(blob, `${baseName}.pdf`);
+          setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page raster PDF.`, tone: 'info' });
         }
-        downloadBlob(blob, `${baseName}.pdf`);
-        setExportState({ busy: false, mode, message: `Downloaded ${renderedDeck.length}-page vector PDF.`, tone: 'info' });
         return;
       }
 

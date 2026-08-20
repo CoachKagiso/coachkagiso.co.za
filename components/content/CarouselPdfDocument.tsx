@@ -6,33 +6,33 @@ import {
   StyleSheet,
   Text,
   View,
-  pdf,
 } from '@react-pdf/renderer';
+import { getSiteUrl } from '@/lib/env';
 import type { CarouselTemplateOption } from '@/lib/content/carousel-template-registry';
 import type { CarouselSlide } from './ContentStudio';
 
 // Self-host the SIL OFL Inter + Playfair Display binaries so the exported PDF
 // uses brand fonts and never a woff2/Google-Fonts-CSS path that React PDF
-// cannot parse. Resolved against the runtime origin so public assets load.
-const BASE = typeof window !== 'undefined' ? window.location.origin : '';
+// cannot parse. Resolved against the live origin so the server-side renderer
+// can fetch the TTF bytes.
+const ORIGIN = getSiteUrl();
+const FONT = (name: string) => `${ORIGIN}/fonts/${name}`;
 
-if (typeof window !== 'undefined') {
-  Font.register({ family: 'Inter', fontWeight: 400, src: `${BASE}/fonts/Inter-Regular.ttf` });
-  Font.register({ family: 'Inter', fontWeight: 500, src: `${BASE}/fonts/Inter-Medium.ttf` });
-  Font.register({ family: 'Inter', fontWeight: 600, src: `${BASE}/fonts/Inter-SemiBold.ttf` });
-  Font.register({ family: 'Inter', fontWeight: 700, src: `${BASE}/fonts/Inter-Bold.ttf` });
-  Font.register({ family: 'Playfair Display', fontWeight: 500, src: `${BASE}/fonts/PlayfairDisplay-Medium.ttf` });
-  Font.register({ family: 'Playfair Display', fontWeight: 600, src: `${BASE}/fonts/PlayfairDisplay-SemiBold.ttf` });
-  Font.register({ family: 'Playfair Display', fontWeight: 700, src: `${BASE}/fonts/PlayfairDisplay-Bold.ttf` });
-  // CHANGE: disable hyphenation so text wraps at word boundaries only and no
-  // mid-word hyphens appear in the exported PDF (PNG lane is untouched).
-  try {
-    (Font as unknown as { registerHyphenationCallback?: (cb: (...args: unknown[]) => unknown[]) => void }).registerHyphenationCallback?.(
-      () => [''],
-    );
-  } catch {
-    // registerHyphenationCallback is a no-op-safe opt-in on supported versions.
-  }
+Font.register({ family: 'Inter', fontWeight: 400, src: FONT('Inter-Regular.ttf') });
+Font.register({ family: 'Inter', fontWeight: 500, src: FONT('Inter-Medium.ttf') });
+Font.register({ family: 'Inter', fontWeight: 600, src: FONT('Inter-SemiBold.ttf') });
+Font.register({ family: 'Inter', fontWeight: 700, src: FONT('Inter-Bold.ttf') });
+Font.register({ family: 'Playfair Display', fontWeight: 500, src: FONT('PlayfairDisplay-Medium.ttf') });
+Font.register({ family: 'Playfair Display', fontWeight: 600, src: FONT('PlayfairDisplay-SemiBold.ttf') });
+Font.register({ family: 'Playfair Display', fontWeight: 700, src: FONT('PlayfairDisplay-Bold.ttf') });
+
+// CHANGE: disable hyphenation so text wraps at word boundaries only and no
+// mid-word hyphens appear in the exported PDF. Returns the whole word back so
+// the layout engine never splits it.
+try {
+  Font.registerHyphenationCallback(() => ['']);
+} catch {
+  // registerHyphenationCallback is opt-in on supported versions; ignore if absent.
 }
 
 export const CAROUSEL_PDF_PAGE = { width: 1080, height: 1350 } as const;
@@ -53,8 +53,6 @@ export type CarouselPdfProps = {
   deck: CarouselPdfSlide[];
   template: CarouselTemplateOption;
 };
-
-const CONTENT_W = { width: CAROUSEL_PDF_CONTENT_WIDTH } as const;
 
 const styles = StyleSheet.create({
   page: {
@@ -88,12 +86,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     letterSpacing: 0.18 * 26,
   },
-  wordmarkSerif: {
-    fontFamily: 'Playfair Display',
-    fontWeight: 700,
-    fontSize: 24,
-    letterSpacing: 0.08 * 24,
-  },
   handle: {
     fontFamily: 'Inter',
     fontWeight: 500,
@@ -118,18 +110,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 6,
   },
-  counterStrip: {
-    fontFamily: 'Inter',
-    fontWeight: 600,
-    fontSize: 22,
-    letterSpacing: 0.12 * 22,
-    textTransform: 'uppercase',
-  },
-  stripDot: {
-    width: 27,
-    height: 4,
-    borderRadius: 2,
-  },
   headline: {
     fontFamily: 'Playfair Display',
     fontWeight: 600,
@@ -144,13 +124,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     width: CAROUSEL_PDF_CONTENT_WIDTH,
   },
-  caption: {
-    fontFamily: 'Inter',
-    fontWeight: 500,
-    fontSize: 28,
-    lineHeight: 1.45,
-    marginTop: 16,
-  },
   footerDash: {
     height: 4,
     width: 48,
@@ -163,12 +136,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.12 * 22,
     textTransform: 'uppercase',
   },
+  stripDot: {
+    width: 27,
+    height: 4,
+    borderRadius: 2,
+  },
 });
 
 function resolveComposition(slide: CarouselSlide): string {
   return slide.composition === 'auto' ? 'note_card' : slide.composition;
 }
 
+// CHANGE (brief #6): in the vector PDF only, emoji bullets (e.g.
+// signature_narrative CTA bullets) are replaced with Rodeo Dust dot/dash
+// bullets. PNG keeps emoji intact.
 function replaceEmojiBullets(text: string): string {
   return text.replace(/[\u{1F38F}\u{1F50F}\u{1F389}\u{1F44C}\u{1F91D}\u{1F44D}\u{1F98C}\u{1F44E}\u{1F44F}\u{2B50}\u{1F3AF}]/gu, '\u2022');
 }
@@ -180,6 +161,8 @@ function bodyBullets(body: string): string[] {
     .filter(Boolean);
 }
 
+// Each bullet is a single <Text> node (no per-character/per-line splits) so the
+// exported text stays selectable and extracts as clean whole words.
 function BulletedBody({
   body,
   palette,
@@ -209,10 +192,10 @@ function BulletedBody({
     );
   }
   return (
-    <View style={{ width: CAROUSEL_PDF_CONTENT_WIDTH, gap: 10, marginTop: 8 }}>
+    <View style={{ width: CAROUSEL_PDF_CONTENT_WIDTH, gap: 14, marginTop: 8 }}>
       {bullets.map((point, i) => (
         <View key={`b-${i}`} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-          <Text style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: size, lineHeight: 1.5, color: palette.accent }}>{'\u2022'}</Text>
+          <Text style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: size, lineHeight: 1.5, color: palette.accent, width: 26, textAlign: 'center' }}>{'\u2022'}</Text>
           <Text style={{ fontFamily: 'Inter', fontWeight: 400, fontSize: size, lineHeight: 1.5, color: bodyColor || palette.foreground, flex: 1 }}>{point}</Text>
         </View>
       ))}
@@ -273,14 +256,12 @@ function Counter({
 }
 
 function HeaderRow({
-  item,
   index,
   total,
   eyebrow,
   furniture,
   palette,
 }: {
-  item: CarouselPdfSlide;
   index: number;
   total: number;
   eyebrow: string;
@@ -307,14 +288,10 @@ function HeaderRow({
 }
 
 function FooterRow({
-  index,
-  total,
   isLast,
   furniture,
   palette,
 }: {
-  index: number;
-  total: number;
   isLast: boolean;
   furniture: CarouselTemplateOption['furniture'];
   palette: CarouselTemplateOption['palette'];
@@ -327,9 +304,9 @@ function FooterRow({
         <Text style={[styles.footerLabel, { color: furniture.footerColor }]}>{furniture.footerLeft}</Text>
       </View>
       {isSignature ? null : isLast ? (
-        <Text style={[styles.counterStrip, { color: furniture.footerColor }]}>{furniture.footerRightLast}</Text>
+        <Text style={[styles.handle, { color: furniture.footerColor }]}>{furniture.footerRightLast}</Text>
       ) : (
-        <Text style={[styles.counterStrip, { color: furniture.footerColor }]}>{furniture.footerRight}</Text>
+        <Text style={[styles.handle, { color: furniture.footerColor }]}>{furniture.footerRight}</Text>
       )}
       {furniture.swipeCue && !isLast ? (
         <Text style={[styles.handle, { color: palette.muted }]}>SWIPE</Text>
@@ -341,11 +318,9 @@ function FooterRow({
 function CoverCard({
   item,
   palette,
-  furniture,
 }: {
   item: CarouselPdfSlide;
   palette: CarouselTemplateOption['palette'];
-  furniture: CarouselTemplateOption['furniture'];
 }) {
   return (
     <>
@@ -366,7 +341,7 @@ function CoverCard({
             fontSize: 36,
             lineHeight: 1.5,
             marginTop: 24,
-            color: palette.muted,
+            color: palette.foreground,
             width: CAROUSEL_PDF_CONTENT_WIDTH,
           }}
         >
@@ -414,6 +389,7 @@ function QuotePanel({
             lineHeight: 1.5,
             color: palette.foreground,
             width: 772,
+            marginTop: 16,
           }}
         >
           {replaceEmojiBullets(item.slide.body || '')}
@@ -437,19 +413,24 @@ function NumberedStack({
         {item.slide.headline}
       </Text>
       <View style={{ width: CAROUSEL_PDF_CONTENT_WIDTH, marginTop: 32, gap: 40 }}>
-        {points.map((point, i) => (
-          <View key={`n-${i}`} style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start', width: '100%' }}>
-            <Text style={{ fontFamily: 'Playfair Display', fontWeight: 600, fontSize: 40, color: palette.accent, width: 48, textAlign: 'center' }}>
-              {String(i + 1).padStart(2, '0')}
-            </Text>
-            <Text style={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 36, lineHeight: 1.4, color: palette.foreground, flex: 1 }}>
-              {point.split('\n')[0]}
-            </Text>
-            <Text style={{ fontFamily: 'Inter', fontWeight: 400, fontSize: 30, lineHeight: 1.4, color: palette.muted, flex: 1 }}>
-              {point.split('\n').slice(1).join(' ').trim() || point}
-            </Text>
-          </View>
-        ))}
+        {points.map((point, i) => {
+          const [titleLine, ...rest] = point.split('\n');
+          return (
+            <View key={`n-${i}`} style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start', width: '100%' }}>
+              <Text style={{ fontFamily: 'Playfair Display', fontWeight: 600, fontSize: 40, color: palette.accent, width: 48, textAlign: 'center' }}>
+                {String(i + 1).padStart(2, '0')}
+              </Text>
+              <Text style={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 36, lineHeight: 1.4, color: palette.foreground, flex: 1 }}>
+                {titleLine}
+              </Text>
+              {rest.length > 0 ? (
+                <Text style={{ fontFamily: 'Inter', fontWeight: 400, fontSize: 28, lineHeight: 1.4, color: palette.muted, flex: 1 }}>
+                  {rest.join(' ').trim()}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
     </>
   );
@@ -485,7 +466,7 @@ function CardGrid({
               {String(i + 1).padStart(2, '0')}
             </Text>
             <Text style={{ fontFamily: 'Inter', fontWeight: 400, fontSize: 28, lineHeight: 1.4, color: palette.muted, width: 364 }}>
-              {point}
+              {replaceEmojiBullets(point)}
             </Text>
           </View>
         ))}
@@ -579,7 +560,7 @@ function SoftReflection({
         <BulletedBody body={item.slide.body} palette={palette} size={36} />
       </View>
       {item.slide.cta ? (
-        <Text style={[styles.caption, { marginTop: 20, color: palette.accent }]}>{item.slide.cta}</Text>
+        <Text style={[styles.handle, { marginTop: 20, color: palette.accent }]}>{item.slide.cta}</Text>
       ) : null}
     </>
   );
@@ -676,7 +657,7 @@ function SlideContent({
     case 'bold_claim':
     case 'quiet_intro':
     case 'editorial_cover':
-      return <CoverCard item={item} palette={palette} furniture={furniture} />;
+      return <CoverCard item={item} palette={palette} />;
     case 'quote_panel':
       return <QuotePanel item={item} palette={palette} />;
     case 'numbered_stack':
@@ -726,21 +707,15 @@ export function CarouselPdfDocument({ deck, template }: CarouselPdfProps) {
                 color: palette.foreground,
               },
             ]}
-            size={CAROUSEL_PDF_PAGE}
           >
-            <HeaderRow item={item} index={index} total={deck.length} eyebrow={item.eyebrow} furniture={furniture} palette={palette} />
+            <HeaderRow index={index} total={deck.length} eyebrow={item.eyebrow} furniture={furniture} palette={palette} />
             <View style={{ flex: 1, marginTop: 20, justifyContent: 'center' }}>
               <SlideContent item={item} palette={palette} furniture={furniture} />
             </View>
-            <FooterRow index={index} total={deck.length} isLast={isLast} furniture={furniture} palette={palette} />
+            <FooterRow isLast={isLast} furniture={furniture} palette={palette} />
           </Page>
         );
       })}
     </Document>
   );
-}
-
-export async function renderCarouselPdfBlob(deck: CarouselPdfSlide[], template: CarouselTemplateOption): Promise<Blob> {
-  const doc = pdf(<CarouselPdfDocument deck={deck} template={template} />);
-  return doc.toBlob();
 }
