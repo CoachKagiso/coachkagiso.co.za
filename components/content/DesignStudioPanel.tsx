@@ -6428,6 +6428,12 @@ export default function DesignStudioPanel({
   // for a design that has never been saved, which is what makes Save create a
   // new row rather than overwriting whatever was open before.
   const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
+  // CHANGE S2: loading the saved design is async, and a pending carousel import
+  // applies almost immediately on mount. Without this flag the fetch resolved
+  // afterwards and replaced the freshly imported deck with the last saved
+  // design - silently losing the import. Anything that deliberately replaces
+  // the document claims it, and the loader then leaves it alone.
+  const documentClaimedRef = useRef(false);
   const [savedDesigns, setSavedDesigns] = useState<DesignDocumentSummaryRecord[]>([]);
   const [designSaveBusy, setDesignSaveBusy] = useState(false);
   const canvasViewportRef = useRef<HTMLElement | null>(null);
@@ -6577,7 +6583,7 @@ export default function DesignStudioPanel({
     let cancelled = false;
 
     const applyDocument = (parsed: DesignDocument, id: string | null) => {
-      if (cancelled) return;
+      if (cancelled || documentClaimedRef.current) return;
       const emptyHistory: DesignHistory = { past: [], future: [] };
       designRef.current = parsed;
       designHistoryRef.current = emptyHistory;
@@ -6590,6 +6596,7 @@ export default function DesignStudioPanel({
     };
 
     const applyLocalMirror = () => {
+      if (documentClaimedRef.current) return;
       const local = readLocalDesignMirror();
       if (isDesignDocument(local)) applyDocument(local, null);
     };
@@ -6598,7 +6605,10 @@ export default function DesignStudioPanel({
       try {
         const designs = await listSavedDesigns(adminKey);
         if (cancelled) return;
+        // The list is still worth showing even if an import has claimed the
+        // canvas; only the document itself must not be overwritten.
         setSavedDesigns(designs);
+        if (documentClaimedRef.current) return;
 
         if (designs.length === 0) {
           // Nothing saved server-side yet: keep whatever is in this browser so
@@ -6742,6 +6752,7 @@ export default function DesignStudioPanel({
     // means the next Save creates its own record instead of overwriting
     // whatever was open - which is how importing a second carousel used to
     // destroy the first with no way back.
+    documentClaimedRef.current = true;
     setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
@@ -7270,6 +7281,7 @@ export default function DesignStudioPanel({
   function replaceDesignDocument(nextDesign: DesignDocument, message: string) {
     // See replaceImportedDesignDocument. openSavedDesign re-attaches the id
     // straight after calling this.
+    documentClaimedRef.current = true;
     setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
