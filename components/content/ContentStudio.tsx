@@ -54,6 +54,7 @@ import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
+import { renderCarouselPdfBlob, type CarouselPdfSlide } from '@/components/content/CarouselPdfDocument';
 import {
   CAROUSEL_EXPORT_FONT_SANS,
   CAROUSEL_EXPORT_FONT_SERIF,
@@ -415,7 +416,7 @@ type ExtractedFramework = {
   suggestedPillar?: string;
 };
 
-type CarouselSlide = {
+export type CarouselSlide = {
   id: string;
   role: CarouselSlideRole;
   composition: CarouselComposition;
@@ -10779,6 +10780,61 @@ function CarouselStudioPanel({
         tone: 'info',
       });
 
+      if (mode === 'pdf') {
+        // CHANGE I: vector PDF via @react-pdf/renderer. Text stays selectable and
+        // crisp at 200%/400%. PNG export path (2x raster) is untouched.
+        const pdfSlides: CarouselPdfSlide[] = renderedDeck.map((slide, index) => {
+          const role = slide.role || getDefaultCarouselSlideRole(displayedLayoutRecipe, index, renderedDeck.length);
+          const composition = slide.composition === 'auto' ? 'note_card' : slide.composition;
+          const baseSize = getCarouselHeadlineSize(composition as CarouselComposition, getCarouselSlideTextStats(slide));
+          // The PDF page is 1080x1350 = 1.8x the 600px studio preview, so scale
+          // the headline by the same export ratio used by the raster lane.
+          const headlineSize = Math.round(baseSize * (displayedExportDimensions.width / 600));
+          return {
+            slide,
+            role,
+            composition,
+            headlineSize,
+            eyebrow: renderedEyebrows[index] || '',
+          };
+        });
+
+        let blob: Blob;
+        try {
+          blob = await renderCarouselPdfBlob(pdfSlides, displayedTemplateOption);
+        } catch (pdfError) {
+          // CHANGE I fallback: if the vector document fails to render, fall
+          // back to the 2x raster capture embedded page-for-page so export
+          // never blocks.
+          console.warn('Vector PDF failed, falling back to raster:', pdfError instanceof Error ? pdfError.message : String(pdfError));
+          const html2canvas = (await import('html2canvas')).default;
+          await waitForCarouselExportFonts(elements[0]);
+          const canvases: HTMLCanvasElement[] = [];
+          for (const [index, element] of elements.entries()) {
+            setExportState({ busy: true, mode, message: `Capturing slide ${index + 1} of ${elements.length}...`, tone: 'info' });
+            canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
+          }
+          const { default: jsPDF } = await import('jspdf');
+          const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
+          const rasterPdf = new jsPDF({
+            orientation,
+            unit: 'px',
+            format: [dimensions.width, dimensions.height],
+            compress: true,
+            hotfixes: ['px_scaling'],
+          });
+          canvases.forEach((canvas, index) => {
+            if (index > 0) rasterPdf.addPage([dimensions.width, dimensions.height], orientation);
+            rasterPdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
+          });
+          blob = rasterPdf.output('blob');
+        }
+        downloadBlob(blob, `${baseName}.pdf`);
+        setExportState({ busy: false, mode, message: `Downloaded ${renderedDeck.length}-page vector PDF.`, tone: 'info' });
+        return;
+      }
+
+      // CHANGE A1: PNG path keeps the 2x raster capture (correct for feed images).
       const html2canvas = (await import('html2canvas')).default;
       const canvases: HTMLCanvasElement[] = [];
       await waitForCarouselExportFonts(elements[0]);
@@ -10791,31 +10847,6 @@ function CarouselStudioPanel({
           tone: 'info',
         });
         canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
-      }
-
-      if (mode === 'pdf') {
-        setExportState({ busy: true, mode, message: 'Building PDF...', tone: 'info' });
-        const { jsPDF } = await import('jspdf');
-        const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
-        // CHANGE A2: pages match the platform dimensions exactly (e.g.
-        // 1080x1350) instead of the 2x capture size, keeping the PDF tidy.
-        const pageWidth = dimensions.width;
-        const pageHeight = dimensions.height;
-        const pdf = new jsPDF({
-          orientation,
-          unit: 'px',
-          format: [pageWidth, pageHeight],
-          compress: true,
-          hotfixes: ['px_scaling'],
-        });
-
-        canvases.forEach((canvas, index) => {
-          if (index > 0) pdf.addPage([pageWidth, pageHeight], orientation);
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight);
-        });
-        pdf.save(`${baseName}.pdf`);
-        setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page PDF.`, tone: 'info' });
-        return;
       }
 
       setExportState({ busy: true, mode, message: 'Downloading PNG frames...', tone: 'info' });
