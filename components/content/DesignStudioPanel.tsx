@@ -287,6 +287,9 @@ export type DesignStudioCarouselDraftInput = {
   slides: DesignStudioCarouselSlideInput[];
   caption?: string;
   createdAt?: string;
+  // CHANGE N: the custom closing slide chosen in Carousel Studio. Appended as
+  // the final page when the deck is opened here.
+  customCtaTemplateId?: string;
 };
 
 export type DesignStudioCarouselImport = {
@@ -2216,6 +2219,47 @@ function isDesignTemplateRecord(value: unknown): value is DesignTemplateRecord {
   );
 }
 
+// CHANGE N: Carousel Studio needs to offer the CTA templates that were designed
+// here, but it should not have to know how they are stored. These two readers
+// are the only doorway; everything else about template storage stays private to
+// this module, so moving templates to Supabase later touches only this file.
+export type DesignCtaTemplateSummary = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  updatedAt: string;
+};
+
+function readStoredDesignTemplates(): DesignTemplateRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(DESIGN_TEMPLATES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record));
+  } catch {
+    return [];
+  }
+}
+
+export function readDesignCtaTemplateSummaries(): DesignCtaTemplateSummary[] {
+  return readStoredDesignTemplates()
+    .filter((record) => getDesignTemplateKind(record) === 'cta')
+    .map((record) => ({
+      id: record.id,
+      name: record.name,
+      width: record.width,
+      height: record.height,
+      updatedAt: record.updatedAt,
+    }));
+}
+
+function findStoredDesignTemplateById(id: string): DesignTemplateRecord | null {
+  return readStoredDesignTemplates().find((record) => record.id === id) || null;
+}
+
 function isDesignStudioCarouselImport(value: unknown): value is DesignStudioCarouselImport {
   if (!value || typeof value !== 'object') return false;
   const record = value as Partial<DesignStudioCarouselImport>;
@@ -2606,11 +2650,40 @@ function hydrateCarouselTemplatePage(
   };
 }
 
+// CHANGE N: build the closing page from the chosen custom CTA template, resized
+// to the deck's frame so it sits flush with the other slides.
+function buildCustomCtaPage(
+  draft: DesignStudioCarouselDraftInput,
+  dimensions: { width: number; height: number },
+  pageIndex: number,
+): DesignPage | null {
+  if (!draft.customCtaTemplateId) return null;
+  const ctaRecord = findStoredDesignTemplateById(draft.customCtaTemplateId);
+  const ctaPage = ctaRecord?.document.pages[0];
+  if (!ctaRecord || !ctaPage) return null;
+
+  const resized = resizeDesignCanvas(
+    cloneDesignDocument({ ...ctaRecord.document, pages: [ctaPage] }),
+    dimensions.width,
+    dimensions.height,
+  );
+  const resizedPage = resized.pages[0];
+  if (!resizedPage) return null;
+
+  return {
+    ...resizedPage,
+    id: createDesignId('page'),
+    name: `Slide ${pageIndex + 1} - ${ctaRecord.name}`,
+    layers: resizedPage.layers.map((layer) => ({ ...layer, id: createDesignId(layer.type) } as DesignLayer)),
+  };
+}
+
 function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftInput, templateRecord?: DesignTemplateRecord | null) {
   const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
   const dimensions = getCarouselExportDimensions(aspectOption);
   const template = getCarouselTemplateOption(draft.template);
   const matchingTemplate = templateRecord && templateRecord.document.pages.length > 0 ? templateRecord : null;
+  const customCtaPage = buildCustomCtaPage(draft, dimensions, draft.slides.length);
 
   if (matchingTemplate) {
     const normalizedTemplateDocument = resizeDesignCanvas(
@@ -2629,10 +2702,13 @@ function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftI
       templateSourceName: matchingTemplate.name,
       carouselTemplate: draft.template,
       carouselLayoutRecipe: draft.layoutRecipe,
-      pages: draft.slides.map((slide, index) => {
-        const pagePattern = normalizedTemplateDocument.pages[index] || normalizedTemplateDocument.pages[normalizedTemplateDocument.pages.length - 1];
-        return hydrateCarouselTemplatePage(pagePattern, draft, slide, index, draft.slides.length);
-      }),
+      pages: [
+        ...draft.slides.map((slide, index) => {
+          const pagePattern = normalizedTemplateDocument.pages[index] || normalizedTemplateDocument.pages[normalizedTemplateDocument.pages.length - 1];
+          return hydrateCarouselTemplatePage(pagePattern, draft, slide, index, draft.slides.length);
+        }),
+        ...(customCtaPage ? [customCtaPage] : []),
+      ],
     } satisfies DesignDocument;
   }
 
@@ -2645,9 +2721,12 @@ function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftI
     templateSourceName: template.label,
     carouselTemplate: draft.template,
     carouselLayoutRecipe: draft.layoutRecipe,
-    pages: draft.slides.map((slide, index) => (
-      buildCarouselDesignPage(draft, slide, index, draft.slides.length, dimensions.width, dimensions.height)
-    )),
+    pages: [
+      ...draft.slides.map((slide, index) => (
+        buildCarouselDesignPage(draft, slide, index, draft.slides.length, dimensions.width, dimensions.height)
+      )),
+      ...(customCtaPage ? [customCtaPage] : []),
+    ],
   } satisfies DesignDocument;
 }
 
