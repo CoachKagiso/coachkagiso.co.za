@@ -35,10 +35,10 @@ Almost every defect below is a symptom of that mismatch:
 | 1 | PNG/PDF export quality | 1 | **Done** |
 | 3 | Export selected slides only | 1 | **Done** |
 | 7 | Design Studio export drift + blur | 1 | **Mostly done** — see caveat |
-| 2 | Design template gallery | 2 | Planned |
-| 6 | Save-as-template, incl. CTA kind | 2 | Planned |
-| 4 | Fidelity loss on "Open in Design Studio" | 2 | Planned (resolves via 2 + 6) |
-| 5 | Custom CTA slide | 2 | Planned (needs 6) |
+| 6 | Save-as-template, incl. CTA kind | 2 | **Done** |
+| 5 | Custom CTA slide | 2 | **Done** |
+| 2 | Design template gallery | 2 | Partial — kinds, filter and badges shipped; thumbnails and Supabase storage outstanding |
+| 4 | Fidelity loss on "Open in Design Studio" | 2 | Next |
 | 9 | Design Studio layout shell | 2 | Planned |
 | 10 | Carousel DNA extraction from uploaded PDF | 3 | Planned |
 | 8 | Remove image background | 3 | Planned |
@@ -49,6 +49,40 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Template kinds and the custom CTA slide (items 6 and 5)
+
+**Templates now declare what they are for.** `DesignTemplateKind` is
+`'deck' | 'cover' | 'cta'`. Save-as-template replaced `window.prompt` with a
+dialog, since a prompt can only ever return a string and a template now needs a
+kind as well as a name. Templates saved before this change have no `kind` and
+normalise to `'deck'`, which is what they all were.
+
+Carousel import now considers **deck-kind templates only**. Without that filter a
+single-slide CTA or cover template could be picked to skin an entire imported
+deck and stretched across every slide.
+
+**The custom CTA slide** is designed once in Design Studio, saved as a `cta`
+template, and chosen per deck in Carousel Studio.
+`customCtaTemplateId`/`customCtaTemplateName` ride on the draft and survive the
+vault round-trip; the AI never sets them. On import the template's page is
+resized to the deck's frame and appended as the final page, on both the hydrated
+and synthesized paths.
+
+`DesignStudioPanel` exports `readDesignCtaTemplateSummaries()` as the single
+doorway into template storage, so Carousel Studio never learns where templates
+live. When those move to Supabase, only that file changes.
+
+**Honest limitation, surfaced in the UI:** Carousel Studio's own PDF/PNG export
+stays at the deck slide count. The CTA is a `DesignDocument`, and Carousel Studio
+renders through `CarouselSlideFrame` and `CarouselPdfDocument` — different
+renderers. To get the CTA in the file you export from Design Studio. The picker
+says so directly rather than silently dropping a slide. This is the same
+three-renderer problem as item 4, and it resolves the same way.
+
+Verified end to end: the choice persists to the backlog row in Supabase, and
+opening a 9-slide deck in Design Studio produces 10 pages ending in
+`Slide 10 - Follow CTA - Masterclass`.
 
 ### 2026-08-20 — Design Studio export fidelity (item 7)
 
