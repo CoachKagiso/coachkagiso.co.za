@@ -7,6 +7,7 @@ import {
   CAROUSEL_SLIDE_ROLE_GLOSSES,
   carouselLayoutRecipeOptions,
 } from '@/lib/content/carousel-template-registry';
+import { normaliseCarouselFramework, normaliseFramework } from '@/lib/content/carousel-framework';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,12 +75,26 @@ You are a structural analyst reading a LinkedIn carousel deck slide by slide. Yo
 Output ONLY valid JSON with no other text:
 
 {
-  "hookPattern": "How does the cover slide open? One sentence. (question / bold claim / statistic / scene / uncomfortable truth / reversal)",
+  "hookPattern": "How does the cover slide open? One sentence describing the move it makes, not the words it uses.",
   "emotionalTension": "What problem, fear, or frustration does the deck activate? One sentence naming the specific emotion.",
   "storyStructure": "How does the deck move from cover to close? One sentence describing the arc.",
-  "ctaStyle": "How does the final slide close? One sentence. (soft ask / direct ask / reflection prompt / next-step instruction / follow prompt)",
+  "ctaStyle": "How does the final slide close? One sentence describing what it asks of the reader.",
   "formatLogic": "Why does the carousel format suit this content? One sentence covering pacing, slide count, or how the idea is chunked.",
-  "suggestedPillar": "Which pillar does this structure fit? One sentence: name the pillar (Career Growth & Strategy / Leadership & People Development / Personal Brand & Visibility / Mentorship & Community) and why.",
+  "suggestedPillar": "Which pillar does this STRUCTURE fit? Name one (Career Growth & Strategy / Leadership & People Development / Personal Brand & Visibility / Mentorship & Community) and justify it from the shape of the deck - the arc, the pacing, the kind of ask it closes on. Never justify it from the deck's topic.",
+  "hookTechnique": "Name the psychological triggers the opening stacks, in order, joined by ' -> '. Use trigger names, never the source's words. Then one sentence on why that stack makes a reader keep swiping.",
+  "intraSlideLoop": ["The repeating beat pattern of a typical inner slide, in order, 2-5 short beat names. Example shape only: the name of each move, 1-3 words each. If inner slides have no repeating pattern, return an empty array."],
+  "pacing": {
+    "sentence": "Typical sentence length as a measured range, and whether one idea or several sit on a line.",
+    "breath": "How white space is used between beats.",
+    "close": "How a slide ends, as a rule with a length. Say how consistently it holds - do not claim every slide unless every slide does it."
+  },
+  "valueMethod": "How the deck makes its value usable. One or two sentences on the delivery mechanism, not the subject.",
+  "ctaLayers": ["Each distinct job the closing does, in order, as 'Layer name - what it asks and why it is easy to say yes to'. One entry per layer. Most decks have 1-3."],
+  "emotionalArc": {
+    "start": "What the reader feels at the cover, in 2-4 words.",
+    "middle": "What they feel through the middle, in 2-4 words.",
+    "end": "What they feel at the close, in 2-4 words."
+  },
   "slideCount": number of slides you were given,
   "slideArc": ["one role per slide, in order, chosen ONLY from: ${CAROUSEL_ROLE_MENU}. Use the role name only, not the description."],
   "layoutRecipe": "Which recipe best matches the arc? Choose ONE: ${CAROUSEL_RECIPE_MENU}",
@@ -89,56 +104,17 @@ Output ONLY valid JSON with no other text:
   "hasExtractableStructure": true | false
 }
 
-LENGTH RULE: 1-2 sentences per text field. Under 220 words total.
+LENGTH RULE: 1-2 sentences per text field. Under 450 words total.
 
 CRITICAL RULES:
 - Output ONLY the JSON object above
-- NEVER reproduce any wording from the source
+- NEVER reproduce any wording from the source, not even a short quote. Describe the move, name the technique, and give the measurement - never the sentence.
 - NEVER include the subject matter - only the structural pattern
+- Describe mechanism, not category. "Stacks a consensus claim then invalidates it" is useful. "Bold claim" is not.
+- Only claim a pattern you can see holding across the slides. If it holds on some, say on how many.
 - slideArc must have exactly one entry per slide you were given, in order
 - If the slides carry no readable copy, set hasExtractableStructure to false and leave text fields empty
 `;
-
-function normaliseCarouselFramework(value: Record<string, unknown>, slideCount: number) {
-  const allowedRoles: Set<string> = new Set(CAROUSEL_SLIDE_ROLES);
-  const allowedRecipes: Set<string> = new Set(carouselLayoutRecipeOptions.map((option) => option.value));
-  const rawArc = Array.isArray(value.slideArc) ? value.slideArc : [];
-  // The arc is positional - entry N describes slide N - so an unrecognised role
-  // is coerced to the generic inner role rather than dropped. Dropping used to
-  // shorten the array, which silently shifted every later slide's role by one.
-  const slideArc = rawArc
-    .map((role) => String(role || '').trim().toLowerCase())
-    .map((role) => {
-      if (allowedRoles.has(role)) return role;
-      console.warn(`Carousel arc: unrecognised role "${role}" coerced to "step".`);
-      return 'step';
-    })
-    .slice(0, slideCount);
-  const rawDensity = String(value.copyDensity || '').trim().toLowerCase();
-  const rawRecipe = String(value.layoutRecipe || '').trim().toLowerCase();
-
-  return {
-    ...normaliseFramework(value),
-    slideCount,
-    slideArc,
-    layoutRecipe: allowedRecipes.has(rawRecipe) ? rawRecipe : '',
-    copyDensity: ['light', 'medium', 'dense'].includes(rawDensity) ? rawDensity : '',
-    visualPattern: String(value.visualPattern || '').trim(),
-    whatMakesItWork: String(value.whatMakesItWork || '').trim(),
-  };
-}
-
-function normaliseFramework(value: Record<string, unknown>) {
-  return {
-    hookPattern: String(value.hookPattern || '').trim(),
-    emotionalTension: String(value.emotionalTension || '').trim(),
-    storyStructure: String(value.storyStructure || '').trim(),
-    ctaStyle: String(value.ctaStyle || '').trim(),
-    formatLogic: String(value.formatLogic || '').trim(),
-    suggestedPillar: String(value.suggestedPillar || '').trim(),
-    hasExtractableStructure: value.hasExtractableStructure !== false,
-  };
-}
 
 function extractJsonObject(text: string) {
   try {
@@ -295,7 +271,7 @@ async function extractCarouselStructure(
         content: `CAROUSEL DECK (${slideCount} slides):\n${slideText}\n\nRead this deck and extract its structural framework.`,
       },
     ],
-    900,
+    1600,
     0.2,
   );
 
@@ -419,7 +395,7 @@ export async function POST(req: NextRequest) {
 
     try {
       const raw = await extractCarouselStructure(deckText, slideImages.length, runtime);
-      const framework = normaliseCarouselFramework(raw, slideImages.length);
+      const framework = normaliseCarouselFramework(raw, slideImages.length, (role) => console.warn(`Carousel arc: unrecognised role "${role}" coerced to "step".`));
 
       if (!framework.hasExtractableStructure || !framework.storyStructure) {
         return NextResponse.json(
