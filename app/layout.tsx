@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import { Raleway, Noto_Serif_Display, Dancing_Script } from 'next/font/google';
+import { Inter, Playfair_Display, Dancing_Script } from 'next/font/google';
 import SmoothScroll from '@/components/SmoothScroll';
 import CookieNotice from '@/components/CookieNotice';
 import MouseTrail from '@/components/MouseTrail';
@@ -7,12 +7,12 @@ import { OrganizationJsonLd } from '@/app/JsonLd';
 import 'lenis/dist/lenis.css';
 import './globals.css'; // Global styles
 
-const raleway = Raleway({
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
 });
 
-const notoSerif = Noto_Serif_Display({
+const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-serif',
 });
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={`${raleway.variable} ${notoSerif.variable} ${dancingScript.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} ${dancingScript.variable}`} suppressHydrationWarning>
       <body className="cursor-none font-sans antialiased text-[#142334] bg-white" suppressHydrationWarning>
         <OrganizationJsonLd />
         <MouseTrail />

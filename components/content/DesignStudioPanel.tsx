@@ -1782,9 +1782,9 @@ const designFormatOptions: Array<{ value: DesignFormat; label: string; detail: s
 ];
 
 const designFontOptions: Array<{ value: DesignFontFamily; label: string; fontFamily: string }> = [
-  { value: 'serif', label: 'Serif', fontFamily: 'var(--font-serif), Georgia, "Times New Roman", serif' },
-  { value: 'sans', label: 'Sans', fontFamily: 'var(--font-sans), Raleway, Arial, sans-serif' },
-  { value: 'interTight', label: 'Poppins', fontFamily: 'var(--font-primary), "Poppins", sans-serif' },
+  { value: 'serif', label: 'Serif', fontFamily: 'var(--font-serif), "Playfair Display", Georgia, serif' },
+  { value: 'sans', label: 'Sans', fontFamily: 'var(--font-sans), "Inter", "Helvetica Neue", Arial, sans-serif' },
+  { value: 'interTight', label: 'Inter', fontFamily: 'var(--font-primary), "Inter", "Helvetica Neue", Arial, sans-serif' },
   { value: 'hand', label: 'Hand', fontFamily: '"Comic Sans MS", "Segoe Print", "Bradley Hand", cursive' },
   { value: 'alohaLover', label: 'Aloha Lover', fontFamily: '"Aloha Lover", "Segoe Print", cursive' },
   { value: 'daughterHand', label: 'Daughter Hand', fontFamily: '"Daughter Hand", "Segoe Print", cursive' },
@@ -1832,7 +1832,7 @@ function createDefaultManifestoDesign(): DesignDocument {
       {
         id: 'page-1',
         name: 'Manifesto note',
-        background: '#F5F2ED',
+        background: '#E8E3DF',
         backgroundEffects: getDefaultBackgroundEffects(),
         layers: [
           {
@@ -1865,11 +1865,29 @@ function createDefaultManifestoDesign(): DesignDocument {
             fontFamily: 'sans',
             fontSize: 30,
             fontWeight: 800,
-            color: '#B98567',
+            color: '#142334',
             lineHeight: 1,
             textAlign: 'left',
             textTransform: 'uppercase',
             letterSpacing: 5,
+          },
+          {
+            id: 'accent-dash',
+            type: 'shape',
+            name: 'Accent dash',
+            shape: 'rectangle',
+            x: 104,
+            y: 196,
+            width: 96,
+            height: 8,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: true,
+            fillColor: '#C9AD98',
+            strokeColor: 'transparent',
+            strokeWidth: 0,
+            borderRadius: 9999,
           },
           {
             id: 'series-chip',
@@ -4017,8 +4035,10 @@ async function captureDesignCanvas(
     await waitForDesignFonts(exportElement);
     await prepareSvgMaskNodesForExport(exportElement);
     const rootStyles = getComputedStyle(document.documentElement);
-    const fontSans = rootStyles.getPropertyValue('--font-sans').trim() || 'Raleway, Arial, sans-serif';
-    const fontSerif = rootStyles.getPropertyValue('--font-serif').trim() || 'Georgia, "Times New Roman", serif';
+    // Brand stacks (CHANGE I of the Carousel Studio v2 brief): the CSS vars can
+    // still resolve to off-brand fonts on the public site; export must not.
+    const fontSans = rootStyles.getPropertyValue('--font-sans').trim() || 'Inter, "Helvetica Neue", Arial, sans-serif';
+    const fontSerif = rootStyles.getPropertyValue('--font-serif').trim() || '"Playfair Display", Georgia, serif';
     return await html2canvas(exportElement, {
       backgroundColor: null,
       logging: false,
