@@ -75,9 +75,14 @@ import {
   getCarouselCompositionOption,
   getCarouselCompositionOptionsForRole,
   getCarouselExportDimensions,
+  getCarouselHeadlineSize,
   getCarouselLayoutRecipeOption,
+  getCarouselResolvedHeadlineSize,
+  getCarouselSlideBodyPoints,
   getCarouselSlideCountOption,
+  getCarouselSlideTextStats,
   getCarouselTemplateOption,
+  resolveCarouselComposition,
   isCarouselAspectRatio,
   isCarouselComposition,
   isCarouselLayoutRecipe,
@@ -8563,82 +8568,6 @@ function CarouselLayoutRecipeSelector({
   );
 }
 
-function getCarouselSlideBodyPoints(body: string, limit = 4) {
-  return body
-    .split(/\n+|;\s+|(?<=\.)\s+/)
-    .map((point) => point.trim().replace(/\.$/, ''))
-    .filter(Boolean)
-    .slice(0, limit);
-}
-
-function getCarouselSlideTextStats(slide: CarouselSlide) {
-  const headlineWords = slide.headline.trim().split(/\s+/).filter(Boolean).length;
-  const bodyWords = slide.body.trim().split(/\s+/).filter(Boolean).length;
-  const totalChars = `${slide.headline} ${slide.body} ${slide.cta || ''}`.trim().length;
-
-  return {
-    headlineWords,
-    bodyWords,
-    totalChars,
-    density: totalChars > 260 || bodyWords > 44 ? 'dense' : totalChars > 160 || bodyWords > 26 ? 'medium' : 'light',
-  };
-}
-
-function resolveCarouselComposition(
-  slide: CarouselSlide,
-  role: CarouselSlideRole,
-  template: ReturnType<typeof getCarouselTemplateOption>,
-  bodyPoints: string[],
-): CarouselComposition {
-  const selected = normalizeCarouselComposition(slide.composition, role);
-  if (selected !== 'auto') return selected;
-
-  const stats = getCarouselSlideTextStats(slide);
-
-  if (role === 'cover') {
-    if (stats.headlineWords <= 6 && stats.bodyWords <= 18 && template.value === 'bold_diagnostic') return 'bold_claim';
-    if (stats.headlineWords > 10 || stats.bodyWords > 28) return 'quiet_intro';
-    return 'editorial_cover';
-  }
-
-  if (role === 'cta') {
-    const actionText = `${slide.headline} ${slide.body} ${slide.cta || ''}`.toLowerCase();
-    if (actionText.includes('save') || actionText.includes('share')) return 'save_share_close';
-    if (slide.cta || stats.bodyWords <= 18) return 'direct_action';
-    return 'soft_reflection';
-  }
-
-  if (role === 'proof') {
-    if (stats.bodyWords > 30) return 'example_note';
-    if (stats.headlineWords <= 6 && stats.bodyWords <= 18) return 'credibility_cue';
-    return 'evidence_card';
-  }
-
-  if (role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule') {
-    if (bodyPoints.length >= 3 && stats.density !== 'dense') return 'card_grid';
-    if (stats.density === 'dense') return 'side_rail';
-    return 'numbered_stack';
-  }
-
-  if (stats.bodyWords > 34) return 'note_card';
-  if (slide.body.includes(':') || slide.body.toLowerCase().includes('not ')) return 'contrast_block';
-  return 'quote_panel';
-}
-
-function getCarouselHeadlineSize(composition: CarouselComposition, stats: ReturnType<typeof getCarouselSlideTextStats>) {
-  // Brand type scale at 1080x1350 (CHANGE G): cover 96-110px, inner 72-84px.
-  // These values are the 600px studio-preview baseline; the export lane scales by
-  // exportScale (1080/600 = 1.8) to land on the brand sizes.
-  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 53 : 61;
-  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 53 : 59;
-  if (composition === 'quiet_intro') return 53;
-  if (composition === 'direct_action') return 44;
-  if (composition === 'save_share_close') return 42;
-  if (composition === 'credibility_cue') return 42;
-  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 40;
-  return stats.headlineWords > 9 ? 40 : 46;
-}
-
 type CarouselDeckQualityTone = 'ready' | 'watch' | 'fix';
 
 type CarouselDeckFixAction =
@@ -9183,12 +9112,12 @@ function CarouselSlideFrame({
   const isCover = role === 'cover';
   const isCta = role === 'cta';
   const headlineSize = getCarouselHeadlineSize(composition, textStats);
-  const coverHeadlineSize = Math.min(headlineSize + (isCareerNotes ? 8 : 6), 61);
-  const resolvedHeadlineSize = isCover
-    ? coverHeadlineSize
-    : isCareerNotes
-      ? Math.min(headlineSize + 4, 46)
-      : headlineSize;
+  // CHANGE P: shared with Design Studio's importer so a deck cannot render at
+  // one size here and another size there.
+  const resolvedHeadlineSize = getCarouselResolvedHeadlineSize(composition, textStats, {
+    isCover,
+    template: template.value,
+  });
   const overflowFlag = !exportDimensions && (textStats.bodyWords > 58 || textStats.totalChars > 360);
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
