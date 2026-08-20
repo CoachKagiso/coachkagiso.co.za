@@ -98,6 +98,7 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
+import { buildTemplateFillPrompt, countPlaceholders, splitRebuildOutput } from '@/lib/content/carousel-template';
 import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
 import {
   cleanMessyMiddleNotes,
@@ -441,6 +442,8 @@ type ExtractedFramework = {
   copyDensity?: string;
   visualPattern?: string;
   whatMakesItWork?: string;
+  // Written by Stage 2 and filed in the Vault, never kept in Transform.
+  fillInTemplate?: string;
 };
 
 export type CarouselSlide = {
@@ -1183,6 +1186,7 @@ const vaultSections: Array<{ value: VaultSection; label: string; description: st
   { value: 'smart', label: 'Smart Suggest', description: 'AI-suggested ideas saved for later', icon: Sparkles },
   { value: 'messy', label: 'Messy Middle', description: 'Raw thoughts and unfinished fragments', icon: PenLine },
   { value: 'insights', label: 'Insights', description: 'Published articles ready to repurpose', icon: FileText },
+  { value: 'templates', label: 'Templates', description: 'Saved carousel moulds ready to reuse', icon: Layers3 },
 ];
 
 const createPlatformOptions: CreatePlatformOption[] = [
@@ -4007,14 +4011,35 @@ export default function ContentStudio({
     });
   }, [backlogPillarFilter, backlogPlatformFilter, backlogRecords, backlogSearch, backlogStatusFilter]);
 
+  // CHANGE T2: analysed decks are kept as a reusable swipe file. The framework
+  // is transient in Transform's own flow, so without this the analysis is spent
+  // the moment a rebuild happens.
+  const [dnaReferences, setDnaReferences] = useState<{
+    id: string;
+    label: string;
+    slideCount: number;
+    layoutRecipe: string | null;
+    slideArc: string[];
+    framework: ExtractedFramework;
+  }[]>([]);
+  const [dnaSaving, setDnaSaving] = useState(false);
+  // The mould Stage 2 returns alongside the rebuilt deck. It is held only long
+  // enough to be filed in the Vault - Transform is not where templates live.
+  const [alchemyTemplate, setAlchemyTemplate] = useState('');
+  const [templateFillingId, setTemplateFillingId] = useState<string | null>(null);
+  const [alchemyDeckWarning, setAlchemyDeckWarning] = useState('');
+
   const vaultTotals = useMemo(
     () => ({
       ideas: backlogRecords.filter(isIdeaBacklogItem).length,
       smart: backlogRecords.filter(isSmartSuggestItem).length,
       messy: backlogRecords.filter(isMessyMiddleItem).length,
       insights: backlogRecords.filter(isInsightsBacklogItem).length,
+      // Templates live in carousel_dna, not the backlog, so the count comes from
+      // the saved references rather than from a backlog filter.
+      templates: dnaReferences.length,
     }),
-    [backlogRecords],
+    [backlogRecords, dnaReferences],
   );
   const vaultBuckets = useMemo<Record<VaultSection, ContentBacklogItem[]>>(
     () => ({
@@ -4022,6 +4047,8 @@ export default function ContentStudio({
       smart: sortVaultRecordsByExpiry(filteredBacklog.filter(isSmartSuggestItem)),
       messy: sortVaultRecordsByExpiry(filteredBacklog.filter(isMessyMiddleItem)),
       insights: sortVaultRecordsByExpiry(filteredBacklog.filter(isInsightsBacklogItem)),
+      // Never holds backlog items - the templates tab renders dnaReferences.
+      templates: [],
     }),
     [filteredBacklog],
   );
@@ -5297,18 +5324,6 @@ export default function ContentStudio({
     setCreateError(null);
   }
 
-  // CHANGE T2: analysed decks are kept as a reusable swipe file. The framework
-  // is transient in Transform's own flow, so without this the analysis is spent
-  // the moment a rebuild happens.
-  const [dnaReferences, setDnaReferences] = useState<{
-    id: string;
-    label: string;
-    slideCount: number;
-    layoutRecipe: string | null;
-    slideArc: string[];
-    framework: ExtractedFramework;
-  }[]>([]);
-  const [dnaSaving, setDnaSaving] = useState(false);
 
   const fetchDnaReferences = useCallback(async () => {
     try {
@@ -5339,8 +5354,12 @@ export default function ContentStudio({
 
   async function saveDnaReference() {
     if (!alchemyFramework || dnaSaving) return;
+    if (!alchemyTemplate.trim()) {
+      setCreateError('Rebuild first - the template is written during the rebuild, then filed in the Vault.');
+      return;
+    }
     const suggested = alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
-    const label = window.prompt('Name this reference structure', suggested);
+    const label = window.prompt('Name this template', suggested);
     if (!label?.trim()) return;
 
     setDnaSaving(true);
@@ -5352,9 +5371,12 @@ export default function ContentStudio({
         slideCount: alchemyFramework.slideCount || 0,
         layoutRecipe: alchemyFramework.layoutRecipe || null,
         slideArc: alchemyFramework.slideArc || [],
-        framework: alchemyFramework,
+        // The mould rides inside the framework jsonb, so saving a template needs
+        // no migration and keeps the typed columns doing their job.
+        framework: { ...alchemyFramework, fillInTemplate: alchemyTemplate.trim() },
       });
       await loadDnaReferences();
+      setActiveVaultSection('templates');
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Could not save this reference.');
     } finally {
@@ -5372,6 +5394,56 @@ export default function ContentStudio({
     setCreateError(null);
   }
 
+  // Filling a saved mould is a generation, not a navigation: the deck is built
+  // first and only then handed to Carousel Studio, so the studio always opens on
+  // a finished draft rather than an empty canvas the user has to trigger again.
+  async function useTemplateInCarouselStudio(reference: (typeof dnaReferences)[number]) {
+    const template = String(reference.framework?.fillInTemplate || '').trim();
+    if (!template) {
+      setCreateError('This saved reference has no template. Rebuild the deck to produce one.');
+      return;
+    }
+
+    const topic = window.prompt(`What should "${reference.label}" be about?`, '');
+    if (!topic?.trim()) return;
+
+    const selection: CreateSelection = {
+      platform: 'linkedin',
+      contentType: 'carousel',
+      subType: null,
+      angle: 'tactical_teacher',
+      angleRegister: null,
+      carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: (reference.layoutRecipe as CarouselLayoutRecipe) || DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+    };
+
+    setTemplateFillingId(reference.id);
+    setCreateError(null);
+    try {
+      const result = await callAi(
+        deriveCreateMode(selection),
+        buildTemplateFillPrompt({
+          template,
+          topic: topic.trim(),
+          label: reference.label,
+          pillar: String(reference.framework?.suggestedPillar || '') || null,
+          slideArc: reference.slideArc,
+        }),
+        selection,
+      );
+      const draft = buildCarouselDraftFromAiOutput(result, selection, topic.trim(), 'auto');
+      setGeneratedCarouselDraft(draft);
+      setGeneratedPost(formatCarouselDraftForOutput(draft));
+      openGeneratedCarouselDraftInDesign();
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not build a deck from this template.');
+    } finally {
+      setTemplateFillingId(null);
+    }
+  }
+
   async function deleteDnaReference(id: string) {
     if (!window.confirm('Delete this reference structure?')) return;
     try {
@@ -5386,6 +5458,7 @@ export default function ContentStudio({
   // here rather than at extraction time means the slide count is visible before
   // any AI spend, and a retry does not re-render the PDF.
   async function selectAlchemyDeckFile(file: File | null) {
+    setAlchemyDeckWarning('');
     setAlchemyDeckFile(null);
     setAlchemyDeckPages([]);
     setAlchemyDeckNotice('');
@@ -5520,8 +5593,20 @@ export default function ContentStudio({
           formData.append('slides', new File([page.blob], `slide-${page.pageNumber}.jpg`, { type: 'image/jpeg' }));
         });
         const response = await fetch('/api/content/transform/stage1', { method: 'POST', body: formData });
-        const parsed = (await response.json().catch(() => ({}))) as { framework?: ExtractedFramework; error?: string };
+        const parsed = (await response.json().catch(() => ({}))) as {
+          framework?: ExtractedFramework;
+          error?: string;
+          warnings?: { unreadableSlides?: number; totalSlides?: number; unknownRoles?: string[] };
+        };
         if (!response.ok || !parsed.framework) throw new Error(parsed.error || 'Could not extract the structure.');
+        // An arc built from a deck that was only half read must say so, rather
+        // than presenting itself as a clean extraction.
+        const unreadable = parsed.warnings?.unreadableSlides || 0;
+        setAlchemyDeckWarning(
+          unreadable > 0
+            ? `${unreadable} of ${parsed.warnings?.totalSlides || alchemyDeckPages.length} slides could not be read. The structure below is based on the rest.`
+            : '',
+        );
         data = { framework: parsed.framework };
       } else if (alchemyInputType === 'image') {
         if (alchemyImageFile) {
@@ -5606,7 +5691,9 @@ export default function ContentStudio({
         calendarContext,
         researchEntries: activeResearchEntries.length > 0 ? activeResearchEntries : undefined,
       });
-      setAlchemyOutput(data.result.trim());
+      const { post, template } = splitRebuildOutput(data.result);
+      setAlchemyOutput(post);
+      setAlchemyTemplate(template);
       setAlchemyStage('complete');
     } catch (error) {
       setAlchemyStage('extracted');
@@ -6070,11 +6157,13 @@ export default function ContentStudio({
                 dnaReferences={dnaReferences}
                 dnaSaving={dnaSaving}
                 onSaveDnaReference={() => void saveDnaReference()}
+                hasTemplate={Boolean(alchemyTemplate.trim())}
                 onUseDnaReference={useDnaReference}
                 onDeleteDnaReference={(id) => void deleteDnaReference(id)}
                 deckPageCount={alchemyDeckPages.length}
                 deckFileName={alchemyDeckFile?.name || ''}
                 deckNotice={alchemyDeckNotice}
+                deckWarning={alchemyDeckWarning}
                 deckReading={alchemyDeckReading}
                 onDeckSelect={(file) => void selectAlchemyDeckFile(file)}
                 inputTypes={transformInputTypes}
@@ -6689,15 +6778,84 @@ export default function ContentStudio({
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">{activeVaultMeta.label}</p>
                   <h3 className="mt-2 font-serif text-[28px] leading-tight text-[#142334]">{activeVaultMeta.description}</h3>
                   <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
-                    Holds {vaultPolicies[activeVaultSection].maxItems} items. Auto-deletes after {vaultPolicies[activeVaultSection].retentionDays} days, with a warning {vaultPolicies[activeVaultSection].warningDays} days before expiry.
+                    {activeVaultSection === 'templates'
+                      ? `Holds ${vaultPolicies.templates.maxItems} templates. Templates are kept until you delete them.`
+                      : `Holds ${vaultPolicies[activeVaultSection].maxItems} items. Auto-deletes after ${vaultPolicies[activeVaultSection].retentionDays} days, with a warning ${vaultPolicies[activeVaultSection].warningDays} days before expiry.`}
                   </p>
                 </div>
                 <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B6B6B]">
-                  {activeVaultRecords.length} showing
+                  {activeVaultSection === 'templates' ? dnaReferences.length : activeVaultRecords.length} showing
                 </p>
               </div>
 
-              <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
+              {activeVaultSection === 'templates' && (
+                <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+                  {dnaReferences.length === 0 ? (
+                    <div className="rounded-[12px] border border-dashed border-[#D8C8BB] bg-[#F8F6F4] p-6">
+                      <Layers3 className="h-7 w-7 text-[#C9AD98]" />
+                      <p className="mt-4 font-serif text-[24px] leading-tight text-[#142334]">No templates saved yet.</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/62">
+                        Upload a carousel PDF in Transform, rebuild it in Kagiso&apos;s voice, then save the mould here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigateContent('studio')}
+                        className="studio-secondary-button mt-4"
+                      >
+                        Go to Transform
+                      </button>
+                    </div>
+                  ) : (
+                    dnaReferences.map((reference) => {
+                      const template = String(reference.framework?.fillInTemplate || '');
+                      const placeholders = countPlaceholders(template);
+                      const isFilling = templateFillingId === reference.id;
+                      return (
+                        <article key={reference.id} className="flex flex-col rounded-[12px] border border-[#E4D8CB] bg-white p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6B6B6B]">
+                            {reference.slideCount || reference.slideArc.length} slides
+                            {placeholders > 0 ? ` - ${placeholders} blanks` : ''}
+                          </p>
+                          <h4 className="mt-1 font-serif text-[20px] leading-tight text-[#142334]">{reference.label}</h4>
+                          {reference.slideArc.length > 0 && (
+                            <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
+                              {reference.slideArc
+                                .map((role) => carouselSlideRoleLabels[role as CarouselSlideRole] || role)
+                                .join(' - ')}
+                            </p>
+                          )}
+                          {!template && (
+                            <p className="mt-2 text-[12px] leading-relaxed text-[#B4571F]">
+                              Saved before templates existed. Rebuild the deck to add one.
+                            </p>
+                          )}
+                          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                            <button
+                              type="button"
+                              onClick={() => void useTemplateInCarouselStudio(reference)}
+                              disabled={isFilling || !template}
+                              className="studio-primary-button flex-1 disabled:opacity-50"
+                            >
+                              {isFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                              {isFilling ? 'Building deck...' : 'Use this template'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteDnaReference(reference.id)}
+                              className="studio-card-action-button px-3"
+                              aria-label={`Delete ${reference.label}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              <div className={`mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] ${activeVaultSection === 'templates' ? 'hidden' : ''}`}>
                 {activeVaultRecords.length === 0 ? (
                   <div className="rounded-[12px] border border-dashed border-[#D8C8BB] bg-[#F8F6F4] p-6">
                     {activeVaultSection === 'messy' ? (
@@ -7226,11 +7384,13 @@ function TransformFlow({
   dnaReferences,
   dnaSaving,
   onSaveDnaReference,
+  hasTemplate,
   onUseDnaReference,
   onDeleteDnaReference,
   deckPageCount,
   deckFileName,
   deckNotice,
+  deckWarning,
   deckReading,
   onDeckSelect,
   inputTypes,
@@ -7290,12 +7450,14 @@ function TransformFlow({
   }[];
   dnaSaving: boolean;
   onSaveDnaReference: () => void;
+  hasTemplate: boolean;
   onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
   onDeleteDnaReference: (id: string) => void;
   // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
   deckPageCount: number;
   deckFileName: string;
   deckNotice: string;
+  deckWarning: string;
   deckReading: boolean;
   onDeckSelect: (file: File | null) => void;
   inputTypes: typeof transformInputTypes;
@@ -7479,6 +7641,9 @@ function TransformFlow({
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-bold text-[#142334]">{deckFileName}</p>
                       <p className="mt-1 text-[12px] text-[#142334]/58">{deckNotice}</p>
+                      {deckWarning && (
+                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-[#B4571F]">{deckWarning}</p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -7609,18 +7774,24 @@ function TransformFlow({
               ))}
             </div>
 
-            {/* CHANGE T2: keep this structure for reuse. Without it the analysis
-                is spent on a single rebuild. */}
+            {/* Templates are not kept in Transform. Rebuilding writes the mould,
+                and this files it in the Vault, which is where it is reused from. */}
             {framework.slideCount ? (
-              <button
-                type="button"
-                onClick={onSaveDnaReference}
-                disabled={dnaSaving}
-                className="studio-secondary-button mt-4 w-fit"
-              >
-                {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
-                Save as reference structure
-              </button>
+              hasTemplate ? (
+                <button
+                  type="button"
+                  onClick={onSaveDnaReference}
+                  disabled={dnaSaving}
+                  className="studio-secondary-button mt-4 w-fit"
+                >
+                  {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
+                  Save template to Vault
+                </button>
+              ) : (
+                <p className="mt-4 text-[12px] leading-relaxed text-[#142334]/58">
+                  Rebuild this deck to write its reusable template. The template is saved to the Vault, not here.
+                </p>
+              )
             ) : null}
 
             <div className="mt-5 flex items-center gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">

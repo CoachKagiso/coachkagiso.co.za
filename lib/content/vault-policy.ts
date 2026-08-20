@@ -2,7 +2,16 @@ import type { ContentBacklogItem } from '@/lib/content-studio';
 
 type VaultBacklogShape = Pick<ContentBacklogItem, 'source' | 'notes'>;
 
-export type VaultSection = 'ideas' | 'smart' | 'messy' | 'insights';
+// 'templates' is backed by carousel_dna rather than the backlog table, so it
+// never holds ContentBacklogItems and is excluded from expiry sweeps.
+export type VaultSection = 'ideas' | 'smart' | 'messy' | 'insights' | 'templates';
+
+export const BACKLOG_VAULT_SECTIONS = ['ideas', 'smart', 'messy', 'insights'] as const;
+export type BacklogVaultSection = (typeof BACKLOG_VAULT_SECTIONS)[number];
+
+export function isBacklogVaultSection(section: VaultSection): section is BacklogVaultSection {
+  return (BACKLOG_VAULT_SECTIONS as readonly string[]).includes(section);
+}
 
 export type VaultPolicy = {
   label: string;
@@ -37,6 +46,15 @@ export const vaultPolicies: Record<VaultSection, VaultPolicy> = {
     maxItems: 40,
     retentionDays: 90,
     warningDays: 14,
+  },
+  // Templates are deliberately long-lived: a mould is worth keeping far longer
+  // than a raw idea, and it is the reusable asset the whole Transform flow exists
+  // to produce.
+  templates: {
+    label: 'Templates',
+    maxItems: 40,
+    retentionDays: 3650,
+    warningDays: 0,
   },
 };
 
