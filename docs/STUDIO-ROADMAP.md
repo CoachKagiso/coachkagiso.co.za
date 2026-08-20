@@ -39,8 +39,8 @@ Almost every defect below is a symptom of that mismatch:
 | 5 | Custom CTA slide | 2 | **Done** |
 | 2 | Design template gallery | 2 | Partial — kinds, filter, badges and Supabase storage shipped; thumbnails outstanding |
 | 4 | Fidelity loss on "Open in Design Studio" | 2 | **Done** |
-| 9 | Design Studio layout shell | 2 | Next |
-| 10 | Carousel DNA extraction from uploaded PDF | 3 | Planned |
+| 9 | Design Studio layout shell | 2 | **Done** |
+| 10 | Carousel DNA extraction from uploaded PDF | 3 | Next |
 | 8 | Remove image background | 3 | Planned |
 
 Tier 1 = correctness and daily relief. Tier 2 = the template/document model.
@@ -49,6 +49,39 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Canvas room: a real fit, and focus mode (item 9)
+
+**"Fit" was never a fit.** `fitCanvasZoom()` was `setCanvasZoom(100)` — it reset
+to the exact zoom that overflows the column. The button that should have solved
+the cramped canvas was causing it. It now measures the canvas viewport and
+solves for the zoom that fits.
+
+It fits to **width**, not to the whole artboard. Fitting height as well landed
+around 51% on a portrait frame, smaller than the 60–65% that was being set by
+hand — and the column scrolls vertically anyway. The problem being solved is
+horizontal.
+
+**The canvas column had no floor.** Between 1280px and 1535px the grid was two
+columns with the right panel spanning both, leaving the canvas at
+`minmax(0, 1.1fr)`. It now holds `minmax(560px, 1.4fr)` at `xl` and
+`minmax(620px, 1.5fr)` at `2xl`, with the side columns trimmed to pay for it.
+
+**Focus mode** hides both side columns, drops the shell to one column and
+re-fits. The canvas also re-fits when the frame size changes.
+
+Verified at 1577px: panels visible → canvas column 620px, auto-fit 54%, artboard
+renders 583px wide *inside* a 620px column, so nothing is clipped. Focus on →
+column 1301px, auto-fit 117%. Toggling back restores both panels and 54%.
+
+Not attempted: the full Canva shell (icon rail, panels sliding over the canvas,
+floating contextual toolbar). That is a large restructure of a 9,600-line
+component, and these three changes remove the daily friction. Worth revisiting
+only if the panels still feel in the way.
+
+Reminder: working zoom never affected exports. They render from a separate
+hidden full-size stage — the cut-off was the PDF page/image mismatch fixed in
+76afa1e.
 
 ### 2026-08-20 — Templates on Supabase, and one shared slide geometry (items 2 and 4)
 

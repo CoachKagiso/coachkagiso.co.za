@@ -8158,8 +8158,11 @@ export default function DesignStudioPanel({
     const horizontalPadding = parseFloat(styles.paddingLeft || '0') + parseFloat(styles.paddingRight || '0');
     // Leave a little breathing room so the artboard never touches the edges.
     const availableWidth = Math.max(1, viewport.clientWidth - horizontalPadding - 24);
-    const availableHeight = Math.max(1, window.innerHeight - 220);
-    const ratio = Math.min(availableWidth / design.width, availableHeight / design.height);
+    // Fit to width, not to the whole artboard. The canvas column scrolls
+    // vertically, and the problem being solved here is horizontal - the artboard
+    // being squeezed by the side panels. Fitting height as well lands around 51%
+    // on a portrait frame, smaller than the 60-65% that was being set by hand.
+    const ratio = availableWidth / design.width;
     setCanvasZoom(clamp(Math.floor(ratio * 100), MIN_CANVAS_ZOOM, MAX_CANVAS_ZOOM));
   }, [design.width, design.height]);
 
