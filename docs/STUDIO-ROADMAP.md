@@ -34,7 +34,7 @@ Almost every defect below is a symptom of that mismatch:
 |---|---|---|---|
 | 1 | PNG/PDF export quality | 1 | **Done** |
 | 3 | Export selected slides only | 1 | **Done** |
-| 7 | Design Studio export drift + blur | 1 | Next |
+| 7 | Design Studio export drift + blur | 1 | **Mostly done** — see caveat |
 | 2 | Design template gallery | 2 | Planned |
 | 6 | Save-as-template, incl. CTA kind | 2 | Planned |
 | 4 | Fidelity loss on "Open in Design Studio" | 2 | Planned (resolves via 2 + 6) |
@@ -49,6 +49,71 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Design Studio export fidelity (item 7)
+
+Three separate root causes, all in `components/content/DesignStudioPanel.tsx`.
+
+**The PDF cut-off was a page/image size mismatch, not the zoom level.**
+
+`exportPdf` created the document with `format: [design.width, design.height]`
+(1x) and then drew every image at the *canvas* size, which is `pixelScale` times
+larger. On page 1 that painted a 2160x2700 bitmap onto a 1080x1350 page anchored
+top-left, so the exported PDF showed only the **top-left quarter** of the design.
+Pages 2+ were then added at the canvas size, so page dimensions were inconsistent
+within one document as well.
+
+Pages now stay at the design size throughout, and the image is drawn to fill
+exactly that box — the bitmap keeps its extra pixels, so it is oversampled into
+the page instead of cropped by it.
+
+Worth noting: this is unrelated to the zoom level of the visible canvas. Export
+has always rendered from a separate hidden full-size stage, never from the canvas
+you are looking at.
+
+**Elements moved because recoloured SVG assets were forced back into flow.**
+
+`applySvgMaskExportToNode` ended with
+`node.style.position = node.style.position || 'relative'`. Recoloured SVG asset
+nodes are positioned by class (`absolute inset-0`), not inline style, so
+`node.style.position` read empty for every one of them and the fallback fired.
+Forcing `position: relative` pulled the node out of absolute positioning and back
+into normal flow, where an empty box collapses to zero height. That is why
+exported assets landed in the wrong place or changed size.
+
+It now reads the *computed* position and only falls back to `relative` when the
+node is genuinely `static`. The same fix also removes a measurement mismatch: the
+child's background geometry was calculated from `offsetWidth`/`offsetHeight`
+measured *before* the node was collapsed by that very line.
+
+**Viewport clipping hardened.**
+
+The export host sat at `position: fixed; left: 0; top: 0` — inside the visible
+viewport — while html2canvas rendered through a window sized by
+`windowWidth`/`windowHeight` taken from `window.innerWidth`/`innerHeight`. Any
+design taller than the browser window could be clipped. The host now sits at
+`left: -100000px` and the render window is at least the design size plus margin,
+mirroring the carousel lane, which has never had this problem.
+
+**Blur: export resolution is now a choice.**
+
+`scale: 2` was hardcoded with no way to raise it. Added `DesignExportScale`
+(1 | 2 | 3) with a control next to the export buttons, defaulting to 2x. Export
+messages now report the actual pixel dimensions produced, and PNG filenames carry
+the scale. Added `releaseDesignExportCanvas` and freed each canvas after its
+bytes reach a blob or the PDF.
+
+**Caveat — rotation drift is not fully solved.**
+
+Layers apply `transform: rotate()` on the bounds wrapper and, when flipped,
+`scaleX(-1)` / `scaleY(-1)` on the content child. Nested transforms are a known
+html2canvas weakness, so a layer that is *both rotated and flipped* may still
+render slightly off. The position fix above resolves the far more common case
+(assets moving or resizing), but the durable answer is to stop rasterising
+entirely: the layer model is already a vector scene graph and can render to SVG
+and then to true vector PDF. That is its own piece of work — the main unknown is
+text wrapping, since SVG has no automatic line breaking and lines would have to
+be measured and emitted as `tspan`s.
 
 ### 2026-08-20 — Export resolution and per-slide export (items 1 and 3)
 
@@ -112,19 +177,10 @@ Recorded here so they are not rediscovered from scratch.
 aspect ratio still produces a 1350-tall vector PDF page. The PNG lane honours the
 selected ratio correctly; only the vector PDF ignores it.
 
-**Design Studio export clips at the viewport.** `captureDesignCanvas` passes
-`windowWidth: window.innerWidth, windowHeight: window.innerHeight` while the
-export host sits at `position: fixed; left: 0; top: 0` at full design size. When
-the design is taller than the browser viewport, html2canvas clips it. The
-carousel lane avoids this by parking its host at `left: -10000px` and passing
-`scrollWidth`. Note: this is *not* caused by the zoom level of the visible
-canvas — export renders from a separate hidden full-size stage.
-
-**Design Studio export drifts on rotated layers.** Layers render via
-`transform: rotate(${layer.rotation}deg)`. Partial CSS-transform support is
-html2canvas's best-known failure mode, which is why rotated elements land in the
-wrong place. The durable fix is to stop rasterising: the layer model is already a
-vector scene graph, so it can render to SVG and then to PDF.
+**Rotated *and* flipped layers may still drift on export.** See the item 7
+caveat in the changelog. Nested CSS transforms (rotate on the bounds wrapper,
+scale(-1) on the content child) are a known html2canvas weakness. Resolved
+properly by the vector renderer, not by more raster patching.
 
 **Carousel drafts are auto-deleted after 60 days.** `getVaultSectionForItem`
 (`lib/content/vault-policy.ts`) has no case for `carousel_draft`, so finished

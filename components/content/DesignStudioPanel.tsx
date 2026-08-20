@@ -345,6 +345,16 @@ type ExportState = {
   tone: 'info' | 'error';
 };
 
+// CHANGE L: Design Studio exports were hardcoded to 2x with no way to raise or
+// lower it. Mirrors the Carousel Studio scale control.
+type DesignExportScale = 1 | 2 | 3;
+const designExportScaleOptions: { value: DesignExportScale; label: string; description: string }[] = [
+  { value: 1, label: '1x', description: 'Native canvas size. Smallest files.' },
+  { value: 2, label: '2x', description: 'Retina sharp. Best default.' },
+  { value: 3, label: '3x', description: 'Maximum detail. Large files.' },
+];
+const DEFAULT_DESIGN_EXPORT_SCALE: DesignExportScale = 2;
+
 type DesignHistoryEntry = {
   design: DesignDocument;
   activePageId: string;
@@ -3870,6 +3880,20 @@ function applySvgMaskExportToNode(
     Number.isFinite(naturalHeight) ? naturalHeight : undefined,
   );
 
+  // CHANGE L: preserve the node's real positioning.
+  //
+  // Recoloured SVG asset nodes are laid out by class ("absolute inset-0"), not
+  // by inline style, so `node.style.position` reads empty and the old code
+  // below forced `position: relative` on every one of them. That pulled the
+  // node out of absolute positioning and back into flow, where an empty box
+  // collapses to zero height - which is why exported assets landed in the wrong
+  // place or changed size. Read the computed value and only fall back when the
+  // node really is static.
+  const computedPosition = node.ownerDocument.defaultView?.getComputedStyle(node).position;
+  const resolvedPosition = computedPosition && computedPosition !== 'static'
+    ? computedPosition
+    : 'relative';
+
   node.replaceChildren();
   node.style.background = 'transparent';
   node.style.backgroundColor = 'transparent';
@@ -3882,7 +3906,7 @@ function applySvgMaskExportToNode(
   node.style.webkitMaskPosition = 'initial';
   node.style.webkitMaskRepeat = 'initial';
   node.style.webkitMaskSize = 'initial';
-  node.style.position = node.style.position || 'relative';
+  node.style.position = resolvedPosition;
   node.style.overflow = 'hidden';
   Object.assign(child.style, childStyle);
   node.append(child);
@@ -3952,6 +3976,13 @@ async function waitForDesignImages(element: HTMLElement) {
   );
 }
 
+// CHANGE L: a 3x export of a large canvas is tens of megabytes of RGBA. Free
+// each one as soon as its bytes have reached a blob or the PDF.
+function releaseDesignExportCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -3994,23 +4025,29 @@ async function captureDesignCanvas(
   options?: {
     transparentBackground?: boolean;
     visibleLayerIds?: string[];
+    pixelScale?: DesignExportScale;
   },
 ) {
+  const pixelScale = options?.pixelScale ?? DEFAULT_DESIGN_EXPORT_SCALE;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
   const captureId = `design-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const visibleLayerIds = options?.visibleLayerIds ? new Set(options.visibleLayerIds) : null;
 
   exportHost.setAttribute('aria-hidden', 'true');
+  // CHANGE L: park the host far off-screen instead of at the viewport origin.
+  // At left/top 0 the host sat inside the visible viewport, and html2canvas
+  // renders through a window sized by windowWidth/windowHeight - so anything
+  // taller than the browser window got clipped. This mirrors the carousel lane,
+  // which has never had that problem.
   exportHost.style.position = 'fixed';
-  exportHost.style.left = '0';
+  exportHost.style.left = '-100000px';
   exportHost.style.top = '0';
   exportHost.style.width = `${design.width}px`;
   exportHost.style.height = `${design.height}px`;
   exportHost.style.overflow = 'hidden';
   exportHost.style.pointerEvents = 'none';
   exportHost.style.zIndex = '-1';
-  exportHost.style.opacity = '0';
   exportHost.style.visibility = 'visible';
 
   exportElement.dataset.designExportCaptureId = captureId;
@@ -4042,12 +4079,14 @@ async function captureDesignCanvas(
     return await html2canvas(exportElement, {
       backgroundColor: null,
       logging: false,
-      scale: 2,
+      scale: pixelScale,
       width: design.width,
       height: design.height,
       useCORS: true,
-      windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight,
+      // CHANGE L: the render window must be able to contain the whole design,
+      // otherwise html2canvas clips it at the browser viewport.
+      windowWidth: Math.max(document.documentElement.scrollWidth, design.width + 200),
+      windowHeight: Math.max(document.documentElement.scrollHeight, design.height + 200),
       scrollX: 0,
       scrollY: 0,
       onclone: (clonedDocument) => {
@@ -6189,6 +6228,7 @@ export default function DesignStudioPanel({
   const [deletedAssetIds, setDeletedAssetIds] = useState<string[]>([]);
   const [deletedAssetsLoaded, setDeletedAssetsLoaded] = useState(false);
   const [exportState, setExportState] = useState<ExportState | null>(null);
+  const [exportPixelScale, setExportPixelScale] = useState<DesignExportScale>(DEFAULT_DESIGN_EXPORT_SCALE);
   const [designTemplates, setDesignTemplates] = useState<DesignTemplateRecord[]>([]);
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
   const [templateMessage, setTemplateMessage] = useState('');
@@ -7858,10 +7898,22 @@ export default function DesignStudioPanel({
       await new Promise((resolve) => window.setTimeout(resolve, 350));
 
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
+      const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas, {
+        pixelScale: exportPixelScale,
+      });
       const blob = await canvasToPngBlob(canvas);
-      downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}.png`);
-      setExportState({ busy: false, message: 'PNG exported.', tone: 'info' });
+      const exportedWidth = canvas.width;
+      const exportedHeight = canvas.height;
+      releaseDesignExportCanvas(canvas);
+      downloadBlob(
+        blob,
+        `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}@${exportPixelScale}x.png`,
+      );
+      setExportState({
+        busy: false,
+        message: `PNG exported at ${exportedWidth}x${exportedHeight}.`,
+        tone: 'info',
+      });
     } catch (error) {
       setExportState({
         busy: false,
@@ -7909,17 +7961,37 @@ export default function DesignStudioPanel({
         await waitForNextDesignPaint();
         await new Promise((resolve) => window.setTimeout(resolve, 200));
 
-        const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvasWidth, canvasHeight);
+        const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas, {
+          pixelScale: exportPixelScale,
+        });
+        // CHANGE L: this is the export cut-off.
+        //
+        // The document was created with a page of [design.width, design.height]
+        // (1x) but every image was drawn at the *canvas* size, which is
+        // pixelScale times larger. On page 1 that painted a 2160x2700 image
+        // onto a 1080x1350 page anchored top-left, so the PDF showed only the
+        // top-left quarter of the design. Pages 2+ were then added at the
+        // canvas size, so page dimensions were inconsistent too.
+        //
+        // Pages now stay at the design size on every page, and the image is
+        // drawn to fill exactly that box. The bitmap keeps its extra pixels, so
+        // it is oversampled into the page rather than cropped by it.
+        if (index > 0) pdf.addPage([exportDesign.width, exportDesign.height], orientation);
+        pdf.addImage(
+          canvas.toDataURL('image/png'),
+          'PNG',
+          0,
+          0,
+          exportDesign.width,
+          exportDesign.height,
+        );
+        releaseDesignExportCanvas(canvas);
       }
 
       downloadBlob(pdf.output('blob'), `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
       setExportState({
         busy: false,
-        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}.`,
+        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'} at ${exportDesign.width}x${exportDesign.height}, ${exportPixelScale}x detail.`,
         tone: 'info',
       });
     } catch (error) {
@@ -7943,7 +8015,32 @@ export default function DesignStudioPanel({
                 Start with the Manifesto Note Graphic, then use the same page and layer engine for carousel and presentation formats.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* CHANGE L: export resolution, matching Carousel Studio. */}
+              <div
+                className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-[#F8F6F4] p-1"
+                role="group"
+                aria-label="Export resolution"
+              >
+                {designExportScaleOptions.map((option) => {
+                  const isSelected = exportPixelScale === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setExportPixelScale(option.value)}
+                      disabled={exportState?.busy}
+                      title={`${option.description} (${design.width * option.value}x${design.height * option.value})`}
+                      aria-pressed={isSelected}
+                      className={`rounded-full px-3 py-1 text-[12px] font-bold transition disabled:opacity-50 ${
+                        isSelected ? 'bg-[#142334] text-white' : 'text-[#142334]/60 hover:bg-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
               <button type="button" onClick={saveDesign} className="studio-secondary-button">
                 <Save className="h-4 w-4" />
                 Save design
