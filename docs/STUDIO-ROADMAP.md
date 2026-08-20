@@ -37,9 +37,9 @@ Almost every defect below is a symptom of that mismatch:
 | 7 | Design Studio export drift + blur | 1 | **Mostly done** — see caveat |
 | 6 | Save-as-template, incl. CTA kind | 2 | **Done** |
 | 5 | Custom CTA slide | 2 | **Done** |
-| 2 | Design template gallery | 2 | Partial — kinds, filter and badges shipped; thumbnails and Supabase storage outstanding |
-| 4 | Fidelity loss on "Open in Design Studio" | 2 | Next |
-| 9 | Design Studio layout shell | 2 | Planned |
+| 2 | Design template gallery | 2 | Partial — kinds, filter, badges and Supabase storage shipped; thumbnails outstanding |
+| 4 | Fidelity loss on "Open in Design Studio" | 2 | **Done** |
+| 9 | Design Studio layout shell | 2 | Next |
 | 10 | Carousel DNA extraction from uploaded PDF | 3 | Planned |
 | 8 | Remove image background | 3 | Planned |
 
@@ -49,6 +49,46 @@ Tier 3 = new capability.
 ---
 
 ## Changelog
+
+### 2026-08-20 — Templates on Supabase, and one shared slide geometry (items 2 and 4)
+
+**Templates moved off localStorage.** New `design_templates` table holding the
+DesignDocument as jsonb, a `/api/content/design-templates` route behind the
+existing dashboard auth, and a browser client that uploads anything still in
+localStorage exactly once before clearing the local copy. If an upload fails the
+local records stay visible and the client stays in fallback mode, so templates
+never vanish from the UI.
+
+One migration consequence worth knowing: local ids were self-generated and
+Postgres assigns its own, so a carousel draft referencing a pre-migration CTA
+template shows the "no longer in Design Studio" warning and needs re-picking
+once. This only affects templates that existed before the migration ran.
+
+**One geometry for all lanes (item 4).** `buildCarouselDesignPage` was a second,
+independent layout implementation, which is why an imported deck did not look
+like the preview:
+
+| | Importer (before) | Preview |
+|---|---|---|
+| margin | `width * 0.078` = 84px | 40 units = 72px |
+| headline | `height * 0.064` = 86px | type scale = 110px |
+| body / CTA | fixed fractions of the canvas | flowed column |
+| composition | never resolved | resolved, drives the type scale |
+
+Geometry and sizing now live in `carousel-template-registry.ts`:
+`CAROUSEL_PREVIEW_BASE_WIDTH` plus `carouselLayoutMetrics` hold the preview
+baseline, and `getCarouselSlideBodyPoints`, `getCarouselSlideTextStats`,
+`resolveCarouselComposition` and `getCarouselHeadlineSize` moved out of
+ContentStudio so both files call the same functions rather than copies.
+`getCarouselResolvedHeadlineSize` captures the cover bump the preview applied
+inline and the importer did not — the reason covers landed a step small.
+
+Verified on a real deck: preview headline 61px, imported design 110px
+(61 x 1.8), against 86px before.
+
+Note this aligns the **preview and Design Studio**. The vector PDF keeps its own
+tuned page padding (96/140) on purpose, since it was deliberately set in
+228c95e. Unifying that lane is a separate decision, not an accident to fix.
 
 ### 2026-08-20 — Template kinds and the custom CTA slide (items 6 and 5)
 
