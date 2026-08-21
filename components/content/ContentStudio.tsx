@@ -20,6 +20,8 @@ import {
   CopyPlus,
   Check,
   Copy,
+  Lock,
+  LockOpen,
   Layers3,
   Lightbulb,
   Link2,
@@ -3390,6 +3392,16 @@ function TeardownDetail({
   );
 }
 
+/**
+ * A saved reference may hold the mould as a structured object, as the flattened
+ * string, or both, depending on when it was saved. Callers should never reach
+ * for one shape directly.
+ */
+function readReferenceTemplate(framework: ExtractedFramework | undefined | null): string {
+  const flat = String(framework?.fillInTemplate || '').trim();
+  return flat || templateToText(framework?.template);
+}
+
 /** Flattens the mould for storage, so a saved reference keeps a readable copy. */
 function templateToText(template: ExtractedFramework['template']): string {
   if (!template?.slides?.length) return '';
@@ -4420,8 +4432,12 @@ export default function ContentStudio({
     layoutRecipe: string | null;
     slideArc: string[];
     framework: ExtractedFramework;
+    locked?: boolean;
   }[]>([]);
   const [dnaSaving, setDnaSaving] = useState(false);
+  // Set when a saved template was opened for editing, so Save can offer to
+  // overwrite it rather than only ever creating another copy.
+  const [editingReferenceId, setEditingReferenceId] = useState<string | null>(null);
   // The mould Stage 2 returns alongside the rebuilt deck. It is held only long
   // enough to be filed in the Vault - Transform is not where templates live.
   const [alchemyTemplate, setAlchemyTemplate] = useState('');
@@ -5771,15 +5787,33 @@ export default function ContentStudio({
     };
   }, [fetchDnaReferences]);
 
-  async function saveDnaReference() {
+  async function saveDnaReference(mode: 'auto' | 'new' = 'auto') {
     if (!alchemyFramework || dnaSaving) return;
-    if (!alchemyTemplate.trim()) {
+    const hasTemplateToSave = Boolean(alchemyTemplate.trim() || alchemyTemplateDraft?.slides?.length);
+    if (!hasTemplateToSave) {
       setCreateError('Rebuild first - the template is written during the rebuild, then filed in the Vault.');
       return;
     }
-    const suggested = alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
-    const label = window.prompt('Name this template', suggested);
-    if (!label?.trim()) return;
+
+    // Overwrite the template that was opened for editing, unless the caller
+    // explicitly asked for a copy. A locked original falls through to a copy.
+    const existing = mode === 'auto' && editingReferenceId
+      ? dnaReferences.find((item) => item.id === editingReferenceId)
+      : undefined;
+    const replacing = existing && !existing.locked ? existing : undefined;
+
+    let label = replacing?.label || '';
+    if (!replacing) {
+      const suggested = existing?.locked
+        ? `${existing.label} (copy)`
+        : alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
+      const entered = window.prompt(
+        existing?.locked ? 'The original is locked. Save this as a new template:' : 'Name this template',
+        suggested,
+      );
+      if (!entered?.trim()) return;
+      label = entered;
+    }
 
     // Transient edit-tracking keys are stripped so they never reach the database.
     const draft = alchemyTemplateDraft ?? alchemyFramework.template ?? null;
@@ -5789,8 +5823,9 @@ export default function ContentStudio({
 
     setDnaSaving(true);
     try {
-      await requestJson('/api/content/carousel-dna', 'POST', {
+      await requestJson('/api/content/carousel-dna', replacing ? 'PATCH' : 'POST', {
         key: adminKey,
+        ...(replacing ? { id: replacing.id } : {}),
         label: label.trim(),
         sourceName: alchemyDeckFile?.name || null,
         slideCount: alchemyFramework.slideCount || 0,
@@ -5831,11 +5866,43 @@ export default function ContentStudio({
     setCreateError(null);
   }
 
+  function editDnaReference(reference: (typeof dnaReferences)[number]) {
+    // Editing happens in Transform's template tab, so the saved framework is
+    // loaded back into the panel with editing already switched on.
+    setAlchemyFramework(reference.framework);
+    setAlchemyStage('extracted');
+    setAlchemyOutput('');
+    setAlchemyTemplate('');
+    setAlchemyCritique(null);
+    setCreateError(null);
+    setEditingReferenceId(reference.id);
+    setAlchemyFrameworkTab('template');
+    setAlchemyRebuildMode('advanced');
+    setAlchemyInputType('carousel');
+    navigateContent('studio');
+    setStudioMode('transform');
+  }
+
+  async function toggleDnaLock(reference: (typeof dnaReferences)[number]) {
+    try {
+      const data = await requestJson<{ reference: (typeof dnaReferences)[number] }>(
+        '/api/content/carousel-dna',
+        'PATCH',
+        { key: adminKey, id: reference.id, locked: !reference.locked },
+      );
+      setDnaReferences((current) =>
+        current.map((item) => (item.id === reference.id ? { ...item, locked: data.reference.locked } : item)),
+      );
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not change the lock.');
+    }
+  }
+
   // Filling a saved mould is a generation, not a navigation: the deck is built
   // first and only then handed to Carousel Studio, so the studio always opens on
   // a finished draft rather than an empty canvas the user has to trigger again.
   async function useTemplateInCarouselStudio(reference: (typeof dnaReferences)[number]) {
-    const template = String(reference.framework?.fillInTemplate || '').trim();
+    const template = readReferenceTemplate(reference.framework);
     if (!template) {
       setCreateError('This saved reference has no template. Rebuild the deck to produce one.');
       return;
@@ -6597,6 +6664,8 @@ export default function ContentStudio({
                 dnaReferences={dnaReferences}
                 dnaSaving={dnaSaving}
                 onSaveDnaReference={() => void saveDnaReference()}
+                onSaveDnaReferenceAsNew={() => void saveDnaReference('new')}
+                editingReference={editingReferenceId ? dnaReferences.find((item) => item.id === editingReferenceId) ?? null : null}
                 hasTemplate={Boolean(alchemyTemplate.trim()) || Boolean(alchemyFramework?.template?.slides?.length)}
                 frameworkTab={alchemyFrameworkTab}
                 onFrameworkTabChange={setAlchemyFrameworkTab}
@@ -7252,7 +7321,7 @@ export default function ContentStudio({
                     </div>
                   ) : (
                     dnaReferences.map((reference) => {
-                      const template = String(reference.framework?.fillInTemplate || '');
+                      const template = readReferenceTemplate(reference.framework);
                       const placeholders = countPlaceholders(template);
                       const isFilling = templateFillingId === reference.id;
                       return (
@@ -7261,7 +7330,10 @@ export default function ContentStudio({
                             {reference.slideCount || reference.slideArc.length} slides
                             {placeholders > 0 ? ` - ${placeholders} blanks` : ''}
                           </p>
-                          <h4 className="mt-1 font-serif text-[20px] leading-tight text-[#142334]">{reference.label}</h4>
+                          <h4 className="mt-1 flex items-center gap-2 font-serif text-[20px] leading-tight text-[#142334]">
+                            {reference.label}
+                            {reference.locked && <Lock className="h-3.5 w-3.5 shrink-0 text-[#C9AD98]" />}
+                          </h4>
                           {reference.slideArc.length > 0 && (
                             <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
                               {reference.slideArc
@@ -7286,9 +7358,30 @@ export default function ContentStudio({
                             </button>
                             <button
                               type="button"
-                              onClick={() => void deleteDnaReference(reference.id)}
+                              onClick={() => editDnaReference(reference)}
+                              disabled={!template}
+                              className="studio-card-action-button px-3 disabled:opacity-40"
+                              aria-label={`Edit ${reference.label}`}
+                              title="Edit in Transform"
+                            >
+                              <PenLine className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void toggleDnaLock(reference)}
                               className="studio-card-action-button px-3"
+                              aria-label={reference.locked ? `Unlock ${reference.label}` : `Lock ${reference.label}`}
+                              title={reference.locked ? 'Unlock' : 'Lock so it cannot be deleted or overwritten'}
+                            >
+                              {reference.locked ? <Lock className="h-4 w-4 text-[#142334]" /> : <LockOpen className="h-4 w-4" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteDnaReference(reference.id)}
+                              disabled={reference.locked}
+                              className="studio-card-action-button px-3 disabled:opacity-40"
                               aria-label={`Delete ${reference.label}`}
+                              title={reference.locked ? 'Locked - unlock to delete' : 'Delete'}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -7829,6 +7922,8 @@ function TransformFlow({
   dnaReferences,
   dnaSaving,
   onSaveDnaReference,
+  onSaveDnaReferenceAsNew,
+  editingReference,
   hasTemplate,
   frameworkTab,
   onFrameworkTabChange,
@@ -7900,6 +7995,8 @@ function TransformFlow({
   }[];
   dnaSaving: boolean;
   onSaveDnaReference: () => void;
+  onSaveDnaReferenceAsNew: () => void;
+  editingReference: { id: string; label: string; locked?: boolean } | null;
   hasTemplate: boolean;
   frameworkTab: 'mechanics' | 'template';
   onFrameworkTabChange: (tab: 'mechanics' | 'template') => void;
@@ -8367,15 +8464,35 @@ function TransformFlow({
                 and this files it in the Vault, which is where it is reused from. */}
             {framework.slideCount ? (
               hasTemplate ? (
-                <button
-                  type="button"
-                  onClick={onSaveDnaReference}
-                  disabled={dnaSaving}
-                  className="studio-secondary-button mt-4 w-fit"
-                >
-                  {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
-                  Save template to Vault
-                </button>
+                <div className="mt-4 flex flex-col gap-2">
+                  {editingReference?.locked && (
+                    <p className="flex items-center gap-1.5 text-[12px] text-[#B4571F]">
+                      <Lock className="h-3.5 w-3.5" />
+                      &ldquo;{editingReference.label}&rdquo; is locked. Saving will create a new template.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={onSaveDnaReference}
+                      disabled={dnaSaving}
+                      className="studio-secondary-button w-fit"
+                    >
+                      {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
+                      {editingReference && !editingReference.locked ? 'Save changes' : 'Save template to Vault'}
+                    </button>
+                    {editingReference && !editingReference.locked && (
+                      <button
+                        type="button"
+                        onClick={onSaveDnaReferenceAsNew}
+                        disabled={dnaSaving}
+                        className="studio-ghost-button w-fit"
+                      >
+                        Save as new
+                      </button>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <p className="mt-4 text-[12px] leading-relaxed text-[#142334]/58">
                   Rebuild this deck to write its reusable template. The template is saved to the Vault, not here.
