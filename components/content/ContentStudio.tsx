@@ -449,6 +449,7 @@ type ExtractedFramework = {
   copyDensity?: string;
   visualPattern?: string;
   whatMakesItWork?: string;
+  suggestedRegister?: string;
   // Mechanism: how the deck works, rather than what it is about.
   hookTechnique?: string;
   intraSlideLoop?: string[];
@@ -457,7 +458,7 @@ type ExtractedFramework = {
   ctaLayers?: string[];
   emotionalArc?: { start?: string; middle?: string; end?: string };
   // The reusable fill-in mould produced by Stage 1, shown in the template tab.
-  template?: { headline: string; slides: { label: string; content: string }[] } | null;
+  template?: { name?: string; bestFor?: string; headline: string; slides: { label: string; content: string }[] } | null;
   // The teaching layer. Short quotes live here and nowhere else, and this block
   // is never forwarded to Stage 2 - that omission is the firewall.
   teardown?: Partial<Record<'hook' | 'structure' | 'pacing' | 'value' | 'cta' | 'arc', { quote?: string; examples?: string[]; why?: string }>> | null;
@@ -1205,7 +1206,7 @@ const vaultSections: Array<{ value: VaultSection; label: string; description: st
   { value: 'smart', label: 'Smart Suggest', description: 'AI-suggested ideas saved for later', icon: Sparkles },
   { value: 'messy', label: 'Messy Middle', description: 'Raw thoughts and unfinished fragments', icon: PenLine },
   { value: 'insights', label: 'Insights', description: 'Published articles ready to repurpose', icon: FileText },
-  { value: 'templates', label: 'Templates', description: 'Saved carousel moulds ready to reuse', icon: Layers3 },
+  { value: 'templates', label: 'Carousel Templates', description: 'Saved carousel moulds ready to reuse', icon: Layers3 },
 ];
 
 const createPlatformOptions: CreatePlatformOption[] = [
@@ -3393,6 +3394,24 @@ function TeardownDetail({
 }
 
 /**
+ * The tags that say what a saved template is FOR, as opposed to what shape it
+ * is. Empty entries are dropped so an older reference shows fewer tags rather
+ * than blank pills.
+ */
+function getTemplateTags(reference: {
+  layoutRecipe: string | null;
+  framework?: ExtractedFramework;
+}): string[] {
+  const recipe = reference.layoutRecipe
+    ? getCarouselLayoutRecipeOption(reference.layoutRecipe as CarouselLayoutRecipe).label
+    : '';
+  const register = String(reference.framework?.suggestedRegister || '').trim();
+  const pillar = String(reference.framework?.suggestedPillar || '').split(/[-–.]/)[0].trim();
+  const density = String(reference.framework?.copyDensity || '').trim();
+  return [register, pillar, recipe, density ? `${density} copy` : ''].filter(Boolean);
+}
+
+/**
  * A saved reference may hold the mould as a structured object, as the flattened
  * string, or both, depending on when it was saved. Callers should never reach
  * for one shape directly.
@@ -3434,7 +3453,7 @@ function TemplateSlideBody({ content }: { content: string }) {
 }
 
 type TemplateSlide = { label: string; content: string; key?: string };
-type TemplateShape = { headline: string; slides: TemplateSlide[] };
+type TemplateShape = { name?: string; bestFor?: string; headline: string; slides: TemplateSlide[] };
 type TemplateDraft = TemplateShape;
 
 /** How a slide differs from the state it was extracted in. */
@@ -5804,9 +5823,12 @@ export default function ContentStudio({
 
     let label = replacing?.label || '';
     if (!replacing) {
+      // The extraction already named the mould by its shape, which is a far
+      // better default than the PDF's filename.
+      const fromExtraction = (alchemyTemplateDraft?.name || alchemyFramework.template?.name || '').trim();
       const suggested = existing?.locked
         ? `${existing.label} (copy)`
-        : alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
+        : fromExtraction || alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
       const entered = window.prompt(
         existing?.locked ? 'The original is locked. Save this as a new template:' : 'Name this template',
         suggested,
@@ -7325,7 +7347,9 @@ export default function ContentStudio({
                       const placeholders = countPlaceholders(template);
                       const isFilling = templateFillingId === reference.id;
                       return (
-                        <article key={reference.id} className="flex flex-col rounded-[12px] border border-[#E4D8CB] bg-white p-4">
+                        <article key={reference.id} className="flex flex-col rounded-[12px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+                          {/* Shape first, then purpose. The tags answer "what is
+                              this template for" without opening it. */}
                           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6B6B6B]">
                             {reference.slideCount || reference.slideArc.length} slides
                             {placeholders > 0 ? ` - ${placeholders} blanks` : ''}
@@ -7334,8 +7358,25 @@ export default function ContentStudio({
                             {reference.label}
                             {reference.locked && <Lock className="h-3.5 w-3.5 shrink-0 text-[#C9AD98]" />}
                           </h4>
+                          {getTemplateTags(reference).length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {getTemplateTags(reference).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center rounded-full border border-[#E4D8CB] bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {reference.framework?.template?.bestFor && (
+                            <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/70">
+                              {reference.framework.template.bestFor}
+                            </p>
+                          )}
                           {reference.slideArc.length > 0 && (
-                            <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
+                            <p className="mt-2 text-[11px] leading-relaxed text-[#142334]/45">
                               {reference.slideArc
                                 .map((role) => carouselSlideRoleLabels[role as CarouselSlideRole] || role)
                                 .join(' - ')}
@@ -7428,7 +7469,7 @@ export default function ContentStudio({
                     const expiryInfo = vaultExpiryById.get(item.id) || getVaultExpiryInfo(item);
                     const carouselDraft = getCarouselDraftFromBacklogItem(item);
                     return (
-                      <article key={item.id} className="flex min-h-[260px] flex-col justify-between rounded-[10px] border border-[#E4D8CB] bg-white p-4">
+                      <article key={item.id} className="flex min-h-[260px] flex-col justify-between rounded-[10px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
                       <div>
                         <div className="flex flex-wrap gap-2">
                           <Badge className={activeVaultSection === 'messy' ? 'bg-[#F3E8FF] text-[#7C3AED]' : 'bg-[#F5F3EE] text-[#6B6B6B]'}>

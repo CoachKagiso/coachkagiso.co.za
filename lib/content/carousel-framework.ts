@@ -55,9 +55,21 @@ export const TEARDOWN_LAYERS = ['hook', 'structure', 'pacing', 'value', 'cta', '
 
 /** The reusable fill-in mould, one entry per slide, brackets intact. */
 export type FrameworkTemplate = {
+  name: string;
+  bestFor: string;
   headline: string;
   slides: { label: string; content: string }[];
 };
+
+/** Kagiso's writing registers, as the Advanced selector lists them. */
+export const CAROUSEL_REGISTERS = [
+  'Tactical Teacher',
+  'Reflective Leader',
+  'Reflection Friday',
+  'Conviction Reframe',
+  'Celebration & Gratitude',
+  'The Challenger',
+] as const;
 
 export type CarouselFramework = BaseFramework & {
   template: FrameworkTemplate | null;
@@ -68,6 +80,7 @@ export type CarouselFramework = BaseFramework & {
   copyDensity: string;
   visualPattern: string;
   whatMakesItWork: string;
+  suggestedRegister: string;
   // Mechanism fields. These describe how the deck works rather than what it is
   // about, so they abstract cleanly and never carry source wording.
   hookTechnique: string;
@@ -136,7 +149,7 @@ export function normaliseTemplate(value: unknown): FrameworkTemplate | null {
     .slice(0, 20);
 
   if (slides.length === 0) return null;
-  return { headline: text(raw.headline), slides };
+  return { name: text(raw.name), bestFor: text(raw.bestFor), headline: text(raw.headline), slides };
 }
 
 function nested(value: unknown): Record<string, unknown> {
@@ -200,6 +213,12 @@ export function normaliseCarouselFramework(
     copyDensity: (CAROUSEL_COPY_DENSITIES as readonly string[]).includes(rawDensity) ? rawDensity : '',
     visualPattern: text(value.visualPattern),
     whatMakesItWork: text(value.whatMakesItWork),
+    // Matched case-insensitively against the real register list, so a stray
+    // capitalisation does not blank the field the way an invalid enum would.
+    suggestedRegister:
+      CAROUSEL_REGISTERS.find(
+        (register) => register.toLowerCase() === text(value.suggestedRegister).toLowerCase(),
+      ) || '',
     hookTechnique: text(value.hookTechnique),
     intraSlideLoop: stringList(value.intraSlideLoop, 8),
     pacing: {

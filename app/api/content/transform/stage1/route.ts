@@ -109,7 +109,10 @@ Output ONLY valid JSON with no other text:
     "cta": { "quote": "Up to 12 words from the closing slide.", "why": "Two or three sentences on why each layer is easy to say yes to, and which layer is doing the most work." },
     "arc": { "why": "Two sentences on how the reader's feeling is engineered from first slide to last." }
   },
+  "suggestedRegister": "Which of Kagiso's writing registers does this STRUCTURE suit? Choose exactly one and return only that name: Tactical Teacher / Reflective Leader / Reflection Friday / Conviction Reframe / Celebration & Gratitude / The Challenger.",
   "template": {
+    "name": "A short, specific name for this mould - 2 to 5 words describing its SHAPE, never its topic. Good: 'Numbered proof listicle'. Bad: 'Storytelling tips deck'.",
+    "bestFor": "One sentence on the kind of content this mould suits, written to help someone choose it from a list months later.",
     "headline": "One line naming what this mould is for, e.g. 'A 9-slide authority deck'.",
     "slides": [
       {
