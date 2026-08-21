@@ -499,7 +499,12 @@ export async function POST(req: NextRequest) {
     try {
       const ocrResult = await extractTextFromImage(imageBase64, imageMediaType, runtime);
 
-      if (!ocrResult.hasText || ocrResult.text.length < MIN_TEXT_LENGTH) {
+      // Lenient check: OCR prompt is strict on hasText, so a short but real post
+      // (e.g. 40 chars) was being rejected as "no readable text" while the same
+      // text pasted directly worked. Allow either hasText or sufficient length,
+      // and let structure extraction decide if the pattern is extractable.
+      const hasUsableText = ocrResult.hasText || ocrResult.text.trim().length >= MIN_TEXT_LENGTH;
+      if (!hasUsableText) {
         return NextResponse.json(
           { error: 'This image does not contain readable text content (like a post, caption, article, or slide). Structure extraction requires text to analyse. Try uploading a screenshot of a social post or paste the text directly.' },
           { status: 422 },

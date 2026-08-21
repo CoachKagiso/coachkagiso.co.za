@@ -73,12 +73,15 @@ export function modelSupportsVision(model: unknown) {
 }
 
 /**
- * Used when an image is attached but the configured model cannot read images. The cheapest
- * capable model wins, because this only ever fires for the high-volume secondary-model tools
- * and the list is ordered by intelligence rather than price.
+ * Used when an image is attached but the configured model cannot read images.
+ * For cost on high-volume tools the cheapest capable model would win, but the
+ * free cloaked model (stealth/ox-alpha) is still proving stability, so it is
+ * excluded from automatic fallback and only used when explicitly selected.
  */
 export function getFallbackVisionModel() {
-  return OPENROUTER_MODEL_OPTIONS
-    .filter((option) => option.supportsVision)
-    .sort((a, b) => (a.inputPrice + a.outputPrice) - (b.inputPrice + b.outputPrice))[0]?.value || null;
+  const visionModels = OPENROUTER_MODEL_OPTIONS.filter((option) => option.supportsVision);
+  // Exclude free cloaked endpoints from implicit fallback — they are opted-in only.
+  const stable = visionModels.filter((option) => !(option.inputPrice === 0 && option.outputPrice === 0));
+  const pool = stable.length > 0 ? stable : visionModels;
+  return pool.sort((a, b) => (a.inputPrice + a.outputPrice) - (b.inputPrice + b.outputPrice))[0]?.value || null;
 }
