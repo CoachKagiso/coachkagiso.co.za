@@ -1,4 +1,5 @@
 import {
+  CUSTOM_TEMPLATE_PREFIX,
   carouselTemplateOptions,
   getCarouselTemplateOption,
   type CarouselTemplate,
@@ -33,7 +34,7 @@ export type CarouselSkinInput = {
 };
 
 /** Custom skins carry this prefix so a stored value can never collide with a built-in. */
-export const CUSTOM_SKIN_PREFIX = 'custom:';
+export const CUSTOM_SKIN_PREFIX = CUSTOM_TEMPLATE_PREFIX;
 
 export function isCustomSkinValue(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith(CUSTOM_SKIN_PREFIX);
