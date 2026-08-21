@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Flag,
+  Lock,
   Loader2,
   Mail,
   Plus,
@@ -41,6 +42,7 @@ import {
   DEFAULT_OPENROUTER_SECONDARY_MODEL,
   normalizeOpenRouterModel,
   OPENROUTER_MODEL_OPTIONS,
+  modelRequiresReasoning,
 } from '@/lib/ai-models';
 import { SECONDARY_MODEL_TOOLS } from '@/lib/zai-pinned-tools';
 import type {
@@ -290,17 +292,23 @@ function Toggle({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-full transition ${checked ? 'bg-[#142334]' : 'bg-[#D1D5DB]'}`}
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      className={`relative h-7 w-12 rounded-full transition ${checked ? 'bg-[#142334]' : 'bg-[#D1D5DB]'} ${
+        disabled ? 'cursor-not-allowed opacity-60' : ''
+      }`}
       aria-pressed={checked}
+      aria-disabled={disabled}
       aria-label={label}
     >
       <span
@@ -423,6 +431,10 @@ export default function SettingsPageComponent({
   }, [businessGoals]);
   const primaryModel = normalizeOpenRouterModel(aiConfig.primary_model, DEFAULT_OPENROUTER_PRIMARY_MODEL);
   const secondaryModel = normalizeOpenRouterModel(aiConfig.secondary_model, DEFAULT_OPENROUTER_SECONDARY_MODEL);
+  // Whether the chosen endpoints refuse to have reasoning turned off. Read from
+  // the catalogue rather than hard-coded, so a new model only has to set the flag.
+  const primaryRequiresReasoning = modelRequiresReasoning(primaryModel);
+  const secondaryRequiresReasoning = modelRequiresReasoning(secondaryModel);
 
   async function saveSetting(key: string, value: unknown) {
     setSaveStates((current) => ({ ...current, [key]: 'saving' }));
@@ -1195,11 +1207,27 @@ export default function SettingsPageComponent({
                   <div className="grid gap-0.5">
                     <span className="text-[13px] font-semibold text-[#142334]">Reasoning / Extended Thinking</span>
                     <span className="text-[12px] text-[#6B6B6B]">ON = model thinks deeply before responding (slower, higher quality). OFF = direct responses (faster, cheaper).</span>
+                    {/* Some endpoints refuse to have reasoning turned off. The toggle
+                        is shown locked on rather than silently rewriting the saved
+                        setting, so switching back to another model restores whatever
+                        was chosen before. */}
+                    {primaryRequiresReasoning && (
+                      <span className="mt-1 flex items-center gap-1.5 text-[12px] font-semibold text-[#8C7466]">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        {primaryModel} always reasons. This cannot be turned off.
+                      </span>
+                    )}
+                    {!primaryRequiresReasoning && secondaryRequiresReasoning && (
+                      <span className="mt-1 text-[12px] text-[#8C7466]">
+                        {secondaryModel} always reasons, whatever this is set to.
+                      </span>
+                    )}
                   </div>
                   <Toggle
-                    checked={aiConfig.reasoning_enabled ?? false}
+                    checked={primaryRequiresReasoning ? true : aiConfig.reasoning_enabled ?? false}
                     onChange={(checked) => setAiConfig({ ...aiConfig, reasoning_enabled: checked })}
                     label="Toggle reasoning / extended thinking"
+                    disabled={primaryRequiresReasoning}
                   />
                 </div>
                 <p className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
