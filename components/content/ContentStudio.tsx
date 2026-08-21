@@ -15,6 +15,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  Check,
   Copy,
   Layers3,
   Lightbulb,
@@ -3456,17 +3457,19 @@ function TransformTemplateTab({ template }: { template: { headline: string; slid
 
       <div className="mt-2 flex flex-col gap-2">
         {template.slides.map((slide, index) => (
-          <div key={`${slide.label}-${index}`} className="overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-white">
+          <div key={`${slide.label}-${index}`} className="group overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-white">
             <div className="flex items-center justify-between gap-2 border-b border-[#E4D8CB] bg-[#F5F3EE] px-3 py-1.5">
               <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">{slide.label}</span>
+              {/* Hover-only and icon-only: nine labelled buttons made the mould
+                  harder to read than the template it was showing. Revealed on
+                  keyboard focus too, so it stays reachable without a mouse. */}
               <button
                 type="button"
                 onClick={() => copy(String(index), `${slide.label}\n${slide.content}`)}
                 aria-label={`Copy ${slide.label}`}
-                className="flex items-center gap-1 rounded-[5px] border border-[#E4D8CB] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:border-[#142334] hover:text-[#142334]"
+                className="rounded-[5px] border border-transparent p-1 text-[#6B6B6B] opacity-0 transition hover:border-[#E4D8CB] hover:bg-white hover:text-[#142334] focus-visible:opacity-100 group-hover:opacity-100"
               >
-                <Copy className="h-3 w-3" />
-                {copied === String(index) ? 'Copied' : 'Copy'}
+                {copied === String(index) ? <Check className="h-3.5 w-3.5 text-[#142334]" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
             <TemplateSlideBody content={slide.content} />
