@@ -15,6 +15,9 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  ArrowUp,
+  ArrowDown,
+  CopyPlus,
   Check,
   Copy,
   Layers3,
@@ -3418,13 +3421,62 @@ function TemplateSlideBody({ content }: { content: string }) {
   );
 }
 
-function TransformTemplateTab({ template }: { template: { headline: string; slides: { label: string; content: string }[] } | null }) {
+type TemplateSlide = { label: string; content: string };
+type TemplateShape = { headline: string; slides: TemplateSlide[] };
+
+/**
+ * The reusable mould. Read-only by default; Advanced turns on editing so the
+ * slides can be reworded, reordered, duplicated or dropped before the template
+ * is filed in the Vault.
+ *
+ * Every control sits on hover next to copy, so a template being read looks like
+ * a template rather than a toolbar.
+ */
+function TransformTemplateTab({
+  template,
+  editable,
+  onChange,
+}: {
+  template: TemplateShape | null;
+  editable: boolean;
+  onChange: (next: TemplateShape) => void;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
 
   function copy(id: string, value: string) {
     void navigator.clipboard?.writeText(value);
     setCopied(id);
     window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1200);
+  }
+
+  function commit(slides: TemplateSlide[]) {
+    onChange({ headline: template?.headline || '', slides });
+  }
+
+  function updateSlide(index: number, content: string) {
+    if (!template) return;
+    commit(template.slides.map((slide, i) => (i === index ? { ...slide, content } : slide)));
+  }
+
+  function duplicateSlide(index: number) {
+    if (!template) return;
+    const next = [...template.slides];
+    next.splice(index + 1, 0, { ...next[index] });
+    commit(next);
+  }
+
+  function moveSlide(index: number, direction: -1 | 1) {
+    if (!template) return;
+    const target = index + direction;
+    if (target < 0 || target >= template.slides.length) return;
+    const next = [...template.slides];
+    [next[index], next[target]] = [next[target], next[index]];
+    commit(next);
+  }
+
+  function deleteSlide(index: number) {
+    if (!template) return;
+    commit(template.slides.filter((_, i) => i !== index));
   }
 
   if (!template || template.slides.length === 0) {
@@ -3440,11 +3492,17 @@ function TransformTemplateTab({ template }: { template: { headline: string; slid
   }
 
   const allSlides = template.slides.map((slide) => `${slide.label}\n${slide.content}`).join('\n\n');
+  const iconButton =
+    'rounded-[5px] border border-transparent p-1 text-[#6B6B6B] opacity-0 transition hover:border-[#E4D8CB] hover:bg-white hover:text-[#142334] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-0';
 
   return (
     <div className="mt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-[#6B6B6B]">{template.headline || 'A reusable mould. Fill the brackets with your own topic.'}</p>
+        <p className="text-[11px] text-[#6B6B6B]">
+          {editable
+            ? 'Editing on. Hover a slide to reorder, duplicate or remove it.'
+            : template.headline || 'A reusable mould. Fill the brackets with your own topic.'}
+        </p>
         <button
           type="button"
           onClick={() => copy('all', allSlides)}
@@ -3460,19 +3518,67 @@ function TransformTemplateTab({ template }: { template: { headline: string; slid
           <div key={`${slide.label}-${index}`} className="group overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-white">
             <div className="flex items-center justify-between gap-2 border-b border-[#E4D8CB] bg-[#F5F3EE] px-3 py-1.5">
               <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">{slide.label}</span>
-              {/* Hover-only and icon-only: nine labelled buttons made the mould
-                  harder to read than the template it was showing. Revealed on
-                  keyboard focus too, so it stays reachable without a mouse. */}
-              <button
-                type="button"
-                onClick={() => copy(String(index), `${slide.label}\n${slide.content}`)}
-                aria-label={`Copy ${slide.label}`}
-                className="rounded-[5px] border border-transparent p-1 text-[#6B6B6B] opacity-0 transition hover:border-[#E4D8CB] hover:bg-white hover:text-[#142334] focus-visible:opacity-100 group-hover:opacity-100"
-              >
-                {copied === String(index) ? <Check className="h-3.5 w-3.5 text-[#142334]" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => copy(String(index), `${slide.label}\n${slide.content}`)}
+                  aria-label={`Copy ${slide.label}`}
+                  className={iconButton}
+                >
+                  {copied === String(index) ? <Check className="h-3.5 w-3.5 text-[#142334]" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                {editable && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => moveSlide(index, -1)}
+                      disabled={index === 0}
+                      aria-label={`Move ${slide.label} up`}
+                      className={iconButton}
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveSlide(index, 1)}
+                      disabled={index === template.slides.length - 1}
+                      aria-label={`Move ${slide.label} down`}
+                      className={iconButton}
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateSlide(index)}
+                      aria-label={`Duplicate ${slide.label}`}
+                      className={iconButton}
+                    >
+                      <CopyPlus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteSlide(index)}
+                      aria-label={`Delete ${slide.label}`}
+                      className={`${iconButton} hover:!text-[#B4571F]`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <TemplateSlideBody content={slide.content} />
+            {editable ? (
+              <textarea
+                value={slide.content}
+                onChange={(event) => updateSlide(index, event.target.value)}
+                onWheel={trapWheel}
+                rows={Math.min(14, Math.max(3, slide.content.split('\n').length + 1))}
+                aria-label={`${slide.label} content`}
+                className="w-full resize-y border-0 bg-white p-3 font-mono text-[11.5px] leading-[1.65] text-[#142334] focus:outline-none focus:ring-1 focus:ring-inset focus:ring-[#C9AD98]"
+              />
+            ) : (
+              <TemplateSlideBody content={slide.content} />
+            )}
           </div>
         ))}
       </div>
@@ -4264,6 +4370,11 @@ export default function ContentStudio({
   const [templateFillingId, setTemplateFillingId] = useState<string | null>(null);
   const [alchemyDeckWarning, setAlchemyDeckWarning] = useState('');
   const [alchemyFrameworkTab, setAlchemyFrameworkTab] = useState<'mechanics' | 'template'>('mechanics');
+  // The mould as it currently stands, including any edits. Seeded from the
+  // extraction; what gets filed in the Vault is this, not the original.
+  const [alchemyTemplateDraft, setAlchemyTemplateDraft] = useState<
+    { headline: string; slides: { label: string; content: string }[] } | null
+  >(null);
 
   const vaultTotals = useMemo(
     () => ({
@@ -5561,6 +5672,10 @@ export default function ContentStudio({
   }
 
 
+  useEffect(() => {
+    setAlchemyTemplateDraft(alchemyFramework?.template ?? null);
+  }, [alchemyFramework]);
+
   const fetchDnaReferences = useCallback(async () => {
     try {
       const response = await fetch(`/api/content/carousel-dna?key=${encodeURIComponent(adminKey)}`);
@@ -5609,7 +5724,11 @@ export default function ContentStudio({
         slideArc: alchemyFramework.slideArc || [],
         // The mould rides inside the framework jsonb, so saving a template needs
         // no migration and keeps the typed columns doing their job.
-        framework: { ...alchemyFramework, fillInTemplate: alchemyTemplate.trim() || templateToText(alchemyFramework.template) },
+        framework: {
+          ...alchemyFramework,
+          template: alchemyTemplateDraft ?? alchemyFramework.template ?? null,
+          fillInTemplate: alchemyTemplate.trim() || templateToText(alchemyTemplateDraft ?? alchemyFramework.template),
+        },
       });
       await loadDnaReferences();
       setActiveVaultSection('templates');
@@ -6399,6 +6518,8 @@ export default function ContentStudio({
                 hasTemplate={Boolean(alchemyTemplate.trim()) || Boolean(alchemyFramework?.template?.slides?.length)}
                 frameworkTab={alchemyFrameworkTab}
                 onFrameworkTabChange={setAlchemyFrameworkTab}
+                templateDraft={alchemyTemplateDraft}
+                onTemplateDraftChange={setAlchemyTemplateDraft}
                 onUseDnaReference={useDnaReference}
                 onDeleteDnaReference={(id) => void deleteDnaReference(id)}
                 deckPageCount={alchemyDeckPages.length}
@@ -7628,6 +7749,8 @@ function TransformFlow({
   hasTemplate,
   frameworkTab,
   onFrameworkTabChange,
+  templateDraft,
+  onTemplateDraftChange,
   onUseDnaReference,
   onDeleteDnaReference,
   deckPageCount,
@@ -7696,6 +7819,8 @@ function TransformFlow({
   hasTemplate: boolean;
   frameworkTab: 'mechanics' | 'template';
   onFrameworkTabChange: (tab: 'mechanics' | 'template') => void;
+  templateDraft: { headline: string; slides: { label: string; content: string }[] } | null;
+  onTemplateDraftChange: (next: { headline: string; slides: { label: string; content: string }[] }) => void;
   onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
   onDeleteDnaReference: (id: string) => void;
   // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
@@ -8046,7 +8171,11 @@ function TransformFlow({
             </div>
 
             {frameworkTab === 'template' ? (
-              <TransformTemplateTab template={framework.template ?? null} />
+              <TransformTemplateTab
+                template={templateDraft ?? framework.template ?? null}
+                editable={rebuildMode === 'advanced'}
+                onChange={onTemplateDraftChange}
+              />
             ) : framework.slideCount ? (
               <>
                 <dl className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] sm:grid-cols-3">
