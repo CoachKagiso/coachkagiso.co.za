@@ -21,15 +21,33 @@ test('both defaults name a model the picker actually offers', () => {
 });
 
 test('the picker stays ordered by intelligence, strongest first', () => {
-  const scores = OPENROUTER_MODEL_OPTIONS.map((option) => option.intelligence);
+  // Unscored models sit at the end rather than breaking the order, so only the
+  // scored ones are checked for descent.
+  const scores = OPENROUTER_MODEL_OPTIONS
+    .map((option) => option.intelligence)
+    .filter((score) => typeof score === 'number');
   assert.deepEqual(scores, [...scores].sort((a, b) => b - a));
+
+  const firstUnscored = OPENROUTER_MODEL_OPTIONS.findIndex((option) => typeof option.intelligence !== 'number');
+  if (firstUnscored !== -1) {
+    const after = OPENROUTER_MODEL_OPTIONS.slice(firstUnscored);
+    assert.ok(
+      after.every((option) => typeof option.intelligence !== 'number'),
+      'a scored model must not sit below an unscored one',
+    );
+  }
 });
 
 test('every listed model carries the fields the picker renders', () => {
   for (const option of OPENROUTER_MODEL_OPTIONS) {
     assert.ok(option.value.trim(), 'a model needs a value');
     assert.equal(option.label, option.value, `${option.value} label should match its value`);
-    assert.equal(typeof option.intelligence, 'number', `${option.value} needs an intelligence score`);
+    // intelligence is optional by design - cloaked and preview endpoints publish
+    // no score, and the picker hides the badge when it is absent. It must still
+    // be a number when present.
+    if (option.intelligence !== undefined) {
+      assert.equal(typeof option.intelligence, 'number', `${option.value} intelligence must be a number when set`);
+    }
     assert.equal(typeof option.inputPrice, 'number', `${option.value} needs an input price`);
     assert.equal(typeof option.outputPrice, 'number', `${option.value} needs an output price`);
   }
