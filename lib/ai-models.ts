@@ -1,7 +1,11 @@
 export type AiModelOption = {
   value: string;
   label: string;
-  intelligence: number;
+  /**
+   * Provider intelligence score. Optional because some endpoints publish no
+   * score; the dropdown hides the badge when it is absent.
+   */
+  intelligence?: number;
   inputPrice: number;
   outputPrice: number;
   /**
@@ -35,6 +39,11 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 51, inputPrice: 0.49, outputPrice: 1.54 },
   { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3', intelligence: 44, inputPrice: 0.22, outputPrice: 1.2, supportsVision: true },
   { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro', intelligence: 42, inputPrice: 0.44, outputPrice: 0.87 },
+  // Free while cloaked, so it sorts first on price. requiresReasoning is not
+  // optional here: the endpoint rejects `reasoning: { effort: 'none' }` with a
+  // 400 rather than ignoring it, which made every generation fail while the
+  // Settings reasoning toggle was off.
+  { value: 'stealth/ox-alpha', label: 'stealth/ox-alpha', inputPrice: 0, outputPrice: 0, requiresReasoning: true, supportsVision: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
