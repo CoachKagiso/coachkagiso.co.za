@@ -8106,6 +8106,15 @@ function TransformFlow({
   // and polish keep working on the same value.
   const outputSlides = splitSlidePreamble(outputBody).slides;
   const hasImage = Boolean(imagePreview);
+  // The analysis folds away once a rebuild exists, so the finished draft is not
+  // buried under it. Reopening is one click, and starting a fresh extraction
+  // brings it back.
+  const [frameworkCollapsed, setFrameworkCollapsed] = useState(false);
+  const hasOutput = Boolean(output.trim());
+  useEffect(() => {
+    setFrameworkCollapsed(hasOutput);
+  }, [hasOutput]);
+
   const isLoading = stage === 'extracting' || stage === 'rebuilding';
   const transformationNote = output ? (
     <>
@@ -8361,10 +8370,25 @@ function TransformFlow({
         {framework && (
           <div className="mt-6 rounded-[12px] border border-[#E4D8CB] bg-[#F5F3EE] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Extracted structure</p>
-                <h4 className="mt-1 font-serif text-[24px] leading-tight text-[#142334]">Only the pattern survived</h4>
-              </div>
+              {/* Collapses itself once a rebuild exists. The analysis is long, and
+                  after the rebuild the thing worth reading is below it - but it
+                  stays one click away rather than being thrown out. */}
+              <button
+                type="button"
+                onClick={() => setFrameworkCollapsed((current) => !current)}
+                aria-expanded={!frameworkCollapsed}
+                className="flex items-start gap-2 text-left"
+              >
+                <ChevronDown
+                  className={`mt-4 h-4 w-4 shrink-0 text-[#8C7466] transition-transform ${frameworkCollapsed ? '-rotate-90' : ''}`}
+                />
+                <span>
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Extracted structure</span>
+                  <span className="mt-1 block font-serif text-[24px] leading-tight text-[#142334]">
+                    {frameworkCollapsed ? 'Show the pattern' : 'Only the pattern survived'}
+                  </span>
+                </span>
+              </button>
               {/* Describes where THIS framework came from, not whichever input
                   tile happens to be selected now. A loaded reference kept showing
                   "Text" over a nine-slide deck. */}
@@ -8372,178 +8396,180 @@ function TransformFlow({
                 {framework.slideCount ? 'Carousel PDF' : selectedInput.label}
               </Badge>
             </div>
-            {/* Both tabs render after any successful extraction. The spec strip
-                and arc are dropped when the source had no deck, but the tabs
-                themselves are never hidden - a missing template shows an empty
-                state rather than vanishing. */}
-            <div className="mt-4 flex gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
-              {([
-                { id: 'mechanics' as const, label: 'Mechanics teardown' },
-                { id: 'template' as const, label: 'Reusable template' },
-              ]).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={frameworkTab === tab.id}
-                  onClick={() => onFrameworkTabChange(tab.id)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-[6px] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
-                    frameworkTab === tab.id ? 'bg-[#142334] text-white' : 'text-[#6B6B6B] hover:text-[#142334]'
-                  }`}
-                >
-                  {tab.id === 'mechanics' ? <Layers3 className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {frameworkTab === 'template' ? (
-              <TransformTemplateTab
-                template={templateDraft ?? framework.template ?? null}
-                editable={rebuildMode === 'advanced'}
-                onChange={onTemplateDraftChange}
-                baseline={templateBaseline}
-              />
-            ) : framework.slideCount ? (
-              <>
-                <dl className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] sm:grid-cols-3">
-                  {getDeckSpecEntries(framework).map((entry) => (
-                    <div
-                      key={entry.label}
-                      className={`bg-white px-3 py-2.5 ${entry.wide ? 'sm:col-span-3' : ''}`}
-                    >
-                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{entry.label}</dt>
-                      <dd className="mt-1 text-[13px] font-medium leading-relaxed text-[#142334]">{entry.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-
-                {framework.slideArc && framework.slideArc.length > 0 && (
-                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">Slide arc</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      {framework.slideArc.map((role, index) => {
-                        const label = carouselSlideRoleLabels[role as CarouselSlideRole];
-                        return (
-                          <span
-                            key={`${role}-${index}`}
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                              label
-                                ? 'border border-[#E4D8CB] bg-[#F5F3EE] text-[#142334]'
-                                : 'border border-dashed border-[#B4571F] bg-white text-[#B4571F]'
-                            }`}
-                          >
-                            <span className="font-medium text-[#A09086]">{index + 1}</span>
-                            {label || `${role} !`}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-3 flex flex-col gap-2">
-                  {getMechanicsCards(framework).map((card, index) => (
-                    <article key={card.title} className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
-                      <h5 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
-                        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[#F5F3EE] text-[10px] font-semibold text-[#142334]">
-                          {index + 1}
-                        </span>
-                        {card.title}
-                      </h5>
-                      {card.lead && (
-                        <p className="mt-1.5 font-serif text-[17px] leading-snug text-[#142334]">{card.lead}</p>
-                      )}
-                      {card.body && (
-                        <p className="mt-1.5 text-[13px] leading-relaxed text-[#142334]/80">{card.body}</p>
-                      )}
-                      {card.beats && card.beats.length > 0 && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          {card.beats.map((beat, beatIndex) => (
-                            <span key={`${beat}-${beatIndex}`} className="rounded-[6px] border border-[#E4D8CB] bg-[#F5F3EE] px-2.5 py-1 text-[11px] font-semibold text-[#142334]">
-                              {beat}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {card.rows && card.rows.length > 0 && (
-                        <div className="mt-2 grid gap-1.5">
-                          {card.rows.map((row) => (
-                            <div key={row.label} className="grid gap-2 text-[12px] sm:grid-cols-[78px_1fr]">
-                              <span className="pt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">{row.label}</span>
-                              <span className="leading-relaxed text-[#142334]">{row.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {/* The teaching layer. Quotes are shown here and never sent
-                          to Stage 2, so the panel can teach from the source's own
-                          lines without any of them reaching the rebuild. */}
-                      {(() => {
-                        const layer = card.key ? framework.teardown?.[card.key] : undefined;
-                        return layer ? <TeardownDetail layer={layer} /> : null;
-                      })()}
-                    </article>
-                  ))}
-                </div>
-
-                {framework.whatMakesItWork && (
-                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] border-l-[3px] border-l-[#142334] bg-white px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">What makes it work</p>
-                    <p className="mt-1 font-serif text-[15px] leading-snug text-[#142334]">{framework.whatMakesItWork}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
-                {getFrameworkRows(framework).map((row) => (
-                  <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
-                    <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
-                    <span className="leading-relaxed text-[#142334]">{row.value}</span>
-                  </div>
+            {!frameworkCollapsed && (<>
+              {/* Both tabs render after any successful extraction. The spec strip
+                  and arc are dropped when the source had no deck, but the tabs
+                  themselves are never hidden - a missing template shows an empty
+                  state rather than vanishing. */}
+              <div className="mt-4 flex gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
+                {([
+                  { id: 'mechanics' as const, label: 'Mechanics teardown' },
+                  { id: 'template' as const, label: 'Reusable template' },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={frameworkTab === tab.id}
+                    onClick={() => onFrameworkTabChange(tab.id)}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-[6px] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                      frameworkTab === tab.id ? 'bg-[#142334] text-white' : 'text-[#6B6B6B] hover:text-[#142334]'
+                    }`}
+                  >
+                    {tab.id === 'mechanics' ? <Layers3 className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            )}
 
-            {/* Templates are not kept in Transform. Rebuilding writes the mould,
-                and this files it in the Vault, which is where it is reused from. */}
-            {framework.slideCount ? (
-              hasTemplate ? (
-                <div className="mt-4 flex flex-col gap-2">
-                  {editingReference?.locked && (
-                    <p className="flex items-center gap-1.5 text-[12px] text-[#B4571F]">
-                      <Lock className="h-3.5 w-3.5" />
-                      &ldquo;{editingReference.label}&rdquo; is locked. Saving will create a new template.
-                    </p>
+              {frameworkTab === 'template' ? (
+                <TransformTemplateTab
+                  template={templateDraft ?? framework.template ?? null}
+                  editable={rebuildMode === 'advanced'}
+                  onChange={onTemplateDraftChange}
+                  baseline={templateBaseline}
+                />
+              ) : framework.slideCount ? (
+                <>
+                  <dl className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] sm:grid-cols-3">
+                    {getDeckSpecEntries(framework).map((entry) => (
+                      <div
+                        key={entry.label}
+                        className={`bg-white px-3 py-2.5 ${entry.wide ? 'sm:col-span-3' : ''}`}
+                      >
+                        <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{entry.label}</dt>
+                        <dd className="mt-1 text-[13px] font-medium leading-relaxed text-[#142334]">{entry.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  {framework.slideArc && framework.slideArc.length > 0 && (
+                    <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">Slide arc</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {framework.slideArc.map((role, index) => {
+                          const label = carouselSlideRoleLabels[role as CarouselSlideRole];
+                          return (
+                            <span
+                              key={`${role}-${index}`}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                label
+                                  ? 'border border-[#E4D8CB] bg-[#F5F3EE] text-[#142334]'
+                                  : 'border border-dashed border-[#B4571F] bg-white text-[#B4571F]'
+                              }`}
+                            >
+                              <span className="font-medium text-[#A09086]">{index + 1}</span>
+                              {label || `${role} !`}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={onSaveDnaReference}
-                      disabled={dnaSaving}
-                      className="studio-secondary-button w-fit"
-                    >
-                      {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
-                      {editingReference && !editingReference.locked ? 'Save changes' : 'Save template to Vault'}
-                    </button>
-                    {editingReference && !editingReference.locked && (
+
+                  <div className="mt-3 flex flex-col gap-2">
+                    {getMechanicsCards(framework).map((card, index) => (
+                      <article key={card.title} className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
+                        <h5 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                          <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[#F5F3EE] text-[10px] font-semibold text-[#142334]">
+                            {index + 1}
+                          </span>
+                          {card.title}
+                        </h5>
+                        {card.lead && (
+                          <p className="mt-1.5 font-serif text-[17px] leading-snug text-[#142334]">{card.lead}</p>
+                        )}
+                        {card.body && (
+                          <p className="mt-1.5 text-[13px] leading-relaxed text-[#142334]/80">{card.body}</p>
+                        )}
+                        {card.beats && card.beats.length > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {card.beats.map((beat, beatIndex) => (
+                              <span key={`${beat}-${beatIndex}`} className="rounded-[6px] border border-[#E4D8CB] bg-[#F5F3EE] px-2.5 py-1 text-[11px] font-semibold text-[#142334]">
+                                {beat}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {card.rows && card.rows.length > 0 && (
+                          <div className="mt-2 grid gap-1.5">
+                            {card.rows.map((row) => (
+                              <div key={row.label} className="grid gap-2 text-[12px] sm:grid-cols-[78px_1fr]">
+                                <span className="pt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">{row.label}</span>
+                                <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* The teaching layer. Quotes are shown here and never sent
+                            to Stage 2, so the panel can teach from the source's own
+                            lines without any of them reaching the rebuild. */}
+                        {(() => {
+                          const layer = card.key ? framework.teardown?.[card.key] : undefined;
+                          return layer ? <TeardownDetail layer={layer} /> : null;
+                        })()}
+                      </article>
+                    ))}
+                  </div>
+
+                  {framework.whatMakesItWork && (
+                    <div className="mt-3 rounded-[8px] border border-[#E4D8CB] border-l-[3px] border-l-[#142334] bg-white px-4 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">What makes it work</p>
+                      <p className="mt-1 font-serif text-[15px] leading-snug text-[#142334]">{framework.whatMakesItWork}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
+                  {getFrameworkRows(framework).map((row) => (
+                    <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
+                      <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
+                      <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Templates are not kept in Transform. Rebuilding writes the mould,
+                  and this files it in the Vault, which is where it is reused from. */}
+              {framework.slideCount ? (
+                hasTemplate ? (
+                  <div className="mt-4 flex flex-col gap-2">
+                    {editingReference?.locked && (
+                      <p className="flex items-center gap-1.5 text-[12px] text-[#B4571F]">
+                        <Lock className="h-3.5 w-3.5" />
+                        &ldquo;{editingReference.label}&rdquo; is locked. Saving will create a new template.
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={onSaveDnaReferenceAsNew}
+                        onClick={onSaveDnaReference}
                         disabled={dnaSaving}
-                        className="studio-ghost-button w-fit"
+                        className="studio-secondary-button w-fit"
                       >
-                        Save as new
+                        {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
+                        {editingReference && !editingReference.locked ? 'Save changes' : 'Save template to Vault'}
                       </button>
-                    )}
+                      {editingReference && !editingReference.locked && (
+                        <button
+                          type="button"
+                          onClick={onSaveDnaReferenceAsNew}
+                          disabled={dnaSaving}
+                          className="studio-ghost-button w-fit"
+                        >
+                          Save as new
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <p className="mt-4 text-[12px] leading-relaxed text-[#142334]/58">
-                  Rebuild this deck to write its reusable template. The template is saved to the Vault, not here.
-                </p>
-              )
-            ) : null}
+                ) : (
+                  <p className="mt-4 text-[12px] leading-relaxed text-[#142334]/58">
+                    Rebuild this deck to write its reusable template. The template is saved to the Vault, not here.
+                  </p>
+                )
+              ) : null}
+            </>)}
 
             <div className="mt-5 flex items-center gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
               <button
@@ -8638,6 +8664,7 @@ function TransformFlow({
         {output && (
           <div className="mt-5">
             <OutputWithActions
+              surfaceClassName="rounded-[8px] border border-[#E4D8CB] bg-[#E8E3DF] p-5"
               title="Transform rebuild"
               value={output}
               bodyOverride={
