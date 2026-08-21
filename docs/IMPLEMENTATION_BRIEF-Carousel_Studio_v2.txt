@@ -1,0 +1,111 @@
+# IMPLEMENTATION BRIEF — Carousel Studio v2: Export Quality Fix + Template Redesign
+
+You are working in the coach-kagiso monorepo (Next.js 16, React 19, Tailwind 4, Supabase, Vercel). Reference doc: KNOWLEDGE_TRANSFER.md in repo root. This brief covers TWO workstreams: (A) fixing soft/low-res carousel exports, and (B) redesigning all carousel templates plus adding one new template. Every decision below is LOCKED by the owner. Do not re-litigate them. Where something is genuinely ambiguous, flag it in a comment and choose the conservative option; never invent brand values.
+
+## 0. Rules
+- Brand spec (Section 1) is the canonical source for colour and type. Where code disagrees, code changes.
+- Do NOT touch: payments, assistant, email/backlog, diagnostic, DB schema/migrations, dashboard chrome colours (#EDEBE8/#F5F3EE stay for now — separate cleanup later).
+- Do NOT refactor ContentStudio.tsx / DesignStudioPanel.tsx beyond the named functions. Targeted edits only.
+- Keep TypeScript strict-clean. Run the test suite after: node --experimental-strip-types --test tests/*.test.mjs
+- Existing localStorage DesignTemplateRecord shapes must keep loading (no breaking shape changes).
+- Commit in logical units (export fix / registry data / renderer / tokens), conventional messages.
+
+## 1. Brand spec (canonical)
+Palette: Dark Gunmetal #142334 (headings, body, primary CTA, dark sections); Rodeo Dust #C9AD98 (accents, eyebrows, secondary surfaces — NEVER primary CTA; surfaces using it MUST take Dark Gunmetal text, white fails WCAG AA); Chai #E4D8CB (soft backgrounds, card panels); Latte #A09086 (secondary text, borders); White #FFFFFF; sparing extras Froth #E8E3DF, Creme #CDC6C3.
+Type: Inter (body/UI, 300–600); Playfair Display (headlines, 500–700); Northwell ONLY for the About-page signature line — never in carousels, headlines, buttons, eyebrows.
+No italic body copy. Card radius 16px. Pill 9999px.
+Primary CTA: solid Dark Gunmetal, white text, Inter 600. Rodeo Dust surfaces: Dark Gunmetal text.
+
+## 2. CHANGE A — Export pipeline (components/content/ContentStudio.tsx)
+
+A1. captureCarouselSlideCanvas (~line 10005). The current code supersamples 2x then ALWAYS downscales to the platform target (1080×1350) with imageSmoothingEnabled=true; the PDF then embeds that 1x raster. This is the reported softness bug. REPLACE the downscale block with: keep/normalise to 2x and never downscale:
+
+    const targetW = dimensions.width * 2;   // 2160
+    const targetH = dimensions.height * 2;  // 2700
+    if (captured.width !== targetW || captured.height !== targetH) {
+      const out = document.createElement('canvas');
+      out.width = targetW;
+      out.height = targetH;
+      const ctx = out.getContext('2d')!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(captured, 0, 0, targetW, targetH);
+      captured = out;
+    }
+    return captured; // always 2x output
+
+A2. exportCarousel (~line 10664). PNG downloads now emit 2160×2700 (square: 2160×2160). Keep getCarouselExportBaseName naming. For PDF: jspdf page size stays at platform dims (1080×1350 px, hotfixes ['px_scaling']); verify addImage places the FULL 2x canvas at page size (0,0,dimensions.width,dimensions.height). If it currently converts to a 1x dataURL first, change it to embed the 2x canvas.
+
+A3. getCarouselExportFontFamilies (~line 9976). Stop reading --font-sans/--font-serif for export (they resolve to off-brand Raleway/Noto Serif). Hardcode brand stacks: 'Inter, "Helvetica Neue", Arial, sans-serif' and '"Playfair Display", Georgia, serif'.
+
+A4. waitForCarouselExportFonts (~line 9984). Replace the 40-font-request cap with explicit loads, then ready:
+
+    await Promise.all([
+      '300 1em Inter', '400 1em Inter', '500 1em Inter', '600 1em Inter',
+      '500 1em "Playfair Display"', '600 1em "Playfair Display"', '700 1em "Playfair Display"',
+    ].map((f) => document.fonts.load(f)));
+    await document.fonts.ready;
+
+A5. The onclone injected styles that force font-family on [data-carousel-export-slide] and .font-serif/h1/h2/h3 must use the brand stacks from A3, not generic sans/serif keywords or CSS-var values.
+
+## 3. CHANGE B — Aspect ratios (lib/content/carousel-template-registry.ts ~line 636 + UI strings)
+- linkedin_document: exportWidth 1080, exportHeight 1350 (was 1398). Update its label/size string to "1080 x 1350".
+- portrait_4_5 and square_1_1 unchanged. auto resolution logic unchanged.
+- Find and update ALL UI copy mentioning 1398 (CarouselStudioPanel/ContentStudio frame cards: "Auto 1080 x 1398", "LinkedIn PDF 1080 x 1398" and their descriptions). Auto description: "Use LinkedIn document portrait for LinkedIn and 4:5 portrait for Instagram/Facebook."
+
+## 4. CHANGE C — Palette remap (registry: CarouselTemplatePalette + designDirection.tokens per template)
+Exact values (background / foreground / muted / accent / panel / border / chipBackground / chipText):
+- editorial_authority: #E8E3DF / #142334 / #A09086 / #C9AD98 / #FFFFFF / #CDC6C3 / #142334 / #FFFFFF. Quote/panel surfaces currently a cool grey (~#F5F6F8) become #FFFFFF.
+- editorial_career_notes: #E4D8CB / #142334 / #A09086 / #C9AD98 / #FFFFFF / #A09086 / #142334 / #FFFFFF. Delete the rust/terracotta accent entirely; "hand-drawn movement cues" become Rodeo Dust vector arrows/underlines.
+- warm_coaching: #E4D8CB / #142334 / #A09086 / #C9AD98 / #FFFFFF / #CDC6C3 / #C9AD98 / #142334.
+- soft_diagnostic_cards: #E8E3DF / #142334 / #A09086 / #A09086 / #FFFFFF / #A09086 / #E4D8CB / #142334. Delete the sage green entirely.
+- bold_diagnostic: #142334 / #FFFFFF / #CDC6C3 / #C9AD98 / #142334 / #C9AD98 / #C9AD98 / #142334.
+If the studio skin-preview cards hardcode swatch colours, update them to these tokens.
+
+## 5. CHANGE D — New template, recipe, roles
+- Add CarouselTemplate 'signature_narrative'. Palette: #E8E3DF / #142334 / #A09086 / #C9AD98 / #FFFFFF / #CDC6C3 / #142334 / #FFFFFF. designDirection: the owner's Canva-origin story system (see Section 9). Studio card copy: "Signature Narrative — Launch & story decks. Progress strip, handle, swipe cue, personal story beats, event CTA."
+- Add CarouselLayoutRecipe 'narrative_launch': stages hook -> sign (repeat 2-4) -> turn -> cta. Studio card copy: "Hook -> Signs -> Personal turn -> Event CTA. A story-driven launch sequence."
+- Add CarouselSlideRole 'sign' and 'turn'. Map in carouselCompositionsByRole using EXISTING compositions only: sign -> [note_card, example_note, quote_panel]; turn -> [soft_reflection, example_note]. Do not invent new compositions.
+- Wire both new options into the CarouselStudioPanel skin/arc card grids following the existing card pattern.
+
+## 6. CHANGE E — Eyebrow system (kills the internal-label leak)
+Slides currently render the internal role/composition names as the eyebrow (e.g. "REFRAME / QUOTE PANEL", "COVER", "PROOF CUE"). Add to the registry: stageEyebrows: Record<CarouselLayoutRecipe, Partial<Record<CarouselSlideRole, string>>> with:
+- authority_framework: reframe 'THE REFRAME', framework 'THE FRAMEWORK', step 'THE PRACTICE', proof 'THE COST', cta 'YOUR MOVE'
+- guided_shift: mirror 'SOUND FAMILIAR?', diagnosis 'NAME IT', reframe 'THE SHIFT', step 'START SMALL', reflection 'REFLECT', cta 'YOUR MOVE'
+- diagnostic_reframe: diagnosis 'THE HIDDEN PROBLEM', myth 'THE MISTAKE', cost 'THE COST', rule 'THE BETTER RULE', step 'THE MOVE', cta 'YOUR MOVE'
+- narrative_launch: sign 'SIGN {n}' (replace {n} with the 1-based sign index), turn 'REFLECTION', cta 'JOIN US'
+Cover slides: render the deck's pillar name if provided, else no eyebrow. The slide renderer must read stageEyebrows[recipe][role] and NEVER render role/composition identifiers. Unknown role -> empty string.
+
+## 7. CHANGE F — Furniture system (slide renderer)
+Add per-template furniture config in the registry: { wordmark, counter: 'pill' | 'strip', footerLeft, footerRight, swipeCue, handle }.
+Defaults for the five existing skins: wordmark 'COACH KAGISO' (Inter 600, 26px, +0.18em, #142334) top-left; counter 'pill' top-right (Dark Gunmetal pill, white Inter 600 24px, format "02 / 09"); footer-left: Rodeo Dust dash (48x8px, radius 9999) + 'COACHKAGISO.COM' (Inter 600 24px, #A09086, +0.12em); footer-right: '@coach.kagiso  ·  SWIPE ->' on all slides except the last; last slide footer-right: 'LINK IN COMMENTS'.
+signature_narrative variant: wordmark 'COACHKAGISO' one word (Inter 700, +0.08em) top-left; top-right '@coach.kagiso' in #A09086; counter 'strip' bottom-left: numbers 01..N in a row, active = #142334 with a Rodeo Dust underline bar, inactive = #CDC6C3; bottom-right 'SWIPE ->' (last slide: 'LINK IN COMMENTS').
+DELETE the Rodeo Dust circle number badge with white numerals entirely (brand violation). Counter always derives from the FINAL slide count after empty-slide filtering (see G4). Safe margins: 96px sides; 140px header band; 140px footer band; no content inside the bands.
+
+## 8. CHANGE G — Type scale, caps, overflow, empty slides (slide renderer + builder)
+Type scale at 1080x1350: cover headline Playfair 600 96-110px max 3 lines; inner headline Playfair 600 72-84px max 2 lines; eyebrow Inter 600 26px +0.14em #C9AD98; body Inter 400 36-40px lh 1.5 #142334; micro/furniture Inter 600 22-26px.
+Content caps (enforced in the slide builder): cover headline <=45 chars, cover sub <=140; quote/body <=220; CTA bullets <=4 x <=40 chars; framework rows <=3 with sub <=60; grid cards <=4 with title <=30 / sub <=45.
+Overflow handling: auto-shrink one type step; if still over, set an overflowWarning flag shown as an amber badge in the studio UI ("Text may clip — shorten or shrink"). Never silently clip.
+Empty slides: any stage/slide whose content is empty is removed before render and the deck renumbered. A deck never exports an empty page. Min 5, max 10 slides.
+
+## 9. CHANGE H — Signature Narrative reference structure (from the owner's Canva deck)
+Slide-by-slide target: (1) Hook: big Playfair statement + one-line sub ("There are two others..."). (2-4) Signs: eyebrow SIGN N, Playfair headline, two short body blocks with one Inter 600 key line (e.g. "Comfortable is the most dangerous place to be."). (5) Bridge: "Only one of these signs is about performance..." pattern. (6-7) Turn: personal story in Reflection-Friday register ("I had to learn this myself." / "I had to start pouring into relationships again."). (8) CTA: headline + up to 4 emoji bullets (emoji allowed ONLY in this skin's CTA: e.g. live-virtual-workshop / duration / capacity / outcome), one footnote line for price + early-bird deadline, footer cue. Event date, price and deadline are per-deck editable content (existing cta fields; add an optional footnote string to the cta slide type only if no such field exists) — NEVER hardcoded, they go stale each season.
+
+## 10. CHANGE I — Design Studio defaults + token convergence
+- DesignStudioPanel.tsx createDefaultManifestoDesign (line 1824): background #F5F2ED -> #E8E3DF; brand-top "COACH KAGISO" layer colour #B98567 -> #142334; add a Rodeo Dust accent dash if trivial.
+- captureDesignCanvas (~line 3972): font fallbacks 'Raleway, Arial, sans-serif' / 'Georgia...' -> the brand stacks from 2.A3.
+- app/globals.css: set --font-sans to the Inter stack and --font-serif to the Playfair stack (canonical typography). Audit explicit Raleway / Noto Serif Display / Poppins / script-font references in carousel and design surfaces and replace with brand stacks. Northwell remains ONLY on the About-page signature. NOTE: this changes public-site rendering where vars are used — that is intended (site was off-spec). Do not chase dashboard chrome neutrals now.
+
+## 11. CHANGE J — Voice rules for generated carousel copy
+In registry promptBehavior.slideRules (all templates) and any carousel-specific rules in lib/content/system-prompt.ts: max ONE em dash per deck; use her vocabulary (elevate, show up, stretch, pour into, hold space, intentional, visibility, "your career matters"); banned: leverage, synergy, empowerment, manifestation, hustle, strategist; tension slides use the conviction-reframe pattern (name the comfortable default, flip it as a risk); CTA slides use her soft-pitch pattern (deliver value, one sentence offer, signoff); no internal template labels in copy.
+
+## 12. Verification checklist (do all, report results)
+1. Tests pass.
+2. Build a 7-slide deck in editorial_authority and in signature_narrative. Export PNG + PDF for linkedin_document and portrait_4_5.
+3. PNG files are 2160x2700 (square 2160x2160). Open the PDF at 200% zoom: text must be crisp, no bilinear softness.
+4. Eyebrows show audience-facing labels only; no "REFRAME / QUOTE PANEL" style strings anywhere in exports.
+5. No empty slides; counters sequential and correct; pill counter on the five skins, progress strip on signature_narrative; swipe cue present except last slide.
+6. No Rodeo Dust surface with white text anywhere in exports.
+7. No 1398 string left in UI or registry.
+8. Existing saved Design Studio localStorage templates still load and export.
+Report: files changed, test output, and any flagged ambiguities.
