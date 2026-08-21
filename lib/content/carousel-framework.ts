@@ -29,7 +29,14 @@ export type EmotionalArc = {
   end: string;
 };
 
+/** The reusable fill-in mould, one entry per slide, brackets intact. */
+export type FrameworkTemplate = {
+  headline: string;
+  slides: { label: string; content: string }[];
+};
+
 export type CarouselFramework = BaseFramework & {
+  template: FrameworkTemplate | null;
   slideCount: number;
   slideArc: string[];
   layoutRecipe: string;
@@ -57,6 +64,28 @@ function text(value: unknown): string {
 function stringList(value: unknown, max: number): string[] {
   if (!Array.isArray(value)) return [];
   return value.map(text).filter(Boolean).slice(0, max);
+}
+
+/**
+ * Parses the fill-in mould. Returns null when the model produced nothing usable,
+ * so the panel can show an explicit empty state rather than an empty tab.
+ */
+export function normaliseTemplate(value: unknown): FrameworkTemplate | null {
+  const raw = nested(value);
+  const rawSlides = Array.isArray(raw.slides) ? raw.slides : [];
+  const slides = rawSlides
+    .map((entry, index) => {
+      const slide = nested(entry);
+      return {
+        label: text(slide.label) || `Slide ${index + 1}`,
+        content: text(slide.content),
+      };
+    })
+    .filter((slide) => slide.content.length > 0)
+    .slice(0, 20);
+
+  if (slides.length === 0) return null;
+  return { headline: text(raw.headline), slides };
 }
 
 function nested(value: unknown): Record<string, unknown> {
@@ -112,6 +141,7 @@ export function normaliseCarouselFramework(
 
   return {
     ...normaliseFramework(value),
+    template: normaliseTemplate(value.template),
     slideCount,
     slideArc,
     layoutRecipe: allowedRecipes.has(rawRecipe) ? rawRecipe : '',

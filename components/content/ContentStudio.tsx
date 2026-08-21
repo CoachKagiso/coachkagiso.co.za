@@ -15,6 +15,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  Copy,
   Layers3,
   Lightbulb,
   Link2,
@@ -449,7 +450,9 @@ type ExtractedFramework = {
   valueMethod?: string;
   ctaLayers?: string[];
   emotionalArc?: { start?: string; middle?: string; end?: string };
-  // Written by Stage 2 and filed in the Vault, never kept in Transform.
+  // The reusable fill-in mould produced by Stage 1, shown in the template tab.
+  template?: { headline: string; slides: { label: string; content: string }[] } | null;
+  // Legacy: the mould as a single string, from rebuilds saved before the tab existed.
   fillInTemplate?: string;
 };
 
@@ -3344,6 +3347,97 @@ function trapWheel(e: React.WheelEvent<HTMLElement>) {
   e.stopPropagation();
 }
 
+/** Flattens the mould for storage, so a saved reference keeps a readable copy. */
+function templateToText(template: ExtractedFramework['template']): string {
+  if (!template?.slides?.length) return '';
+  return template.slides.map((slide) => `${slide.label}\n${slide.content}`).join('\n\n');
+}
+
+/**
+ * Renders one template slide, tinting every [BRACKET] so the blanks read as
+ * fill-me-in rather than as an error. Rodeo Dust, never the validation colour -
+ * that one is reserved for roles the generator cannot accept.
+ */
+function TemplateSlideBody({ content }: { content: string }) {
+  const parts = content.split(/(\[[^\]\n]{2,80}\])/g);
+  return (
+    <pre className="m-0 whitespace-pre-wrap p-3 font-mono text-[11.5px] leading-[1.65] text-[#142334]">
+      {parts.map((part, index) =>
+        /^\[[^\]\n]{2,80}\]$/.test(part) ? (
+          <span
+            key={index}
+            className="rounded-[3px] bg-[#C9AD98]/40 px-1 py-[1px] font-semibold text-[#142334]"
+          >
+            {part}
+          </span>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+    </pre>
+  );
+}
+
+function TransformTemplateTab({ template }: { template: { headline: string; slides: { label: string; content: string }[] } | null }) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function copy(id: string, value: string) {
+    void navigator.clipboard?.writeText(value);
+    setCopied(id);
+    window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1200);
+  }
+
+  if (!template || template.slides.length === 0) {
+    return (
+      <div className="mt-3 rounded-[8px] border border-dashed border-[#D8C8BA] bg-white p-6 text-center">
+        <FileText className="mx-auto h-6 w-6 text-[#C9AD98]" />
+        <p className="mt-3 font-serif text-[18px] leading-tight text-[#142334]">Template not generated</p>
+        <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/62">
+          Re-extract this deck to produce the reusable mould.
+        </p>
+      </div>
+    );
+  }
+
+  const allSlides = template.slides.map((slide) => `${slide.label}\n${slide.content}`).join('\n\n');
+
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-[#6B6B6B]">{template.headline || 'A reusable mould. Fill the brackets with your own topic.'}</p>
+        <button
+          type="button"
+          onClick={() => copy('all', allSlides)}
+          className="flex items-center gap-1.5 rounded-[6px] border border-[#E4D8CB] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:border-[#142334] hover:text-[#142334]"
+        >
+          <Copy className="h-3 w-3" />
+          {copied === 'all' ? 'Copied' : 'Copy all slides'}
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2">
+        {template.slides.map((slide, index) => (
+          <div key={`${slide.label}-${index}`} className="overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-white">
+            <div className="flex items-center justify-between gap-2 border-b border-[#E4D8CB] bg-[#F5F3EE] px-3 py-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">{slide.label}</span>
+              <button
+                type="button"
+                onClick={() => copy(String(index), `${slide.label}\n${slide.content}`)}
+                aria-label={`Copy ${slide.label}`}
+                className="flex items-center gap-1 rounded-[5px] border border-[#E4D8CB] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:border-[#142334] hover:text-[#142334]"
+              >
+                <Copy className="h-3 w-3" />
+                {copied === String(index) ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <TemplateSlideBody content={slide.content} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** The machine-readable half of a carousel extraction, kept visible but compact. */
 function getDeckSpecEntries(framework: ExtractedFramework) {
   const entries: { label: string; value: string }[] = [];
@@ -4116,6 +4210,7 @@ export default function ContentStudio({
   const [alchemyTemplate, setAlchemyTemplate] = useState('');
   const [templateFillingId, setTemplateFillingId] = useState<string | null>(null);
   const [alchemyDeckWarning, setAlchemyDeckWarning] = useState('');
+  const [alchemyFrameworkTab, setAlchemyFrameworkTab] = useState<'mechanics' | 'template'>('mechanics');
 
   const vaultTotals = useMemo(
     () => ({
@@ -5461,7 +5556,7 @@ export default function ContentStudio({
         slideArc: alchemyFramework.slideArc || [],
         // The mould rides inside the framework jsonb, so saving a template needs
         // no migration and keeps the typed columns doing their job.
-        framework: { ...alchemyFramework, fillInTemplate: alchemyTemplate.trim() },
+        framework: { ...alchemyFramework, fillInTemplate: alchemyTemplate.trim() || templateToText(alchemyFramework.template) },
       });
       await loadDnaReferences();
       setActiveVaultSection('templates');
@@ -5549,6 +5644,7 @@ export default function ContentStudio({
   // any AI spend, and a retry does not re-render the PDF.
   async function selectAlchemyDeckFile(file: File | null) {
     setAlchemyDeckWarning('');
+    setAlchemyFrameworkTab('mechanics');
     setAlchemyDeckFile(null);
     setAlchemyDeckPages([]);
     setAlchemyDeckNotice('');
@@ -6247,7 +6343,9 @@ export default function ContentStudio({
                 dnaReferences={dnaReferences}
                 dnaSaving={dnaSaving}
                 onSaveDnaReference={() => void saveDnaReference()}
-                hasTemplate={Boolean(alchemyTemplate.trim())}
+                hasTemplate={Boolean(alchemyTemplate.trim()) || Boolean(alchemyFramework?.template?.slides?.length)}
+                frameworkTab={alchemyFrameworkTab}
+                onFrameworkTabChange={setAlchemyFrameworkTab}
                 onUseDnaReference={useDnaReference}
                 onDeleteDnaReference={(id) => void deleteDnaReference(id)}
                 deckPageCount={alchemyDeckPages.length}
@@ -7475,6 +7573,8 @@ function TransformFlow({
   dnaSaving,
   onSaveDnaReference,
   hasTemplate,
+  frameworkTab,
+  onFrameworkTabChange,
   onUseDnaReference,
   onDeleteDnaReference,
   deckPageCount,
@@ -7541,6 +7641,8 @@ function TransformFlow({
   dnaSaving: boolean;
   onSaveDnaReference: () => void;
   hasTemplate: boolean;
+  frameworkTab: 'mechanics' | 'template';
+  onFrameworkTabChange: (tab: 'mechanics' | 'template') => void;
   onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
   onDeleteDnaReference: (id: string) => void;
   // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
@@ -7860,9 +7962,34 @@ function TransformFlow({
               </div>
               <Badge className="bg-white text-[#6B6B6B]">{selectedInput.label}</Badge>
             </div>
-            {/* A deck gets the spec strip, the arc and the mechanics cards. A
-                text post or screenshot has no arc, so it keeps the plain rows. */}
-            {framework.slideCount ? (
+            {/* Both tabs render after any successful extraction. The spec strip
+                and arc are dropped when the source had no deck, but the tabs
+                themselves are never hidden - a missing template shows an empty
+                state rather than vanishing. */}
+            <div className="mt-4 flex gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
+              {([
+                { id: 'mechanics' as const, label: 'Mechanics teardown' },
+                { id: 'template' as const, label: 'Reusable template' },
+              ]).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={frameworkTab === tab.id}
+                  onClick={() => onFrameworkTabChange(tab.id)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-[6px] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                    frameworkTab === tab.id ? 'bg-[#142334] text-white' : 'text-[#6B6B6B] hover:text-[#142334]'
+                  }`}
+                >
+                  {tab.id === 'mechanics' ? <Layers3 className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {frameworkTab === 'template' ? (
+              <TransformTemplateTab template={framework.template ?? null} />
+            ) : framework.slideCount ? (
               <>
                 <dl className="mt-4 grid gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
                   {getDeckSpecEntries(framework).map((entry) => (

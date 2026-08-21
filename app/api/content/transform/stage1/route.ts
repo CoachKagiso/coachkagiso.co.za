@@ -101,10 +101,27 @@ Output ONLY valid JSON with no other text:
   "copyDensity": "How much copy sits on a typical inner slide? One of: light / medium / dense",
   "visualPattern": "What does the deck do visually across slides? One sentence on layout rhythm, emphasis, or repetition. Describe the pattern, never the brand.",
   "whatMakesItWork": "The single strongest structural choice in this deck, and why it holds attention. One or two sentences.",
+  "template": {
+    "headline": "One line naming what this mould is for, e.g. 'A 9-slide authority deck'.",
+    "slides": [
+      {
+        "label": "Slide 1 - cover",
+        "content": "The reusable mould for this slide. One block per slide, one entry per slide in the arc, in order."
+      }
+    ]
+  },
   "hasExtractableStructure": true | false
 }
 
-LENGTH RULE: 1-2 sentences per text field. Under 450 words total.
+TEMPLATE RULES - this is the reusable mould, and it is the most useful thing you produce:
+- One entry per slide, in the same order as slideArc. Label each "Slide N - role" using that slide's arc role.
+- Write the connecting words plainly, and replace every topic-specific noun, claim, and example with a SQUARE BRACKET placeholder that says what belongs there, like [THE ADVICE EVERYONE REPEATS] or [YOUR OWN EXAMPLE - 8 WORDS MAX].
+- Build each slide from the mechanism you just described - its arc role, the intra-slide beat pattern, and the pacing rules - NOT by copying the source slide and swapping its nouns. A reader who knows the source must not recognise its sentences here.
+- Keep the pacing in the mould itself: short lines, one idea per line, blank line between beats.
+- The closing slide must carry one bracketed line per CTA layer you identified.
+- Every slide must contain at least one [BRACKET]. No slide may be left as finished prose.
+
+LENGTH RULE: 1-2 sentences per text field. Under 900 words total, including the template.
 
 CRITICAL RULES:
 - Output ONLY the JSON object above
@@ -271,7 +288,7 @@ async function extractCarouselStructure(
         content: `CAROUSEL DECK (${slideCount} slides):\n${slideText}\n\nRead this deck and extract its structural framework.`,
       },
     ],
-    1600,
+    4096,
     0.2,
   );
 
@@ -428,8 +445,13 @@ export async function POST(req: NextRequest) {
         .filter((field) => !framework[field]);
 
       if (!framework.hasExtractableStructure || missing.length > 0) {
+        console.warn('Carousel extraction incomplete. Missing fields:', missing.join(', ') || '(hasExtractableStructure false)');
         return NextResponse.json(
-          { error: 'This deck does not have a structure that can be extracted.' },
+          {
+            error: missing.length > 0
+              ? `The deck was read, but the analysis came back incomplete (missing: ${missing.join(', ')}). Try extracting again.`
+              : 'This deck does not have a structure that can be extracted.',
+          },
           { status: 422 },
         );
       }
