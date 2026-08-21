@@ -140,6 +140,7 @@ export function OutputWithActions({
   actionsDisabled = false,
   isRegenerating = false,
   bodyOverride,
+  surfaceClassName,
 }: {
   title: string;
   value: string;
@@ -165,6 +166,9 @@ export function OutputWithActions({
    * editable slide list instead.
    */
   bodyOverride?: ReactNode;
+  /** Lets a caller give the panel its own surface, so a generated draft can sit
+   *  on a different ground from the analysis above it. */
+  surfaceClassName?: string;
 }) {
   const [mode, setMode] = useState<DraftMode>('edit');
   const [insertOpen, setInsertOpen] = useState(false);
@@ -241,7 +245,7 @@ export function OutputWithActions({
   }
 
   return (
-    <div className="rounded-[8px] bg-[#F5F3EE] p-5">
+    <div className={surfaceClassName || 'rounded-[8px] bg-[#F5F3EE] p-5'}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">{title}</p>
