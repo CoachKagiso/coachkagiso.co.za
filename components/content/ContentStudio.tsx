@@ -3421,8 +3421,44 @@ function TemplateSlideBody({ content }: { content: string }) {
   );
 }
 
-type TemplateSlide = { label: string; content: string };
+type TemplateSlide = { label: string; content: string; key?: string };
 type TemplateShape = { headline: string; slides: TemplateSlide[] };
+type TemplateDraft = TemplateShape;
+
+/** How a slide differs from the state it was extracted in. */
+type SlideStatus = 'new' | 'edited' | 'moved' | null;
+
+/**
+ * Marks each slide against the state it was extracted in.
+ *
+ * "Moved" is measured against the other surviving originals, not against the
+ * absolute index. Inserting or deleting a slide shifts everything below it, and
+ * marking all of those as moved buries the one slide you actually dragged.
+ */
+function getSlideStatuses(
+  slides: TemplateSlide[],
+  baseline: { key?: string; content: string }[],
+): SlideStatus[] {
+  if (baseline.length === 0) return slides.map(() => null);
+
+  const baselineByKey = new Map(baseline.filter((entry) => entry.key).map((entry) => [entry.key as string, entry]));
+  const survivingKeys = new Set(slides.map((slide) => slide.key).filter((key): key is string => Boolean(key)));
+
+  const expectedOrder = baseline
+    .map((entry) => entry.key)
+    .filter((key): key is string => Boolean(key) && survivingKeys.has(key as string));
+  const actualOrder = slides
+    .map((slide) => slide.key)
+    .filter((key): key is string => Boolean(key) && baselineByKey.has(key as string));
+
+  return slides.map((slide) => {
+    const original = slide.key ? baselineByKey.get(slide.key) : undefined;
+    if (!original) return 'new';
+    if (original.content !== slide.content) return 'edited';
+    if (actualOrder.indexOf(slide.key as string) !== expectedOrder.indexOf(slide.key as string)) return 'moved';
+    return null;
+  });
+}
 
 /**
  * The reusable mould. Read-only by default; Advanced turns on editing so the
@@ -3436,10 +3472,12 @@ function TransformTemplateTab({
   template,
   editable,
   onChange,
+  baseline,
 }: {
   template: TemplateShape | null;
   editable: boolean;
   onChange: (next: TemplateShape) => void;
+  baseline: { key?: string; content: string }[];
 }) {
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -3448,6 +3486,7 @@ function TransformTemplateTab({
     setCopied(id);
     window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1200);
   }
+
 
   function commit(slides: TemplateSlide[]) {
     onChange({ headline: template?.headline || '', slides });
@@ -3461,7 +3500,7 @@ function TransformTemplateTab({
   function duplicateSlide(index: number) {
     if (!template) return;
     const next = [...template.slides];
-    next.splice(index + 1, 0, { ...next[index] });
+    next.splice(index + 1, 0, { ...next[index], key: `dup${Date.now()}-${Math.random().toString(36).slice(2, 7)}` });
     commit(next);
   }
 
@@ -3491,6 +3530,7 @@ function TransformTemplateTab({
     );
   }
 
+  const statuses = editable ? getSlideStatuses(template.slides, baseline) : template.slides.map(() => null);
   const allSlides = template.slides.map((slide) => `${slide.label}\n${slide.content}`).join('\n\n');
   const iconButton =
     'rounded-[5px] border border-transparent p-1 text-[#6B6B6B] opacity-0 transition hover:border-[#E4D8CB] hover:bg-white hover:text-[#142334] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-0';
@@ -3515,9 +3555,27 @@ function TransformTemplateTab({
 
       <div className="mt-2 flex flex-col gap-2">
         {template.slides.map((slide, index) => (
-          <div key={`${slide.label}-${index}`} className="group overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-[#E4D8CB] bg-[#F5F3EE] px-3 py-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">{slide.label}</span>
+          <div
+            key={slide.key || `${slide.label}-${index}`}
+            className={`group overflow-hidden rounded-[8px] border bg-white ${
+              statuses[index] ? 'border-[#C9AD98]' : 'border-[#E4D8CB]'
+            }`}
+          >
+            {/* Only the header is tinted. Darkening the body would fight the
+                monospace copy and the bracket highlights inside it. */}
+            <div
+              className={`flex items-center justify-between gap-2 border-b px-3 py-1.5 ${
+                statuses[index] ? 'border-[#C9AD98] bg-[#E4D8CB]' : 'border-[#E4D8CB] bg-[#F5F3EE]'
+              }`}
+            >
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                {slide.label}
+                {statuses[index] && (
+                  <span className="rounded-full bg-white/70 px-1.5 py-[1px] text-[9px] tracking-[0.1em] text-[#142334]">
+                    {statuses[index]}
+                  </span>
+                )}
+              </span>
               <div className="flex items-center gap-0.5">
                 <button
                   type="button"
@@ -4372,9 +4430,8 @@ export default function ContentStudio({
   const [alchemyFrameworkTab, setAlchemyFrameworkTab] = useState<'mechanics' | 'template'>('mechanics');
   // The mould as it currently stands, including any edits. Seeded from the
   // extraction; what gets filed in the Vault is this, not the original.
-  const [alchemyTemplateDraft, setAlchemyTemplateDraft] = useState<
-    { headline: string; slides: { label: string; content: string }[] } | null
-  >(null);
+  const [alchemyTemplateDraft, setAlchemyTemplateDraft] = useState<TemplateDraft | null>(null);
+  const [alchemyTemplateBaseline, setAlchemyTemplateBaseline] = useState<{ key?: string; content: string }[]>([]);
 
   const vaultTotals = useMemo(
     () => ({
@@ -5673,7 +5730,18 @@ export default function ContentStudio({
 
 
   useEffect(() => {
-    setAlchemyTemplateDraft(alchemyFramework?.template ?? null);
+    const source = alchemyFramework?.template ?? null;
+    if (!source) {
+      setAlchemyTemplateDraft(null);
+      setAlchemyTemplateBaseline([]);
+      return;
+    }
+    // Keys are assigned here and never persisted. Without them a duplicate would
+    // shift every slide below it and they would all read as changed, because
+    // position is the only other way to tell two slides apart.
+    const keyed = source.slides.map((slide, index) => ({ ...slide, key: `s${index}-${Date.now()}` }));
+    setAlchemyTemplateDraft({ headline: source.headline, slides: keyed });
+    setAlchemyTemplateBaseline(keyed.map((slide) => ({ key: slide.key, content: slide.content })));
   }, [alchemyFramework]);
 
   const fetchDnaReferences = useCallback(async () => {
@@ -5713,6 +5781,12 @@ export default function ContentStudio({
     const label = window.prompt('Name this template', suggested);
     if (!label?.trim()) return;
 
+    // Transient edit-tracking keys are stripped so they never reach the database.
+    const draft = alchemyTemplateDraft ?? alchemyFramework.template ?? null;
+    const savedTemplate = draft
+      ? { headline: draft.headline, slides: draft.slides.map(({ label, content }) => ({ label, content })) }
+      : null;
+
     setDnaSaving(true);
     try {
       await requestJson('/api/content/carousel-dna', 'POST', {
@@ -5726,10 +5800,18 @@ export default function ContentStudio({
         // no migration and keeps the typed columns doing their job.
         framework: {
           ...alchemyFramework,
-          template: alchemyTemplateDraft ?? alchemyFramework.template ?? null,
-          fillInTemplate: alchemyTemplate.trim() || templateToText(alchemyTemplateDraft ?? alchemyFramework.template),
+          // Keys are a UI concept for tracking edits; they never leave the client.
+          template: savedTemplate,
+          fillInTemplate: alchemyTemplate.trim() || templateToText(savedTemplate),
         },
       });
+      // What was saved is now the state everything is compared against, so the
+      // edited and moved marks clear.
+      if (alchemyTemplateDraft) {
+        setAlchemyTemplateBaseline(
+          alchemyTemplateDraft.slides.map((slide) => ({ key: slide.key, content: slide.content })),
+        );
+      }
       await loadDnaReferences();
       setActiveVaultSection('templates');
     } catch (error) {
@@ -6520,6 +6602,7 @@ export default function ContentStudio({
                 onFrameworkTabChange={setAlchemyFrameworkTab}
                 templateDraft={alchemyTemplateDraft}
                 onTemplateDraftChange={setAlchemyTemplateDraft}
+                templateBaseline={alchemyTemplateBaseline}
                 onUseDnaReference={useDnaReference}
                 onDeleteDnaReference={(id) => void deleteDnaReference(id)}
                 deckPageCount={alchemyDeckPages.length}
@@ -7751,6 +7834,7 @@ function TransformFlow({
   onFrameworkTabChange,
   templateDraft,
   onTemplateDraftChange,
+  templateBaseline,
   onUseDnaReference,
   onDeleteDnaReference,
   deckPageCount,
@@ -7819,8 +7903,9 @@ function TransformFlow({
   hasTemplate: boolean;
   frameworkTab: 'mechanics' | 'template';
   onFrameworkTabChange: (tab: 'mechanics' | 'template') => void;
-  templateDraft: { headline: string; slides: { label: string; content: string }[] } | null;
-  onTemplateDraftChange: (next: { headline: string; slides: { label: string; content: string }[] }) => void;
+  templateDraft: TemplateDraft | null;
+  onTemplateDraftChange: (next: TemplateDraft) => void;
+  templateBaseline: { key?: string; content: string }[];
   onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
   onDeleteDnaReference: (id: string) => void;
   // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
@@ -8175,6 +8260,7 @@ function TransformFlow({
                 template={templateDraft ?? framework.template ?? null}
                 editable={rebuildMode === 'advanced'}
                 onChange={onTemplateDraftChange}
+                baseline={templateBaseline}
               />
             ) : framework.slideCount ? (
               <>
