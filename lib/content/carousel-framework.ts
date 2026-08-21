@@ -29,6 +29,30 @@ export type EmotionalArc = {
   end: string;
 };
 
+/**
+ * The teaching layer. Short verbatim quotes are permitted here and nowhere else,
+ * and this block is deliberately NOT passed to Stage 2 - see DeckShape in
+ * transform-deck-shape.ts, which omits it. That omission is the firewall: the
+ * panel can teach from the source's own lines without any of them reaching the
+ * prompt that writes Kagiso's decks.
+ */
+export type TeardownLayer = {
+  quote: string;
+  examples: string[];
+  why: string;
+};
+
+export type FrameworkTeardown = {
+  hook: TeardownLayer;
+  structure: TeardownLayer;
+  pacing: TeardownLayer;
+  value: TeardownLayer;
+  cta: TeardownLayer;
+  arc: TeardownLayer;
+};
+
+export const TEARDOWN_LAYERS = ['hook', 'structure', 'pacing', 'value', 'cta', 'arc'] as const;
+
 /** The reusable fill-in mould, one entry per slide, brackets intact. */
 export type FrameworkTemplate = {
   headline: string;
@@ -37,6 +61,7 @@ export type FrameworkTemplate = {
 
 export type CarouselFramework = BaseFramework & {
   template: FrameworkTemplate | null;
+  teardown: FrameworkTeardown | null;
   slideCount: number;
   slideArc: string[];
   layoutRecipe: string;
@@ -70,6 +95,32 @@ function stringList(value: unknown, max: number): string[] {
  * Parses the fill-in mould. Returns null when the model produced nothing usable,
  * so the panel can show an explicit empty state rather than an empty tab.
  */
+/** Caps each quote at 12 words, enforcing the prompt rule rather than trusting it. */
+function clampQuote(value: unknown): string {
+  const words = text(value).split(/\s+/).filter(Boolean);
+  if (words.length <= 12) return words.join(' ');
+  return `${words.slice(0, 12).join(' ')}...`;
+}
+
+export function normaliseTeardown(value: unknown): FrameworkTeardown | null {
+  const raw = nested(value);
+  const layers = TEARDOWN_LAYERS.map((name) => {
+    const layer = nested(raw[name]);
+    return [
+      name,
+      {
+        quote: clampQuote(layer.quote),
+        examples: stringList(layer.examples, 4).map((entry) => clampQuote(entry)),
+        why: text(layer.why),
+      },
+    ] as const;
+  });
+
+  const hasContent = layers.some(([, layer]) => layer.why || layer.quote || layer.examples.length > 0);
+  if (!hasContent) return null;
+  return Object.fromEntries(layers) as FrameworkTeardown;
+}
+
 export function normaliseTemplate(value: unknown): FrameworkTemplate | null {
   const raw = nested(value);
   const rawSlides = Array.isArray(raw.slides) ? raw.slides : [];
@@ -142,6 +193,7 @@ export function normaliseCarouselFramework(
   return {
     ...normaliseFramework(value),
     template: normaliseTemplate(value.template),
+    teardown: normaliseTeardown(value.teardown),
     slideCount,
     slideArc,
     layoutRecipe: allowedRecipes.has(rawRecipe) ? rawRecipe : '',

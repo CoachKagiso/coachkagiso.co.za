@@ -452,6 +452,9 @@ type ExtractedFramework = {
   emotionalArc?: { start?: string; middle?: string; end?: string };
   // The reusable fill-in mould produced by Stage 1, shown in the template tab.
   template?: { headline: string; slides: { label: string; content: string }[] } | null;
+  // The teaching layer. Short quotes live here and nowhere else, and this block
+  // is never forwarded to Stage 2 - that omission is the firewall.
+  teardown?: Partial<Record<'hook' | 'structure' | 'pacing' | 'value' | 'cta' | 'arc', { quote?: string; examples?: string[]; why?: string }>> | null;
   // Legacy: the mould as a single string, from rebuilds saved before the tab existed.
   fillInTemplate?: string;
 };
@@ -3347,6 +3350,42 @@ function trapWheel(e: React.WheelEvent<HTMLElement>) {
   e.stopPropagation();
 }
 
+/**
+ * The teaching detail under a mechanics card: what the source actually said, and
+ * why that move works. Quotes are capped at 12 words server-side and are never
+ * forwarded to the rebuild.
+ */
+function TeardownDetail({
+  layer,
+}: {
+  layer: { quote?: string; examples?: string[]; why?: string };
+}) {
+  const quotes = [layer.quote, ...(layer.examples || [])].filter((entry): entry is string => Boolean(entry?.trim()));
+  if (quotes.length === 0 && !layer.why?.trim()) return null;
+
+  return (
+    <div className="mt-3 border-t border-[#EFE7DE] pt-3">
+      {quotes.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {quotes.map((quote, index) => (
+            <p
+              key={index}
+              className="border-l-2 border-[#C9AD98] pl-3 font-serif text-[13px] italic leading-snug text-[#142334]/85"
+            >
+              &ldquo;{quote}&rdquo;
+            </p>
+          ))}
+        </div>
+      )}
+      {layer.why?.trim() && (
+        <p className={`text-[12.5px] leading-relaxed text-[#142334]/75 ${quotes.length > 0 ? 'mt-2.5' : ''}`}>
+          {layer.why}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Flattens the mould for storage, so a saved reference keeps a readable copy. */
 function templateToText(template: ExtractedFramework['template']): string {
   if (!template?.slides?.length) return '';
@@ -3456,6 +3495,7 @@ function getDeckSpecEntries(framework: ExtractedFramework) {
 }
 
 type MechanicsCard = {
+  key?: 'hook' | 'structure' | 'pacing' | 'value' | 'cta' | 'arc';
   title: string;
   lead?: string;
   body?: string;
@@ -3474,6 +3514,7 @@ function getMechanicsCards(framework: ExtractedFramework): MechanicsCard[] {
   if (framework.hookTechnique || framework.hookPattern) {
     const [lead, ...rest] = (framework.hookTechnique || '').split(/\.\s+/);
     cards.push({
+      key: 'hook',
       title: 'Hook technique',
       lead: framework.hookTechnique ? lead : undefined,
       body: framework.hookTechnique ? rest.join('. ') || undefined : framework.hookPattern,
@@ -3482,6 +3523,7 @@ function getMechanicsCards(framework: ExtractedFramework): MechanicsCard[] {
 
   if (framework.storyStructure || framework.intraSlideLoop?.length) {
     cards.push({
+      key: 'structure',
       title: 'Structure pattern',
       lead: framework.storyStructure,
       beats: framework.intraSlideLoop,
@@ -3493,23 +3535,24 @@ function getMechanicsCards(framework: ExtractedFramework): MechanicsCard[] {
     framework.pacing?.breath ? { label: 'Breath', value: framework.pacing.breath } : null,
     framework.pacing?.close ? { label: 'Close', value: framework.pacing.close } : null,
   ].filter((row): row is { label: string; value: string } => Boolean(row));
-  if (pacingRows.length > 0) cards.push({ title: 'Pacing', rows: pacingRows });
+  if (pacingRows.length > 0) cards.push({ key: 'pacing', title: 'Pacing', rows: pacingRows });
 
-  if (framework.valueMethod) cards.push({ title: 'Value delivery', lead: framework.valueMethod });
+  if (framework.valueMethod) cards.push({ key: 'value', title: 'Value delivery', lead: framework.valueMethod });
 
   if (framework.ctaLayers?.length) {
     cards.push({
+      key: 'cta',
       title: 'CTA structure',
       rows: framework.ctaLayers.map((layer, index) => ({ label: `Layer ${index + 1}`, value: layer })),
     });
   } else if (framework.ctaStyle) {
-    cards.push({ title: 'CTA structure', lead: framework.ctaStyle });
+    cards.push({ key: 'cta', title: 'CTA structure', lead: framework.ctaStyle });
   }
 
   const arcBeats = [framework.emotionalArc?.start, framework.emotionalArc?.middle, framework.emotionalArc?.end]
     .filter((beat): beat is string => Boolean(beat));
   if (arcBeats.length > 0) {
-    cards.push({ title: 'Emotional arc', lead: arcBeats.join(' → '), beats: undefined });
+    cards.push({ key: 'arc', title: 'Emotional arc', lead: arcBeats.join(' → '), beats: undefined });
   } else if (framework.emotionalTension) {
     cards.push({ title: 'Emotional tension', lead: framework.emotionalTension });
   }
@@ -7960,7 +8003,12 @@ function TransformFlow({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">Extracted structure</p>
                 <h4 className="mt-1 font-serif text-[24px] leading-tight text-[#142334]">Only the pattern survived</h4>
               </div>
-              <Badge className="bg-white text-[#6B6B6B]">{selectedInput.label}</Badge>
+              {/* Describes where THIS framework came from, not whichever input
+                  tile happens to be selected now. A loaded reference kept showing
+                  "Text" over a nine-slide deck. */}
+              <Badge className="bg-white text-[#6B6B6B]">
+                {framework.slideCount ? 'Carousel PDF' : selectedInput.label}
+              </Badge>
             </div>
             {/* Both tabs render after any successful extraction. The spec strip
                 and arc are dropped when the source had no deck, but the tabs
@@ -8058,6 +8106,13 @@ function TransformFlow({
                           ))}
                         </div>
                       )}
+                      {/* The teaching layer. Quotes are shown here and never sent
+                          to Stage 2, so the panel can teach from the source's own
+                          lines without any of them reaching the rebuild. */}
+                      {(() => {
+                        const layer = card.key ? framework.teardown?.[card.key] : undefined;
+                        return layer ? <TeardownDetail layer={layer} /> : null;
+                      })()}
                     </article>
                   ))}
                 </div>
