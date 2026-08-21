@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import Image from 'next/image';
 import {
@@ -29,6 +29,7 @@ import {
   Mail,
   MessageSquare,
   Mic2,
+  Palette,
   PenLine,
   Plus,
   RefreshCcw,
@@ -105,6 +106,14 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
+import {
+  customSkinId,
+  isCustomSkinValue,
+  listTemplateOptions,
+  resolveTemplateOption,
+  type CarouselSkin,
+} from '@/lib/content/carousel-skins';
+import type { CarouselTemplateOption, CarouselTemplatePalette } from '@/lib/content/carousel-template-registry';
 import { buildTemplateFillPrompt, countPlaceholders, replaceSlidesInOutput, splitRebuildOutput, splitSlidePreamble } from '@/lib/content/carousel-template';
 import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
 import {
@@ -3461,6 +3470,31 @@ function buildCarouselDraftFromRebuild(
 }
 
 /**
+ * Custom skins, shared through context rather than threaded as props. The picker
+ * and the export path sit at very different depths in this tree, and both need
+ * the same list to resolve a stored template value.
+ */
+type CarouselSkinsContextValue = {
+  skins: CarouselSkin[];
+  adminKey: string;
+  reload: () => Promise<void>;
+};
+
+const CarouselSkinsContext = createContext<CarouselSkinsContextValue>({
+  skins: [],
+  adminKey: '',
+  reload: async () => {},
+});
+
+function useCarouselSkins() {
+  return useContext(CarouselSkinsContext).skins;
+}
+
+function useCarouselSkinActions() {
+  return useContext(CarouselSkinsContext);
+}
+
+/**
  * The tags that say what a saved template is FOR, as opposed to what shape it
  * is. Empty entries are dropped so an older reference shows fewer tags rather
  * than blank pills.
@@ -4521,6 +4555,7 @@ export default function ContentStudio({
     locked?: boolean;
   }[]>([]);
   const [dnaSaving, setDnaSaving] = useState(false);
+  const [carouselSkins, setCarouselSkins] = useState<CarouselSkin[]>([]);
   // Set when a saved template was opened for editing, so Save can offer to
   // overwrite it rather than only ever creating another copy.
   const [editingReferenceId, setEditingReferenceId] = useState<string | null>(null);
@@ -5874,6 +5909,20 @@ export default function ContentStudio({
     setAlchemyTemplateBaseline(keyed.map((slide) => ({ key: slide.key, content: slide.content })));
   }, [alchemyFramework]);
 
+  const loadCarouselSkins = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/content/carousel-skins?key=${encodeURIComponent(adminKey)}`);
+      const data = (await response.json().catch(() => ({}))) as { skins?: CarouselSkin[] };
+      if (response.ok && data.skins) setCarouselSkins(data.skins);
+    } catch {
+      // A missing skin list must not block Carousel Studio; built-ins still work.
+    }
+  }, [adminKey]);
+
+  useEffect(() => {
+    void loadCarouselSkins();
+  }, [loadCarouselSkins]);
+
   const fetchDnaReferences = useCallback(async () => {
     try {
       const response = await fetch(`/api/content/carousel-dna?key=${encodeURIComponent(adminKey)}`);
@@ -6500,6 +6549,7 @@ export default function ContentStudio({
   ];
 
   return (
+    <CarouselSkinsContext.Provider value={{ skins: carouselSkins, adminKey, reload: loadCarouselSkins }}>
     <section id="content-studio" className="w-full min-w-0 pb-10">
       <div className="w-full min-w-0 space-y-3">
         <ContentTopBar
@@ -7771,6 +7821,7 @@ export default function ContentStudio({
         />
       )}
     </section>
+    </CarouselSkinsContext.Provider>
   );
 }
 
@@ -9826,6 +9877,142 @@ function CarouselAspectRatioSelector({
   );
 }
 
+const SKIN_COLOUR_FIELDS: { key: keyof CarouselTemplatePalette & string; label: string; hint: string }[] = [
+  { key: 'background', label: 'Background', hint: 'The slide itself' },
+  { key: 'panel', label: 'Panel', hint: 'Cards and boxes on top' },
+  { key: 'foreground', label: 'Text', hint: 'Headlines and body' },
+  { key: 'muted', label: 'Muted text', hint: 'Metadata and captions' },
+  { key: 'accent', label: 'Accent', hint: 'Bullets, dashes, the active dot' },
+  { key: 'border', label: 'Border', hint: 'Hairlines and dividers' },
+  { key: 'chipBackground', label: 'Chip background', hint: 'The slide-number pill' },
+  { key: 'chipText', label: 'Chip text', hint: 'Text inside that pill' },
+];
+
+/**
+ * Builds a skin by overlaying colours on a built-in template. Only the look is
+ * editable: the layout, the recipe and the generation prompts stay with the base,
+ * which is what lets a custom skin export as vector PDF like any built-in.
+ */
+function CarouselSkinEditor({
+  base,
+  editing,
+  onClose,
+}: {
+  base: CarouselTemplateOption;
+  editing: CarouselSkin | null;
+  onClose: () => void;
+}) {
+  const { adminKey, reload } = useCarouselSkinActions();
+  const [name, setName] = useState(editing?.name || `${base.label} (mine)`);
+  const [wordmark, setWordmark] = useState(String(editing?.furniture?.wordmark ?? base.furniture.wordmark));
+  const [palette, setPalette] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    for (const field of SKIN_COLOUR_FIELDS) {
+      seed[field.key] = String(editing?.palette?.[field.key] ?? base.palette[field.key]);
+    }
+    return seed;
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!name.trim()) {
+      setError('Give this skin a name.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const body = {
+        key: adminKey,
+        name: name.trim(),
+        baseTemplate: editing?.baseTemplate || base.value,
+        palette,
+        furniture: { wordmark: wordmark.trim() || base.furniture.wordmark },
+      };
+      const response = await fetch('/api/content/carousel-skins', {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(editing ? { ...body, id: editing.id } : body),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error || 'Could not save this skin.');
+      await reload();
+      onClose();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save this skin.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-[10px] border border-[#C9AD98] bg-[#F8F6F4] p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8C7466]">
+            {editing ? 'Edit skin' : 'New skin'}
+          </p>
+          <p className="mt-1 text-[12px] text-[#142334]/62">
+            Built on {getCarouselTemplateOption((editing?.baseTemplate || base.value) as CarouselTemplate).label}. Layout and
+            prompts stay the same; only the look changes.
+          </p>
+        </div>
+        <div
+          className="h-14 w-24 shrink-0 rounded-[6px] border"
+          style={{ background: palette.background, borderColor: palette.border }}
+          aria-hidden="true"
+        >
+          <div className="m-2 h-3 w-10 rounded-full" style={{ background: palette.accent }} />
+          <div className="mx-2 h-2 w-16 rounded-full" style={{ background: palette.foreground, opacity: 0.75 }} />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">Skin name</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} className="studio-input h-10" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">Wordmark</span>
+          <input value={wordmark} onChange={(event) => setWordmark(event.target.value)} className="studio-input h-10" />
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {SKIN_COLOUR_FIELDS.map((field) => (
+          <label key={field.key} className="flex items-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-white px-2 py-1.5">
+            <input
+              type="color"
+              value={palette[field.key]}
+              onChange={(event) => setPalette((current) => ({ ...current, [field.key]: event.target.value }))}
+              className="h-7 w-9 shrink-0 cursor-pointer rounded border border-[#E4D8CB] bg-white"
+              aria-label={field.label}
+            />
+            <span className="min-w-0">
+              <span className="block text-[11px] font-semibold text-[#142334]">{field.label}</span>
+              <span className="block text-[10px] leading-tight text-[#142334]/55">{field.hint}</span>
+            </span>
+            <span className="ml-auto font-mono text-[10px] uppercase text-[#8C7466]">{palette[field.key]}</span>
+          </label>
+        ))}
+      </div>
+
+      {error && <p className="mt-3 text-[12px] font-semibold text-[#B4571F]">{error}</p>}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={() => void save()} disabled={busy} className="studio-primary-button w-fit">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Palette className="h-4 w-4" />}
+          {editing ? 'Save skin' : 'Create skin'}
+        </button>
+        <button type="button" onClick={onClose} className="studio-ghost-button w-fit">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CarouselTemplateSelector({
   value,
   onChange,
@@ -9839,7 +10026,23 @@ function CarouselTemplateSelector({
   title?: string;
   disabled?: boolean;
 }) {
-  const selectedOption = getCarouselTemplateOption(value);
+  const skins = useCarouselSkins();
+  const { adminKey, reload } = useCarouselSkinActions();
+  const options = listTemplateOptions(skins);
+  const selectedOption = resolveTemplateOption(value, skins);
+  const [skinEditor, setSkinEditor] = useState<{ base: CarouselTemplateOption; editing: CarouselSkin | null } | null>(null);
+  const editingSkin = isCustomSkinValue(value) ? skins.find((skin) => skin.id === customSkinId(value)) || null : null;
+
+  async function removeSkin(skin: CarouselSkin) {
+    if (!window.confirm(`Delete the skin "${skin.name}"? Decks using it fall back to ${getCarouselTemplateOption(skin.baseTemplate as CarouselTemplate).label}.`)) return;
+    await fetch('/api/content/carousel-skins', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: adminKey, id: skin.id }),
+    });
+    await reload();
+    if (isCustomSkinValue(value) && customSkinId(value) === skin.id) onChange(skin.baseTemplate as CarouselTemplate);
+  }
 
   return (
     <section className="rounded-[8px] border border-[#E4D8CB] bg-white p-5">
@@ -9848,11 +10051,53 @@ function CarouselTemplateSelector({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">{eyebrow}</p>
           <h3 className="mt-1 font-serif text-[26px] leading-tight text-[#142334]">{title}</h3>
         </div>
-        <Badge className="bg-[#F5F3EE] text-[#8C7466]">{selectedOption.label}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-[#F5F3EE] text-[#8C7466]">{selectedOption.label}</Badge>
+          {!disabled && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSkinEditor({ base: selectedOption, editing: null })}
+                className="flex items-center gap-1.5 rounded-[6px] border border-[#E4D8CB] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:border-[#142334] hover:text-[#142334]"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                New skin from this
+              </button>
+              {editingSkin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSkinEditor({ base: selectedOption, editing: editingSkin })}
+                    className="flex items-center gap-1.5 rounded-[6px] border border-[#E4D8CB] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] transition hover:border-[#142334] hover:text-[#142334]"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    Edit skin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeSkin(editingSkin)}
+                    aria-label={`Delete ${editingSkin.name}`}
+                    className="rounded-[6px] border border-[#E4D8CB] bg-white p-1.5 text-[#A24E37] transition hover:border-[#A24E37]"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
+      {skinEditor && (
+        <CarouselSkinEditor
+          base={skinEditor.base}
+          editing={skinEditor.editing}
+          onClose={() => setSkinEditor(null)}
+        />
+      )}
+
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        {carouselTemplateOptions.map((option) => {
+        {options.map((option) => {
           const isSelected = value === option.value;
           return (
             <button
@@ -12034,7 +12279,9 @@ function CarouselStudioPanel({
   const displayedAspectOption = getCarouselAspectRatioOption(displayedAspectRatio, latestDraft?.platform);
   const displayedExportDimensions = getCarouselExportDimensions(displayedAspectOption);
   const displayedTemplate = latestDraft?.template || defaultTemplate;
-  const displayedTemplateOption = getCarouselTemplateOption(displayedTemplate);
+  // Resolved through the skin list so a custom skin renders and exports exactly
+  // as a built-in does - the PDF route receives this object, not the id.
+  const displayedTemplateOption = resolveTemplateOption(displayedTemplate, useCarouselSkins());
   const displayedLayoutRecipe = latestDraft?.layoutRecipe || defaultLayoutRecipe;
   const displayedLayoutRecipeOption = getCarouselLayoutRecipeOption(displayedLayoutRecipe);
   const deckQualityReport = latestDraft ? buildCarouselDeckQualityReport(latestDraft, displayedTemplateOption) : null;
