@@ -3394,6 +3394,57 @@ function TeardownDetail({
 }
 
 /**
+ * Turns a rebuilt deck's slide text into the structured draft Carousel Studio
+ * reads. The rebuild is text - slides parsed out of "SLIDE n - role" headings -
+ * so without this it can be copied and saved but never opened as a deck.
+ *
+ * The role comes from the heading, the first line becomes the headline and the
+ * rest the body, which is how the studio renders every other draft.
+ */
+function buildCarouselDraftFromRebuild(
+  slides: { label: string; content: string }[],
+  framework: ExtractedFramework,
+  options: { title?: string; platform?: CreatePlatform } = {},
+): CarouselDraftPayload | null {
+  if (slides.length < 2) return null;
+
+  const layoutRecipe = (framework.layoutRecipe as CarouselLayoutRecipe) || DEFAULT_CAROUSEL_LAYOUT_RECIPE;
+  const normalised = slides
+    .map((slide, index) => {
+      const role = (slide.label.split(/\s[-–]\s/).pop() || '').trim().toLowerCase();
+      const lines = slide.content.split('\n').map((line) => line.trim());
+      const headline = lines.find(Boolean) || '';
+      const body = lines.slice(lines.indexOf(headline) + 1).join('\n').trim();
+      return normalizeCarouselSlide({ role, headline, body }, index, layoutRecipe, slides.length);
+    })
+    .filter((slide): slide is CarouselSlide => Boolean(slide));
+
+  if (normalised.length < 2) return null;
+
+  const platform = options.platform || 'linkedin';
+  const title = options.title?.trim() || normalised[0].headline || 'Rebuilt carousel';
+  return {
+    kind: 'carousel_draft',
+    version: 1,
+    title,
+    caption: '',
+    platform,
+    outputPlatform: createPlatformToContentPlatform[platform],
+    pillar: normalizeGeneratedPillar(framework.suggestedPillar) || null,
+    register: framework.suggestedRegister || null,
+    angle: null,
+    angleLabel: null,
+    topic: title,
+    slideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+    aspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+    template: DEFAULT_CAROUSEL_TEMPLATE,
+    layoutRecipe,
+    slides: normalised,
+    createdAt: new Date().toISOString(),
+  } satisfies CarouselDraftPayload;
+}
+
+/**
  * The tags that say what a saved template is FOR, as opposed to what shape it
  * is. Empty entries are dropped so an older reference shows fewer tags rather
  * than blank pills.
@@ -5137,6 +5188,34 @@ export default function ContentStudio({
     setActiveSection('vault');
   }
 
+  // A rebuilt carousel is a deck, so it is saved as one. Without the structured
+  // draft in notes the Vault card has nothing to open Carousel Studio with, and
+  // the deck is stranded as plain text.
+  const outputSlidesForSave = useMemo(
+    () => splitSlidePreamble(extractOutputMetadata(alchemyOutput).body || alchemyOutput).slides,
+    [alchemyOutput],
+  );
+  const alchemyRebuiltDeck = useMemo(
+    () => (alchemyFramework ? buildCarouselDraftFromRebuild(outputSlidesForSave, alchemyFramework, {
+      title: alchemyFramework.template?.name,
+      platform: alchemyTargetPlatform !== 'auto' ? alchemyTargetPlatform : 'linkedin',
+    }) : null),
+    [alchemyFramework, outputSlidesForSave, alchemyTargetPlatform],
+  );
+
+  async function saveRebuiltDeckToBacklog() {
+    if (alchemyRebuiltDeck) {
+      await saveCarouselDraftToBacklog(alchemyRebuiltDeck);
+      return;
+    }
+    await saveOutputToBacklog(alchemyOutput, 'Transform rebuild', alchemyOutputPlatform);
+  }
+
+  function openRebuiltDeckInCarouselStudio() {
+    if (!alchemyRebuiltDeck) return;
+    void saveCarouselDraftToBacklog(alchemyRebuiltDeck);
+  }
+
   async function saveOutputToBacklog(
     content: string,
     titleFallback: string,
@@ -6742,7 +6821,8 @@ export default function ContentStudio({
                 onOutputChange={setAlchemyOutput}
                 onPolish={polishAlchemyOutput}
                 onQualityCheck={runAlchemyCritique}
-                onSave={() => saveOutputToBacklog(alchemyOutput, 'Transform rebuild', alchemyOutputPlatform)}
+                onSave={() => void saveRebuiltDeckToBacklog()}
+              onOpenCarouselStudio={alchemyRebuiltDeck ? () => openRebuiltDeckInCarouselStudio() : undefined}
                 onCalendar={() =>
                   setCalendarModal({
                     mode: 'create',
@@ -7964,6 +8044,7 @@ function TransformFlow({
   dnaSaving,
   onSaveDnaReference,
   onSaveDnaReferenceAsNew,
+  onOpenCarouselStudio,
   editingReference,
   hasTemplate,
   frameworkTab,
@@ -8037,6 +8118,7 @@ function TransformFlow({
   dnaSaving: boolean;
   onSaveDnaReference: () => void;
   onSaveDnaReferenceAsNew: () => void;
+  onOpenCarouselStudio?: () => void;
   editingReference: { id: string; label: string; locked?: boolean } | null;
   hasTemplate: boolean;
   frameworkTab: 'mechanics' | 'template';
@@ -8691,6 +8773,16 @@ function TransformFlow({
               isRegenerating={stage === 'rebuilding'}
               extraAction={
                 <div className="flex flex-wrap items-center gap-2">
+                  {onOpenCarouselStudio && (
+                    <button
+                      type="button"
+                      onClick={onOpenCarouselStudio}
+                      className="flex items-center gap-1.5 rounded-[6px] border border-[#142334] bg-[#142334] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                    >
+                      <Layers3 className="h-3.5 w-3.5" />
+                      Open Carousel Studio
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onRebuildModeChange('advanced')}
