@@ -3076,15 +3076,31 @@ function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem)
 }
 
 function getCarouselDraftFromBacklogItem(item: ContentBacklogItem): CarouselDraftPayload | null {
-  if (!item.notes) return null;
-  try {
-    const parsed = JSON.parse(item.notes);
-    const record = asPlainObject(parsed);
-    if (!record || record.kind !== 'carousel_draft') return null;
-    return normalizeStoredCarouselDraft(record.draft || record, item);
-  } catch {
-    return null;
-  }
+  const structured = (() => {
+    if (!item.notes) return null;
+    try {
+      const parsed = JSON.parse(item.notes);
+      const record = asPlainObject(parsed);
+      if (!record || record.kind !== 'carousel_draft') return null;
+      return normalizeStoredCarouselDraft(record.draft || record, item);
+    } catch {
+      return null;
+    }
+  })();
+  if (structured) return structured;
+
+  // Older rebuilds were saved as plain text before the structured draft existed,
+  // and a deck saved that way had no way into Carousel Studio. If the content
+  // still reads as slides, rebuild the draft from it rather than stranding it.
+  const slides = splitSlidePreamble(item.content || '').slides;
+  if (slides.length < 2) return null;
+  return buildCarouselDraftFromRebuild(slides, {}, {
+    title: item.title,
+    platform:
+      (Object.keys(createPlatformToContentPlatform) as CreatePlatform[]).find(
+        (key) => createPlatformToContentPlatform[key] === item.platform,
+      ) || 'linkedin',
+  });
 }
 
 function formatCarouselDraftForOutput(draft: CarouselDraftPayload) {
@@ -3403,7 +3419,7 @@ function TeardownDetail({
  */
 function buildCarouselDraftFromRebuild(
   slides: { label: string; content: string }[],
-  framework: ExtractedFramework,
+  framework: Partial<ExtractedFramework>,
   options: { title?: string; platform?: CreatePlatform } = {},
 ): CarouselDraftPayload | null {
   if (slides.length < 2) return null;
