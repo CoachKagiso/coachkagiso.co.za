@@ -7606,8 +7606,11 @@ function TransformFlow({
     </>
   ) : null;
 
+  // Two columns from xl, matching the right panel's own xl:sticky. This sat at
+  // 2xl, so anything under a 1536px viewport - most laptops - stacked into one
+  // column and the panel lost the side-by-side reading it was designed for.
   return (
-    <div className="mt-6 grid gap-5 2xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]">
+    <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]">
       <div className="grid gap-4">
         <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-5">
           <div className="flex items-start gap-3">
