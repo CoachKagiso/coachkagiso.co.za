@@ -78,6 +78,17 @@ Format logic: ${framework.formatLogic}
 ${framework.suggestedPillar ? `Suggested pillar: ${framework.suggestedPillar}` : ''}
 ${buildDeckShapeSection(framework)}
 
+# BRAND TRANSLATION - CRITICAL:
+If framework contains sales variables ($2,500 offer, $250k/year, close rate, message X people a day, big audience vs big action), DO NOT keep them. Translate to Kagiso variables:
+
+- $2,500 offer / $250k -> R40k to R80k income OR 20 applications -> 1 interview math
+- Message 20 people a day -> Send 20 generic applications a day
+- Close 1.4% -> 1.4% callback rate
+- Big audience vs big action -> More experience vs clearer positioning line
+- Sales tactics / income generation pillar -> Override to Personal Brand / Job Search / Career Development
+
+NEVER output high-ticket, closing, or audience monetization advice. Always translate to Corporate SA job search, positioning line, proof with numbers.
+
 TARGET:
 ${targetSection}
 ${pillarNote}${registerNote}${directionNote}${calendarNote}
