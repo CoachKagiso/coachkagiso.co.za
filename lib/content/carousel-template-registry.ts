@@ -876,8 +876,21 @@ export function getCarouselCompositionOptionsForRole(role: CarouselSlideRole) {
     .filter((option, index, options) => options.findIndex((item) => item.value === option.value) === index);
 }
 
+/**
+ * Custom skins are stored under this prefix so a user-defined value can never
+ * collide with a built-in, and so validators can accept one without needing the
+ * skin list - which lives behind the database and is not available everywhere a
+ * draft is normalised.
+ */
+export const CUSTOM_TEMPLATE_PREFIX = 'custom:';
+
 export function isCarouselTemplate(value?: string | null): value is CarouselTemplate {
-  return Boolean(value && carouselTemplateOptions.some((option) => option.value === value));
+  if (!value) return false;
+  // A custom skin is valid here even though it is not in the built-in list.
+  // Resolution falls back to the base template if the skin has since been
+  // deleted, so accepting it cannot leave a draft unrenderable.
+  if (value.startsWith(CUSTOM_TEMPLATE_PREFIX)) return true;
+  return carouselTemplateOptions.some((option) => option.value === value);
 }
 
 export function getCarouselTemplateOption(value?: CarouselTemplate | null) {
