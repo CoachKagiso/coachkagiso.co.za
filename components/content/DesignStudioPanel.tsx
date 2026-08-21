@@ -38,6 +38,7 @@ import {
   RefreshCcw,
   RotateCw,
   Save,
+  Scissors,
   Search,
   SendToBack,
   SlidersHorizontal,
@@ -56,7 +57,13 @@ import {
 } from 'lucide-react';
 import {
   getCarouselAspectRatioOption,
+  carouselLayoutMetrics,
   getCarouselExportDimensions,
+  getCarouselResolvedHeadlineSize,
+  getCarouselLayoutScale,
+  getCarouselSlideBodyPoints,
+  getCarouselSlideTextStats,
+  resolveCarouselComposition,
   getCarouselLayoutRecipeOption,
   getCarouselTemplateOption,
   type CarouselAspectRatio,
@@ -67,6 +74,27 @@ import {
 } from '@/lib/content/carousel-template-registry';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
+import type { DesignPdfInput } from '@/components/content/DesignPdfDocument';
+import {
+  DESIGN_DOCUMENT_LEGACY_STORAGE_KEY,
+  clearLocalDesignMirror,
+  createSavedDesign,
+  deleteSavedDesign,
+  fetchSavedDesign,
+  listSavedDesigns,
+  readLocalDesignMirror,
+  updateSavedDesign,
+  writeLocalDesignMirror,
+  type DesignDocumentSummaryRecord,
+} from '@/lib/content/design-document-client';
+import {
+  DESIGN_TEMPLATE_LEGACY_STORAGE_KEY,
+  deleteDesignTemplateRecord,
+  loadDesignTemplates,
+  persistLocalFallbackTemplates,
+  saveDesignTemplate,
+  updateDesignTemplateRecord,
+} from '@/lib/content/design-template-client';
 
 type DesignFormat = 'social_graphic' | 'carousel' | 'presentation';
 type DesignLayerType = 'text' | 'asset' | 'shape';
@@ -287,6 +315,9 @@ export type DesignStudioCarouselDraftInput = {
   slides: DesignStudioCarouselSlideInput[];
   caption?: string;
   createdAt?: string;
+  // CHANGE N: the custom closing slide chosen in Carousel Studio. Appended as
+  // the final page when the deck is opened here.
+  customCtaTemplateId?: string;
 };
 
 export type DesignStudioCarouselImport = {
@@ -326,9 +357,44 @@ type DesignStudioPendingImport =
       source: DesignStudioTextImport;
     };
 
+// CHANGE M: templates now declare what they are for.
+//
+// "deck" templates skin a whole carousel on import. "cover" templates style a
+// single opening slide. "cta" templates are the closing slide Kagiso appends to
+// a deck - his own follow/promo message, which is deliberately different from
+// the CTA the content itself argues for.
+type DesignTemplateKind = 'deck' | 'cover' | 'cta';
+
+const designTemplateKindOptions: {
+  value: DesignTemplateKind;
+  label: string;
+  description: string;
+}[] = [
+  { value: 'deck', label: 'Deck template', description: 'Skins a whole carousel when a draft is opened in Design Studio.' },
+  { value: 'cover', label: 'Cover template', description: 'Styles the opening slide on its own.' },
+  { value: 'cta', label: 'Custom CTA', description: 'A closing slide you can append to any carousel from Carousel Studio.' },
+];
+
+const DEFAULT_DESIGN_TEMPLATE_KIND: DesignTemplateKind = 'deck';
+
+function isDesignTemplateKind(value: unknown): value is DesignTemplateKind {
+  return value === 'deck' || value === 'cover' || value === 'cta';
+}
+
+// Templates saved before kinds existed have no `kind`; they were all whole-deck
+// designs, so they normalise to "deck".
+function getDesignTemplateKind(record: Pick<DesignTemplateRecord, 'kind'>): DesignTemplateKind {
+  return isDesignTemplateKind(record.kind) ? record.kind : DEFAULT_DESIGN_TEMPLATE_KIND;
+}
+
+function getDesignTemplateKindOption(kind: DesignTemplateKind) {
+  return designTemplateKindOptions.find((option) => option.value === kind) || designTemplateKindOptions[0];
+}
+
 type DesignTemplateRecord = {
   id: string;
   name: string;
+  kind?: DesignTemplateKind;
   format: DesignFormat;
   width: number;
   height: number;
@@ -344,6 +410,16 @@ type ExportState = {
   message: string;
   tone: 'info' | 'error';
 };
+
+// CHANGE L: Design Studio exports were hardcoded to 2x with no way to raise or
+// lower it. Mirrors the Carousel Studio scale control.
+type DesignExportScale = 1 | 2 | 3;
+const designExportScaleOptions: { value: DesignExportScale; label: string; description: string }[] = [
+  { value: 1, label: '1x', description: 'Native canvas size. Smallest files.' },
+  { value: 2, label: '2x', description: 'Retina sharp. Best default.' },
+  { value: 3, label: '3x', description: 'Maximum detail. Large files.' },
+];
+const DEFAULT_DESIGN_EXPORT_SCALE: DesignExportScale = 2;
 
 type DesignHistoryEntry = {
   design: DesignDocument;
@@ -367,11 +443,15 @@ type DesignPatchOptions = {
   recordHistory?: boolean;
 };
 
-const DESIGN_STORAGE_KEY = 'coach-kagiso-design-studio-v3-manifesto';
+// CHANGE S: retained only as the offline mirror key; the design itself lives
+// in Supabase now. See lib/content/design-document-client.ts.
+const DESIGN_STORAGE_KEY = DESIGN_DOCUMENT_LEGACY_STORAGE_KEY;
 const BRAND_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-brand-assets';
 const DELETED_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-deleted-assets';
 const LEGACY_HIDDEN_ASSETS_STORAGE_KEY = 'coach-kagiso-design-studio-v3-hidden-assets';
-const DESIGN_TEMPLATES_STORAGE_KEY = 'coach-kagiso-design-studio-v1-templates';
+// CHANGE O: templates now live in Supabase. The legacy key is still read once so
+// anything already saved in this browser is uploaded rather than lost.
+const DESIGN_TEMPLATES_STORAGE_KEY = DESIGN_TEMPLATE_LEGACY_STORAGE_KEY;
 const CONTENT_VAULT_COLLAPSED_STORAGE_KEY = 'coach-kagiso-design-studio-v1-content-vault-collapsed';
 const DESIGN_LAYER_CLIPBOARD_TEXT = 'Coach Kagiso Design Studio layer selection';
 export const DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY = 'coach-kagiso-design-studio-v1-pending-import';
@@ -2171,6 +2251,137 @@ function isDesignTemplateRecord(value: unknown): value is DesignTemplateRecord {
   );
 }
 
+// CHANGE N: Carousel Studio needs to offer the CTA templates that were designed
+// here, but it should not have to know how they are stored. These two readers
+// are the only doorway; everything else about template storage stays private to
+// this module, so moving templates to Supabase later touches only this file.
+export type DesignCtaTemplateSummary = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  updatedAt: string;
+};
+
+// CHANGE O: reads through the templates API (with its localStorage fallback)
+// rather than straight from browser storage.
+export async function readDesignCtaTemplateSummaries(adminKey?: string): Promise<DesignCtaTemplateSummary[]> {
+  const result = await loadDesignTemplates(adminKey);
+  return result.templates
+    .filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record))
+    .filter((record) => getDesignTemplateKind(record) === 'cta')
+    .map((record) => ({
+      id: record.id,
+      name: record.name,
+      width: record.width,
+      height: record.height,
+      updatedAt: record.updatedAt,
+    }));
+}
+
+/**
+ * CHANGE W: the full CTA template, converted to the shape the vector PDF
+ * renderer draws. Carousel Studio needs this to append the CTA as a real page
+ * in its own export, rather than only when the deck is opened in Design Studio.
+ *
+ * SVG assets are rasterised here because React PDF cannot read them; the rest
+ * of the page stays vector.
+ */
+/**
+ * Built-in assets plus whatever brand assets this browser holds. The component
+ * merges these in state; a module-level export has to read the stored copy.
+ */
+function readAssetLibrarySnapshot(): Record<string, DesignAsset> {
+  if (typeof window === 'undefined') return designAssetLibrary;
+  try {
+    const raw = window.localStorage.getItem(BRAND_ASSETS_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (!Array.isArray(parsed)) return designAssetLibrary;
+    const custom = parsed.filter((asset): asset is DesignAsset => isDesignAsset(asset));
+    return custom.reduce<Record<string, DesignAsset>>(
+      (acc, asset) => ({ ...acc, [asset.id]: asset }),
+      { ...designAssetLibrary },
+    );
+  } catch {
+    return designAssetLibrary;
+  }
+}
+
+export async function loadCtaTemplatePdfInput(
+  templateId: string,
+  adminKey?: string,
+): Promise<DesignPdfInput | null> {
+  const result = await loadDesignTemplates(adminKey);
+  const record = result.templates
+    .filter((item): item is DesignTemplateRecord => isDesignTemplateRecord(item))
+    .find((item) => item.id === templateId);
+
+  const page = record?.document.pages[0];
+  if (!record || !page) return null;
+
+  const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
+  const assets = readAssetLibrarySnapshot();
+  const layers = [];
+
+  for (const layer of page.layers) {
+    const base = {
+      id: layer.id,
+      type: layer.type,
+      x: layer.x,
+      y: layer.y,
+      width: layer.width,
+      height: layer.height,
+      rotation: layer.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      flipX: layer.flipX,
+      flipY: layer.flipY,
+      borderRadius: getLayerBaseBorderRadius(layer),
+    };
+
+    if (layer.type === 'text') {
+      layers.push({
+        ...base,
+        text: layer.text,
+        fontFamily: layer.fontFamily,
+        fontSize: layer.fontSize,
+        fontWeight: layer.fontWeight,
+        color: layer.color,
+        lineHeight: layer.lineHeight,
+        textAlign: layer.textAlign,
+        backgroundColor: layer.backgroundColor,
+        padding: layer.padding,
+        letterSpacing: layer.letterSpacing,
+        textTransform: layer.textTransform,
+        textDecoration: layer.textDecoration,
+        fontStyle: layer.fontStyle,
+      });
+    } else if (layer.type === 'shape') {
+      layers.push({
+        ...base,
+        shape: layer.shape,
+        fillColor: layer.fillColor,
+        strokeColor: layer.strokeColor,
+        strokeWidth: layer.strokeWidth,
+      });
+    } else {
+      const asset = assets[layer.assetId];
+      const imageSrc = asset
+        ? (isSvgDesignAsset(asset)
+            ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
+            : asset.src)
+        : undefined;
+      layers.push({ ...base, imageSrc, fit: layer.fit });
+    }
+  }
+
+  return {
+    width: record.width,
+    height: record.height,
+    pages: [{ id: page.id, background: page.background, layers }],
+  };
+}
+
 function isDesignStudioCarouselImport(value: unknown): value is DesignStudioCarouselImport {
   if (!value || typeof value !== 'object') return false;
   const record = value as Partial<DesignStudioCarouselImport>;
@@ -2316,18 +2527,47 @@ function buildCarouselDesignPage(
 ): DesignPage {
   const template = getCarouselTemplateOption(draft.template);
   const palette = template.palette;
-  const margin = Math.round(width * 0.078);
-  const contentWidth = width - margin * 2;
   const isCover = index === 0 || slide.role === 'cover';
   const isClose = index === total - 1 || slide.role === 'cta';
   const roleLabel = getCarouselRoleLabel(slide.role, index, draft.layoutRecipe, total);
   const bodyText = getCarouselDraftVisualBody(slide);
   const ctaText = getCarouselDraftVisualCta(slide, index, total);
-  const headlineSize = isCover ? Math.round(height * 0.064) : Math.round(height * 0.052);
-  const bodyTop = isCover ? Math.round(height * 0.62) : Math.round(height * 0.48);
-  const bodyHeight = isCover ? Math.round(height * 0.18) : Math.round(height * 0.28);
-  const panelY = Math.max(bodyTop - 28, margin + 260);
   const mutedInk = palette.foreground === '#FFFFFF' ? '#FFFFFF' : palette.muted;
+
+  // CHANGE P: geometry now comes from the shared preview baseline rather than
+  // this function's own fractions of the canvas. `margin` used to be
+  // width * 0.078 (84px at 1080) while the preview used 40 preview-units
+  // (72px at 1080), and the headline was a fraction of height rather than the
+  // brand type scale - which is why a deck opened in Design Studio did not look
+  // like the deck in the preview.
+  const scale = getCarouselLayoutScale(width);
+  const px = (previewValue: number) => Math.round(previewValue * scale);
+
+  const sidePadding = isCover
+    ? px(carouselLayoutMetrics.coverSidePadding)
+    : px(carouselLayoutMetrics.outerPadding);
+  const margin = px(carouselLayoutMetrics.outerPadding);
+  const contentWidth = width - sidePadding * 2;
+
+  // Same composition decision the preview makes, so the type scale below lands
+  // on the same size for the same slide.
+  const bodyPoints = getCarouselSlideBodyPoints(slide.body);
+  const composition = resolveCarouselComposition(slide, slide.role, template, bodyPoints);
+  const stats = getCarouselSlideTextStats(slide);
+  const headlineSize = px(getCarouselResolvedHeadlineSize(composition, stats, { isCover, template: draft.template }));
+
+  // Stack the content column top-down inside the safe band instead of pinning
+  // each block to a fraction of the canvas. This mirrors how the preview's flex
+  // column flows, so blocks keep their relative rhythm at any frame size.
+  const safeTop = px(carouselLayoutMetrics.safeBandY);
+  const headlineTop = safeTop;
+  const headlineLines = Math.max(1, Math.ceil(stats.headlineWords / (isCover ? 3.2 : 4.2)));
+  const headlineHeight = Math.round(headlineSize * carouselLayoutMetrics.headlineLineHeight * headlineLines);
+  const bodyFontSize = px(carouselLayoutMetrics.bodyFontSize);
+  const bodyLines = Math.max(1, Math.ceil(stats.bodyWords / 7));
+  const bodyHeight = Math.round(bodyFontSize * carouselLayoutMetrics.bodyLineHeight * bodyLines);
+  const panelY = headlineTop + headlineHeight + px(28);
+  const bodyTop = panelY + px(20);
 
   const layers: DesignLayer[] = [
     createCarouselShapeLayer({
@@ -2347,12 +2587,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Brand',
       text: 'COACH KAGISO',
-      x: margin,
-      y: margin + 34,
+      x: sidePadding,
+      y: margin + px(19),
       width: Math.round(contentWidth * 0.45),
-      height: 44,
+      height: px(24),
       fontFamily: 'sans',
-      fontSize: 24,
+      fontSize: px(carouselLayoutMetrics.brandFontSize),
       fontWeight: 800,
       color: palette.accent,
       lineHeight: 1,
@@ -2364,12 +2604,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Page number',
       text: `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`,
-      x: width - margin - 188,
-      y: margin + 34,
-      width: 188,
-      height: 38,
+      x: width - sidePadding - px(104),
+      y: margin + px(19),
+      width: px(104),
+      height: px(21),
       fontFamily: 'sans',
-      fontSize: 20,
+      fontSize: px(carouselLayoutMetrics.counterFontSize),
       fontWeight: 700,
       color: mutedInk,
       lineHeight: 1,
@@ -2380,12 +2620,12 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Slide role',
       text: roleLabel,
-      x: margin,
-      y: margin + 108,
-      width: Math.min(380, contentWidth),
-      height: 54,
+      x: sidePadding,
+      y: margin + px(60),
+      width: Math.min(px(211), contentWidth),
+      height: px(30),
       fontFamily: 'sans',
-      fontSize: 20,
+      fontSize: px(carouselLayoutMetrics.eyebrowFontSize),
       fontWeight: 800,
       color: palette.chipText,
       lineHeight: 1,
@@ -2401,10 +2641,10 @@ function buildCarouselDesignPage(
       id: createDesignId('text'),
       name: 'Headline',
       text: normalizeDesignText(slide.headline, draft.title),
-      x: margin,
-      y: isCover ? Math.round(height * 0.25) : Math.round(height * 0.23),
+      x: sidePadding,
+      y: headlineTop,
       width: contentWidth,
-      height: isCover ? Math.round(height * 0.29) : Math.round(height * 0.22),
+      height: headlineHeight,
       fontFamily: 'serif',
       fontSize: headlineSize,
       fontWeight: 800,
@@ -2420,10 +2660,10 @@ function buildCarouselDesignPage(
       createCarouselShapeLayer({
         id: createDesignId('shape'),
         name: 'Body panel',
-        x: margin,
+        x: sidePadding,
         y: panelY,
         width: contentWidth,
-        height: bodyHeight + 52,
+        height: bodyHeight + px(30),
         fillColor: palette.panel,
         strokeColor: palette.border,
         strokeWidth: 2,
@@ -2434,12 +2674,12 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'Body',
         text: bodyText,
-        x: margin + 44,
-        y: panelY + 36,
-        width: contentWidth - 88,
+        x: sidePadding + px(24),
+        y: bodyTop,
+        width: contentWidth - px(48),
         height: bodyHeight,
         fontFamily: 'sans',
-        fontSize: isCover ? 34 : 32,
+        fontSize: bodyFontSize,
         fontWeight: 600,
         color: template.value === 'bold_diagnostic' ? palette.foreground : '#142334',
         lineHeight: 1.26,
@@ -2455,7 +2695,7 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'Visual note',
         text: slide.visualSuggestion.trim(),
-        x: margin,
+        x: sidePadding,
         y: height - margin - 168,
         width: contentWidth,
         height: 72,
@@ -2476,7 +2716,7 @@ function buildCarouselDesignPage(
         id: createDesignId('text'),
         name: 'CTA',
         text: ctaText,
-        x: margin,
+        x: sidePadding,
         y: height - margin - 104,
         width: contentWidth,
         height: 64,
@@ -2561,11 +2801,44 @@ function hydrateCarouselTemplatePage(
   };
 }
 
-function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftInput, templateRecord?: DesignTemplateRecord | null) {
+// CHANGE N: build the closing page from the chosen custom CTA template, resized
+// to the deck's frame so it sits flush with the other slides.
+function buildCustomCtaPage(
+  draft: DesignStudioCarouselDraftInput,
+  dimensions: { width: number; height: number },
+  pageIndex: number,
+  ctaRecord: DesignTemplateRecord | null,
+): DesignPage | null {
+  if (!draft.customCtaTemplateId || !ctaRecord) return null;
+  const ctaPage = ctaRecord.document.pages[0];
+  if (!ctaPage) return null;
+
+  const resized = resizeDesignCanvas(
+    cloneDesignDocument({ ...ctaRecord.document, pages: [ctaPage] }),
+    dimensions.width,
+    dimensions.height,
+  );
+  const resizedPage = resized.pages[0];
+  if (!resizedPage) return null;
+
+  return {
+    ...resizedPage,
+    id: createDesignId('page'),
+    name: `Slide ${pageIndex + 1} - ${ctaRecord.name}`,
+    layers: resizedPage.layers.map((layer) => ({ ...layer, id: createDesignId(layer.type) } as DesignLayer)),
+  };
+}
+
+function createDesignDocumentFromCarouselDraft(
+  draft: DesignStudioCarouselDraftInput,
+  templateRecord?: DesignTemplateRecord | null,
+  ctaTemplateRecord?: DesignTemplateRecord | null,
+) {
   const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
   const dimensions = getCarouselExportDimensions(aspectOption);
   const template = getCarouselTemplateOption(draft.template);
   const matchingTemplate = templateRecord && templateRecord.document.pages.length > 0 ? templateRecord : null;
+  const customCtaPage = buildCustomCtaPage(draft, dimensions, draft.slides.length, ctaTemplateRecord || null);
 
   if (matchingTemplate) {
     const normalizedTemplateDocument = resizeDesignCanvas(
@@ -2584,10 +2857,13 @@ function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftI
       templateSourceName: matchingTemplate.name,
       carouselTemplate: draft.template,
       carouselLayoutRecipe: draft.layoutRecipe,
-      pages: draft.slides.map((slide, index) => {
-        const pagePattern = normalizedTemplateDocument.pages[index] || normalizedTemplateDocument.pages[normalizedTemplateDocument.pages.length - 1];
-        return hydrateCarouselTemplatePage(pagePattern, draft, slide, index, draft.slides.length);
-      }),
+      pages: [
+        ...draft.slides.map((slide, index) => {
+          const pagePattern = normalizedTemplateDocument.pages[index] || normalizedTemplateDocument.pages[normalizedTemplateDocument.pages.length - 1];
+          return hydrateCarouselTemplatePage(pagePattern, draft, slide, index, draft.slides.length);
+        }),
+        ...(customCtaPage ? [customCtaPage] : []),
+      ],
     } satisfies DesignDocument;
   }
 
@@ -2600,9 +2876,12 @@ function createDesignDocumentFromCarouselDraft(draft: DesignStudioCarouselDraftI
     templateSourceName: template.label,
     carouselTemplate: draft.template,
     carouselLayoutRecipe: draft.layoutRecipe,
-    pages: draft.slides.map((slide, index) => (
-      buildCarouselDesignPage(draft, slide, index, draft.slides.length, dimensions.width, dimensions.height)
-    )),
+    pages: [
+      ...draft.slides.map((slide, index) => (
+        buildCarouselDesignPage(draft, slide, index, draft.slides.length, dimensions.width, dimensions.height)
+      )),
+      ...(customCtaPage ? [customCtaPage] : []),
+    ],
   } satisfies DesignDocument;
 }
 
@@ -3870,6 +4149,20 @@ function applySvgMaskExportToNode(
     Number.isFinite(naturalHeight) ? naturalHeight : undefined,
   );
 
+  // CHANGE L: preserve the node's real positioning.
+  //
+  // Recoloured SVG asset nodes are laid out by class ("absolute inset-0"), not
+  // by inline style, so `node.style.position` reads empty and the old code
+  // below forced `position: relative` on every one of them. That pulled the
+  // node out of absolute positioning and back into flow, where an empty box
+  // collapses to zero height - which is why exported assets landed in the wrong
+  // place or changed size. Read the computed value and only fall back when the
+  // node really is static.
+  const computedPosition = node.ownerDocument.defaultView?.getComputedStyle(node).position;
+  const resolvedPosition = computedPosition && computedPosition !== 'static'
+    ? computedPosition
+    : 'relative';
+
   node.replaceChildren();
   node.style.background = 'transparent';
   node.style.backgroundColor = 'transparent';
@@ -3882,7 +4175,7 @@ function applySvgMaskExportToNode(
   node.style.webkitMaskPosition = 'initial';
   node.style.webkitMaskRepeat = 'initial';
   node.style.webkitMaskSize = 'initial';
-  node.style.position = node.style.position || 'relative';
+  node.style.position = resolvedPosition;
   node.style.overflow = 'hidden';
   Object.assign(child.style, childStyle);
   node.append(child);
@@ -3952,6 +4245,13 @@ async function waitForDesignImages(element: HTMLElement) {
   );
 }
 
+// CHANGE L: a 3x export of a large canvas is tens of megabytes of RGBA. Free
+// each one as soon as its bytes have reached a blob or the PDF.
+function releaseDesignExportCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -3980,9 +4280,24 @@ function preloadAllDesignFonts() {
 }
 
 function waitForNextDesignPaint() {
+  // CHANGE L: requestAnimationFrame does not fire while the document is hidden,
+  // so switching to another tab part-way through an export left the whole
+  // pipeline waiting on a frame that would never arrive - the export sat on
+  // "Preparing..." forever with no error and no way out. Race the frame against
+  // a short timeout so a backgrounded tab still finishes.
   return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const timeoutId = window.setTimeout(finish, 250);
+
     window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve());
+      window.requestAnimationFrame(finish);
     });
   });
 }
@@ -3994,23 +4309,29 @@ async function captureDesignCanvas(
   options?: {
     transparentBackground?: boolean;
     visibleLayerIds?: string[];
+    pixelScale?: DesignExportScale;
   },
 ) {
+  const pixelScale = options?.pixelScale ?? DEFAULT_DESIGN_EXPORT_SCALE;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
   const captureId = `design-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const visibleLayerIds = options?.visibleLayerIds ? new Set(options.visibleLayerIds) : null;
 
   exportHost.setAttribute('aria-hidden', 'true');
+  // CHANGE L: park the host far off-screen instead of at the viewport origin.
+  // At left/top 0 the host sat inside the visible viewport, and html2canvas
+  // renders through a window sized by windowWidth/windowHeight - so anything
+  // taller than the browser window got clipped. This mirrors the carousel lane,
+  // which has never had that problem.
   exportHost.style.position = 'fixed';
-  exportHost.style.left = '0';
+  exportHost.style.left = '-100000px';
   exportHost.style.top = '0';
   exportHost.style.width = `${design.width}px`;
   exportHost.style.height = `${design.height}px`;
   exportHost.style.overflow = 'hidden';
   exportHost.style.pointerEvents = 'none';
   exportHost.style.zIndex = '-1';
-  exportHost.style.opacity = '0';
   exportHost.style.visibility = 'visible';
 
   exportElement.dataset.designExportCaptureId = captureId;
@@ -4042,12 +4363,14 @@ async function captureDesignCanvas(
     return await html2canvas(exportElement, {
       backgroundColor: null,
       logging: false,
-      scale: 2,
+      scale: pixelScale,
       width: design.width,
       height: design.height,
       useCORS: true,
-      windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight,
+      // CHANGE L: the render window must be able to contain the whole design,
+      // otherwise html2canvas clips it at the browser viewport.
+      windowWidth: Math.max(document.documentElement.scrollWidth, design.width + 200),
+      windowHeight: Math.max(document.documentElement.scrollHeight, design.height + 200),
       scrollX: 0,
       scrollY: 0,
       onclone: (clonedDocument) => {
@@ -6151,12 +6474,16 @@ function DesignCanvas({
 }
 
 export default function DesignStudioPanel({
+  adminKey,
   carouselImports = [],
   textImports = [],
   vaultImports = [],
   importRequest = null,
   onImportRequestHandled,
 }: {
+  // CHANGE O: templates are a server resource now, so the panel needs the same
+  // dashboard key the rest of the studio uses.
+  adminKey?: string;
   carouselImports?: DesignStudioCarouselImport[];
   textImports?: DesignStudioTextImport[];
   vaultImports?: DesignStudioVaultImport[];
@@ -6189,10 +6516,41 @@ export default function DesignStudioPanel({
   const [deletedAssetIds, setDeletedAssetIds] = useState<string[]>([]);
   const [deletedAssetsLoaded, setDeletedAssetsLoaded] = useState(false);
   const [exportState, setExportState] = useState<ExportState | null>(null);
+  const [exportPixelScale, setExportPixelScale] = useState<DesignExportScale>(DEFAULT_DESIGN_EXPORT_SCALE);
   const [designTemplates, setDesignTemplates] = useState<DesignTemplateRecord[]>([]);
+  // CHANGE M: save dialog (name + kind), and the gallery's kind filter.
+  const [templateDraft, setTemplateDraft] = useState<{ name: string; kind: DesignTemplateKind } | null>(null);
+  const [templateKindFilter, setTemplateKindFilter] = useState<DesignTemplateKind | 'all'>('all');
+  const [templatesUseLocalFallback, setTemplatesUseLocalFallback] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  // CHANGE U: background removal runs in the browser and can take a while on
+  // first use while the model downloads, so it needs its own progress state.
+  const [backgroundRemovalBusy, setBackgroundRemovalBusy] = useState(false);
+  const [backgroundRemovalStatus, setBackgroundRemovalStatus] = useState('');
   const [designTemplatesLoaded, setDesignTemplatesLoaded] = useState(false);
   const [templateMessage, setTemplateMessage] = useState('');
   const [canvasZoom, setCanvasZoom] = useState(100);
+  // CHANGE Q: focus mode hides both side columns so the artboard gets the full
+  // width. Persisted because it is a working preference, not a transient state.
+  const [isCanvasFocusMode, setIsCanvasFocusMode] = useState(false);
+  // CHANGE S: the design being edited is now a row. `currentDesignId` is null
+  // for a design that has never been saved, which is what makes Save create a
+  // new row rather than overwriting whatever was open before.
+  const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
+  // CHANGE S2: loading the saved design is async, and a pending carousel import
+  // applies almost immediately on mount. Without this flag the fetch resolved
+  // afterwards and replaced the freshly imported deck with the last saved
+  // design - silently losing the import. Anything that deliberately replaces
+  // the document claims it, and the loader then leaves it alone.
+  const documentClaimedRef = useRef(false);
+  const [savedDesigns, setSavedDesigns] = useState<DesignDocumentSummaryRecord[]>([]);
+  const [designSaveBusy, setDesignSaveBusy] = useState(false);
+  const canvasViewportRef = useRef<HTMLElement | null>(null);
+  // CHANGE R: the header holds Save and the export buttons, but it scrolls away
+  // as soon as you are working on the canvas. Watch it, and float a compact bar
+  // with the same essential actions whenever it is off-screen.
+  const headerActionsRef = useRef<HTMLDivElement | null>(null);
+  const [areHeaderActionsVisible, setAreHeaderActionsVisible] = useState(true);
   const [canvasGuides, setCanvasGuides] = useState<DesignCanvasGuides>({
     grid: true,
     safeArea: true,
@@ -6317,30 +6675,73 @@ export default function DesignStudioPanel({
     return () => document.removeEventListener('selectionchange', onSelectionChange);
   }, [selectedLayer]);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(DESIGN_STORAGE_KEY);
-    if (!raw) return;
-    let timeoutId: number | null = null;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!isDesignDocument(parsed)) return;
-      timeoutId = window.setTimeout(() => {
-        const emptyHistory: DesignHistory = { past: [], future: [] };
-        designRef.current = parsed;
-        designHistoryRef.current = emptyHistory;
-        activePageIdRef.current = parsed.pages[0]?.id || 'page-1';
-        setDesign(parsed);
-        setDesignHistory(emptyHistory);
-        setActivePageId(activePageIdRef.current);
-        selectSingleLayer(parsed.pages[0]?.layers.find((layer) => !layer.locked)?.id || null);
-      }, 0);
-    } catch {
-      window.localStorage.removeItem(DESIGN_STORAGE_KEY);
-    }
-    return () => {
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
+  // CHANGE S: memoised because the design-loading effect depends on it. As a
+  // plain function it changed identity every render, which would have made that
+  // effect re-run - and refetch the design list - on every single render.
+  const selectSingleLayer = useCallback((id: string | null) => {
+    selectedLayerIdRef.current = id;
+    selectedLayerIdsRef.current = id ? [id] : [];
+    setSelectedLayerIdState(id);
+    setSelectedLayerIds(selectedLayerIdsRef.current);
   }, []);
+
+  // CHANGE S: open the most recently saved design from Supabase, falling back to
+  // the local mirror when the API is unreachable (most likely the
+  // design_documents migration has not been applied yet).
+  useEffect(() => {
+    let cancelled = false;
+
+    const applyDocument = (parsed: DesignDocument, id: string | null) => {
+      if (cancelled || documentClaimedRef.current) return;
+      const emptyHistory: DesignHistory = { past: [], future: [] };
+      designRef.current = parsed;
+      designHistoryRef.current = emptyHistory;
+      activePageIdRef.current = parsed.pages[0]?.id || 'page-1';
+      setDesign(parsed);
+      setDesignHistory(emptyHistory);
+      setActivePageId(activePageIdRef.current);
+      selectSingleLayer(parsed.pages[0]?.layers.find((layer) => !layer.locked)?.id || null);
+      setCurrentDesignId(id);
+    };
+
+    const applyLocalMirror = () => {
+      if (documentClaimedRef.current) return;
+      const local = readLocalDesignMirror();
+      if (isDesignDocument(local)) applyDocument(local, null);
+    };
+
+    void (async () => {
+      try {
+        const designs = await listSavedDesigns(adminKey);
+        if (cancelled) return;
+        // The list is still worth showing even if an import has claimed the
+        // canvas; only the document itself must not be overwritten.
+        setSavedDesigns(designs);
+        if (documentClaimedRef.current) return;
+
+        if (designs.length === 0) {
+          // Nothing saved server-side yet: keep whatever is in this browser so
+          // work in progress is not thrown away by the move.
+          applyLocalMirror();
+          return;
+        }
+
+        const latest = await fetchSavedDesign(designs[0].id, adminKey);
+        if (cancelled) return;
+        if (isDesignDocument(latest.document)) {
+          applyDocument(latest.document, latest.id);
+        } else {
+          applyLocalMirror();
+        }
+      } catch {
+        applyLocalMirror();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey, selectSingleLayer]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -6402,35 +6803,44 @@ export default function DesignStudioPanel({
     window.localStorage.setItem(DELETED_ASSETS_STORAGE_KEY, JSON.stringify(deletedAssetIds));
   }, [deletedAssetIds, deletedAssetsLoaded]);
 
+  // CHANGE O: load templates from Supabase, migrating anything still held in
+  // this browser. Falls back to localStorage if the API cannot be reached -
+  // most likely because the design_templates migration has not been applied.
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const raw = window.localStorage.getItem(DESIGN_TEMPLATES_STORAGE_KEY);
-      if (!raw) {
-        setDesignTemplatesLoaded(true);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(raw) as unknown;
-        setDesignTemplates(Array.isArray(parsed) ? parsed.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record)) : []);
-      } catch {
-        window.localStorage.removeItem(DESIGN_TEMPLATES_STORAGE_KEY);
-      } finally {
-        setDesignTemplatesLoaded(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, []);
+    let cancelled = false;
 
+    void (async () => {
+      const result = await loadDesignTemplates(adminKey);
+      if (cancelled) return;
+
+      setDesignTemplates(
+        result.templates.filter((record): record is DesignTemplateRecord => isDesignTemplateRecord(record)),
+      );
+      setTemplatesUseLocalFallback(result.usedLocalFallback);
+      setDesignTemplatesLoaded(true);
+
+      if (result.usedLocalFallback) {
+        setTemplateMessage(
+          `Templates are saved in this browser only - the templates service is unreachable (${result.error}). Apply the design_templates migration to sync them.`,
+        );
+      } else if (result.migratedCount > 0) {
+        setTemplateMessage(
+          `Moved ${result.migratedCount} template${result.migratedCount === 1 ? '' : 's'} from this browser into your account. They are now available on any device.`,
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey]);
+
+  // Only the degraded path writes to localStorage now; the Supabase copy is
+  // otherwise authoritative.
   useEffect(() => {
-    if (!designTemplatesLoaded) return;
-    try {
-      window.localStorage.setItem(DESIGN_TEMPLATES_STORAGE_KEY, JSON.stringify(designTemplates));
-    } catch {
-      window.setTimeout(() => {
-        setTemplateMessage('Template storage is full. Remove an older template, then save again.');
-      }, 0);
-    }
-  }, [designTemplates, designTemplatesLoaded]);
+    if (!designTemplatesLoaded || !templatesUseLocalFallback) return;
+    persistLocalFallbackTemplates(designTemplates);
+  }, [designTemplates, designTemplatesLoaded, templatesUseLocalFallback]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -6447,6 +6857,12 @@ export default function DesignStudioPanel({
   }, [isVaultPanelCollapsed, vaultPanelPreferenceLoaded]);
 
   const replaceImportedDesignDocument = useCallback((nextDesign: DesignDocument, message: string) => {
+    // CHANGE S: an imported deck is a new design. Detaching from the saved row
+    // means the next Save creates its own record instead of overwriting
+    // whatever was open - which is how importing a second carousel used to
+    // destroy the first with no way back.
+    documentClaimedRef.current = true;
+    setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
     const emptyHistory: DesignHistory = { past: [], future: [] };
@@ -6466,24 +6882,39 @@ export default function DesignStudioPanel({
     setCanvasZoom(100);
   }, []);
 
+  // CHANGE M: gallery contents after the kind filter.
+  const visibleDesignTemplates = useMemo(() => (
+    templateKindFilter === 'all'
+      ? designTemplates
+      : designTemplates.filter((template) => getDesignTemplateKind(template) === templateKindFilter)
+  ), [designTemplates, templateKindFilter]);
+
+  // CHANGE O: the custom CTA template comes from the loaded set, not storage.
+  const findCtaTemplateRecord = useCallback((draft: DesignStudioCarouselDraftInput) => (
+    draft.customCtaTemplateId
+      ? designTemplates.find((template) => template.id === draft.customCtaTemplateId) || null
+      : null
+  ), [designTemplates]);
+
   const getPreferredImportedCarouselTemplateRecord = useCallback((draft: DesignStudioCarouselDraftInput) => {
     const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
     const dimensions = getCarouselExportDimensions(aspectOption);
-    return designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    // CHANGE M: only whole-deck templates may skin an imported carousel. A
+    // single-slide CTA or cover template would otherwise be stretched across
+    // every slide in the deck.
+    const deckTemplates = designTemplates.filter((template) => (
+      template.format === 'carousel' && getDesignTemplateKind(template) === 'deck'
+    ));
+    return deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template &&
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel'
-    )) || null;
+    )) || deckTemplates[0] || null;
   }, [designTemplates]);
 
   const getPreferredImportedTextTemplateRecord = useCallback(() => (
@@ -6500,14 +6931,17 @@ export default function DesignStudioPanel({
 
   const importCarouselDraftFromRequest = useCallback((source: DesignStudioCarouselImport) => {
     const templateRecord = getPreferredImportedCarouselTemplateRecord(source.draft);
-    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord);
+    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord, findCtaTemplateRecord(source.draft));
     replaceImportedDesignDocument(
       nextDesign,
       templateRecord
         ? `Opened ${source.label} with "${templateRecord.name}".`
         : `Opened ${source.label} as editable carousel pages.`,
     );
-  }, [getPreferredImportedCarouselTemplateRecord, replaceImportedDesignDocument]);
+    // findCtaTemplateRecord depends on the loaded template set; without it here
+    // this callback would close over an empty list on first render and drop the
+    // custom CTA slide.
+  }, [findCtaTemplateRecord, getPreferredImportedCarouselTemplateRecord, replaceImportedDesignDocument]);
 
   const importTextDraftFromRequest = useCallback((source: DesignStudioTextImport) => {
     const templateRecord = getPreferredImportedTextTemplateRecord();
@@ -6600,13 +7034,6 @@ export default function DesignStudioPanel({
       return acc;
     }, {});
   }, [assetSearchTerms, brandAssets, deletedAssetIds]);
-
-  function selectSingleLayer(id: string | null) {
-    selectedLayerIdRef.current = id;
-    selectedLayerIdsRef.current = id ? [id] : [];
-    setSelectedLayerIdState(id);
-    setSelectedLayerIds(selectedLayerIdsRef.current);
-  }
 
   function selectLayer(id: string | null, additive = false) {
     if (!id) {
@@ -6901,7 +7328,7 @@ export default function DesignStudioPanel({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activePage.id, selectedLayers, undoDesignChange, redoDesignChange]);
+  }, [activePage.id, selectedLayers, undoDesignChange, redoDesignChange, selectSingleLayer]);
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
@@ -6961,6 +7388,10 @@ export default function DesignStudioPanel({
   }
 
   function replaceDesignDocument(nextDesign: DesignDocument, message: string) {
+    // See replaceImportedDesignDocument. openSavedDesign re-attaches the id
+    // straight after calling this.
+    documentClaimedRef.current = true;
+    setCurrentDesignId(null);
     const nextPage = nextDesign.pages[0];
     const nextSelectedLayerId = nextPage?.layers.find((layer) => !layer.locked)?.id || null;
     const emptyHistory: DesignHistory = { past: [], future: [] };
@@ -6983,19 +7414,21 @@ export default function DesignStudioPanel({
   function getPreferredCarouselTemplateRecord(draft: DesignStudioCarouselDraftInput) {
     const aspectOption = getCarouselAspectRatioOption(draft.aspectRatio, draft.platform);
     const dimensions = getCarouselExportDimensions(aspectOption);
-    return designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    // CHANGE M: deck-kind templates only - see the imported-record matcher.
+    const deckTemplates = designTemplates.filter((template) => (
+      template.format === 'carousel' && getDesignTemplateKind(template) === 'deck'
+    ));
+    return deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template &&
       template.width === dimensions.width &&
       template.height === dimensions.height
-    )) || designTemplates.find((template) => (
-      template.format === 'carousel' &&
+    )) || deckTemplates.find((template) => (
       template.sourceCarouselTemplate === draft.template
     )) || null;
   }
 
   function importCarouselDraft(source: DesignStudioCarouselImport, templateRecord = getPreferredCarouselTemplateRecord(source.draft)) {
-    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord);
+    const nextDesign = createDesignDocumentFromCarouselDraft(source.draft, templateRecord, findCtaTemplateRecord(source.draft));
     replaceDesignDocument(
       nextDesign,
       templateRecord
@@ -7023,58 +7456,94 @@ export default function DesignStudioPanel({
     replaceDesignDocument(createBlankDesignDocument(design.format, design.width, design.height), 'Blank design started.');
   }
 
-  function persistDesignTemplates(records: DesignTemplateRecord[]) {
-    try {
-      window.localStorage.setItem(DESIGN_TEMPLATES_STORAGE_KEY, JSON.stringify(records));
-      return true;
-    } catch {
-      setTemplateMessage('Template storage is full. Delete an older template, then save again.');
-      return false;
-    }
+  // CHANGE M: opens the save dialog. window.prompt could only collect a name,
+  // and a template now also needs a kind.
+  function openSaveTemplateDialog() {
+    setTemplateDraft({
+      name: design.templateSourceName || design.title || 'Design template',
+      kind: design.format === 'carousel' ? 'deck' : DEFAULT_DESIGN_TEMPLATE_KIND,
+    });
   }
 
-  function saveCurrentDesignAsTemplate() {
-    const fallbackName = design.templateSourceName || design.title || 'Design template';
-    const name = window.prompt('Template name', fallbackName);
-    if (!name?.trim()) return;
+  async function saveCurrentDesignAsTemplate(rawName: string, kind: DesignTemplateKind) {
+    const name = rawName.trim();
+    if (!name || templateBusy) return;
 
     const now = new Date().toISOString();
-    const id = createDesignId('template');
+    const localId = createDesignId('template');
     const templateDocument: DesignDocument = {
       ...cloneDesignDocument(design),
       id: createDesignId('template-doc'),
-      title: name.trim(),
-      templateSourceId: id,
-      templateSourceName: name.trim(),
+      title: name,
+      templateSourceId: localId,
+      templateSourceName: name,
       templateUpdatedAt: now,
-    };
-    const record: DesignTemplateRecord = {
-      id,
-      name: name.trim(),
-      format: design.format,
-      width: design.width,
-      height: design.height,
-      sourceCarouselTemplate: design.carouselTemplate,
-      sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
-      document: templateDocument,
-      createdAt: now,
-      updatedAt: now,
     };
 
-    const nextTemplates = [record, ...designTemplates];
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
-    updateDesign((current) => ({
-      ...current,
-      templateSourceId: id,
-      templateSourceName: record.name,
-      templateUpdatedAt: now,
-    }), { recordHistory: false });
-    setTemplateMessage(`"${record.name}" saved and will stay in Saved templates on this browser.`);
+    setTemplateBusy(true);
+    try {
+      // CHANGE O: Supabase assigns the id, so the design points at the stored
+      // record rather than a locally-invented one. Carousel drafts reference CTA
+      // templates by that id, so it has to be the durable one.
+      let record: DesignTemplateRecord;
+
+      if (templatesUseLocalFallback) {
+        record = {
+          id: localId,
+          name,
+          kind,
+          format: design.format,
+          width: design.width,
+          height: design.height,
+          sourceCarouselTemplate: design.carouselTemplate,
+          sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+          document: templateDocument,
+          createdAt: now,
+          updatedAt: now,
+        };
+      } else {
+        const saved = await saveDesignTemplate<DesignDocument>(
+          {
+            name,
+            kind,
+            format: design.format,
+            width: design.width,
+            height: design.height,
+            sourceCarouselTemplate: design.carouselTemplate ?? null,
+            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe ?? null,
+            document: templateDocument,
+          },
+          adminKey,
+        );
+        record = {
+          ...saved,
+          format: design.format,
+          document: { ...saved.document, templateSourceId: saved.id, templateSourceName: saved.name },
+        } as DesignTemplateRecord;
+      }
+
+      setDesignTemplates((current) => [record, ...current]);
+      updateDesign((current) => ({
+        ...current,
+        templateSourceId: record.id,
+        templateSourceName: record.name,
+        templateUpdatedAt: record.updatedAt,
+      }), { recordHistory: false });
+      setTemplateDraft(null);
+      setTemplateMessage(
+        templatesUseLocalFallback
+          ? `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()} in this browser only - the templates service is unreachable.`
+          : `"${record.name}" saved as a ${getDesignTemplateKindOption(kind).label.toLowerCase()}.`,
+      );
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not save this template.');
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
-  function updateCurrentTemplate() {
-    if (!activeTemplateRecord) return;
+  async function updateCurrentTemplate() {
+    if (!activeTemplateRecord || templateBusy) return;
     const confirmed = window.confirm(`Update "${activeTemplateRecord.name}" with this design?`);
     if (!confirmed) return;
 
@@ -7086,24 +7555,45 @@ export default function DesignStudioPanel({
       templateSourceName: activeTemplateRecord.name,
       templateUpdatedAt: now,
     };
-    const nextTemplates = designTemplates.map((template) => (
-      template.id === activeTemplateRecord.id
-        ? {
-            ...template,
+
+    setTemplateBusy(true);
+    try {
+      if (!templatesUseLocalFallback) {
+        await updateDesignTemplateRecord<DesignDocument>(
+          activeTemplateRecord.id,
+          {
             format: design.format,
             width: design.width,
             height: design.height,
-            sourceCarouselTemplate: design.carouselTemplate,
-            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+            sourceCarouselTemplate: design.carouselTemplate ?? null,
+            sourceCarouselLayoutRecipe: design.carouselLayoutRecipe ?? null,
             document: nextDocument,
-            updatedAt: now,
-          }
-        : template
-    ));
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
-    updateDesign((current) => ({ ...current, templateUpdatedAt: now }), { recordHistory: false });
-    setTemplateMessage(`"${activeTemplateRecord.name}" updated and saved.`);
+          },
+          adminKey,
+        );
+      }
+
+      setDesignTemplates((current) => current.map((template) => (
+        template.id === activeTemplateRecord.id
+          ? {
+              ...template,
+              format: design.format,
+              width: design.width,
+              height: design.height,
+              sourceCarouselTemplate: design.carouselTemplate,
+              sourceCarouselLayoutRecipe: design.carouselLayoutRecipe,
+              document: nextDocument,
+              updatedAt: now,
+            }
+          : template
+      )));
+      updateDesign((current) => ({ ...current, templateUpdatedAt: now }), { recordHistory: false });
+      setTemplateMessage(`"${activeTemplateRecord.name}" updated and saved.`);
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not update this template.');
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
   function loadTemplateRecord(template: DesignTemplateRecord) {
@@ -7117,12 +7607,28 @@ export default function DesignStudioPanel({
     replaceDesignDocument(nextDesign, `Loaded "${template.name}".`);
   }
 
-  function deleteTemplateRecord(template: DesignTemplateRecord) {
-    const confirmed = window.confirm(`Delete "${template.name}" from saved templates?`);
+  async function deleteTemplateRecord(template: DesignTemplateRecord) {
+    if (templateBusy) return;
+    const confirmed = window.confirm(
+      getDesignTemplateKind(template) === 'cta'
+        ? `Delete "${template.name}"? Any carousel draft using it as a custom CTA will lose that closing slide.`
+        : `Delete "${template.name}" from saved templates?`,
+    );
     if (!confirmed) return;
-    const nextTemplates = designTemplates.filter((item) => item.id !== template.id);
-    if (!persistDesignTemplates(nextTemplates)) return;
-    setDesignTemplates(nextTemplates);
+
+    setTemplateBusy(true);
+    try {
+      if (!templatesUseLocalFallback) {
+        await deleteDesignTemplateRecord(template.id, adminKey);
+      }
+    } catch (error) {
+      setTemplateMessage(error instanceof Error ? error.message : 'Could not delete this template.');
+      setTemplateBusy(false);
+      return;
+    }
+    setTemplateBusy(false);
+
+    setDesignTemplates((current) => current.filter((item) => item.id !== template.id));
     if (design.templateSourceId === template.id) {
       updateDesign((current) => ({
         ...current,
@@ -7788,6 +8294,57 @@ export default function DesignStudioPanel({
     patchLayer(layer.id, patch);
   }
 
+  // CHANGE U: cut the background out of a placed image.
+  //
+  // The result is registered as a NEW asset rather than overwriting the
+  // original, so the untouched image stays in the library and the change is a
+  // normal undoable layer edit rather than a destructive library mutation.
+  async function removeSelectedLayerBackground(layer: DesignAssetLayer) {
+    const asset = assetLibrary[layer.assetId];
+    if (!asset || backgroundRemovalBusy) return;
+
+    if (isSvgDesignAsset(asset)) {
+      setAssetLibraryMessage('SVG assets have no background to remove - they are already transparent shapes.');
+      return;
+    }
+
+    setBackgroundRemovalBusy(true);
+    setBackgroundRemovalStatus('Preparing the cut-out...');
+    try {
+      const { removeImageBackground } = await import('@/lib/content/background-removal');
+      const cutOutSrc = await removeImageBackground(asset.src, (progress) => {
+        setBackgroundRemovalStatus(
+          progress.ratio === null
+            ? progress.label
+            : `${progress.label} ${Math.round(progress.ratio * 100)}%`,
+        );
+      });
+
+      const size = await getImageNaturalSize(cutOutSrc);
+      const cutOutAsset: DesignAsset = {
+        id: createDesignId('brand-asset'),
+        name: `${asset.name} (cut out)`,
+        src: cutOutSrc,
+        category: 'Brand assets',
+        custom: true,
+        recolorable: false,
+        naturalWidth: size?.width,
+        naturalHeight: size?.height,
+      };
+
+      setBrandAssets((current) => [cutOutAsset, ...current]);
+      patchLayer(layer.id, { assetId: cutOutAsset.id, name: cutOutAsset.name } as Partial<DesignLayer>);
+      setAssetLibraryMessage(`Background removed. "${cutOutAsset.name}" was added to your assets.`);
+    } catch (error) {
+      setAssetLibraryMessage(
+        error instanceof Error ? `Could not remove the background: ${error.message}` : 'Could not remove the background.',
+      );
+    } finally {
+      setBackgroundRemovalBusy(false);
+      setBackgroundRemovalStatus('');
+    }
+  }
+
   function changeAssetLayerAsset(layer: DesignAssetLayer, assetId: DesignAssetId) {
     const asset = assetLibrary[assetId];
     if (!asset) return;
@@ -7799,9 +8356,68 @@ export default function DesignStudioPanel({
     patchLayer(layer.id, patch as Partial<DesignLayer>);
   }
 
-  function saveDesign() {
-    window.localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(designRef.current));
-    setSaveMessage('Design saved on this browser.');
+  // CHANGE S: save to Supabase, mirroring locally so an unreachable API cannot
+  // cost work. Creates a row the first time, updates it after that.
+  async function saveDesign() {
+    if (designSaveBusy) return;
+    const snapshot = designRef.current;
+    writeLocalDesignMirror(snapshot);
+    setDesignSaveBusy(true);
+    setSaveMessage('Saving...');
+
+    try {
+      const payload = {
+        title: snapshot.title || 'Untitled design',
+        format: snapshot.format,
+        width: snapshot.width,
+        height: snapshot.height,
+        document: snapshot as unknown,
+      };
+      const saved = currentDesignId
+        ? await updateSavedDesign(currentDesignId, payload, adminKey)
+        : await createSavedDesign(payload, adminKey);
+
+      setCurrentDesignId(saved.id);
+      setSavedDesigns((current) => {
+        const without = current.filter((item) => item.id !== saved.id);
+        const { document: _document, ...summary } = saved;
+        return [summary, ...without];
+      });
+      setSaveMessage('Design saved to your account.');
+    } catch (error) {
+      setSaveMessage(
+        `Saved in this browser only - ${error instanceof Error ? error.message : 'the designs service is unreachable'}.`,
+      );
+    } finally {
+      setDesignSaveBusy(false);
+    }
+  }
+
+  async function openSavedDesign(summary: DesignDocumentSummaryRecord) {
+    if (designSaveBusy) return;
+    try {
+      const record = await fetchSavedDesign(summary.id, adminKey);
+      if (!isDesignDocument(record.document)) throw new Error('That saved design could not be read.');
+      replaceDesignDocument(record.document, `Opened "${summary.title}".`);
+      setCurrentDesignId(record.id);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Could not open that design.');
+    }
+  }
+
+  async function deleteSavedDesignRecord(summary: DesignDocumentSummaryRecord) {
+    if (designSaveBusy) return;
+    if (!window.confirm(`Delete "${summary.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteSavedDesign(summary.id, adminKey);
+      setSavedDesigns((current) => current.filter((item) => item.id !== summary.id));
+      // The open design is now unsaved rather than silently pointing at a row
+      // that no longer exists, so the next Save creates a fresh one.
+      if (currentDesignId === summary.id) setCurrentDesignId(null);
+      setSaveMessage(`"${summary.title}" deleted.`);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Could not delete that design.');
+    }
   }
 
   function resetDesign() {
@@ -7811,7 +8427,10 @@ export default function DesignStudioPanel({
     setActivePageId(nextDesign.pages[0].id);
     selectSingleLayer('main-headline');
     setSaveMessage('');
-    window.localStorage.removeItem(DESIGN_STORAGE_KEY);
+    // Detach from the saved row: Reset starts a new design, it does not wipe
+    // the one already stored.
+    setCurrentDesignId(null);
+    clearLocalDesignMirror();
   }
 
   function toggleCanvasGuide(key: keyof DesignCanvasGuides) {
@@ -7825,9 +8444,46 @@ export default function DesignStudioPanel({
     setCanvasZoom((current) => clamp(current + delta, MIN_CANVAS_ZOOM, MAX_CANVAS_ZOOM));
   }
 
-  function fitCanvasZoom() {
-    setCanvasZoom(100);
-  }
+  // CHANGE Q: "Fit" used to just set 100%, which is not a fit at all - it is why
+  // the canvas overflowed its column and had to be dialled down to 60-65% by
+  // hand. Measure the actual viewport and solve for the zoom that fits.
+  const fitCanvasZoom = useCallback(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) {
+      setCanvasZoom(100);
+      return;
+    }
+    const styles = window.getComputedStyle(viewport);
+    const horizontalPadding = parseFloat(styles.paddingLeft || '0') + parseFloat(styles.paddingRight || '0');
+    // Leave a little breathing room so the artboard never touches the edges.
+    const availableWidth = Math.max(1, viewport.clientWidth - horizontalPadding - 24);
+    // Fit to width, not to the whole artboard. The canvas column scrolls
+    // vertically, and the problem being solved here is horizontal - the artboard
+    // being squeezed by the side panels. Fitting height as well lands around 51%
+    // on a portrait frame, smaller than the 60-65% that was being set by hand.
+    const ratio = availableWidth / design.width;
+    setCanvasZoom(clamp(Math.floor(ratio * 100), MIN_CANVAS_ZOOM, MAX_CANVAS_ZOOM));
+    // Width-only fit, so height is deliberately not a dependency.
+  }, [design.width]);
+
+  // Fit whenever the frame changes or the panels are collapsed, so the canvas
+  // uses whatever room it has just been given.
+  useEffect(() => {
+    fitCanvasZoom();
+  }, [fitCanvasZoom, isCanvasFocusMode]);
+
+  useEffect(() => {
+    const node = headerActionsRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setAreHeaderActionsVisible(entry.isIntersecting),
+      // A sliver counts as visible, so the floating bar does not flicker in and
+      // out while the header is half on-screen.
+      { threshold: 0, rootMargin: '-8px 0px 0px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   function setCanvasAspectRatio(width: number, height: number) {
     updateDesign((current) => resizeDesignCanvas(current, width, height));
@@ -7858,10 +8514,22 @@ export default function DesignStudioPanel({
       await new Promise((resolve) => window.setTimeout(resolve, 350));
 
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
+      const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas, {
+        pixelScale: exportPixelScale,
+      });
       const blob = await canvasToPngBlob(canvas);
-      downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}.png`);
-      setExportState({ busy: false, message: 'PNG exported.', tone: 'info' });
+      const exportedWidth = canvas.width;
+      const exportedHeight = canvas.height;
+      releaseDesignExportCanvas(canvas);
+      downloadBlob(
+        blob,
+        `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}@${exportPixelScale}x.png`,
+      );
+      setExportState({
+        busy: false,
+        message: `PNG exported at ${exportedWidth}x${exportedHeight}.`,
+        tone: 'info',
+      });
     } catch (error) {
       setExportState({
         busy: false,
@@ -7869,6 +8537,94 @@ export default function DesignStudioPanel({
         tone: 'error',
       });
     }
+  }
+
+  // CHANGE V: build the vector export payload from the layer model.
+  //
+  // SVG assets are rasterised to PNG first: React PDF's <Image> cannot read SVG,
+  // and we are in the browser so a canvas conversion is cheap. Everything else -
+  // text, shapes, rotation - stays as real PDF objects.
+  async function buildVectorPdfInput(exportDesign: DesignDocument) {
+    const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
+    const imageCache = new Map<string, string>();
+
+    const resolveImage = async (asset: DesignAsset | undefined) => {
+      if (!asset) return undefined;
+      const cached = imageCache.get(asset.id);
+      if (cached) return cached;
+      const resolved = isSvgDesignAsset(asset)
+        ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
+        : asset.src;
+      if (resolved) imageCache.set(asset.id, resolved);
+      return resolved;
+    };
+
+    const pages = [];
+    for (const page of exportDesign.pages) {
+      const layers = [];
+      for (const layer of page.layers) {
+        const base = {
+          id: layer.id,
+          type: layer.type,
+          x: layer.x,
+          y: layer.y,
+          width: layer.width,
+          height: layer.height,
+          rotation: layer.rotation,
+          opacity: layer.opacity,
+          visible: layer.visible,
+          flipX: layer.flipX,
+          flipY: layer.flipY,
+          borderRadius: getLayerBaseBorderRadius(layer),
+        };
+
+        if (layer.type === 'text') {
+          layers.push({
+            ...base,
+            text: layer.text,
+            fontFamily: layer.fontFamily,
+            fontSize: layer.fontSize,
+            fontWeight: layer.fontWeight,
+            color: layer.color,
+            lineHeight: layer.lineHeight,
+            textAlign: layer.textAlign,
+            backgroundColor: layer.backgroundColor,
+            padding: layer.padding,
+            letterSpacing: layer.letterSpacing,
+            textTransform: layer.textTransform,
+            textDecoration: layer.textDecoration,
+            fontStyle: layer.fontStyle,
+          });
+        } else if (layer.type === 'shape') {
+          layers.push({
+            ...base,
+            shape: layer.shape,
+            fillColor: layer.fillColor,
+            strokeColor: layer.strokeColor,
+            strokeWidth: layer.strokeWidth,
+          });
+        } else {
+          layers.push({
+            ...base,
+            imageSrc: await resolveImage(assetLibrary[layer.assetId]),
+            fit: layer.fit,
+          });
+        }
+      }
+      pages.push({ id: page.id, background: page.background, layers });
+    }
+
+    return { width: exportDesign.width, height: exportDesign.height, pages };
+  }
+
+  function collectDesignFontFamilies(exportDesign: DesignDocument) {
+    const families: string[] = [];
+    exportDesign.pages.forEach((page) => {
+      page.layers.forEach((layer) => {
+        if (layer.type === 'text' && layer.visible) families.push(layer.fontFamily);
+      });
+    });
+    return families;
   }
 
   async function exportPdf() {
@@ -7883,6 +8639,42 @@ export default function DesignStudioPanel({
       message: `Preparing ${exportDesign.pages.length}-page PDF export...`,
       tone: 'info',
     });
+
+    // CHANGE V: try the vector lane first. The layer model is a scene graph, so
+    // it can be drawn as real PDF objects - sharp at any zoom, exact rotations,
+    // and nothing clipped by the viewport. Raster stays as the fallback.
+    try {
+      const { getVectorExportBlocker, renderDesignPdfBlob } = await import('@/components/content/DesignPdfDocument');
+      const blocker = getVectorExportBlocker(collectDesignFontFamilies(exportDesign));
+
+      if (blocker) {
+        // A vector PDF with substituted fonts looks wrong in a way that is hard
+        // to notice until it is printed. Rasterising is the honest choice here.
+        setExportState({
+          busy: true,
+          message: `Using image export: ${blocker}.`,
+          tone: 'info',
+        });
+      } else {
+        setExportState({ busy: true, message: 'Rendering vector PDF...', tone: 'info' });
+        const input = await buildVectorPdfInput(exportDesign);
+        const blob = await renderDesignPdfBlob(input);
+        downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
+        setExportState({
+          busy: false,
+          message: `Vector PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}. Text stays sharp at any zoom.`,
+          tone: 'info',
+        });
+        return;
+      }
+    } catch (error) {
+      console.warn('Vector PDF failed, falling back to image export:', error);
+      setExportState({
+        busy: true,
+        message: 'Vector render failed - falling back to image export...',
+        tone: 'info',
+      });
+    }
 
     try {
       await waitForNextDesignPaint();
@@ -7909,17 +8701,37 @@ export default function DesignStudioPanel({
         await waitForNextDesignPaint();
         await new Promise((resolve) => window.setTimeout(resolve, 200));
 
-        const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas);
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        if (index > 0) pdf.addPage([canvasWidth, canvasHeight], orientation);
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvasWidth, canvasHeight);
+        const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas, {
+          pixelScale: exportPixelScale,
+        });
+        // CHANGE L: this is the export cut-off.
+        //
+        // The document was created with a page of [design.width, design.height]
+        // (1x) but every image was drawn at the *canvas* size, which is
+        // pixelScale times larger. On page 1 that painted a 2160x2700 image
+        // onto a 1080x1350 page anchored top-left, so the PDF showed only the
+        // top-left quarter of the design. Pages 2+ were then added at the
+        // canvas size, so page dimensions were inconsistent too.
+        //
+        // Pages now stay at the design size on every page, and the image is
+        // drawn to fill exactly that box. The bitmap keeps its extra pixels, so
+        // it is oversampled into the page rather than cropped by it.
+        if (index > 0) pdf.addPage([exportDesign.width, exportDesign.height], orientation);
+        pdf.addImage(
+          canvas.toDataURL('image/png'),
+          'PNG',
+          0,
+          0,
+          exportDesign.width,
+          exportDesign.height,
+        );
+        releaseDesignExportCanvas(canvas);
       }
 
       downloadBlob(pdf.output('blob'), `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
       setExportState({
         busy: false,
-        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}.`,
+        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'} at ${exportDesign.width}x${exportDesign.height}, ${exportPixelScale}x detail.`,
         tone: 'info',
       });
     } catch (error) {
@@ -7933,6 +8745,158 @@ export default function DesignStudioPanel({
 
   return (
     <section data-hide-custom-cursor className="w-full min-w-0 pb-10">
+      {/* CHANGE M: save-as-template dialog. Collects the name and the kind. */}
+      {templateDraft && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#142334]/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save design as template"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setTemplateDraft(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-[8px] bg-white p-5 shadow-xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Save as template</p>
+            <h3 className="mt-2 font-serif text-[26px] leading-tight text-[#142334]">Name it and say what it is for</h3>
+
+            <label className="mt-4 block">
+              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/60">Template name</span>
+              <input
+                autoFocus
+                value={templateDraft.name}
+                onChange={(event) => setTemplateDraft((current) => (
+                  current ? { ...current, name: event.target.value } : current
+                ))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && templateDraft.name.trim()) {
+                    saveCurrentDesignAsTemplate(templateDraft.name, templateDraft.kind);
+                  }
+                  if (event.key === 'Escape') setTemplateDraft(null);
+                }}
+                className="mt-1 w-full rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] px-3 py-2 text-[14px] text-[#142334] outline-none focus:border-[#142334]"
+                placeholder="Manifesto CTA - follow"
+              />
+            </label>
+
+            <div className="mt-4 grid gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/60">What is it for?</span>
+              {designTemplateKindOptions.map((option) => {
+                const isSelected = templateDraft.kind === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setTemplateDraft((current) => (
+                      current ? { ...current, kind: option.value } : current
+                    ))}
+                    aria-pressed={isSelected}
+                    className={`rounded-[8px] border p-3 text-left transition ${
+                      isSelected
+                        ? 'border-[#142334] bg-[#142334] text-white'
+                        : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">{option.label}</span>
+                    <span className={`mt-1 block text-[12px] leading-relaxed ${isSelected ? 'text-white/70' : 'text-[#142334]/60'}`}>
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setTemplateDraft(null)} className="studio-ghost-button">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => saveCurrentDesignAsTemplate(templateDraft.name, templateDraft.kind)}
+                disabled={!templateDraft.name.trim()}
+                className="studio-primary-button"
+              >
+                Save template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGE R: floating action bar. Appears only once the header actions
+          have scrolled out of view, so Save and the exports stay reachable
+          without scrolling back up. Reset is deliberately not here - it is
+          destructive and does not belong one stray click away. */}
+      {!areHeaderActionsVisible && (
+        <div
+          role="toolbar"
+          aria-label="Design actions"
+          className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-full border border-[#E4D8CB] bg-white/95 p-1.5 shadow-[0_18px_45px_rgba(20,35,52,0.18)] backdrop-blur-md md:bottom-8"
+        >
+          <span className="hidden px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8C7466] sm:inline">
+            {activePage.name}
+          </span>
+          <button
+            type="button"
+            onClick={saveDesign}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:bg-[#F8F6F4]"
+          >
+            <Save className="h-3.5 w-3.5" />
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportPdf()}
+            disabled={exportState?.busy}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {exportState?.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportPng()}
+            disabled={exportState?.busy}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#142334] px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#22384f] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {exportState?.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            PNG {exportPixelScale}x
+          </button>
+          <span className="mx-0.5 h-5 w-px bg-[#E4D8CB]" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={undoDesignChange}
+            disabled={!canUndo}
+            title="Undo"
+            aria-label="Undo"
+            className="grid min-h-9 min-w-9 place-items-center rounded-full text-[#142334]/70 transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={redoDesignChange}
+            disabled={!canRedo}
+            title="Redo"
+            aria-label="Redo"
+            className="grid min-h-9 min-w-9 place-items-center rounded-full text-[#142334]/70 transition hover:bg-[#F8F6F4] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCanvasFocusMode((current) => !current)}
+            aria-pressed={isCanvasFocusMode}
+            title={isCanvasFocusMode ? 'Show the side panels' : 'Hide the side panels'}
+            className={`min-h-9 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+              isCanvasFocusMode ? 'bg-[#142334] text-white' : 'text-[#142334]/70 hover:bg-[#F8F6F4]'
+            }`}
+          >
+            Focus
+          </button>
+        </div>
+      )}
+
       <div className="grid w-full min-w-0 gap-4">
         <div className="rounded-[8px] bg-white p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -7943,7 +8907,32 @@ export default function DesignStudioPanel({
                 Start with the Manifesto Note Graphic, then use the same page and layer engine for carousel and presentation formats.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div ref={headerActionsRef} className="flex flex-wrap items-center gap-2">
+              {/* CHANGE L: export resolution, matching Carousel Studio. */}
+              <div
+                className="flex items-center gap-1 rounded-full border border-[#E4D8CB] bg-[#F8F6F4] p-1"
+                role="group"
+                aria-label="Export resolution"
+              >
+                {designExportScaleOptions.map((option) => {
+                  const isSelected = exportPixelScale === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setExportPixelScale(option.value)}
+                      disabled={exportState?.busy}
+                      title={`${option.description} (${design.width * option.value}x${design.height * option.value})`}
+                      aria-pressed={isSelected}
+                      className={`rounded-full px-3 py-1 text-[12px] font-bold transition disabled:opacity-50 ${
+                        isSelected ? 'bg-[#142334] text-white' : 'text-[#142334]/60 hover:bg-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
               <button type="button" onClick={saveDesign} className="studio-secondary-button">
                 <Save className="h-4 w-4" />
                 Save design
@@ -7999,7 +8988,7 @@ export default function DesignStudioPanel({
                   <Plus className="h-4 w-4" />
                   Blank design
                 </button>
-                <button type="button" onClick={saveCurrentDesignAsTemplate} className="studio-secondary-button">
+                <button type="button" onClick={openSaveTemplateDialog} className="studio-secondary-button">
                   <Save className="h-4 w-4" />
                   Save as template
                 </button>
@@ -8080,6 +9069,68 @@ export default function DesignStudioPanel({
               </div>
             )}
 
+            {/* CHANGE S: saved designs. Before this, Design Studio held exactly
+                one design and an import replaced it outright. */}
+            {savedDesigns.length > 0 && (
+              <div className="mt-4 rounded-[8px] bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel>Saved designs</FieldLabel>
+                  <span className="rounded-full bg-[#F5F3EE] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">
+                    {savedDesigns.length}
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  {savedDesigns.slice(0, 6).map((summary) => {
+                    const isCurrent = currentDesignId === summary.id;
+                    return (
+                      <div
+                        key={summary.id}
+                        className={`rounded-[8px] border bg-[#F8F6F4] p-3 transition ${
+                          isCurrent
+                            ? 'border-[#142334] outline outline-2 outline-[#C9AD98]'
+                            : 'border-[#E4D8CB] hover:border-[#C9AD98] hover:bg-white'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void openSavedDesign(summary)}
+                          className="block w-full text-left"
+                        >
+                          <span className="block truncate text-[12px] font-bold text-[#142334]">{summary.title}</span>
+                          <span className="mt-1 block truncate text-[11px] text-[#142334]/55">
+                            {summary.width} x {summary.height} - {summary.format.replace(/_/g, ' ')}
+                          </span>
+                        </button>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void openSavedDesign(summary)}
+                            disabled={isCurrent}
+                            className="min-h-8 rounded-[8px] border border-[#E4D8CB] bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#FBFAF8] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteSavedDesignRecord(summary)}
+                            className="flex min-h-8 items-center justify-center gap-1 rounded-[8px] border border-red-100 bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-[#142334]/55">
+                  {currentDesignId
+                    ? 'Save updates the highlighted design.'
+                    : 'This design has not been saved yet - Save will create a new one.'}
+                </p>
+              </div>
+            )}
+
             {designTemplates.length > 0 && (
               <div className="mt-4 rounded-[8px] bg-white p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -8088,8 +9139,32 @@ export default function DesignStudioPanel({
                     {designTemplates.length}
                   </span>
                 </div>
+                {/* CHANGE M: filter the gallery by what a template is for. */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(['all', ...designTemplateKindOptions.map((option) => option.value)] as const).map((value) => {
+                    const isSelected = templateKindFilter === value;
+                    const count = value === 'all'
+                      ? designTemplates.length
+                      : designTemplates.filter((template) => getDesignTemplateKind(template) === value).length;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTemplateKindFilter(value)}
+                        aria-pressed={isSelected}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition ${
+                          isSelected
+                            ? 'border-[#142334] bg-[#142334] text-white'
+                            : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/60 hover:border-[#C9AD98] hover:bg-white'
+                        }`}
+                      >
+                        {value === 'all' ? 'All' : getDesignTemplateKindOption(value).label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {designTemplates.slice(0, 8).map((template) => (
+                  {visibleDesignTemplates.slice(0, 8).map((template) => (
                     <div
                       key={template.id}
                       className={`group relative rounded-[8px] border bg-[#F8F6F4] p-3 transition ${
@@ -8104,6 +9179,18 @@ export default function DesignStudioPanel({
                           {template.format === 'carousel' && template.sourceCarouselTemplate
                             ? getCarouselTemplateOption(template.sourceCarouselTemplate).label
                             : template.format.replace(/_/g, ' ')}
+                        </span>
+                        {/* CHANGE M: what this template is for. */}
+                        <span
+                          className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${
+                            getDesignTemplateKind(template) === 'cta'
+                              ? 'bg-[#142334] text-white'
+                              : getDesignTemplateKind(template) === 'cover'
+                                ? 'bg-[#C9AD98] text-[#142334]'
+                                : 'bg-[#F5F3EE] text-[#8C7466]'
+                          }`}
+                        >
+                          {getDesignTemplateKindOption(getDesignTemplateKind(template)).label}
                         </span>
                       </button>
                       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -8144,9 +9231,22 @@ export default function DesignStudioPanel({
           )}
         </div>
 
-        <div className="grid w-full min-w-0 gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[minmax(300px,0.9fr)_minmax(0,1.1fr)] xl:items-start 2xl:grid-cols-[minmax(330px,0.95fr)_minmax(520px,1.2fr)_minmax(360px,1.05fr)]">
+        {/* CHANGE Q: at xl the canvas column was minmax(0, 1.1fr) with the right
+            panel spanning both columns, so the artboard could be squeezed to
+            nothing. It now keeps a real minimum, and focus mode collapses the
+            side columns entirely. */}
+        <div
+          className={
+            isCanvasFocusMode
+              ? 'grid w-full min-w-0 gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-1 xl:items-start'
+              : 'grid w-full min-w-0 gap-3 xl:min-h-[calc(100vh-32px)] xl:grid-cols-[minmax(280px,0.8fr)_minmax(560px,1.4fr)] xl:items-start 2xl:grid-cols-[minmax(330px,0.95fr)_minmax(620px,1.5fr)_minmax(340px,0.95fr)]'
+          }
+        >
           <aside
-            className="grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:self-start"
+            hidden={isCanvasFocusMode}
+            className={`grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:self-start ${
+              isCanvasFocusMode ? 'hidden' : ''
+            }`}
             onWheel={trapDesignWheel}
           >
             <section className="rounded-[8px] bg-white p-4">
@@ -8584,6 +9684,7 @@ export default function DesignStudioPanel({
           </aside>
 
           <main
+            ref={canvasViewportRef}
             className="design-studio-scroll-area min-w-0 rounded-[8px] bg-[#F8F6F4] p-1.5 xl:sticky xl:top-4 xl:self-start xl:overflow-x-hidden"
             onWheel={trapDesignWheel}
           >
@@ -8656,9 +9757,25 @@ export default function DesignStudioPanel({
                     <button
                       type="button"
                       onClick={fitCanvasZoom}
+                      title="Fit the artboard to the available space"
                       className="min-h-8 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334]/62 transition hover:bg-[#F8F6F4] hover:text-[#142334]"
                     >
                       Fit
+                    </button>
+                    {/* CHANGE Q: hide both side columns and give the artboard the
+                        full width. */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCanvasFocusMode((current) => !current)}
+                      aria-pressed={isCanvasFocusMode}
+                      title={isCanvasFocusMode ? 'Show the side panels' : 'Hide the side panels and focus on the canvas'}
+                      className={`min-h-8 rounded-full px-3 text-[11px] font-bold uppercase tracking-[0.12em] transition ${
+                        isCanvasFocusMode
+                          ? 'bg-[#142334] text-white'
+                          : 'text-[#142334]/62 hover:bg-[#F8F6F4] hover:text-[#142334]'
+                      }`}
+                    >
+                      Focus
                     </button>
                   </div>
                 </div>
@@ -8772,7 +9889,10 @@ export default function DesignStudioPanel({
 
           <aside
             ref={rightPanelRef}
-            className="design-studio-scroll-area grid min-w-0 gap-4 overflow-x-hidden xl:col-span-2 xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 2xl:col-span-1 [scrollbar-gutter:stable]"
+            hidden={isCanvasFocusMode}
+            className={`design-studio-scroll-area grid min-w-0 gap-4 overflow-x-hidden xl:sticky xl:top-4 xl:max-h-[calc(100vh-120px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain xl:pr-2 [scrollbar-gutter:stable] ${
+              isCanvasFocusMode ? 'hidden' : 'xl:col-span-2 2xl:col-span-1'
+            }`}
             onWheel={trapDesignWheel}
           >
             <section className="rounded-[8px] bg-white p-4">
@@ -9027,6 +10147,27 @@ export default function DesignStudioPanel({
                               ))}
                             </select>
                           </label>
+
+                          {/* CHANGE U: cut the background out of a placed photo.
+                              Runs in this browser - the image is never uploaded. */}
+                          <div className="grid gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void removeSelectedLayerBackground(selectedLayer)}
+                              disabled={selectedLayer.locked || backgroundRemovalBusy}
+                              className="flex min-h-9 items-center justify-center gap-2 rounded-[8px] border border-[#E4D8CB] bg-white px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98] hover:bg-[#FBFAF8] disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              {backgroundRemovalBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Scissors className="h-3.5 w-3.5" />
+                              )}
+                              Remove background
+                            </button>
+                            {backgroundRemovalBusy && backgroundRemovalStatus && (
+                              <p className="text-[11px] leading-relaxed text-[#142334]/58">{backgroundRemovalStatus}</p>
+                            )}
+                          </div>
                           {selectedAsset?.groupedLayers?.length ? (
                             <button
                               type="button"

@@ -691,7 +691,11 @@ function SlideContent({
   }
 }
 
-export function CarouselPdfDocument({ deck, template }: CarouselPdfProps) {
+export function CarouselPdfDocument({
+  deck,
+  template,
+  trailingPages,
+}: CarouselPdfProps & { trailingPages?: React.ReactNode }) {
   const { palette, furniture } = template;
   return (
     <Document>
@@ -716,6 +720,10 @@ export function CarouselPdfDocument({ deck, template }: CarouselPdfProps) {
           </Page>
         );
       })}
+      {/* CHANGE W: a custom CTA slide is a design document, not a carousel
+          slide. Appending its already-built vector pages here keeps the whole
+          deck in one PDF without merging two files or rasterising either. */}
+      {trailingPages}
     </Document>
   );
 }
