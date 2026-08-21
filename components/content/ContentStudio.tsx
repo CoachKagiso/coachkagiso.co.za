@@ -3477,9 +3477,14 @@ function TransformTemplateTab({ template }: { template: { headline: string; slid
   );
 }
 
-/** The machine-readable half of a carousel extraction, kept visible but compact. */
+/**
+ * The machine-readable half of a carousel extraction, kept visible but compact.
+ * The three short values sit on one row; the pillar carries a sentence of
+ * justification, so it spans the full width underneath rather than being
+ * squeezed into a quarter column.
+ */
 function getDeckSpecEntries(framework: ExtractedFramework) {
-  const entries: { label: string; value: string }[] = [];
+  const entries: { label: string; value: string; wide?: boolean }[] = [];
   if (framework.slideCount) entries.push({ label: 'Slide count', value: String(framework.slideCount) });
   if (framework.layoutRecipe) {
     entries.push({
@@ -3490,7 +3495,9 @@ function getDeckSpecEntries(framework: ExtractedFramework) {
   if (framework.copyDensity) {
     entries.push({ label: 'Copy density', value: framework.copyDensity.replace(/^./, (c) => c.toUpperCase()) });
   }
-  if (framework.suggestedPillar) entries.push({ label: 'Suggested pillar', value: framework.suggestedPillar });
+  if (framework.suggestedPillar) {
+    entries.push({ label: 'Suggested pillar', value: framework.suggestedPillar, wide: true });
+  }
   return entries;
 }
 
@@ -8039,11 +8046,14 @@ function TransformFlow({
               <TransformTemplateTab template={framework.template ?? null} />
             ) : framework.slideCount ? (
               <>
-                <dl className="mt-4 grid gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
+                <dl className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] sm:grid-cols-3">
                   {getDeckSpecEntries(framework).map((entry) => (
-                    <div key={entry.label} className="bg-white px-3 py-2.5">
+                    <div
+                      key={entry.label}
+                      className={`bg-white px-3 py-2.5 ${entry.wide ? 'sm:col-span-3' : ''}`}
+                    >
                       <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{entry.label}</dt>
-                      <dd className="mt-1 text-[13px] font-medium text-[#142334]">{entry.value}</dd>
+                      <dd className="mt-1 text-[13px] font-medium leading-relaxed text-[#142334]">{entry.value}</dd>
                     </div>
                   ))}
                 </dl>
