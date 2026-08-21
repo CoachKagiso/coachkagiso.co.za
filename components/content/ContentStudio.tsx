@@ -15,6 +15,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  Layers3,
   Lightbulb,
   Link2,
   Loader2,
@@ -45,6 +46,8 @@ import { OutputPanel, OutputWithActions } from '@/components/content/shared/Outp
 import { EditorialCalendarTab } from '@/components/content/tabs/EditorialCalendarTab';
 import DesignStudioPanel, {
   DESIGN_STUDIO_PENDING_IMPORT_STORAGE_KEY,
+  readDesignCtaTemplateSummaries,
+  type DesignCtaTemplateSummary,
   type DesignStudioCarouselImport,
   type DesignStudioImportRequest,
   type DesignStudioTextImport,
@@ -73,9 +76,14 @@ import {
   getCarouselCompositionOption,
   getCarouselCompositionOptionsForRole,
   getCarouselExportDimensions,
+  getCarouselHeadlineSize,
   getCarouselLayoutRecipeOption,
+  getCarouselResolvedHeadlineSize,
+  getCarouselSlideBodyPoints,
   getCarouselSlideCountOption,
+  getCarouselSlideTextStats,
   getCarouselTemplateOption,
+  resolveCarouselComposition,
   isCarouselAspectRatio,
   isCarouselComposition,
   isCarouselLayoutRecipe,
@@ -90,6 +98,7 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
+import { buildTemplateFillPrompt, countPlaceholders, splitRebuildOutput } from '@/lib/content/carousel-template';
 import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
 import {
   cleanMessyMiddleNotes,
@@ -145,6 +154,15 @@ type CreatePlatform = CarouselPlatform;
 type TopicSource = 'manual' | 'signal' | 'brief';
 type CreatePillarFocus = ContentPillar | 'auto';
 type CarouselExportMode = 'pdf' | 'png';
+// CHANGE J: export resolution is now a user choice. 1x is the LinkedIn/Instagram
+// native frame, 2x and 3x oversample for retina feeds and reuse in decks.
+type CarouselExportScale = 1 | 2 | 3;
+const carouselExportScaleOptions: { value: CarouselExportScale; label: string; description: string }[] = [
+  { value: 1, label: '1x', description: 'Native frame. Smallest files.' },
+  { value: 2, label: '2x', description: 'Retina sharp. Best default.' },
+  { value: 3, label: '3x', description: 'Maximum detail. Large files.' },
+];
+const DEFAULT_CAROUSEL_EXPORT_SCALE: CarouselExportScale = 2;
 type AiMode =
   | 'signal_brief'
   | 'auto_topic'
@@ -350,7 +368,9 @@ type SessionPlannerPresentationOutput = {
   generatedAt: string;
 };
 type HookType = 'text_post' | 'spoken_video' | 'visual' | 'visual_spoken';
-type TransformInputType = 'text' | 'image';
+// CHANGE T: 'carousel' uploads a LinkedIn carousel PDF. Stage 1 already
+// extracts structure from a screenshot; a deck is the same job across N slides.
+type TransformInputType = 'text' | 'image' | 'carousel';
 type AiPromptSelection = Pick<CreateSelection, 'contentType' | 'subType' | 'angle' | 'angleRegister'>;
 type SmartPulseKey = 'platform' | 'content' | 'angle' | 'topic';
 type SmartSuggestState =
@@ -414,6 +434,23 @@ type ExtractedFramework = {
   ctaStyle: string;
   formatLogic: string;
   suggestedPillar?: string;
+  // CHANGE T: only present when the source was a carousel deck. The arc and
+  // recipe use the registry vocabulary so the DNA can drive the generator.
+  slideCount?: number;
+  slideArc?: string[];
+  layoutRecipe?: string;
+  copyDensity?: string;
+  visualPattern?: string;
+  whatMakesItWork?: string;
+  // Mechanism: how the deck works, rather than what it is about.
+  hookTechnique?: string;
+  intraSlideLoop?: string[];
+  pacing?: { sentence?: string; breath?: string; close?: string };
+  valueMethod?: string;
+  ctaLayers?: string[];
+  emotionalArc?: { start?: string; middle?: string; end?: string };
+  // Written by Stage 2 and filed in the Vault, never kept in Transform.
+  fillInTemplate?: string;
 };
 
 export type CarouselSlide = {
@@ -447,6 +484,11 @@ type CarouselDraftPayload = {
   slides: CarouselSlide[];
   accessibilityNote?: string;
   createdAt: string;
+  // CHANGE N: Kagiso's own closing slide - a follow or promo message that is
+  // deliberately separate from the CTA the content itself argues for. Designed
+  // in Design Studio, chosen here, appended as the final page on import.
+  customCtaTemplateId?: string;
+  customCtaTemplateName?: string;
 };
 
 type CarouselDraftRecord = {
@@ -1128,6 +1170,13 @@ const transformInputTypes: {
     inputLabel: 'Upload a screenshot',
     placeholder: '',
   },
+  {
+    value: 'carousel',
+    label: 'Carousel PDF',
+    description: 'Upload a LinkedIn carousel',
+    inputLabel: 'Upload a carousel PDF',
+    placeholder: '',
+  },
 ];
 
 const contentSections: { value: ContentSection; label: string; icon: LucideIcon }[] = [
@@ -1144,6 +1193,7 @@ const vaultSections: Array<{ value: VaultSection; label: string; description: st
   { value: 'smart', label: 'Smart Suggest', description: 'AI-suggested ideas saved for later', icon: Sparkles },
   { value: 'messy', label: 'Messy Middle', description: 'Raw thoughts and unfinished fragments', icon: PenLine },
   { value: 'insights', label: 'Insights', description: 'Published articles ready to repurpose', icon: FileText },
+  { value: 'templates', label: 'Templates', description: 'Saved carousel moulds ready to reuse', icon: Layers3 },
 ];
 
 const createPlatformOptions: CreatePlatformOption[] = [
@@ -3001,6 +3051,14 @@ function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem)
     slides,
     accessibilityNote: multilineString(rawDraft.accessibilityNote ?? rawDraft.accessibility_note),
     createdAt: compactString(rawDraft.createdAt ?? rawDraft.created_at) || item?.createdAt || new Date().toISOString(),
+    // CHANGE N: survives the vault round-trip. The AI never sets these - they
+    // are Kagiso's choice in Carousel Studio.
+    ...(compactString(rawDraft.customCtaTemplateId)
+      ? { customCtaTemplateId: compactString(rawDraft.customCtaTemplateId) }
+      : {}),
+    ...(compactString(rawDraft.customCtaTemplateName)
+      ? { customCtaTemplateName: compactString(rawDraft.customCtaTemplateName) }
+      : {}),
   };
 }
 
@@ -3272,6 +3330,7 @@ function sortVaultRecordsByExpiry(items: ContentBacklogItem[]) {
 
 function getTransformInputIcon(inputType: TransformInputType, className = 'h-4 w-4') {
   if (inputType === 'image') return <ImageIcon className={className} />;
+  if (inputType === 'carousel') return <Layers3 className={className} />;
   return <FileText className={className} />;
 }
 
@@ -3285,6 +3344,87 @@ function trapWheel(e: React.WheelEvent<HTMLElement>) {
   e.stopPropagation();
 }
 
+/** The machine-readable half of a carousel extraction, kept visible but compact. */
+function getDeckSpecEntries(framework: ExtractedFramework) {
+  const entries: { label: string; value: string }[] = [];
+  if (framework.slideCount) entries.push({ label: 'Slide count', value: String(framework.slideCount) });
+  if (framework.layoutRecipe) {
+    entries.push({
+      label: 'Closest recipe',
+      value: getCarouselLayoutRecipeOption(framework.layoutRecipe as CarouselLayoutRecipe).label,
+    });
+  }
+  if (framework.copyDensity) {
+    entries.push({ label: 'Copy density', value: framework.copyDensity.replace(/^./, (c) => c.toUpperCase()) });
+  }
+  if (framework.suggestedPillar) entries.push({ label: 'Suggested pillar', value: framework.suggestedPillar });
+  return entries;
+}
+
+type MechanicsCard = {
+  title: string;
+  lead?: string;
+  body?: string;
+  beats?: string[];
+  rows?: { label: string; value: string }[];
+};
+
+/**
+ * The mechanics teardown. Cards are dropped when the extraction did not produce
+ * that layer, so an older saved framework renders what it has rather than a
+ * column of empty headings.
+ */
+function getMechanicsCards(framework: ExtractedFramework): MechanicsCard[] {
+  const cards: MechanicsCard[] = [];
+
+  if (framework.hookTechnique || framework.hookPattern) {
+    const [lead, ...rest] = (framework.hookTechnique || '').split(/\.\s+/);
+    cards.push({
+      title: 'Hook technique',
+      lead: framework.hookTechnique ? lead : undefined,
+      body: framework.hookTechnique ? rest.join('. ') || undefined : framework.hookPattern,
+    });
+  }
+
+  if (framework.storyStructure || framework.intraSlideLoop?.length) {
+    cards.push({
+      title: 'Structure pattern',
+      lead: framework.storyStructure,
+      beats: framework.intraSlideLoop,
+    });
+  }
+
+  const pacingRows = [
+    framework.pacing?.sentence ? { label: 'Sentence', value: framework.pacing.sentence } : null,
+    framework.pacing?.breath ? { label: 'Breath', value: framework.pacing.breath } : null,
+    framework.pacing?.close ? { label: 'Close', value: framework.pacing.close } : null,
+  ].filter((row): row is { label: string; value: string } => Boolean(row));
+  if (pacingRows.length > 0) cards.push({ title: 'Pacing', rows: pacingRows });
+
+  if (framework.valueMethod) cards.push({ title: 'Value delivery', lead: framework.valueMethod });
+
+  if (framework.ctaLayers?.length) {
+    cards.push({
+      title: 'CTA structure',
+      rows: framework.ctaLayers.map((layer, index) => ({ label: `Layer ${index + 1}`, value: layer })),
+    });
+  } else if (framework.ctaStyle) {
+    cards.push({ title: 'CTA structure', lead: framework.ctaStyle });
+  }
+
+  const arcBeats = [framework.emotionalArc?.start, framework.emotionalArc?.middle, framework.emotionalArc?.end]
+    .filter((beat): beat is string => Boolean(beat));
+  if (arcBeats.length > 0) {
+    cards.push({ title: 'Emotional arc', lead: arcBeats.join(' → '), beats: undefined });
+  } else if (framework.emotionalTension) {
+    cards.push({ title: 'Emotional tension', lead: framework.emotionalTension });
+  }
+
+  if (framework.visualPattern) cards.push({ title: 'Visual pattern', body: framework.visualPattern });
+
+  return cards;
+}
+
 function getFrameworkRows(framework: ExtractedFramework) {
   return [
     { label: 'Hook pattern', value: framework.hookPattern },
@@ -3293,6 +3433,16 @@ function getFrameworkRows(framework: ExtractedFramework) {
     { label: 'CTA style', value: framework.ctaStyle },
     { label: 'Format logic', value: framework.formatLogic },
     ...(framework.suggestedPillar ? [{ label: 'Suggested pillar', value: framework.suggestedPillar }] : []),
+    ...(framework.slideCount ? [{ label: 'Slide count', value: String(framework.slideCount) }] : []),
+    ...(framework.slideArc?.length
+      ? [{ label: 'Slide arc', value: framework.slideArc.map((role) => carouselSlideRoleLabels[role as CarouselSlideRole] || role).join(' -> ') }]
+      : []),
+    ...(framework.layoutRecipe
+      ? [{ label: 'Closest recipe', value: getCarouselLayoutRecipeOption(framework.layoutRecipe as CarouselLayoutRecipe).label }]
+      : []),
+    ...(framework.copyDensity ? [{ label: 'Copy density', value: framework.copyDensity }] : []),
+    ...(framework.visualPattern ? [{ label: 'Visual pattern', value: framework.visualPattern }] : []),
+    ...(framework.whatMakesItWork ? [{ label: 'What makes it work', value: framework.whatMakesItWork }] : []),
   ];
 }
 
@@ -3782,6 +3932,12 @@ export default function ContentStudio({
   const [alchemyImageName, setAlchemyImageName] = useState('');
   const [alchemyImageSize, setAlchemyImageSize] = useState(0);
   const [alchemyImageUrl, setAlchemyImageUrl] = useState('');
+  // CHANGE T: carousel PDF upload. The rendered page images are held until
+  // extraction so a re-run does not need to re-render the PDF.
+  const [alchemyDeckFile, setAlchemyDeckFile] = useState<File | null>(null);
+  const [alchemyDeckPages, setAlchemyDeckPages] = useState<{ pageNumber: number; blob: Blob }[]>([]);
+  const [alchemyDeckNotice, setAlchemyDeckNotice] = useState('');
+  const [alchemyDeckReading, setAlchemyDeckReading] = useState(false);
   const [alchemyUrlOpen, setAlchemyUrlOpen] = useState(false);
   const [alchemyFramework, setAlchemyFramework] = useState<ExtractedFramework | null>(null);
   const [alchemyOutput, setAlchemyOutput] = useState('');
@@ -3943,14 +4099,35 @@ export default function ContentStudio({
     });
   }, [backlogPillarFilter, backlogPlatformFilter, backlogRecords, backlogSearch, backlogStatusFilter]);
 
+  // CHANGE T2: analysed decks are kept as a reusable swipe file. The framework
+  // is transient in Transform's own flow, so without this the analysis is spent
+  // the moment a rebuild happens.
+  const [dnaReferences, setDnaReferences] = useState<{
+    id: string;
+    label: string;
+    slideCount: number;
+    layoutRecipe: string | null;
+    slideArc: string[];
+    framework: ExtractedFramework;
+  }[]>([]);
+  const [dnaSaving, setDnaSaving] = useState(false);
+  // The mould Stage 2 returns alongside the rebuilt deck. It is held only long
+  // enough to be filed in the Vault - Transform is not where templates live.
+  const [alchemyTemplate, setAlchemyTemplate] = useState('');
+  const [templateFillingId, setTemplateFillingId] = useState<string | null>(null);
+  const [alchemyDeckWarning, setAlchemyDeckWarning] = useState('');
+
   const vaultTotals = useMemo(
     () => ({
       ideas: backlogRecords.filter(isIdeaBacklogItem).length,
       smart: backlogRecords.filter(isSmartSuggestItem).length,
       messy: backlogRecords.filter(isMessyMiddleItem).length,
       insights: backlogRecords.filter(isInsightsBacklogItem).length,
+      // Templates live in carousel_dna, not the backlog, so the count comes from
+      // the saved references rather than from a backlog filter.
+      templates: dnaReferences.length,
     }),
-    [backlogRecords],
+    [backlogRecords, dnaReferences],
   );
   const vaultBuckets = useMemo<Record<VaultSection, ContentBacklogItem[]>>(
     () => ({
@@ -3958,6 +4135,8 @@ export default function ContentStudio({
       smart: sortVaultRecordsByExpiry(filteredBacklog.filter(isSmartSuggestItem)),
       messy: sortVaultRecordsByExpiry(filteredBacklog.filter(isMessyMiddleItem)),
       insights: sortVaultRecordsByExpiry(filteredBacklog.filter(isInsightsBacklogItem)),
+      // Never holds backlog items - the templates tab renders dnaReferences.
+      templates: [],
     }),
     [filteredBacklog],
   );
@@ -4121,7 +4300,9 @@ export default function ContentStudio({
   const alchemyOutputPlatform = alchemyTargetPlatform !== 'auto' ? createPlatformToContentPlatform[alchemyTargetPlatform] : defaultOutputPlatform;
   const hasAlchemyInput = alchemyInputType === 'image'
     ? Boolean(alchemyImageFile || alchemyImageBase64)
-    : Boolean(alchemySource.trim());
+    : alchemyInputType === 'carousel'
+      ? alchemyDeckPages.length > 0
+      : Boolean(alchemySource.trim());
   const canExtractAlchemy = hasAlchemyInput;
   const canRebuildAlchemy = Boolean(alchemyFramework);
   const selectedCreateType = findContentTypeOption(createSelection);
@@ -5231,6 +5412,189 @@ export default function ContentStudio({
     setCreateError(null);
   }
 
+
+  const fetchDnaReferences = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/content/carousel-dna?key=${encodeURIComponent(adminKey)}`);
+      const data = (await response.json().catch(() => ({}))) as { references?: typeof dnaReferences };
+      return response.ok && data.references ? data.references : null;
+    } catch {
+      // A missing reference list must not block the Transform flow.
+      return null;
+    }
+  }, [adminKey]);
+
+  const loadDnaReferences = useCallback(async () => {
+    const references = await fetchDnaReferences();
+    if (references) setDnaReferences(references);
+  }, [fetchDnaReferences]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const references = await fetchDnaReferences();
+      if (!cancelled && references) setDnaReferences(references);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDnaReferences]);
+
+  async function saveDnaReference() {
+    if (!alchemyFramework || dnaSaving) return;
+    if (!alchemyTemplate.trim()) {
+      setCreateError('Rebuild first - the template is written during the rebuild, then filed in the Vault.');
+      return;
+    }
+    const suggested = alchemyDeckFile?.name.replace(/\.pdf$/i, '') || 'Reference deck';
+    const label = window.prompt('Name this template', suggested);
+    if (!label?.trim()) return;
+
+    setDnaSaving(true);
+    try {
+      await requestJson('/api/content/carousel-dna', 'POST', {
+        key: adminKey,
+        label: label.trim(),
+        sourceName: alchemyDeckFile?.name || null,
+        slideCount: alchemyFramework.slideCount || 0,
+        layoutRecipe: alchemyFramework.layoutRecipe || null,
+        slideArc: alchemyFramework.slideArc || [],
+        // The mould rides inside the framework jsonb, so saving a template needs
+        // no migration and keeps the typed columns doing their job.
+        framework: { ...alchemyFramework, fillInTemplate: alchemyTemplate.trim() },
+      });
+      await loadDnaReferences();
+      setActiveVaultSection('templates');
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not save this reference.');
+    } finally {
+      setDnaSaving(false);
+    }
+  }
+
+  function useDnaReference(reference: (typeof dnaReferences)[number]) {
+    // Drop the saved framework back into Stage 2's input. Rebuilding from a
+    // reference is the same operation as rebuilding from a fresh analysis.
+    setAlchemyFramework(reference.framework);
+    setAlchemyStage('extracted');
+    setAlchemyOutput('');
+    setAlchemyCritique(null);
+    setCreateError(null);
+  }
+
+  // Filling a saved mould is a generation, not a navigation: the deck is built
+  // first and only then handed to Carousel Studio, so the studio always opens on
+  // a finished draft rather than an empty canvas the user has to trigger again.
+  async function useTemplateInCarouselStudio(reference: (typeof dnaReferences)[number]) {
+    const template = String(reference.framework?.fillInTemplate || '').trim();
+    if (!template) {
+      setCreateError('This saved reference has no template. Rebuild the deck to produce one.');
+      return;
+    }
+
+    const topic = window.prompt(`What should "${reference.label}" be about?`, '');
+    if (!topic?.trim()) return;
+
+    const selection: CreateSelection = {
+      platform: 'linkedin',
+      contentType: 'carousel',
+      subType: null,
+      angle: 'tactical_teacher',
+      angleRegister: null,
+      carouselSlideCount: DEFAULT_CAROUSEL_SLIDE_COUNT,
+      carouselAspectRatio: DEFAULT_CAROUSEL_ASPECT_RATIO,
+      carouselTemplate: DEFAULT_CAROUSEL_TEMPLATE,
+      carouselLayoutRecipe: (reference.layoutRecipe as CarouselLayoutRecipe) || DEFAULT_CAROUSEL_LAYOUT_RECIPE,
+    };
+
+    setTemplateFillingId(reference.id);
+    setCreateError(null);
+    try {
+      const result = await callAi(
+        deriveCreateMode(selection),
+        buildTemplateFillPrompt({
+          template,
+          topic: topic.trim(),
+          label: reference.label,
+          pillar: String(reference.framework?.suggestedPillar || '') || null,
+          slideArc: reference.slideArc,
+        }),
+        selection,
+      );
+      const draft = buildCarouselDraftFromAiOutput(result, selection, topic.trim(), 'auto');
+      setGeneratedCarouselDraft(draft);
+      setGeneratedPost(formatCarouselDraftForOutput(draft));
+      // Persists the finished deck and switches to Carousel Studio with it
+      // selected, so the studio opens on the built draft rather than a canvas.
+      await saveCarouselDraftToBacklog(draft);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not build a deck from this template.');
+    } finally {
+      setTemplateFillingId(null);
+    }
+  }
+
+  async function deleteDnaReference(id: string) {
+    if (!window.confirm('Delete this reference structure?')) return;
+    try {
+      await requestJson('/api/content/carousel-dna', 'DELETE', { key: adminKey, id });
+      setDnaReferences((current) => current.filter((item) => item.id !== id));
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not delete this reference.');
+    }
+  }
+
+  // CHANGE T: render the uploaded deck to page images in the browser. Doing it
+  // here rather than at extraction time means the slide count is visible before
+  // any AI spend, and a retry does not re-render the PDF.
+  async function selectAlchemyDeckFile(file: File | null) {
+    setAlchemyDeckWarning('');
+    setAlchemyDeckFile(null);
+    setAlchemyDeckPages([]);
+    setAlchemyDeckNotice('');
+    setAlchemyFramework(null);
+    setAlchemyOutput('');
+    setAlchemyStage('idle');
+    setAlchemyCritique(null);
+    setCreateError(null);
+
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setCreateError('Upload the carousel as a PDF. That is what LinkedIn serves when you download a document post.');
+      return;
+    }
+    if (file.size > 40 * 1024 * 1024) {
+      setCreateError('That PDF is over 40MB. Export it smaller and try again.');
+      return;
+    }
+
+    setAlchemyDeckReading(true);
+    try {
+      const { readCarouselPdfPages, MAX_CAROUSEL_PDF_PAGES } = await import('@/lib/content/carousel-pdf-reader');
+      const result = await readCarouselPdfPages(file);
+      if (result.pages.length === 0) throw new Error('That PDF has no readable pages.');
+
+      setAlchemyDeckFile(file);
+      setAlchemyDeckPages(result.pages);
+      setAlchemyDeckNotice(
+        result.truncated
+          ? `${result.totalPages} slides found - the first ${MAX_CAROUSEL_PDF_PAGES} will be analysed.`
+          : `${result.pages.length} slide${result.pages.length === 1 ? '' : 's'} ready to analyse.`,
+      );
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not read that PDF.');
+    } finally {
+      setAlchemyDeckReading(false);
+    }
+  }
+
+  function clearAlchemyDeck() {
+    setAlchemyDeckFile(null);
+    setAlchemyDeckPages([]);
+    setAlchemyDeckNotice('');
+  }
+
   function selectAlchemyInputType(inputType: TransformInputType) {
     setAlchemyInputType(inputType);
     resetAlchemyFlow();
@@ -5311,7 +5675,30 @@ export default function ContentStudio({
     try {
       let data: { framework: ExtractedFramework };
 
-      if (alchemyInputType === 'image') {
+      if (alchemyInputType === 'carousel') {
+        if (alchemyDeckPages.length === 0) throw new Error('Upload a carousel PDF first.');
+        const formData = new FormData();
+        formData.append('key', adminKey);
+        alchemyDeckPages.forEach((page) => {
+          formData.append('slides', new File([page.blob], `slide-${page.pageNumber}.jpg`, { type: 'image/jpeg' }));
+        });
+        const response = await fetch('/api/content/transform/stage1', { method: 'POST', body: formData });
+        const parsed = (await response.json().catch(() => ({}))) as {
+          framework?: ExtractedFramework;
+          error?: string;
+          warnings?: { unreadableSlides?: number; totalSlides?: number; unknownRoles?: string[] };
+        };
+        if (!response.ok || !parsed.framework) throw new Error(parsed.error || 'Could not extract the structure.');
+        // An arc built from a deck that was only half read must say so, rather
+        // than presenting itself as a clean extraction.
+        const unreadable = parsed.warnings?.unreadableSlides || 0;
+        setAlchemyDeckWarning(
+          unreadable > 0
+            ? `${unreadable} of ${parsed.warnings?.totalSlides || alchemyDeckPages.length} slides could not be read. The structure below is based on the rest.`
+            : '',
+        );
+        data = { framework: parsed.framework };
+      } else if (alchemyInputType === 'image') {
         if (alchemyImageFile) {
           const formData = new FormData();
           formData.append('key', adminKey);
@@ -5339,6 +5726,7 @@ export default function ContentStudio({
 
       setAlchemySource('');
       clearAlchemyImage();
+      clearAlchemyDeck();
       setAlchemyFramework(data.framework);
       setAlchemyStage('extracted');
     } catch (error) {
@@ -5393,7 +5781,9 @@ export default function ContentStudio({
         calendarContext,
         researchEntries: activeResearchEntries.length > 0 ? activeResearchEntries : undefined,
       });
-      setAlchemyOutput(data.result.trim());
+      const { post, template } = splitRebuildOutput(data.result);
+      setAlchemyOutput(post);
+      setAlchemyTemplate(template);
       setAlchemyStage('complete');
     } catch (error) {
       setAlchemyStage('extracted');
@@ -5854,6 +6244,18 @@ export default function ContentStudio({
 
             {studioMode === 'transform' && (
               <TransformFlow
+                dnaReferences={dnaReferences}
+                dnaSaving={dnaSaving}
+                onSaveDnaReference={() => void saveDnaReference()}
+                hasTemplate={Boolean(alchemyTemplate.trim())}
+                onUseDnaReference={useDnaReference}
+                onDeleteDnaReference={(id) => void deleteDnaReference(id)}
+                deckPageCount={alchemyDeckPages.length}
+                deckFileName={alchemyDeckFile?.name || ''}
+                deckNotice={alchemyDeckNotice}
+                deckWarning={alchemyDeckWarning}
+                deckReading={alchemyDeckReading}
+                onDeckSelect={(file) => void selectAlchemyDeckFile(file)}
                 inputTypes={transformInputTypes}
                 inputType={alchemyInputType}
                 selectedInput={selectedAlchemyInput}
@@ -5922,6 +6324,7 @@ export default function ContentStudio({
 
         {activeWorkspace === 'carousel' && (
           <CarouselStudioPanel
+            adminKey={adminKey}
             key={`carousel-${selectedCarouselDraftId || carouselDraftRecords[0]?.item.id || 'empty'}`}
             drafts={carouselDraftRecords}
             defaultAspectRatio={createSelection.carouselAspectRatio}
@@ -5956,6 +6359,7 @@ export default function ContentStudio({
 
         {activeWorkspace === 'design' && (
           <DesignStudioPanel
+            adminKey={adminKey}
             carouselImports={designCarouselImports}
             textImports={designTextImports}
             vaultImports={designVaultImports}
@@ -6464,15 +6868,84 @@ export default function ContentStudio({
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">{activeVaultMeta.label}</p>
                   <h3 className="mt-2 font-serif text-[28px] leading-tight text-[#142334]">{activeVaultMeta.description}</h3>
                   <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
-                    Holds {vaultPolicies[activeVaultSection].maxItems} items. Auto-deletes after {vaultPolicies[activeVaultSection].retentionDays} days, with a warning {vaultPolicies[activeVaultSection].warningDays} days before expiry.
+                    {activeVaultSection === 'templates'
+                      ? `Holds ${vaultPolicies.templates.maxItems} templates. Templates are kept until you delete them.`
+                      : `Holds ${vaultPolicies[activeVaultSection].maxItems} items. Auto-deletes after ${vaultPolicies[activeVaultSection].retentionDays} days, with a warning ${vaultPolicies[activeVaultSection].warningDays} days before expiry.`}
                   </p>
                 </div>
                 <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B6B6B]">
-                  {activeVaultRecords.length} showing
+                  {activeVaultSection === 'templates' ? dnaReferences.length : activeVaultRecords.length} showing
                 </p>
               </div>
 
-              <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
+              {activeVaultSection === 'templates' && (
+                <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+                  {dnaReferences.length === 0 ? (
+                    <div className="rounded-[12px] border border-dashed border-[#D8C8BB] bg-[#F8F6F4] p-6">
+                      <Layers3 className="h-7 w-7 text-[#C9AD98]" />
+                      <p className="mt-4 font-serif text-[24px] leading-tight text-[#142334]">No templates saved yet.</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/62">
+                        Upload a carousel PDF in Transform, rebuild it in Kagiso&apos;s voice, then save the mould here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigateContent('studio')}
+                        className="studio-secondary-button mt-4"
+                      >
+                        Go to Transform
+                      </button>
+                    </div>
+                  ) : (
+                    dnaReferences.map((reference) => {
+                      const template = String(reference.framework?.fillInTemplate || '');
+                      const placeholders = countPlaceholders(template);
+                      const isFilling = templateFillingId === reference.id;
+                      return (
+                        <article key={reference.id} className="flex flex-col rounded-[12px] border border-[#E4D8CB] bg-white p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6B6B6B]">
+                            {reference.slideCount || reference.slideArc.length} slides
+                            {placeholders > 0 ? ` - ${placeholders} blanks` : ''}
+                          </p>
+                          <h4 className="mt-1 font-serif text-[20px] leading-tight text-[#142334]">{reference.label}</h4>
+                          {reference.slideArc.length > 0 && (
+                            <p className="mt-2 text-[12px] leading-relaxed text-[#142334]/58">
+                              {reference.slideArc
+                                .map((role) => carouselSlideRoleLabels[role as CarouselSlideRole] || role)
+                                .join(' - ')}
+                            </p>
+                          )}
+                          {!template && (
+                            <p className="mt-2 text-[12px] leading-relaxed text-[#B4571F]">
+                              Saved before templates existed. Rebuild the deck to add one.
+                            </p>
+                          )}
+                          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                            <button
+                              type="button"
+                              onClick={() => void useTemplateInCarouselStudio(reference)}
+                              disabled={isFilling || !template}
+                              className="studio-primary-button flex-1 disabled:opacity-50"
+                            >
+                              {isFilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                              {isFilling ? 'Building deck...' : 'Use this template'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteDnaReference(reference.id)}
+                              className="studio-card-action-button px-3"
+                              aria-label={`Delete ${reference.label}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              <div className={`mt-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] ${activeVaultSection === 'templates' ? 'hidden' : ''}`}>
                 {activeVaultRecords.length === 0 ? (
                   <div className="rounded-[12px] border border-dashed border-[#D8C8BB] bg-[#F8F6F4] p-6">
                     {activeVaultSection === 'messy' ? (
@@ -6998,6 +7471,18 @@ function SmartSuggestPanel({
 }
 
 function TransformFlow({
+  dnaReferences,
+  dnaSaving,
+  onSaveDnaReference,
+  hasTemplate,
+  onUseDnaReference,
+  onDeleteDnaReference,
+  deckPageCount,
+  deckFileName,
+  deckNotice,
+  deckWarning,
+  deckReading,
+  onDeckSelect,
   inputTypes,
   inputType,
   selectedInput,
@@ -7044,6 +7529,27 @@ function TransformFlow({
   onDirectionChange,
   onRebuildModeChange,
 }: {
+  // CHANGE T2: saved reference structures.
+  dnaReferences: {
+    id: string;
+    label: string;
+    slideCount: number;
+    layoutRecipe: string | null;
+    slideArc: string[];
+    framework: ExtractedFramework;
+  }[];
+  dnaSaving: boolean;
+  onSaveDnaReference: () => void;
+  hasTemplate: boolean;
+  onUseDnaReference: (reference: { id: string; label: string; slideCount: number; layoutRecipe: string | null; slideArc: string[]; framework: ExtractedFramework }) => void;
+  onDeleteDnaReference: (id: string) => void;
+  // CHANGE T: carousel PDF upload state, rendered to page images by the caller.
+  deckPageCount: number;
+  deckFileName: string;
+  deckNotice: string;
+  deckWarning: string;
+  deckReading: boolean;
+  onDeckSelect: (file: File | null) => void;
   inputTypes: typeof transformInputTypes;
   inputType: TransformInputType;
   selectedInput: (typeof transformInputTypes)[number];
@@ -7145,9 +7651,102 @@ function TransformFlow({
           </div>
         </section>
 
+        {/* CHANGE T2: previously analysed decks, reusable without re-uploading. */}
+        {dnaReferences.length > 0 && (
+          <section className="rounded-[8px] bg-white p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Reference structures</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                  Decks you have already analysed. Reuse one to rebuild in your voice without uploading again.
+                </p>
+              </div>
+              <Badge className="bg-[#F5F3EE] text-[#8C7466]">{dnaReferences.length} saved</Badge>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {dnaReferences.slice(0, 6).map((reference) => (
+                <div key={reference.id} className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3">
+                  <p className="truncate text-[13px] font-bold text-[#142334]">{reference.label}</p>
+                  <p className="mt-1 truncate text-[11px] text-[#142334]/55">
+                    {reference.slideCount} slides
+                    {reference.layoutRecipe
+                      ? ` - ${getCarouselLayoutRecipeOption(reference.layoutRecipe as CarouselLayoutRecipe).label}`
+                      : ''}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onUseDnaReference(reference)}
+                      className="min-h-8 rounded-[8px] border border-[#E4D8CB] bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334] transition hover:border-[#C9AD98]"
+                    >
+                      Use
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDnaReference(reference.id)}
+                      className="flex min-h-8 items-center justify-center gap-1 rounded-[8px] border border-red-100 bg-white px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-red-600 transition hover:border-red-200 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="rounded-[8px] bg-white p-5">
           <TransformStepHeader number="02" title={selectedInput.inputLabel} description="The source material is used only for Stage 1, then cleared before the rebuild." />
-          {inputType === 'image' ? (
+          {inputType === 'carousel' ? (
+            <div className="mt-4">
+              <input
+                id={inputId}
+                type="file"
+                accept="application/pdf"
+                className="sr-only"
+                onChange={(event) => onDeckSelect(event.target.files?.[0] || null)}
+              />
+              {deckPageCount === 0 ? (
+                <label
+                  htmlFor={inputId}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed border-[#C9AD98] bg-[#F8F6F4] px-6 py-10 text-center transition hover:border-[#142334] hover:bg-white"
+                >
+                  {deckReading ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-[#8C7466]" />
+                  ) : (
+                    <Layers3 className="h-6 w-6 text-[#8C7466]" />
+                  )}
+                  <span className="text-[13px] font-bold text-[#142334]">
+                    {deckReading ? 'Reading the deck...' : 'Upload a carousel PDF'}
+                  </span>
+                  <span className="max-w-md text-[12px] leading-relaxed text-[#142334]/58">
+                    Download a LinkedIn document post as PDF and drop it here. Slides are read in this browser, then only
+                    the structure is extracted - never the wording.
+                  </span>
+                </label>
+              ) : (
+                <div className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-[#142334]">{deckFileName}</p>
+                      <p className="mt-1 text-[12px] text-[#142334]/58">{deckNotice}</p>
+                      {deckWarning && (
+                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-[#B4571F]">{deckWarning}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onDeckSelect(null)}
+                      className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466] underline underline-offset-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : inputType === 'image' ? (
             <div className="mt-4">
               <input
                 id={inputId}
@@ -7256,14 +7855,118 @@ function TransformFlow({
               </div>
               <Badge className="bg-white text-[#6B6B6B]">{selectedInput.label}</Badge>
             </div>
-            <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
-              {getFrameworkRows(framework).map((row) => (
-                <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
-                  <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
-                  <span className="leading-relaxed text-[#142334]">{row.value}</span>
+            {/* A deck gets the spec strip, the arc and the mechanics cards. A
+                text post or screenshot has no arc, so it keeps the plain rows. */}
+            {framework.slideCount ? (
+              <>
+                <dl className="mt-4 grid gap-px overflow-hidden rounded-[8px] border border-[#E4D8CB] bg-[#E4D8CB] [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
+                  {getDeckSpecEntries(framework).map((entry) => (
+                    <div key={entry.label} className="bg-white px-3 py-2.5">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">{entry.label}</dt>
+                      <dd className="mt-1 text-[13px] font-medium text-[#142334]">{entry.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {framework.slideArc && framework.slideArc.length > 0 && (
+                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-white p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">Slide arc</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {framework.slideArc.map((role, index) => {
+                        const label = carouselSlideRoleLabels[role as CarouselSlideRole];
+                        return (
+                          <span
+                            key={`${role}-${index}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              label
+                                ? 'border border-[#E4D8CB] bg-[#F5F3EE] text-[#142334]'
+                                : 'border border-dashed border-[#B4571F] bg-white text-[#B4571F]'
+                            }`}
+                          >
+                            <span className="font-medium text-[#A09086]">{index + 1}</span>
+                            {label || `${role} !`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-col gap-2">
+                  {getMechanicsCards(framework).map((card, index) => (
+                    <article key={card.title} className="rounded-[8px] border border-[#E4D8CB] bg-white px-4 py-3">
+                      <h5 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[#F5F3EE] text-[10px] font-semibold text-[#142334]">
+                          {index + 1}
+                        </span>
+                        {card.title}
+                      </h5>
+                      {card.lead && (
+                        <p className="mt-1.5 font-serif text-[17px] leading-snug text-[#142334]">{card.lead}</p>
+                      )}
+                      {card.body && (
+                        <p className="mt-1.5 text-[13px] leading-relaxed text-[#142334]/80">{card.body}</p>
+                      )}
+                      {card.beats && card.beats.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {card.beats.map((beat, beatIndex) => (
+                            <span key={`${beat}-${beatIndex}`} className="rounded-[6px] border border-[#E4D8CB] bg-[#F5F3EE] px-2.5 py-1 text-[11px] font-semibold text-[#142334]">
+                              {beat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {card.rows && card.rows.length > 0 && (
+                        <div className="mt-2 grid gap-1.5">
+                          {card.rows.map((row) => (
+                            <div key={row.label} className="grid gap-2 text-[12px] sm:grid-cols-[78px_1fr]">
+                              <span className="pt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#6B6B6B]">{row.label}</span>
+                              <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {framework.whatMakesItWork && (
+                  <div className="mt-3 rounded-[8px] border border-[#E4D8CB] border-l-[3px] border-l-[#142334] bg-white px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B6B6B]">What makes it work</p>
+                    <p className="mt-1 font-serif text-[15px] leading-snug text-[#142334]">{framework.whatMakesItWork}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-4 divide-y divide-[#E4D8CB] rounded-[8px] bg-white">
+                {getFrameworkRows(framework).map((row) => (
+                  <div key={row.label} className="grid gap-2 px-4 py-3 text-[13px] sm:grid-cols-[120px_1fr]">
+                    <span className="font-semibold text-[#6B6B6B]">{row.label}</span>
+                    <span className="leading-relaxed text-[#142334]">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Templates are not kept in Transform. Rebuilding writes the mould,
+                and this files it in the Vault, which is where it is reused from. */}
+            {framework.slideCount ? (
+              hasTemplate ? (
+                <button
+                  type="button"
+                  onClick={onSaveDnaReference}
+                  disabled={dnaSaving}
+                  className="studio-secondary-button mt-4 w-fit"
+                >
+                  {dnaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers3 className="h-4 w-4" />}
+                  Save template to Vault
+                </button>
+              ) : (
+                <p className="mt-4 text-[12px] leading-relaxed text-[#142334]/58">
+                  Rebuild this deck to write its reusable template. The template is saved to the Vault, not here.
+                </p>
+              )
+            ) : null}
 
             <div className="mt-5 flex items-center gap-1 rounded-[8px] border border-[#E4D8CB] bg-white p-1">
               <button
@@ -8537,82 +9240,6 @@ function CarouselLayoutRecipeSelector({
   );
 }
 
-function getCarouselSlideBodyPoints(body: string, limit = 4) {
-  return body
-    .split(/\n+|;\s+|(?<=\.)\s+/)
-    .map((point) => point.trim().replace(/\.$/, ''))
-    .filter(Boolean)
-    .slice(0, limit);
-}
-
-function getCarouselSlideTextStats(slide: CarouselSlide) {
-  const headlineWords = slide.headline.trim().split(/\s+/).filter(Boolean).length;
-  const bodyWords = slide.body.trim().split(/\s+/).filter(Boolean).length;
-  const totalChars = `${slide.headline} ${slide.body} ${slide.cta || ''}`.trim().length;
-
-  return {
-    headlineWords,
-    bodyWords,
-    totalChars,
-    density: totalChars > 260 || bodyWords > 44 ? 'dense' : totalChars > 160 || bodyWords > 26 ? 'medium' : 'light',
-  };
-}
-
-function resolveCarouselComposition(
-  slide: CarouselSlide,
-  role: CarouselSlideRole,
-  template: ReturnType<typeof getCarouselTemplateOption>,
-  bodyPoints: string[],
-): CarouselComposition {
-  const selected = normalizeCarouselComposition(slide.composition, role);
-  if (selected !== 'auto') return selected;
-
-  const stats = getCarouselSlideTextStats(slide);
-
-  if (role === 'cover') {
-    if (stats.headlineWords <= 6 && stats.bodyWords <= 18 && template.value === 'bold_diagnostic') return 'bold_claim';
-    if (stats.headlineWords > 10 || stats.bodyWords > 28) return 'quiet_intro';
-    return 'editorial_cover';
-  }
-
-  if (role === 'cta') {
-    const actionText = `${slide.headline} ${slide.body} ${slide.cta || ''}`.toLowerCase();
-    if (actionText.includes('save') || actionText.includes('share')) return 'save_share_close';
-    if (slide.cta || stats.bodyWords <= 18) return 'direct_action';
-    return 'soft_reflection';
-  }
-
-  if (role === 'proof') {
-    if (stats.bodyWords > 30) return 'example_note';
-    if (stats.headlineWords <= 6 && stats.bodyWords <= 18) return 'credibility_cue';
-    return 'evidence_card';
-  }
-
-  if (role === 'framework' || role === 'step' || role === 'checklist' || role === 'rule') {
-    if (bodyPoints.length >= 3 && stats.density !== 'dense') return 'card_grid';
-    if (stats.density === 'dense') return 'side_rail';
-    return 'numbered_stack';
-  }
-
-  if (stats.bodyWords > 34) return 'note_card';
-  if (slide.body.includes(':') || slide.body.toLowerCase().includes('not ')) return 'contrast_block';
-  return 'quote_panel';
-}
-
-function getCarouselHeadlineSize(composition: CarouselComposition, stats: ReturnType<typeof getCarouselSlideTextStats>) {
-  // Brand type scale at 1080x1350 (CHANGE G): cover 96-110px, inner 72-84px.
-  // These values are the 600px studio-preview baseline; the export lane scales by
-  // exportScale (1080/600 = 1.8) to land on the brand sizes.
-  if (composition === 'bold_claim') return stats.headlineWords > 7 ? 53 : 61;
-  if (composition === 'editorial_cover') return stats.headlineWords > 9 ? 53 : 59;
-  if (composition === 'quiet_intro') return 53;
-  if (composition === 'direct_action') return 44;
-  if (composition === 'save_share_close') return 42;
-  if (composition === 'credibility_cue') return 42;
-  if (composition === 'card_grid' || composition === 'side_rail' || composition === 'note_card') return 40;
-  return stats.headlineWords > 9 ? 40 : 46;
-}
-
 type CarouselDeckQualityTone = 'ready' | 'watch' | 'fix';
 
 type CarouselDeckFixAction =
@@ -9157,12 +9784,12 @@ function CarouselSlideFrame({
   const isCover = role === 'cover';
   const isCta = role === 'cta';
   const headlineSize = getCarouselHeadlineSize(composition, textStats);
-  const coverHeadlineSize = Math.min(headlineSize + (isCareerNotes ? 8 : 6), 61);
-  const resolvedHeadlineSize = isCover
-    ? coverHeadlineSize
-    : isCareerNotes
-      ? Math.min(headlineSize + 4, 46)
-      : headlineSize;
+  // CHANGE P: shared with Design Studio's importer so a deck cannot render at
+  // one size here and another size there.
+  const resolvedHeadlineSize = getCarouselResolvedHeadlineSize(composition, textStats, {
+    isCover,
+    template: template.value,
+  });
   const overflowFlag = !exportDimensions && (textStats.bodyWords > 58 || textStats.totalChars > 360);
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
@@ -10069,15 +10696,22 @@ async function captureCarouselSlideCanvas(
   element: HTMLElement,
   dimensions: { width: number; height: number },
   html2canvas: typeof import('html2canvas').default,
+  pixelScale: CarouselExportScale = DEFAULT_CAROUSEL_EXPORT_SCALE,
 ) {
   const fonts = getCarouselExportFontFamilies();
   const rect = element.getBoundingClientRect();
   const layoutWidth = Math.max(1, Math.ceil(rect.width));
   const layoutHeight = Math.max(1, Math.round(layoutWidth * (dimensions.height / dimensions.width)));
-  // CHANGE A1: capture at 2x the export dimensions (e.g. 2160x2700 for the
-  // 1080x1350 LinkedIn export) so the PNG is sharp. Never downscale below
-  // dimensions; only upscale when the layout is smaller than the target.
-  const scale = Math.max(2, dimensions.width / layoutWidth) * 2;
+  // CHANGE J: capture straight to the requested output resolution.
+  //
+  // The previous version oversampled to 4x the layout width and then resampled
+  // the result back down to exactly `dimensions` at the end of this function,
+  // which capped every PNG at 1080px wide and threw the extra detail away. The
+  // target is now dimensions * pixelScale, and html2canvas is asked for exactly
+  // that scale, so no resampling is needed in the common case.
+  const targetWidth = Math.round(dimensions.width * pixelScale);
+  const targetHeight = Math.round(dimensions.height * pixelScale);
+  const scale = targetWidth / layoutWidth;
   const captureId = `carousel-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const exportHost = document.createElement('div');
   const exportElement = element.cloneNode(true) as HTMLElement;
@@ -10160,17 +10794,29 @@ async function captureCarouselSlideCanvas(
     exportHost.remove();
   }
 
-  if (captured.width === dimensions.width && captured.height === dimensions.height) return captured;
+  // CHANGE J: only resample when html2canvas could not hit the target exactly
+  // (sub-pixel rounding on odd layout widths). Never resample down to the 1x
+  // frame — that was the bug that made every export look soft at 200%.
+  if (captured.width === targetWidth && captured.height === targetHeight) return captured;
 
   const resized = document.createElement('canvas');
-  resized.width = dimensions.width;
-  resized.height = dimensions.height;
+  resized.width = targetWidth;
+  resized.height = targetHeight;
   const context = resized.getContext('2d');
   if (!context) throw new Error('Could not prepare the carousel export canvas.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  context.drawImage(captured, 0, 0, dimensions.width, dimensions.height);
+  context.drawImage(captured, 0, 0, targetWidth, targetHeight);
+  releaseCarouselExportCanvas(captured);
   return resized;
+}
+
+// CHANGE J: a 3x LinkedIn frame is 3240x4050 (~52MB of RGBA). Holding ten of
+// those at once will crash a tab, so every export path frees each canvas as
+// soon as its bytes have been handed to a blob or the PDF.
+function releaseCarouselExportCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
 function canvasToPngBlob(canvas: HTMLCanvasElement) {
@@ -10618,6 +11264,7 @@ function CarouselDeckQualityPanel({
 }
 
 function CarouselStudioPanel({
+  adminKey,
   drafts,
   defaultAspectRatio,
   defaultTemplate,
@@ -10636,6 +11283,8 @@ function CarouselStudioPanel({
   onDraftSelect,
   onStartDraft,
 }: {
+  // CHANGE O: custom CTA templates are fetched from the templates API.
+  adminKey?: string;
   drafts: CarouselDraftRecord[];
   defaultAspectRatio: CarouselAspectRatio;
   defaultTemplate: CarouselTemplate;
@@ -10723,6 +11372,77 @@ function CarouselStudioPanel({
     message: string;
     tone: 'info' | 'error';
   } | null>(null);
+  // CHANGE J/K: export resolution and slide selection.
+  const [exportPixelScale, setExportPixelScale] = useState<CarouselExportScale>(DEFAULT_CAROUSEL_EXPORT_SCALE);
+  const [selectedExportIndexes, setSelectedExportIndexes] = useState<Set<number>>(
+    () => new Set(renderedDeck.map((_, index) => index)),
+  );
+  const deckLength = renderedDeck.length;
+  const deckSelectionKey = `${activeRecordId || 'placeholder'}:${deckLength}`;
+  const lastDeckSelectionKeyRef = useRef(deckSelectionKey);
+
+  // Selecting a different draft, or adding/removing slides, resets the export
+  // selection to the whole deck. Without this a stale index could point past
+  // the end of a shorter deck.
+  useEffect(() => {
+    if (lastDeckSelectionKeyRef.current === deckSelectionKey) return;
+    lastDeckSelectionKeyRef.current = deckSelectionKey;
+    setSelectedExportIndexes(new Set(Array.from({ length: deckLength }, (_, index) => index)));
+  }, [deckSelectionKey, deckLength]);
+
+  const selectedExportCount = selectedExportIndexes.size;
+  const isWholeDeckSelected = selectedExportCount === deckLength && deckLength > 0;
+
+  // CHANGE N: custom CTA templates designed in Design Studio. Read on mount
+  // because they live in that panel's browser storage, not in the vault.
+  const [ctaTemplates, setCtaTemplates] = useState<DesignCtaTemplateSummary[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void readDesignCtaTemplateSummaries(adminKey).then((templates) => {
+      if (!cancelled) setCtaTemplates(templates);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRecordId, adminKey]);
+
+  const selectedCtaTemplateId = latestDraft?.customCtaTemplateId || null;
+  const selectedCtaTemplate = selectedCtaTemplateId
+    ? ctaTemplates.find((template) => template.id === selectedCtaTemplateId) || null
+    : null;
+  // The chosen template may have been deleted in Design Studio since.
+  const isCtaTemplateMissing = Boolean(selectedCtaTemplateId && !selectedCtaTemplate);
+
+  function chooseCustomCta(template: DesignCtaTemplateSummary | null) {
+    if (!latestRecord || !latestDraft || isSavingLatest) return;
+    const nextDraft: CarouselDraftPayload = { ...latestDraft };
+    if (template) {
+      nextDraft.customCtaTemplateId = template.id;
+      nextDraft.customCtaTemplateName = template.name;
+    } else {
+      delete nextDraft.customCtaTemplateId;
+      delete nextDraft.customCtaTemplateName;
+    }
+    if (areCarouselDraftsEqual(latestDraft, nextDraft)) return;
+    onDraftSave(latestRecord, nextDraft);
+  }
+
+  function toggleExportSlide(index: number) {
+    setSelectedExportIndexes((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function selectAllExportSlides() {
+    setSelectedExportIndexes(new Set(Array.from({ length: deckLength }, (_, index) => index)));
+  }
+
+  function clearExportSlideSelection() {
+    setSelectedExportIndexes(new Set());
+  }
   const [draftHistory, setDraftHistory] = useState<CarouselDraftHistoryState>({
     recordId: null,
     originalDraft: null,
@@ -10753,13 +11473,30 @@ function CarouselStudioPanel({
   async function exportCarousel(mode: CarouselExportMode) {
     if (!latestDraft) return;
 
+    // CHANGE K: export only the slides the user ticked. `selectedExportIndexes`
+    // holds positions in `renderedDeck`; the original slide number travels with
+    // each entry so a single-slide export is still named "-slide-03".
+    const exportTargets = renderedDeck
+      .map((slide, index) => ({ slide, index }))
+      .filter(({ index }) => selectedExportIndexes.has(index));
+
+    if (exportTargets.length === 0) {
+      setExportState({
+        busy: false,
+        mode,
+        message: 'Pick at least one slide to export.',
+        tone: 'error',
+      });
+      return;
+    }
+
     // CHANGE H: export the filtered deck only (empty slides are dropped from
     // the preview), so the PDF page count matches what the audience sees.
-    const elements = exportSlideFrameRefs.current
-      .slice(0, renderedDeck.length)
+    const elements = exportTargets
+      .map(({ index }) => exportSlideFrameRefs.current[index])
       .filter((element): element is HTMLElement => Boolean(element));
 
-    if (elements.length !== renderedDeck.length) {
+    if (elements.length !== exportTargets.length) {
       setExportState({
         busy: false,
         mode,
@@ -10771,12 +11508,18 @@ function CarouselStudioPanel({
 
     const dimensions = displayedExportDimensions;
     const baseName = getCarouselExportBaseName(latestDraft, displayedAspectOption);
+    const isPartialExport = exportTargets.length !== renderedDeck.length;
+    const partialSuffix = isPartialExport && exportTargets.length === 1
+      ? `-slide-${String(exportTargets[0].index + 1).padStart(2, '0')}`
+      : isPartialExport
+        ? `-${exportTargets.length}-slides`
+        : '';
 
     try {
       setExportState({
         busy: true,
         mode,
-        message: mode === 'pdf' ? 'Preparing LinkedIn PDF...' : 'Preparing PNG frames...',
+        message: mode === 'pdf' ? 'Preparing LinkedIn PDF...' : `Preparing PNG frames at ${exportPixelScale}x...`,
         tone: 'info',
       });
 
@@ -10800,7 +11543,49 @@ function CarouselStudioPanel({
           };
         });
 
+        // CHANGE W: append the custom CTA slide as real vector pages. It is a
+        // design document rather than a carousel slide, so it is built by the
+        // design renderer and scaled to the deck's frame, then handed to the
+        // carousel document as trailing pages - one PDF, nothing rasterised.
+        let ctaPages: React.ReactNode = null;
+        let ctaNotice = '';
+        if (latestDraft.customCtaTemplateId && !isPartialExport) {
+          try {
+            const [{ loadCtaTemplatePdfInput }, { buildDesignPdfPages, scaleDesignPdfInput, getVectorExportBlocker }] =
+              await Promise.all([
+                import('@/components/content/DesignStudioPanel'),
+                import('@/components/content/DesignPdfDocument'),
+              ]);
+            const ctaInput = await loadCtaTemplatePdfInput(latestDraft.customCtaTemplateId, adminKey);
+            if (!ctaInput) {
+              ctaNotice = ' The custom CTA template is no longer saved, so it was left out.';
+            } else {
+              const ctaFonts = ctaInput.pages.flatMap((page) =>
+                page.layers.filter((layer) => layer.type === 'text').map((layer) => layer.fontFamily || ''),
+              );
+              const blocker = getVectorExportBlocker(ctaFonts);
+              if (blocker) {
+                ctaNotice = ` The custom CTA was left out: ${blocker}.`;
+              } else {
+                ctaPages = buildDesignPdfPages(
+                  scaleDesignPdfInput(ctaInput, dimensions.width, dimensions.height),
+                  'cta',
+                );
+              }
+            }
+          } catch (ctaError) {
+            console.warn('Could not append the custom CTA slide:', ctaError);
+            ctaNotice = ' The custom CTA slide could not be rendered, so it was left out.';
+          }
+        } else if (latestDraft.customCtaTemplateId && isPartialExport) {
+          ctaNotice = ' The custom CTA is only added when you export the whole deck.';
+        }
+
         let blob: Blob;
+        // CHANGE J: the raster fallback used to be silent (console.warn only),
+        // so a soft PDF looked identical to a sharp one from the outside. Track
+        // it and say so in the UI.
+        let rasterFallbackReason: string | null = null;
         try {
           let vectorOk = false;
           try {
@@ -10831,11 +11616,6 @@ function CarouselStudioPanel({
           console.warn('Vector PDF failed, falling back to raster:', pdfError instanceof Error ? pdfError.message : String(pdfError));
           const html2canvas = (await import('html2canvas')).default;
           await waitForCarouselExportFonts(elements[0]);
-          const canvases: HTMLCanvasElement[] = [];
-          for (const [index, element] of elements.entries()) {
-            setExportState({ busy: true, mode, message: `Capturing slide ${index + 1} of ${elements.length}...`, tone: 'info' });
-            canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
-          }
           const { default: jsPDF } = await import('jspdf');
           const orientation = dimensions.width > dimensions.height ? 'landscape' : 'portrait';
           const rasterPdf = new jsPDF({
@@ -10845,38 +11625,47 @@ function CarouselStudioPanel({
             compress: true,
             hotfixes: ['px_scaling'],
           });
-          canvases.forEach((canvas, index) => {
-            if (index > 0) rasterPdf.addPage([dimensions.width, dimensions.height], orientation);
+          for (const [position, element] of elements.entries()) {
+            setExportState({ busy: true, mode, message: `Capturing slide ${position + 1} of ${elements.length}...`, tone: 'info' });
+            const canvas = await captureCarouselSlideCanvas(element, dimensions, html2canvas, exportPixelScale);
+            if (position > 0) rasterPdf.addPage([dimensions.width, dimensions.height], orientation);
+            // The page stays at 1x px while the image carries pixelScale times
+            // the detail, so the embedded bitmap is oversampled, not stretched.
             rasterPdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dimensions.width, dimensions.height);
-          });
+            releaseCarouselExportCanvas(canvas);
+          }
           blob = rasterPdf.output('blob');
           downloadBlob(blob, `${baseName}.pdf`);
-          setExportState({ busy: false, mode, message: `Downloaded ${canvases.length}-page raster PDF.`, tone: 'info' });
+          setExportState({ busy: false, mode, message: `Downloaded ${elements.length}-page raster PDF.`, tone: 'info' });
         }
         return;
       }
 
-      // CHANGE A1: PNG path keeps the 2x raster capture (correct for feed images).
+      // CHANGE J/K: capture, download and free one frame at a time so a 3x
+      // export of a ten-slide deck never holds half a gigabyte of canvases.
       const html2canvas = (await import('html2canvas')).default;
-      const canvases: HTMLCanvasElement[] = [];
       await waitForCarouselExportFonts(elements[0]);
 
-      for (const [index, element] of elements.entries()) {
+      for (const [position, element] of elements.entries()) {
+        const slideNumber = exportTargets[position].index + 1;
         setExportState({
           busy: true,
           mode,
-          message: `Rendering slide ${index + 1} of ${elements.length}...`,
+          message: `Rendering slide ${slideNumber} (${position + 1} of ${elements.length}) at ${exportPixelScale}x...`,
           tone: 'info',
         });
-        canvases.push(await captureCarouselSlideCanvas(element, dimensions, html2canvas));
+        const canvas = await captureCarouselSlideCanvas(element, dimensions, html2canvas, exportPixelScale);
+        const blob = await canvasToPngBlob(canvas);
+        releaseCarouselExportCanvas(canvas);
+        downloadBlob(blob, `${baseName}-slide-${String(slideNumber).padStart(2, '0')}@${exportPixelScale}x.png`);
       }
 
-      setExportState({ busy: true, mode, message: 'Downloading PNG frames...', tone: 'info' });
-      for (const [index, canvas] of canvases.entries()) {
-        const blob = await canvasToPngBlob(canvas);
-        downloadBlob(blob, `${baseName}-slide-${String(index + 1).padStart(2, '0')}.png`);
-      }
-      setExportState({ busy: false, mode, message: `Downloaded ${canvases.length} PNG frames.`, tone: 'info' });
+      setExportState({
+        busy: false,
+        mode,
+        message: `Downloaded ${elements.length} PNG frame${elements.length === 1 ? '' : 's'} at ${dimensions.width * exportPixelScale}x${dimensions.height * exportPixelScale}.`,
+        tone: 'info',
+      });
     } catch (error) {
       setExportState({
         busy: false,
@@ -11128,6 +11917,175 @@ function CarouselStudioPanel({
           </div>
         )}
 
+        {/* CHANGE N: custom closing slide, designed in Design Studio. */}
+        {latestDraft && (
+          <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Custom CTA slide</p>
+                <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-[#142334]/58">
+                  Your own closing slide - follow, promo, or masterclass - kept separate from the CTA this post argues for.
+                  It is appended as the last slide of the exported PDF, and when you open the deck in Design Studio.
+                </p>
+              </div>
+              {selectedCtaTemplate && <Badge className="bg-[#142334] text-white">On</Badge>}
+            </div>
+
+            {ctaTemplates.length === 0 ? (
+              <p className="mt-3 rounded-[8px] bg-[#F8F6F4] px-3 py-2 text-[12px] leading-relaxed text-[#142334]/62">
+                No custom CTA templates yet. Design one in Design Studio, then use{' '}
+                <span className="font-bold">Save as template</span> and choose{' '}
+                <span className="font-bold">Custom CTA</span>. It will show up here.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => chooseCustomCta(null)}
+                  disabled={isSavingLatest}
+                  aria-pressed={!selectedCtaTemplateId}
+                  className={`rounded-[8px] border px-3 py-2 text-[12px] font-bold transition disabled:opacity-50 ${
+                    !selectedCtaTemplateId
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/60 hover:border-[#C9AD98] hover:bg-white'
+                  }`}
+                >
+                  None
+                </button>
+                {ctaTemplates.map((template) => {
+                  const isSelected = selectedCtaTemplateId === template.id;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => chooseCustomCta(template)}
+                      disabled={isSavingLatest}
+                      aria-pressed={isSelected}
+                      title={`${template.width} x ${template.height}`}
+                      className={`rounded-[8px] border px-3 py-2 text-[12px] font-bold transition disabled:opacity-50 ${
+                        isSelected
+                          ? 'border-[#142334] bg-[#142334] text-white'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                      }`}
+                    >
+                      {template.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {isCtaTemplateMissing && (
+              <div className="mt-3">
+                <Notice tone="error">
+                  {`"${latestDraft.customCtaTemplateName || 'The chosen CTA'}" is no longer in Design Studio's saved templates. Pick another, or choose None.`}
+                </Notice>
+              </div>
+            )}
+
+            {selectedCtaTemplate && (
+              <p className="mt-3 text-[12px] leading-relaxed text-[#142334]/58">
+                PDF export gives you {deckLength + 1} pages - the deck plus this CTA, drawn as vector.
+                PNG frames stay at {deckLength}, since the CTA is a design page rather than a carousel slide.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* CHANGE J/K: export controls - resolution and which slides go out. */}
+        <div className="mt-5 rounded-[8px] border border-[#E4D8CB] bg-white p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">Export settings</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-[#142334]/58">
+                PDF is vector and always sharp. Resolution applies to PNG frames.
+              </p>
+            </div>
+            <Badge className="bg-[#F5F3EE] text-[#8C7466]">
+              {displayedExportDimensions.width * exportPixelScale} x {displayedExportDimensions.height * exportPixelScale}
+            </Badge>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {carouselExportScaleOptions.map((option) => {
+              const isSelected = exportPixelScale === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setExportPixelScale(option.value)}
+                  disabled={isExporting}
+                  title={option.description}
+                  className={`rounded-full border px-4 py-1.5 text-[12px] font-bold transition disabled:opacity-50 ${
+                    isSelected
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334] hover:border-[#C9AD98] hover:bg-white'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {deckLength > 0 && (
+            <div className="mt-4 border-t border-[#E4D8CB] pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8C7466]">
+                  Slides to export
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllExportSlides}
+                    disabled={isExporting || isWholeDeckSelected}
+                    className="text-[11px] font-bold text-[#8C7466] underline underline-offset-2 disabled:opacity-40"
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearExportSlideSelection}
+                    disabled={isExporting || selectedExportCount === 0}
+                    className="text-[11px] font-bold text-[#8C7466] underline underline-offset-2 disabled:opacity-40"
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {renderedDeck.map((slide, index) => {
+                  const isSelected = selectedExportIndexes.has(index);
+                  return (
+                    <button
+                      key={`export-pick-${slide.id}`}
+                      type="button"
+                      onClick={() => toggleExportSlide(index)}
+                      disabled={isExporting}
+                      aria-pressed={isSelected}
+                      title={slide.headline || `Slide ${index + 1}`}
+                      className={`rounded-[8px] border px-3 py-1.5 text-[12px] font-bold tabular-nums transition disabled:opacity-50 ${
+                        isSelected
+                          ? 'border-[#142334] bg-[#142334] text-white'
+                          : 'border-[#E4D8CB] bg-[#F8F6F4] text-[#142334]/55 hover:border-[#C9AD98] hover:bg-white'
+                      }`}
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[12px] text-[#142334]/58">
+                {selectedExportCount === 0
+                  ? 'No slides selected.'
+                  : isWholeDeckSelected
+                    ? `Exporting the full ${deckLength}-slide deck.`
+                    : `Exporting ${selectedExportCount} of ${deckLength} slides.`}
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="mt-5 flex flex-wrap gap-3">
           <button type="button" onClick={onStartDraft} className="studio-primary-button">
             Start from Content Studio <ChevronRight className="h-4 w-4" />
@@ -11146,20 +12104,24 @@ function CarouselStudioPanel({
           <button
             type="button"
             onClick={() => void exportCarousel('pdf')}
-            disabled={!latestDraft || isExporting}
+            disabled={!latestDraft || isExporting || selectedExportCount === 0}
             className="studio-secondary-button"
           >
             {isExporting && exportState?.mode === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            Export PDF
+            {isWholeDeckSelected || selectedExportCount === 0
+              ? 'Export PDF'
+              : `Export PDF (${selectedExportCount})`}
           </button>
           <button
             type="button"
             onClick={() => void exportCarousel('png')}
-            disabled={!latestDraft || isExporting}
+            disabled={!latestDraft || isExporting || selectedExportCount === 0}
             className="studio-ghost-button"
           >
             {isExporting && exportState?.mode === 'png' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export PNGs
+            {isWholeDeckSelected || selectedExportCount === 0
+              ? `Export PNGs (${exportPixelScale}x)`
+              : `Export ${selectedExportCount} PNG${selectedExportCount === 1 ? '' : 's'} (${exportPixelScale}x)`}
           </button>
         </div>
         {exportState?.message && (
