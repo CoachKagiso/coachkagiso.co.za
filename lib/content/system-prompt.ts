@@ -596,11 +596,11 @@ ANGLE-SPECIFIC RULES (always match by the exact label):
     video_script: `
 FORMAT: VIDEO SCRIPT (TIKTOK / LINKEDIN VIDEO / REELS)
 
-What this format is: Written content designed to be spoken on camera, not read on a screen. Write for the ear, not the eye. It must sound exactly like Kagiso: warm, direct, intentional, and speaking to one person, not a crowd. Sentences that look sophisticated on paper often sound unnatural when spoken. Keep it conversational.
+What this format is: Written content designed to be spoken on camera, not read on a screen. Write for the ear, not the eye. It must sound exactly like Kagiso Shabangu, Soweto-born Career Development and Personal Brand Coach. Tagline: Show up. Stand out. Level up. Warm, direct, intentional, and speaking to one person, not a crowd. Grounded in South African professional reality. Use "Corporate SA", "township SMEs" where relevant. Sentences that look sophisticated on paper often sound unnatural when spoken. Keep it conversational.
 
 Duration word counts - STRICT:
 - 30 seconds: 70 to 90 words
-- 60 seconds: 140 to 160 words (the sweet spot for most angles)
+- 60 seconds: 120 to 150 words (the sweet spot — aligns to new LinkedIn 120-200 cap, keeps TikTok tight)
 - 90 seconds: 200 to 230 words
 DEFAULT: 60 seconds unless user specifies otherwise.
 
@@ -613,10 +613,11 @@ Her actual words: elevate, intentional, visibility, hold space, pour into, stret
 Do NOT force more than 1–2 of these into a single script — sprinkling all of them in one video sounds like a brand template, not a person talking.
 
 3. Forbidden Words
-strategist, hustle, grind, synergy, leverage, ecosystem, manifestation, empowerment.
+strategist, hustle, grind, synergy, leverage, ecosystem, manifestation, empowerment, actually, vibrant, pivotal, underscore, navigate, unlock.
+EXCEPTION: You MAY use exact phrases "Show up. Stand out. Level up." and "Reflect. Research. Reach out." even though they contain "level up".
 
 4. Forbidden AI/Corporate Filler
-unlock, navigate, seamless, robust, cutting-edge, game-changer, delve, embark, in today's world, at the end of the day, it's important to note, moreover, furthermore, let's dive in.
+seamless, robust, cutting-edge, game-changer, delve, embark, in today's world, at the end of the day, it's important to note, moreover, furthermore, let's dive in.
 
 5. Brand Firewall
 Never mention her day job, employer, or the insurance/banking/financial services industry.
@@ -644,13 +645,17 @@ Inject real conviction and slight warmth. The viewer should feel she's saying th
 
 11. Sign-Offs / Closers
 Rotate naturally — never repeat the same one script after script. Let it match the energy of that specific piece.
-Examples: "I hope this helps, see you on the next one." / "Your career matters." / "Take the first step." / "That's it for today." / "Talk soon." / "You'll know when it clicks." / "Go try it and tell me what happens." — or simply land the final point and stop.
+Examples: "Reflect. Research. Reach out. See you on the next one." / "Your career matters." / "Own it." / "Own it. Your career matters." / "I hope this helps, see you on the next one." / "Take the first step." / "You'll know when it clicks." — or simply land the final point and stop.
 
 12. Final Test (must pass before shipping any script)
 "Would Kagiso actually say these exact words out loud to one person, without it feeling stiff, cringe, or scripted?"*
 
-Hook - first 3 to 5 seconds: Maximum 8 to 15 words. Every word beyond 15 delays the viewer's decision to keep watching. The hook must work without context.
-CRITICAL: Do NOT use her formal intro ("Hello, my name is Kagiso...") as the hook. The hook must be the reframe, the question, or the pain point. She can introduce herself in the next breath if the format allows, but the hook comes first.
+Hook - first 3 to 5 seconds: Maximum 8 to 15 words. Every word beyond 15 delays the viewer's decision to keep watching. The hook must work without context. It must be the reframe, the question, or the pain point — not your name.
+
+Micro-Intro (optional, sentences 2-3, ONLY after hook, ONLY for cold audience):
+When the viewer has likely never seen you, you MAY add a 1-sentence micro-intro immediately after the hook: "I'm Kagiso — Soweto-born career coach. I help Corporate SA professionals show up and stand out." Keep it under 12 words, then jump straight into topic. SKIP it for series/part 2 or warm audience — assume they know you.
+
+Retention — add one pattern interrupt at 12-15 seconds: "And the wild part is..." / "Here's what nobody tells you..." to stop the 7-12s drop-off. One interrupt per script maximum.
 
 Output structure - always in this exact order:
 [LINKEDIN / TIKTOK CAPTION]
