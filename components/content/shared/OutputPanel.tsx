@@ -12,7 +12,9 @@ import {
   Loader2,
   Plus,
   RefreshCcw,
+  Redo2,
   TextCursorInput,
+  Undo2,
 } from 'lucide-react';
 
 import { extractOutputMetadata } from '@/lib/content/utils';
@@ -174,6 +176,8 @@ export function OutputWithActions({
   const [insertOpen, setInsertOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const lastEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const outputMetadata = extractOutputMetadata(value);
   const editableValue = outputMetadata.body || value;
   const displayPlatform = outputMetadata.platform || platformLabel;
@@ -192,25 +196,61 @@ export function OutputWithActions({
     }
   }
 
-  function getSelection() {
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? editableValue.length;
-    const end = textarea?.selectionEnd ?? editableValue.length;
-    return { start, end };
+  /**
+   * The textarea the caret is actually in. In slide mode there is no single
+   * draft textarea - each slide has its own - so the toolbar has to follow the
+   * focus rather than assume one field. Without this every action landed at the
+   * end of the whole draft instead of at the cursor.
+   */
+  function getActiveEditor(): HTMLTextAreaElement | null {
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (active instanceof HTMLTextAreaElement && panelRef.current?.contains(active)) return active;
+    return lastEditorRef.current && panelRef.current?.contains(lastEditorRef.current)
+      ? lastEditorRef.current
+      : textareaRef.current;
+  }
+
+  /**
+   * Replaces the current selection through execCommand rather than by rewriting
+   * the whole value in React state. Two reasons: it respects the caret in
+   * whichever field has focus, and it writes into the browser's own undo
+   * history, so Ctrl+Z steps back through every edit instead of just the last.
+   */
+  function replaceSelection(build: (selected: string) => string, fallback = '') {
+    const editor = getActiveEditor();
+    if (!editor) return;
+
+    const start = editor.selectionStart ?? editor.value.length;
+    const end = editor.selectionEnd ?? start;
+    const selected = editor.value.slice(start, end) || fallback;
+    const replacement = build(selected);
+
+    editor.focus();
+    editor.setSelectionRange(start, end);
+
+    const inserted = typeof document !== 'undefined' && document.execCommand('insertText', false, replacement);
+    if (!inserted) {
+      // execCommand is unavailable. Fall back to the native setter so React still
+      // sees the change; undo depth is lost but the edit lands in the right place.
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(editor, `${editor.value.slice(0, start)}${replacement}${editor.value.slice(end)}`);
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  function runHistory(command: 'undo' | 'redo') {
+    const editor = getActiveEditor();
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(command);
   }
 
   function insertText(text: string) {
-    const { start, end } = getSelection();
-    const nextValue = `${editableValue.slice(0, start)}${text}${editableValue.slice(end)}`;
-    updateDraft(nextValue, { start: start + text.length, end: start + text.length });
+    replaceSelection(() => text);
   }
 
   function transformSelection(transform: (text: string) => string, fallback: string) {
-    const { start, end } = getSelection();
-    const selectedText = editableValue.slice(start, end) || fallback;
-    const replacement = transform(selectedText);
-    const nextValue = `${editableValue.slice(0, start)}${replacement}${editableValue.slice(end)}`;
-    updateDraft(nextValue, { start, end: start + replacement.length });
+    replaceSelection(transform, fallback);
   }
 
   function applyLinePrefix(type: 'bullet' | 'numbered') {
@@ -245,7 +285,13 @@ export function OutputWithActions({
   }
 
   return (
-    <div className={surfaceClassName || 'rounded-[8px] bg-[#F5F3EE] p-5'}>
+    <div
+      ref={panelRef}
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLTextAreaElement) lastEditorRef.current = event.target;
+      }}
+      className={surfaceClassName || 'rounded-[8px] bg-[#F5F3EE] p-5'}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B6B6B]">{title}</p>
@@ -288,6 +334,27 @@ export function OutputWithActions({
       {mode === 'edit' && hasDraft && (
         <div className="mt-4 rounded-[10px] bg-white p-3">
           <div className="flex flex-wrap items-center gap-2 border-b border-[#E4D8CB] pb-3">
+            {/* Undo and redo drive the browser's own history, which the toolbar
+                now writes into, so these and Ctrl+Z step through the same stack. */}
+            <button
+              type="button"
+              onClick={() => runHistory('undo')}
+              className="studio-card-action-icon"
+              aria-label="Undo (Ctrl+Z)"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => runHistory('redo')}
+              className="studio-card-action-icon"
+              aria-label="Redo (Ctrl+Shift+Z)"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+            <span className="mx-1 h-5 w-px bg-[#E4D8CB]" aria-hidden="true" />
             <button
               type="button"
               onClick={() => transformSelection((text) => toStyledText(text, 'bold'), 'Bold text')}
