@@ -139,6 +139,7 @@ export function OutputWithActions({
   outputNote,
   actionsDisabled = false,
   isRegenerating = false,
+  bodyOverride,
 }: {
   title: string;
   value: string;
@@ -158,6 +159,12 @@ export function OutputWithActions({
   outputNote?: ReactNode;
   actionsDisabled?: boolean;
   isRegenerating?: boolean;
+  /**
+   * Replaces the plain textarea while keeping the header, the toolbar and every
+   * action. A carousel rebuild is a deck, not a paragraph, so it renders as an
+   * editable slide list instead.
+   */
+  bodyOverride?: ReactNode;
 }) {
   const [mode, setMode] = useState<DraftMode>('edit');
   const [insertOpen, setInsertOpen] = useState(false);
@@ -326,14 +333,20 @@ export function OutputWithActions({
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
-            value={editableValue}
-            onChange={(event) => updateDraft(event.target.value)}
-            onWheel={stopNestedScroll}
-            className="mt-3 min-h-[420px] max-h-[62vh] w-full resize-y overflow-y-auto overscroll-contain rounded-[8px] border border-[#E4D8CB] bg-[#FBFAF8] px-4 py-4 font-sans text-[14px] leading-[1.75] text-[#142334] outline-none transition focus:border-[#C9AD98] focus:bg-white"
-            spellCheck
-          />
+          {bodyOverride ? (
+            <div className="mt-3 max-h-[62vh] overflow-y-auto overscroll-contain pr-1" onWheel={stopNestedScroll}>
+              {bodyOverride}
+            </div>
+          ) : (
+            <textarea
+              ref={textareaRef}
+              value={editableValue}
+              onChange={(event) => updateDraft(event.target.value)}
+              onWheel={stopNestedScroll}
+              className="mt-3 min-h-[420px] max-h-[62vh] w-full resize-y overflow-y-auto overscroll-contain rounded-[8px] border border-[#E4D8CB] bg-[#FBFAF8] px-4 py-4 font-sans text-[14px] leading-[1.75] text-[#142334] outline-none transition focus:border-[#C9AD98] focus:bg-white"
+              spellCheck
+            />
+          )}
         </div>
       )}
 

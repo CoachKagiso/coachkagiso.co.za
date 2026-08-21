@@ -120,6 +120,26 @@ export function buildDeckShapeSection(framework: DeckShape): string {
  * Returns an empty string when there is no deck shape, so a text-post rebuild is
  * unaffected.
  */
+/**
+ * The output contract for a carousel rebuild.
+ *
+ * This has to sit at the end of the prompt, next to the other output rules.
+ * Stated inside the deck-shape block it was ignored - the model had the arc but
+ * still wrote one flowing post, because the last word on format said nothing
+ * about slides.
+ */
+export function buildSlideOutputSection(framework: DeckShape): string {
+  const arc = Array.isArray(framework.slideArc) ? framework.slideArc.filter(Boolean) : [];
+  if (arc.length === 0) return '';
+
+  return `
+- WRITE THE DECK AS SLIDES, NOT AS ONE POST. This is the format rule that matters most.
+- Head every slide exactly like this, on its own line: SLIDE 1 - ${arc[0]}
+- Put that slide's copy on the lines underneath, then one blank line before the next heading.
+- Produce exactly ${arc.length} slides, one per role in the arc, in this order: ${arc.map((role, index) => `SLIDE ${index + 1} - ${role}`).join(', ')}
+- Do not merge slides, do not renumber them, and do not add a closing summary outside the slides.`;
+}
+
 export function buildTemplateRequestSection(framework: DeckShape): string {
   const arc = Array.isArray(framework.slideArc) ? framework.slideArc.filter(Boolean) : [];
   if (arc.length === 0 && !framework.slideCount) return '';

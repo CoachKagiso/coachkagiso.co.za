@@ -7,6 +7,8 @@ import {
   normaliseTemplate,
   parseTemplateSlides,
   splitRebuildOutput,
+  replaceSlidesInOutput,
+  splitSlidePreamble,
 } from '../lib/content/carousel-template.ts';
 
 const rebuild = `PLATFORM: LinkedIn | PILLAR: Personal Brand & Visibility | WRITING REGISTER: Tactical Teacher
@@ -89,4 +91,47 @@ test('the fill prompt forbids leaving any bracket behind', () => {
   assert.match(prompt, /Why your CV is not getting interviews/);
   assert.match(prompt, /cover -> step -> cta/);
   assert.match(prompt, /Authority deconstruction/);
+});
+
+test('a rebuilt deck splits into its header and its slides', () => {
+  const rebuild = [
+    'PLATFORM: LinkedIn | PILLAR: Personal Brand & Visibility | WRITING REGISTER: Tactical Teacher',
+    '',
+    'SLIDE 1 - cover',
+    'Everyone treats fixing your CV like it is settled.',
+    '',
+    'SLIDE 2 - step',
+    '1. Lead with proof.',
+  ].join('\n');
+
+  const { preamble, slides } = splitSlidePreamble(rebuild);
+  assert.match(preamble, /PLATFORM: LinkedIn/);
+  assert.equal(slides.length, 2);
+  assert.equal(slides[0].label, 'SLIDE 1 - cover');
+  assert.match(slides[1].content, /Lead with proof/);
+});
+
+test('a rebuild with no slide headings yields no slides, so the textarea stays', () => {
+  const { preamble, slides } = splitSlidePreamble('Just one flowing post with no headings.');
+  assert.equal(slides.length, 0);
+  assert.match(preamble, /flowing post/);
+});
+
+test('editing slides writes back without losing the header', () => {
+  const rebuild = 'PLATFORM: LinkedIn\n\nSLIDE 1 - cover\nOriginal line.\n\nSLIDE 2 - cta\nClose.';
+  const { slides } = splitSlidePreamble(rebuild);
+  slides[0].content = 'Edited line.';
+  const next = replaceSlidesInOutput(rebuild, slides);
+  assert.match(next, /PLATFORM: LinkedIn/);
+  assert.match(next, /Edited line\./);
+  assert.ok(!next.includes('Original line.'));
+  assert.equal(splitSlidePreamble(next).slides.length, 2);
+});
+
+test('reordering slides survives the round trip', () => {
+  const rebuild = 'SLIDE 1 - cover\nFirst.\n\nSLIDE 2 - cta\nSecond.';
+  const { slides } = splitSlidePreamble(rebuild);
+  const swapped = [slides[1], slides[0]];
+  const next = replaceSlidesInOutput(rebuild, swapped);
+  assert.equal(splitSlidePreamble(next).slides[0].label, 'SLIDE 2 - cta');
 });

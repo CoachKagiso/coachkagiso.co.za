@@ -4,6 +4,7 @@ import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import {
   buildDeckShapeSection,
+  buildSlideOutputSection,
   buildTemplateRequestSection,
   type DeckShape,
 } from '@/lib/content/transform-deck-shape';
@@ -89,7 +90,7 @@ BUILD RULES:
 - The result must be entirely original: it shares only structure with the source, not words, not ideas, not examples, and not subject matter
 - If the user specified a platform, follow it and infer the strongest format for that platform
 - If no platform is specified, infer both the strongest platform and strongest format from the structural framework
-- State at the top: PLATFORM: [platform] | PILLAR: [pillar] | WRITING REGISTER: [register]
+- State at the top: PLATFORM: [platform] | PILLAR: [pillar] | WRITING REGISTER: [register]${buildSlideOutputSection(framework)}
 ${buildTemplateRequestSection(framework)}`;
 }
 

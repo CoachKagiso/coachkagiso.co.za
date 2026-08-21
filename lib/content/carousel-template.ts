@@ -64,6 +64,32 @@ export function parseTemplateSlides(template: string): TemplateSlide[] {
   return slides;
 }
 
+/**
+ * Splits a rebuilt deck into whatever precedes the first slide (the PLATFORM /
+ * PILLAR / REGISTER header) and the slides themselves, so the slides can be
+ * edited as a list and written back without losing that header.
+ */
+export function splitSlidePreamble(text: string): { preamble: string; slides: TemplateSlide[] } {
+  const source = String(text ?? '');
+  const match = /^\s*#{0,3}\s*\**\s*SLIDE\s+\d+/im.exec(source);
+  if (!match || match.index === undefined) return { preamble: source.trim(), slides: [] };
+  return {
+    preamble: source.slice(0, match.index).trim(),
+    slides: parseTemplateSlides(source.slice(match.index)),
+  };
+}
+
+export function serialiseSlides(slides: TemplateSlide[]): string {
+  return slides.map((slide) => `${slide.label}\n${slide.content}`.trim()).join('\n\n');
+}
+
+/** Rebuilds the full output text from an edited slide list, header intact. */
+export function replaceSlidesInOutput(output: string, slides: TemplateSlide[]): string {
+  const { preamble } = splitSlidePreamble(output);
+  const body = serialiseSlides(slides);
+  return preamble ? `${preamble}\n\n${body}` : body;
+}
+
 export function normaliseTemplate(raw: string): CarouselTemplateRecord | null {
   const text = String(raw ?? '').trim();
   if (!text) return null;
