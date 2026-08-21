@@ -105,7 +105,7 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
-import { buildTemplateFillPrompt, countPlaceholders, splitRebuildOutput } from '@/lib/content/carousel-template';
+import { buildTemplateFillPrompt, countPlaceholders, replaceSlidesInOutput, splitRebuildOutput, splitSlidePreamble } from '@/lib/content/carousel-template';
 import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
 import {
   cleanMessyMiddleNotes,
@@ -8101,6 +8101,10 @@ function TransformFlow({
 }) {
   const inputId = 'transform-screenshot-upload';
   const outputBody = cleanDraftContent(output);
+  // A rebuild from a carousel comes back as slides. Parsing them lets the output
+  // be edited as a deck while the text stays the source of truth, so copy, save
+  // and polish keep working on the same value.
+  const outputSlides = splitSlidePreamble(outputBody).slides;
   const hasImage = Boolean(imagePreview);
   const isLoading = stage === 'extracting' || stage === 'rebuilding';
   const transformationNote = output ? (
@@ -8636,6 +8640,16 @@ function TransformFlow({
             <OutputWithActions
               title="Transform rebuild"
               value={output}
+              bodyOverride={
+                outputSlides.length > 1 ? (
+                  <TransformTemplateTab
+                    template={{ headline: '', slides: outputSlides }}
+                    editable
+                    onChange={(next) => onOutputChange(replaceSlidesInOutput(output, next.slides))}
+                    baseline={[]}
+                  />
+                ) : undefined
+              }
               wordCount={getWordCount(outputBody)}
               platformLabel={selectedPlatformLabel || 'LinkedIn'}
               contentTypeLabel="Transform rebuild"
