@@ -101,6 +101,14 @@ Output ONLY valid JSON with no other text:
   "copyDensity": "How much copy sits on a typical inner slide? One of: light / medium / dense",
   "visualPattern": "What does the deck do visually across slides? One sentence on layout rhythm, emphasis, or repetition. Describe the pattern, never the brand.",
   "whatMakesItWork": "The single strongest structural choice in this deck, and why it holds attention. One or two sentences.",
+  "teardown": {
+    "hook": { "quote": "Up to 12 words from the cover slide, verbatim.", "why": "Two or three sentences on the psychology: what each trigger does to the reader, in order, and why the stack makes them swipe. End with one blunt editorial line." },
+    "structure": { "quote": "Up to 12 words showing one beat of the repeating pattern.", "why": "Two or three sentences naming the pattern, why it is not story-then-lesson, and what the repetition buys. Say whether the deck demonstrates its own technique, and if the closing slide points back at the deck itself, call that out as a re-read loop." },
+    "pacing": { "examples": ["2-3 real closing lines from the deck, verbatim, each under 8 words."], "why": "Two sentences on the rhythm and its effect on the reader." },
+    "value": { "quote": "Up to 12 words showing how one piece of value is delivered.", "why": "Two or three sentences on why this delivery makes the advice usable rather than theoretical." },
+    "cta": { "quote": "Up to 12 words from the closing slide.", "why": "Two or three sentences on why each layer is easy to say yes to, and which layer is doing the most work." },
+    "arc": { "why": "Two sentences on how the reader's feeling is engineered from first slide to last." }
+  },
   "template": {
     "headline": "One line naming what this mould is for, e.g. 'A 9-slide authority deck'.",
     "slides": [
@@ -121,14 +129,20 @@ TEMPLATE RULES - this is the reusable mould, and it is the most useful thing you
 - The closing slide must carry one bracketed line per CTA layer you identified.
 - Every slide must contain at least one [BRACKET]. No slide may be left as finished prose.
 
-LENGTH RULE: 1-2 sentences per text field. Under 900 words total, including the template.
+LENGTH RULE: 1-2 sentences per text field. Under 1300 words total, including the teardown and the template. Do not pad the machine fields to reach it - the teardown is where the depth goes.
+
+TWO KINDS OF FIELD, AND THE DIFFERENCE MATTERS:
+- The "teardown" block teaches a human how this deck was built. Short verbatim quotes are allowed there, up to 12 words at a time, for analysis. Write it to be read and learned from: name the psychology, quantify the rules, and give one blunt editorial line per layer where it earns its place.
+- Every OTHER field feeds the rebuild engine. Those must carry NO source wording at all - describe the move, name the technique, give the measurement, never the sentence.
 
 CRITICAL RULES:
 - Output ONLY the JSON object above
-- NEVER reproduce any wording from the source, not even a short quote. Describe the move, name the technique, and give the measurement - never the sentence.
-- NEVER include the subject matter - only the structural pattern
+- Outside "teardown", NEVER reproduce any wording from the source, not even a short quote
+- Inside "teardown", never quote more than 12 consecutive words, and never quote the whole of a slide
+- NEVER include the subject matter in the non-teardown fields - only the structural pattern
 - Describe mechanism, not category. "Stacks a consensus claim then invalidates it" is useful. "Bold claim" is not.
-- Only claim a pattern you can see holding across the slides. If it holds on some, say on how many.
+- Quantify wherever you can. "Sentences are short" is useless. "90% are 4-12 words, one idea per line, closing line under 6 words" is useful.
+- Only claim a pattern you can see holding across the slides. Count before you claim. If a closing rule holds on 4 slides out of 9, say so - do not write "every slide".
 - slideArc must have exactly one entry per slide you were given, in order
 - If the slides carry no readable copy, set hasExtractableStructure to false and leave text fields empty
 `;
@@ -288,7 +302,7 @@ async function extractCarouselStructure(
         content: `CAROUSEL DECK (${slideCount} slides):\n${slideText}\n\nRead this deck and extract its structural framework.`,
       },
     ],
-    4096,
+    6000,
     0.2,
   );
 
