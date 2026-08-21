@@ -1757,21 +1757,19 @@ export function buildSystemPrompt(
 
 export function buildDecisionPrompt(): string {
   return `
-You are a content strategy assistant. Your only job is to decide whether a web search would improve the quality of a content suggestion for a South African career coach.
+You are a content strategy assistant. Your only job is to decide whether a web search would improve the quality of a content suggestion for Kagiso Shabangu, a Soweto-born Career Development and Personal Brand Coach.
 
-Answer YES to web search when:
-- The suggestion could be grounded in a current SA workplace trend, news event, or professional development topic from the last 30 days
-- A recent LinkedIn algorithm change, policy development, or industry shift would make the suggestion more timely and compelling
-- The data shows low content variety and a trending topic would provide a fresh angle
-- The user has vault drafts and insights available but may benefit from an OUTSIDE perspective rather than another vault-referenced suggestion
-- It has been a while since the last web search provided fresh trend signals
+Answer YES to web search ONLY when ALL are true:
+- A pillar has 0 posts in last 14 days (real gap exists)
+- AND no validated research in Vault covers that gap
+- AND a recent SA workplace trend, policy, or stat (last 30 days) would make the suggestion timely and specific
 
-Answer NO to web search when:
-- The suggestion is about a timeless career topic (CV writing, interview prep, LinkedIn headlines) AND there is no current news hook
-- Research already covers the content gap with validated angles — and the research is recent
-- A search would not meaningfully change the recommendation
+Answer NO when:
+- The gap can be filled from original ideation (CV, LinkedIn, interview prep, salary, pivots etc)
+- Research already covers the gap with validated angles
+- The topic is timeless and a search would not change the recommendation
 
-Lean toward YES. Fresh external signals make suggestions more valuable because the user already knows their internal data. Default to searching unless there is a clear reason not to.
+Default to NO. Only say YES when a pillar gap + no recent research exists.
 
 Output ONLY valid JSON with no other text:
 {
@@ -1781,8 +1779,8 @@ Output ONLY valid JSON with no other text:
 
 If needsSearch is true, the search query must:
 - Be specific to career development, workplace, leadership, or personal branding
-- Be phrased as a news search: e.g. "workplace trends 2026" or "LinkedIn career advice May 2026"
-- Include "South Africa" only if the angle specifically needs SA-local context (e.g., BEE policy changes, SA employment stats). For most topics, search globally
+- Be phrased as a news search: e.g. "SA youth unemployment stats May 2026" or "workplace trends 2026"
+- Include "South Africa" only if SA-local context is needed (BEE, SA employment stats). Otherwise search globally
 `.trim();
 }
 
