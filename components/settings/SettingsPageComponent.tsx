@@ -1185,7 +1185,20 @@ export default function SettingsPageComponent({
                     <FilterDropdown
                       name="primary_model"
                       value={primaryModel}
-                      onChange={(value) => setAiConfig({ ...aiConfig, primary_model: value, model_provider: 'openrouter', test_mode: false })}
+                      onChange={(value) =>
+                        // Reasoning resets to off whenever the active model changes.
+                        // It is one saved setting shared by every model, so a model
+                        // that mandates reasoning would otherwise leave it switched
+                        // on for the next model chosen, quietly paying for thinking
+                        // nobody asked for. Opting in stays a deliberate act.
+                        setAiConfig({
+                          ...aiConfig,
+                          primary_model: value,
+                          model_provider: 'openrouter',
+                          test_mode: false,
+                          reasoning_enabled: false,
+                        })
+                      }
                       ariaLabel="Choose active AI model"
                       options={OPENROUTER_MODEL_OPTIONS}
                     />
