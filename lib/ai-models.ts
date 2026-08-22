@@ -20,6 +20,13 @@ export type AiModelOption = {
    * Verify these against the provider before relying on them.
    */
   supportsVision?: boolean;
+  /**
+   * Preview or cloaked endpoints. Never chosen automatically: they can vanish,
+   * change behaviour, or - as with the DeepSeek vision preview - be unreachable
+   * under a data policy that denies training, which surfaces as a 404 on every
+   * request rather than as a model that simply performs badly.
+   */
+  experimental?: boolean;
 };
 
 export const ZAI_TEST_MODEL = 'glm-5.2';
@@ -39,11 +46,15 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 51, inputPrice: 0.49, outputPrice: 1.54 },
   { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3', intelligence: 44, inputPrice: 0.22, outputPrice: 1.2, supportsVision: true },
   { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro', intelligence: 42, inputPrice: 0.44, outputPrice: 0.87 },
+  // Same input price as minimax with cheaper output, which is the half that
+  // matters for OCR: the images bill as input, but the pass emits the full
+  // transcript of every slide. Experimental, so treat availability as temporary.
+  { value: 'deepseek/deepseek-v4-flash-vision-exp', label: 'deepseek/deepseek-v4-flash-vision-exp', inputPrice: 0.22, outputPrice: 0.66, supportsVision: true, experimental: true },
   // Free while cloaked, so it sorts first on price. requiresReasoning is not
   // optional here: the endpoint rejects `reasoning: { effort: 'none' }` with a
   // 400 rather than ignoring it, which made every generation fail while the
   // Settings reasoning toggle was off.
-  { value: 'stealth/ox-alpha', label: 'stealth/ox-alpha', inputPrice: 0, outputPrice: 0, requiresReasoning: true, supportsVision: true },
+  { value: 'stealth/ox-alpha', label: 'stealth/ox-alpha', inputPrice: 0, outputPrice: 0, requiresReasoning: true, supportsVision: true, experimental: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
@@ -80,8 +91,9 @@ export function modelSupportsVision(model: unknown) {
  */
 export function getFallbackVisionModel() {
   const visionModels = OPENROUTER_MODEL_OPTIONS.filter((option) => option.supportsVision);
-  // Exclude free cloaked endpoints from implicit fallback — they are opted-in only.
-  const stable = visionModels.filter((option) => !(option.inputPrice === 0 && option.outputPrice === 0));
+  // Experimental endpoints are opt-in only. Cheapness must not make a preview
+  // model the silent default for reading documents.
+  const stable = visionModels.filter((option) => !option.experimental);
   const pool = stable.length > 0 ? stable : visionModels;
   return pool.sort((a, b) => (a.inputPrice + a.outputPrice) - (b.inputPrice + b.outputPrice))[0]?.value || null;
 }

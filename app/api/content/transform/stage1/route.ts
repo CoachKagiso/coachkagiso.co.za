@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { buildAiRequestBody, type AiRuntimeConfig, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { postAiChat, type AiRuntimeConfig, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import { getFallbackVisionModel, modelSupportsVision } from '@/lib/ai-models';
 import {
   CAROUSEL_SLIDE_ROLES,
@@ -168,16 +168,12 @@ function wait(ms: number) {
 }
 
 async function callAi(runtime: AiRuntimeConfig, model: string, messages: Array<Record<string, unknown>>, maxTokens: number, temperature: number) {
-  return fetch(`${runtime.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: runtime.headers,
-    body: JSON.stringify(buildAiRequestBody(runtime, {
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-      response_format: { type: 'json_object' },
-    })),
+  return postAiChat({ ...runtime, model }, {
+    model,
+    messages,
+    max_tokens: maxTokens,
+    temperature,
+    response_format: { type: 'json_object' },
   });
 }
 
