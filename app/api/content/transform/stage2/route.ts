@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
-import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { postAiChat, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import {
   buildDeckShapeSection,
   buildSlideOutputSection,
@@ -133,30 +133,26 @@ export async function POST(req: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch(`${runtime.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: runtime.headers,
-      body: JSON.stringify(buildAiRequestBody(runtime, {
-        model: runtime.model,
-        messages: [
-          {
-            role: 'system',
-            content: buildSystemPrompt(
-              'alchemy_stage2',
-              body?.context ?? {},
-              contentType,
-              subType || undefined,
-              undefined,
-              undefined,
-              researchEntries,
-              targetPillar,
-            ),
-          },
-          { role: 'user', content: buildStage2UserPrompt(framework, platform, contentType, subType, targetPillar, targetRegister, userDirection, calendarContext) },
-        ],
-        max_tokens: 3000,
-        temperature: 0.75,
-      })),
+    response = await postAiChat(runtime, {
+      model: runtime.model,
+      messages: [
+        {
+          role: 'system',
+          content: buildSystemPrompt(
+            'alchemy_stage2',
+            body?.context ?? {},
+            contentType,
+            subType || undefined,
+            undefined,
+            undefined,
+            researchEntries,
+            targetPillar,
+          ),
+        },
+        { role: 'user', content: buildStage2UserPrompt(framework, platform, contentType, subType, targetPillar, targetRegister, userDirection, calendarContext) },
+      ],
+      max_tokens: 3000,
+      temperature: 0.75,
     });
   } catch (error) {
     console.error('Transform Stage 2 network error:', error);

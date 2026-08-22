@@ -75,6 +75,39 @@ export async function resolveAiRuntimeConfig(options: { simpleMode?: boolean } =
   };
 }
 
+/**
+ * Some endpoints refuse to have reasoning turned off and answer 400 rather than
+ * ignoring the instruction. The catalogue carries a requiresReasoning flag for
+ * the ones we know about, but providers keep turning it on for models that did
+ * not need it before - it has now happened to Gemini, to the cloaked model, and
+ * to GLM-5.3 - and a stale flag means every request on that model fails.
+ *
+ * So the flag is treated as an optimisation, not the guard. If a request is
+ * refused for exactly this reason, it is retried once with the disable removed.
+ */
+export async function postAiChat(
+  runtime: AiRuntimeConfig,
+  payload: Record<string, unknown>,
+  options: AiRequestOptions = {},
+): Promise<Response> {
+  const send = (body: Record<string, unknown>) =>
+    fetch(`${runtime.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: runtime.headers,
+      body: JSON.stringify(body),
+    });
+
+  const response = await send(buildAiRequestBody(runtime, payload, options));
+  if (response.status !== 400) return response;
+
+  // The body can only be read once, so clone before inspecting it.
+  const text = await response.clone().text();
+  if (!/reasoning is mandatory/i.test(text)) return response;
+
+  console.warn(`Reasoning is mandatory for ${runtime.model}; retrying without the disable.`);
+  return send(buildAiRequestBody({ ...runtime, reasoningEnabled: true }, payload, options));
+}
+
 export function buildAiRequestBody(
   runtime: AiRuntimeConfig,
   payload: Record<string, unknown>,
