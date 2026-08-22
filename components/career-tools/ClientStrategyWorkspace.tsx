@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  ArrowLeft,
   BriefcaseBusiness,
   CalendarClock,
   ClipboardCheck,
@@ -14,6 +15,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import FilterDropdown from '@/components/FilterDropdown';
+import ManualClientEngagementForm from '@/components/clients/ManualClientEngagementForm';
 import ClientStrategyContext from '@/components/career-tools/ClientStrategyContext';
 import ClientStrategyPlanPanel from '@/components/career-tools/ClientStrategyPlanPanel';
 import ClientFulfillmentChecklist from '@/components/career-tools/ClientFulfillmentChecklist';
@@ -47,15 +49,40 @@ type WorkspaceResponse = {
 const LAST_TAB_PREFIX = 'coach-kagiso:career-tools:last-tab:';
 const DEBRIEF_DRAFT_PREFIX = 'coach-kagiso:career-tools:debrief-draft:';
 const WORKSPACE_TABS = [
-  { value: 'context', label: 'Client Context', icon: UserRound, requiresStrategy: false },
-  { value: 'cv', label: 'CV Analyzer', icon: FileSearch, requiresStrategy: false },
-  { value: 'prep', label: 'Session Preparation', icon: ClipboardCheck, requiresStrategy: true },
-  { value: 'strategy', label: 'Session Brief + Plan', icon: NotebookPen, requiresStrategy: true },
+  {
+    value: 'context',
+    label: 'Client Context',
+    icon: UserRound,
+    requiresStrategy: false,
+    description: 'Intake answers, booking time, and background pulled together so you never retype what a client already told you.',
+  },
+  {
+    value: 'cv',
+    label: 'CV Analyzer',
+    icon: FileSearch,
+    requiresStrategy: false,
+    description: 'Read a CV against the target role and get the gaps, strengths, and rewrite direction in one pass.',
+  },
+  {
+    value: 'prep',
+    label: 'Session Preparation',
+    icon: ClipboardCheck,
+    requiresStrategy: true,
+    description: 'Build the preparation pack before a coaching session, with the questions and evidence you want to open on.',
+  },
+  {
+    value: 'strategy',
+    label: 'Session Brief + Plan',
+    icon: NotebookPen,
+    requiresStrategy: true,
+    description: 'Capture the debrief after the session and turn it into a reviewed support plan you can export.',
+  },
 ] satisfies Array<{
   value: ClientStrategyWorkspaceView;
   label: string;
   icon: typeof UserRound;
   requiresStrategy: boolean;
+  description: string;
 }>;
 
 function clientSearchText(client: ClientRecord) {
@@ -93,6 +120,7 @@ export default function ClientStrategyWorkspace({
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAllClients, setShowAllClients] = useState(false);
+  const [standaloneCv, setStandaloneCv] = useState(false);
   const [activeTab, setActiveTab] = useState<ClientStrategyWorkspaceView>(
     () => normalizeClientStrategyWorkspaceView(selectedView),
   );
@@ -316,6 +344,14 @@ export default function ClientStrategyWorkspace({
             <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[#142334]/62">
               Move from client context to analysis, session preparation, and a reviewed support plan.
             </p>
+            <div className="mt-3">
+              <ManualClientEngagementForm
+                adminKey={adminKey}
+                onCreated={(isTest) => {
+                  if (isTest) setShowAllClients(true);
+                }}
+              />
+            </div>
           </div>
 
           <div className="w-full xl:max-w-2xl">
@@ -375,20 +411,75 @@ export default function ClientStrategyWorkspace({
           </div>
         </div>
 
-        {filteredClientRecords.length === 0 ? (
-          <div className="grid min-h-[220px] place-items-center rounded-[8px] bg-white p-6 text-center" role="status">
-            <div className="max-w-md">
-              <BriefcaseBusiness className="mx-auto h-9 w-9 text-[#C9AD98]" />
-              <p className="mt-4 font-serif text-[26px] text-[#142334]">No client matches this view.</p>
-              <p className="mt-2 text-[13px] leading-relaxed text-[#6B6B6B]">Search by name or switch on Show all clients to inspect retained records.</p>
+        {!selectedClient && standaloneCv ? (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] bg-[#142334] px-4 py-3 text-white">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <FileSearch className="h-4 w-4 shrink-0 text-[#C9AD98]" />
+                  <h3 className="font-serif text-[24px] leading-tight">Quick CV test</h3>
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/60">
+                  Not linked to a client. Nothing here is saved to a client record.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStandaloneCv(false)}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-white/30 px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-[#142334]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to tools
+              </button>
+            </div>
+            <div className="mt-3 min-w-0">
+              <CvAnalyzerDashboard adminKey={adminKey} selectedClient={null} active />
             </div>
           </div>
         ) : !selectedClient ? (
-          <div className="grid min-h-[220px] place-items-center rounded-[8px] border border-dashed border-[#D8C8BB] bg-white p-6 text-center">
-            <div className="max-w-md">
-              <BriefcaseBusiness className="mx-auto h-9 w-9 text-[#C9AD98]" />
-              <p className="mt-4 font-serif text-[26px] text-[#142334]">Choose the client you are preparing for.</p>
-              <p className="mt-2 text-[13px] leading-relaxed text-[#142334]/62">Their intake answers and saved Career Tools work will load without retyping anything.</p>
+          <div className="min-w-0">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {WORKSPACE_TABS.map((tab) => {
+                const Icon = tab.icon;
+                const standalone = tab.value === 'cv';
+                return (
+                  <div key={tab.value} className="flex flex-col rounded-[8px] bg-white p-4">
+                    <Icon className="h-6 w-6 text-[#C9AD98]" />
+                    <h3 className="mt-3 font-serif text-[22px] leading-tight text-[#142334]">{tab.label}</h3>
+                    <p className="mt-2 flex-1 text-[13px] leading-relaxed text-[#142334]/62">{tab.description}</p>
+                    <span className="mt-3 inline-flex w-fit rounded-full border border-[#D8C8BB] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#8C7466]">
+                      {tab.requiresStrategy ? 'Coaching engagements' : 'All client services'}
+                    </span>
+                    {standalone && (
+                      <button
+                        type="button"
+                        onClick={() => setStandaloneCv(true)}
+                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#142334] px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
+                      >
+                        <FileSearch className="h-4 w-4" /> Test a CV now
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              className="mt-3 grid gap-3 rounded-[8px] border border-dashed border-[#D8C8BB] bg-white p-5 text-center"
+              role="status"
+            >
+              <BriefcaseBusiness className="mx-auto h-8 w-8 text-[#C9AD98]" />
+              <div>
+                <p className="font-serif text-[24px] leading-tight text-[#142334]">
+                  {filteredClientRecords.length === 0
+                    ? 'No client matches this view yet.'
+                    : 'Pick the paying client you are working on.'}
+                </p>
+                <p className="mx-auto mt-2 max-w-xl text-[13px] leading-relaxed text-[#142334]/62">
+                  {filteredClientRecords.length === 0
+                    ? 'Search by name, switch on Show all clients to inspect retained records, or add the client if they paid offline by EFT, cash, or card machine.'
+                    : 'Use the picker above to open the tools with their intake answers and saved work already loaded. If they paid offline by EFT, cash, or card machine, add them with the button above first.'}
+                </p>
+              </div>
             </div>
           </div>
         ) : (
