@@ -37,7 +37,11 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[] = [
   { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 63.1, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true },
   { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 60.9, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true },
   { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 59.7, inputPrice: 2.6, outputPrice: 13.0, supportsVision: true },
-  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40 },
+  // GLM-5.3 began refusing the reasoning disable in August 2026. The retry in
+  // postAiChat recovers either way, but flagging it keeps the Settings toggle
+  // honest - unflagged it read OFF while reasoning was happening anyway - and
+  // saves a wasted round trip on every call.
+  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true },
   { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 59, inputPrice: 5.0, outputPrice: 30.0, supportsVision: true },
   { value: 'meta/muse-spark-1.2', label: 'meta/muse-spark-1.2', intelligence: 56.8, inputPrice: 1.25, outputPrice: 4.25, supportsVision: true },
   { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56, inputPrice: 1.25, outputPrice: 7.5, supportsVision: true },
