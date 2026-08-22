@@ -417,10 +417,10 @@ export default function ClientStrategyWorkspace({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <FileSearch className="h-4 w-4 shrink-0 text-[#C9AD98]" />
-                  <h3 className="font-serif text-[24px] leading-tight">Quick CV test</h3>
+                  <h3 className="font-serif text-[24px] leading-tight">Standalone CV analysis</h3>
                 </div>
                 <p className="mt-1 text-[12px] leading-relaxed text-white/60">
-                  Not linked to a client. Nothing here is saved to a client record.
+                  Not linked to a client, so this analysis is not saved to a client record.
                 </p>
               </div>
               <button
@@ -455,7 +455,7 @@ export default function ClientStrategyWorkspace({
                         onClick={() => setStandaloneCv(true)}
                         className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#142334] px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#C9AD98] hover:text-[#142334]"
                       >
-                        <FileSearch className="h-4 w-4" /> Test a CV now
+                        <FileSearch className="h-4 w-4" /> Analyze a CV
                       </button>
                     )}
                   </div>
