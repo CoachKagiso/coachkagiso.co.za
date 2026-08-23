@@ -4,6 +4,24 @@ import { modelRequiresReasoning } from './ai-models.ts';
 export type AiRequestProvider = 'zai' | 'openrouter';
 
 /**
+ * Reasoning tokens are billed from the same output budget as the answer, so a max_tokens sized
+ * for the JSON alone gets spent thinking and the object arrives truncated. Routes keep stating
+ * the budget their content needs; this adds the thinking allowance on top when it applies.
+ *
+ * The allowance scales with the answer rather than being a flat number, because the two move
+ * together: a route asking for a 4k-token report hands the model far more to think about than one
+ * asking for a 100-token title. A flat 4000 was enough for the short routes and not for the long
+ * ones - the CV analyzer on GLM-5.3 kept finishing on `length` with the JSON cut mid-object.
+ */
+const MIN_REASONING_TOKEN_HEADROOM = 4000;
+const REASONING_HEADROOM_RATIO = 2;
+
+export function withReasoningHeadroom(maxTokens: number) {
+  const headroom = Math.max(MIN_REASONING_TOKEN_HEADROOM, Math.round(maxTokens * REASONING_HEADROOM_RATIO));
+  return maxTokens + headroom;
+}
+
+/**
  * Whether the model will actually spend tokens thinking. Some endpoints mandate reasoning, so
  * the Settings toggle being off does not mean reasoning is off for them.
  */

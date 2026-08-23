@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAiProviderRequestOptions, isReasoningActive } from '../lib/ai-request.ts';
+import { getAiProviderRequestOptions, isReasoningActive, withReasoningHeadroom } from '../lib/ai-request.ts';
 import { getFallbackVisionModel, modelSupportsVision } from '../lib/ai-models.ts';
 
 test('disables OpenRouter reasoning when reasoningEnabled is false (default)', () => {
@@ -47,4 +47,15 @@ test('image requests fall back to a vision-capable model when the configured one
   assert.equal(modelSupportsVision('anthropic/claude-opus-5'), true);
   assert.ok(getFallbackVisionModel(), 'a vision-capable fallback must exist in the catalogue');
   assert.equal(modelSupportsVision(getFallbackVisionModel()), true);
+});
+
+test('reasoning headroom scales with the answer budget, with a floor for short routes', () => {
+  // Short routes keep the flat floor - a 100-token title needs no more thinking than that.
+  assert.equal(withReasoningHeadroom(100), 4100);
+  assert.equal(withReasoningHeadroom(900), 4900);
+  // The CV analyzer asks for 4096 and used to land on exactly 8096 - the old flat allowance -
+  // with the JSON cut mid-object. It must now get materially more room than the answer itself.
+  const analyzerBudget = withReasoningHeadroom(4096);
+  assert.ok(analyzerBudget > 8096, 'the analyzer must clear the budget it was truncating at');
+  assert.equal(analyzerBudget, 12288);
 });

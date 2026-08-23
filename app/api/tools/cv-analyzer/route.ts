@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildAiRequestBody, resolveAiRuntimeConfig } from '@/lib/ai-config';
+import { postAiChat, resolveAiRuntimeConfig } from '@/lib/ai-config';
 import {
   buildCvCoachMoveLabelUnion,
   buildCvCoachMoveRulesPrompt,
@@ -435,31 +435,29 @@ export async function POST(request: Request) {
 
   let response: Response;
   try {
-    response = await fetch(`${runtime.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: runtime.headers,
-      body: JSON.stringify(buildAiRequestBody(runtime, {
-        model: runtime.model,
-        messages: [
-          { role: 'system', content: buildCvAnalyzerSystemPrompt() },
-          {
-            role: 'user',
-            content: buildCvAnalyzerUserPrompt({
-              analysisMode,
-              cvText,
-              targetRole,
-              contextNotes,
-              goal: resolvedGoal,
-              seniority: resolvedSeniority,
-              intakeData,
-            }),
-          },
-        ],
-        max_tokens: 4096,
-        temperature: 0.45,
-        response_format: { type: 'json_object' },
-      }, { zeroRetention: true })),
-    });
+    // postAiChat rather than a bare fetch so a model that starts mandating reasoning without the
+    // catalogue knowing yet is retried instead of failing the whole analysis.
+    response = await postAiChat(runtime, {
+      model: runtime.model,
+      messages: [
+        { role: 'system', content: buildCvAnalyzerSystemPrompt() },
+        {
+          role: 'user',
+          content: buildCvAnalyzerUserPrompt({
+            analysisMode,
+            cvText,
+            targetRole,
+            contextNotes,
+            goal: resolvedGoal,
+            seniority: resolvedSeniority,
+            intakeData,
+          }),
+        },
+      ],
+      max_tokens: 4096,
+      temperature: 0.45,
+      response_format: { type: 'json_object' },
+    }, { zeroRetention: true });
   } catch (error) {
     console.error(`${runtime.provider} CV analyzer network error:`, error);
     return NextResponse.json(
@@ -477,10 +475,36 @@ export async function POST(request: Request) {
     );
   }
 
+  let data: {
+    model?: string;
+    choices?: Array<{ finish_reason?: string; message?: { content?: string } }>;
+  };
   try {
-    const data = JSON.parse(responseText) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = data.choices?.[0]?.message?.content?.trim() || '';
-    if (!text) throw new Error('EMPTY_AI_RESPONSE');
+    data = JSON.parse(responseText);
+  } catch (error) {
+    console.error('CV analyzer response was not JSON:', error);
+    return NextResponse.json({ error: 'AI service returned an unreadable report. Try again.' }, { status: 500 });
+  }
+
+  // A cut-off report and a schema mismatch both end up as unparseable JSON, so name the cause
+  // here instead of letting a budget problem read as a broken model.
+  const finishReason = data.choices?.[0]?.finish_reason || 'unknown';
+  if (finishReason === 'length') {
+    console.error('CV analyzer response truncated:', { model: data.model || runtime.model });
+    return NextResponse.json({
+      error: 'The AI ran out of room before finishing this analysis. '
+        + 'This usually means the model spent its budget on reasoning. Try again, or switch the primary model in Settings.',
+      code: 'CV_ANALYZER_OUTPUT_TRUNCATED',
+    }, { status: 502 });
+  }
+
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!text) {
+    console.error('CV analyzer returned no content:', { model: data.model || runtime.model, finishReason });
+    return NextResponse.json({ error: 'The analyzer returned an empty report. Try again.' }, { status: 502 });
+  }
+
+  try {
     const result = normalizeAnalyzerResult(extractToolJsonObject(text));
 
     if (!result.snapshot || !result.priorityFixes.length || !result.nextActions.length || !result.recommendedCoachMove.label) {

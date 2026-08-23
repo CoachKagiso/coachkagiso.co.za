@@ -1,5 +1,5 @@
 import { createSupabaseServiceClient } from '@/lib/supabase-server';
-import { getAiProviderRequestOptions, isReasoningActive } from '@/lib/ai-request';
+import { getAiProviderRequestOptions, isReasoningActive, withReasoningHeadroom } from '@/lib/ai-request';
 import { buildProviderPreferences, type AiRequestOptions } from '@/lib/ai-provider-preferences';
 import { DEFAULT_SETTINGS, type AiConfigSettings } from '@/lib/settings';
 import {
@@ -22,13 +22,6 @@ export type AiRuntimeConfig = {
 
 export const SIMPLE_AI_MODES = new Set(['polish', 'format_recommendation']);
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-
-/**
- * Reasoning tokens are billed from the same output budget as the answer, so a max_tokens sized
- * for the JSON alone gets spent thinking and the object arrives truncated. Routes keep stating
- * the budget their content needs; this adds the thinking allowance on top when it applies.
- */
-const REASONING_TOKEN_HEADROOM = 4000;
 
 export async function loadAiConfig(): Promise<AiConfigSettings> {
   try {
@@ -123,7 +116,7 @@ export function buildAiRequestBody(
   return {
     ...rest,
     ...(needsReasoningHeadroom
-      ? { max_tokens: (rest.max_tokens as number) + REASONING_TOKEN_HEADROOM }
+      ? { max_tokens: withReasoningHeadroom(rest.max_tokens as number) }
       : {}),
     ...getAiProviderRequestOptions(runtime.provider, runtime.model, runtime.reasoningEnabled),
     ...(provider ? { provider } : {}),
