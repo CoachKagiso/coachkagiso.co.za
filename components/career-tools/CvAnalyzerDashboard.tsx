@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -65,6 +65,13 @@ type CvSourceState = {
   fileName: string | null;
   contentType: string | null;
   origin: 'stored' | 'external' | null;
+};
+
+type VerifyResolution = {
+  id: string;
+  title: string;
+  resolution: string;
+  created_at: string;
 };
 
 type CvWorkspaceResponse = {
@@ -351,12 +358,14 @@ function DetailList({
   detailLabel = 'Detail',
   detailTone = 'context',
   fixLabel = 'Do this',
+  renderItemFooter,
 }: {
   title: string;
   items: Array<{ kind?: 'fix' | 'verify'; title: string; detail?: string; whyItMatters?: string; fix?: string }>;
   detailLabel?: string;
   detailTone?: 'context' | 'action';
   fixLabel?: string;
+  renderItemFooter?: (item: { kind?: 'fix' | 'verify'; title: string }) => ReactNode;
 }) {
   if (!items.length) return null;
 
@@ -392,6 +401,7 @@ function DetailList({
                     tone={item.kind === 'verify' ? 'context' : 'action'}
                   />
                 )}
+                {renderItemFooter?.(item)}
               </div>
             </div>
           </li>
@@ -427,6 +437,11 @@ export default function CvAnalyzerDashboard({
   const [error, setError] = useState('');
   const [exportError, setExportError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [resolvedChecks, setResolvedChecks] = useState<VerifyResolution[]>([]);
+  const [resolvingTitle, setResolvingTitle] = useState<string | null>(null);
+  const [resolutionDraft, setResolutionDraft] = useState('');
+  const [resolutionBusy, setResolutionBusy] = useState(false);
+  const [resolutionError, setResolutionError] = useState('');
   const [building, setBuilding] = useState<DeliverableKind | null>(null);
   const [buildError, setBuildError] = useState('');
   const [cvChangeReport, setCvChangeReport] = useState<ChangeReportEntry[] | null>(null);
@@ -469,9 +484,87 @@ export default function CvAnalyzerDashboard({
       }
     }
 
+    async function loadResolvedChecks() {
+      try {
+        const response = await fetch(
+          `/api/clients/${encodeURIComponent(paymentId)}/cv-verify-resolutions`,
+          { headers: { 'x-diagnostic-admin-key': adminKey }, signal: controller.signal },
+        );
+        const data = await response.json().catch(() => null) as { resolutions?: VerifyResolution[] } | null;
+        if (!response.ok) return;
+        setResolvedChecks(data?.resolutions || []);
+      } catch {
+        // A settled-checks list that will not load is not worth blocking the report over - the
+        // analysis is still readable, it just cannot show what has already been closed.
+      }
+    }
+
     void loadClientCv();
+    void loadResolvedChecks();
     return () => controller.abort();
   }, [active, adminKey, selectedClient]);
+
+  // Standalone analyses have no client to remember anything against.
+  useEffect(() => {
+    if (selectedClient) return;
+    setResolvedChecks([]);
+    setResolvingTitle(null);
+    setResolutionDraft('');
+    setResolutionError('');
+  }, [selectedClient]);
+
+  async function saveResolution(title: string) {
+    if (!selectedClient) return;
+    const resolution = resolutionDraft.trim();
+    if (!resolution) {
+      setResolutionError('Say what you established before saving it.');
+      return;
+    }
+
+    setResolutionBusy(true);
+    setResolutionError('');
+    try {
+      const response = await fetch(
+        `/api/clients/${encodeURIComponent(selectedClient.paymentId)}/cv-verify-resolutions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-diagnostic-admin-key': adminKey },
+          body: JSON.stringify({ title, resolution }),
+        },
+      );
+      const data = await response.json().catch(() => null) as
+        { resolution?: VerifyResolution; error?: string } | null;
+      if (!response.ok || !data?.resolution) throw new Error(data?.error || 'Could not save that resolved check.');
+      setResolvedChecks((current) => [data.resolution as VerifyResolution, ...current]);
+      setResolvingTitle(null);
+      setResolutionDraft('');
+    } catch (caught) {
+      setResolutionError(caught instanceof Error ? caught.message : 'Could not save that resolved check.');
+    } finally {
+      setResolutionBusy(false);
+    }
+  }
+
+  async function reopenResolution(id: string) {
+    if (!selectedClient) return;
+    setResolutionError('');
+    const previous = resolvedChecks;
+    setResolvedChecks((current) => current.filter((item) => item.id !== id));
+    try {
+      const response = await fetch(
+        `/api/clients/${encodeURIComponent(selectedClient.paymentId)}/cv-verify-resolutions`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'x-diagnostic-admin-key': adminKey },
+          body: JSON.stringify({ id }),
+        },
+      );
+      if (!response.ok) throw new Error('Could not reopen that check.');
+    } catch (caught) {
+      setResolvedChecks(previous);
+      setResolutionError(caught instanceof Error ? caught.message : 'Could not reopen that check.');
+    }
+  }
 
   function getCvFileValidationError(file: File) {
     const lowerName = file.name.toLowerCase();
@@ -975,7 +1068,73 @@ export default function CvAnalyzerDashboard({
             )}
 
             <div className="grid gap-4">
-              <DetailList title="Priority fixes" items={result.priorityFixes} fixLabel="Do this" />
+              <DetailList
+                title="Priority fixes"
+                items={result.priorityFixes}
+                fixLabel="Do this"
+                renderItemFooter={(item) => {
+                  // Only a client analysis can remember anything: a standalone run has no record to
+                  // write the answer to, so it gets the flag without the offer to close it.
+                  if (item.kind !== 'verify' || !selectedClient) return null;
+                  const settled = resolvedChecks.find((entry) => entry.title === item.title);
+                  if (settled) {
+                    return (
+                      <p className="mt-3 rounded-[8px] bg-[#F7F1EC] px-3 py-2 text-[12px] leading-[1.6] text-[#142334]/70">
+                        <span className="font-semibold">Settled.</span> {settled.resolution}
+                      </p>
+                    );
+                  }
+                  if (resolvingTitle !== item.title) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResolvingTitle(item.title);
+                          setResolutionDraft('');
+                          setResolutionError('');
+                        }}
+                        className="mt-3 rounded-full border border-[#E4D8CB] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466] transition hover:bg-[#F7F1EC]"
+                      >
+                        Confirm and stop flagging
+                      </button>
+                    );
+                  }
+                  return (
+                    <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#8C7466]">
+                        What did you establish?
+                        <textarea
+                          value={resolutionDraft}
+                          onChange={(event) => setResolutionDraft(event.target.value)}
+                          rows={2}
+                          placeholder="Confirmed with client: 2027 is a typo for 2023, already corrected."
+                          className="mt-1.5 w-full rounded-[6px] border border-[#E4D8CB] bg-white px-2.5 py-2 text-[13px] font-normal normal-case tracking-normal text-[#142334] outline-none focus:border-[#C9AD98]"
+                        />
+                      </label>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={resolutionBusy}
+                          onClick={() => void saveResolution(item.title)}
+                          className="rounded-full bg-[#142334] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white disabled:opacity-60"
+                        >
+                          {resolutionBusy ? 'Saving' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setResolvingTitle(null); setResolutionError(''); }}
+                          className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#8C7466]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {resolutionError && (
+                        <p className="mt-2 text-[12px] font-semibold text-[#7A2F22]">{resolutionError}</p>
+                      )}
+                    </div>
+                  );
+                }}
+              />
               <DetailList
                 title="Evidence gaps"
                 items={result.evidenceGaps}
@@ -983,6 +1142,35 @@ export default function CvAnalyzerDashboard({
                 fixLabel="How to prove it"
               />
             </div>
+
+            {selectedClient && resolvedChecks.length > 0 && (
+              <div className="rounded-[8px] border border-white/10 bg-white/[0.08] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">
+                  Settled with the client
+                </p>
+                <p className="mt-2 text-[12px] leading-relaxed text-white/58">
+                  These are closed. The analyzer is told not to raise them again on future runs.
+                </p>
+                <ul className="mt-3 grid gap-2">
+                  {resolvedChecks.map((item) => (
+                    <li key={item.id} className="rounded-[8px] bg-white/[0.06] px-3 py-2.5">
+                      <p className="text-[13px] font-semibold text-white/85">{item.title}</p>
+                      <p className="mt-1 text-[12px] leading-[1.6] text-white/64">{item.resolution}</p>
+                      <button
+                        type="button"
+                        onClick={() => void reopenResolution(item.id)}
+                        className="mt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#C9AD98]"
+                      >
+                        Reopen
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {resolutionError && (
+                  <p className="mt-2 text-[12px] font-semibold text-[#E4D8CB]">{resolutionError}</p>
+                )}
+              </div>
+            )}
 
             {result.rewriteSamples.length > 0 && (
               <div>

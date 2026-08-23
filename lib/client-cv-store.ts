@@ -306,3 +306,84 @@ export async function saveClientCvAnalysisReport(input: {
   if (result.error) throw new Error(result.error.message);
   return result.data as ClientCvAnalysisReportRow;
 }
+
+export type ClientCvVerifyResolutionRow = {
+  id: string;
+  payment_id: string;
+  title: string;
+  resolution: string;
+  created_at: string;
+};
+
+const VERIFY_RESOLUTION_SELECT = 'id, payment_id, title, resolution, created_at';
+const MAX_VERIFY_RESOLUTIONS = 40;
+
+function isMissingVerifyResolutionTable(message?: string) {
+  return Boolean(message && message.includes('cv_verify_resolutions'));
+}
+
+/**
+ * Verify items the coach has already settled with the client. Returned oldest-last so the prompt
+ * shows the most recent answer first when the same ground gets covered twice.
+ *
+ * An absent table is not an error here. The analyzer must keep working on a deployment that has not
+ * had the migration applied yet - it simply has no memory of what was resolved, which is where it
+ * started.
+ */
+export async function listClientCvVerifyResolutions(paymentId: string) {
+  const supabase = createSupabaseServiceClient();
+  const result = await supabase
+    .from('cv_verify_resolutions')
+    .select(VERIFY_RESOLUTION_SELECT)
+    .eq('payment_id', paymentId)
+    .order('created_at', { ascending: false })
+    .limit(MAX_VERIFY_RESOLUTIONS);
+  if (result.error) {
+    if (isMissingVerifyResolutionTable(result.error.message)) return [];
+    throw new Error(result.error.message);
+  }
+  return (result.data || []) as ClientCvVerifyResolutionRow[];
+}
+
+export async function saveClientCvVerifyResolution(input: {
+  paymentId: string;
+  title: string;
+  resolution: string;
+}) {
+  const title = input.title.trim();
+  const resolution = input.resolution.trim();
+  if (!title || !resolution) {
+    throw new Error('A resolution needs both the finding it answers and what you established.');
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const result = await supabase
+    .from('cv_verify_resolutions')
+    .insert({ payment_id: input.paymentId, title, resolution })
+    .select(VERIFY_RESOLUTION_SELECT)
+    .single();
+  if (result.error) {
+    if (isMissingVerifyResolutionTable(result.error.message)) {
+      // Saving cannot degrade quietly the way reading can - the coach would think the answer was
+      // recorded and see the same question again next run.
+      throw new Error('Resolved checks are not set up on this database yet. Apply the cv_verify_resolutions migration.');
+    }
+    throw new Error(result.error.message);
+  }
+  return result.data as ClientCvVerifyResolutionRow;
+}
+
+export async function deleteClientCvVerifyResolution(input: { paymentId: string; id: string }) {
+  const supabase = createSupabaseServiceClient();
+  const result = await supabase
+    .from('cv_verify_resolutions')
+    .delete()
+    .eq('payment_id', input.paymentId)
+    .eq('id', input.id)
+    .select('id');
+  if (result.error) {
+    if (isMissingVerifyResolutionTable(result.error.message)) return 0;
+    throw new Error(result.error.message);
+  }
+  return (result.data || []).length;
+}
