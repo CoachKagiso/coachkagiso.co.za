@@ -7,7 +7,13 @@ import {
 } from '@/lib/buying-flow';
 import { extractCvDocument } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
-import { getClientCvSource, saveClientCvAnalysisReport, saveClientCvVersion } from '@/lib/client-cv-store';
+import {
+  getClientCvSource,
+  listClientCvVerifyResolutions,
+  saveClientCvAnalysisReport,
+  saveClientCvVersion,
+} from '@/lib/client-cv-store';
+import { getIncludedClientDiagnosticContext } from '@/lib/client-diagnostic-context-store';
 import { getClientLiveIntake } from '@/lib/client-intake-store';
 import { loadClientStrategyCvText } from '@/lib/client-strategy-cv-server';
 import { sanitizeClientStrategyIntake } from '@/lib/client-strategy-cv';
@@ -167,6 +173,25 @@ ${renderReportRuleBlock('PLAIN LANGUAGE STANDARD', REPORT_PLAIN_LANGUAGE_RULES)}
 - Worked example: "the CV is unlikely to survive an ATS (the software that filters CVs before a person reads them)".
 
 ${renderReportRuleBlock('EMPHASIS', REPORT_EMPHASIS_RULES)}
+
+ALREADY SETTLED
+The resolved_checks block lists questions Kagiso has already put to the client and answered. Do not
+raise any of them again, in any section, however you would have worded it - the answer is in the block
+and it beats anything you can infer from the text. Match on meaning, not wording: "Check the Santam
+start date" and "Employment timeline looks inconsistent" are the same question and both are closed.
+If a resolution says something was corrected and the CV in front of you still shows the old version,
+that is worth one line saying the fix has not landed in this copy yet. That is not re-asking; it is
+telling him his client sent the wrong file.
+
+CLIENT ARCHETYPE
+When the client_context block carries an archetype, it comes from the 5-Minute Career Diagnostic the
+client filled in themselves, and only when they agreed it could be reused for coaching. Treat it as
+prior context, never as evidence. It tells you what pattern to look for; the CV tells you whether the
+pattern is actually there. If the archetype says someone undersells and the CV is full of hard numbers,
+the CV wins and you say so.
+Write it for Kagiso, not for the client - he is the one reading this. Never address the person about
+their archetype, never present it to them as a diagnosis, and never infer an archetype when none is
+given. If no archetype is present, say nothing about one.
 
 WHAT YOU CANNOT SEE
 You are reading text pulled out of the original document. Layout did not survive the extraction.
@@ -331,6 +356,9 @@ function buildCvAnalyzerUserPrompt({
   intakeData,
   cvFileName,
   cvPageCount,
+  archetypeName,
+  archetypeSubmittedAt,
+  resolvedChecks,
 }: {
   analysisMode: AnalyzerMode;
   cvText: string;
@@ -341,6 +369,9 @@ function buildCvAnalyzerUserPrompt({
   intakeData: Record<string, unknown> | null;
   cvFileName: string;
   cvPageCount: number | null;
+  archetypeName: string;
+  archetypeSubmittedAt: string;
+  resolvedChecks: Array<{ title: string; resolution: string }>;
 }) {
   const goalLabel = goal === 'auto_infer' ? 'Auto-infer from CV' : goal;
   const seniorityLabel = seniority === 'auto_infer' ? 'Auto-infer from CV' : seniority;
@@ -359,6 +390,21 @@ function buildCvAnalyzerUserPrompt({
       ? 'Pages: Not available - only PDFs report a page count, so say nothing about length in pages.'
       : `Pages: ${cvPageCount}`,
     `</document_facts>`,
+    archetypeName
+      ? [
+        `<client_context>`,
+        `Diagnostic archetype: ${archetypeName}`,
+        archetypeSubmittedAt ? `Diagnostic completed: ${archetypeSubmittedAt}` : '',
+        `</client_context>`,
+      ].filter(Boolean).join('\n')
+      : '',
+    resolvedChecks.length
+      ? [
+        `<resolved_checks>`,
+        ...resolvedChecks.map((item) => `- ${item.title}: ${item.resolution}`),
+        `</resolved_checks>`,
+      ].join('\n')
+      : '',
     intakeData ? `<client_intake>\n${JSON.stringify(intakeData)}\n</client_intake>` : '',
     '',
     `<cv_text>`,
@@ -422,6 +468,9 @@ export async function POST(request: Request) {
   // they are the only formatting evidence the analyst legitimately has.
   let cvFileName = '';
   let cvPageCount: number | null = null;
+  let archetypeName = '';
+  let archetypeSubmittedAt = '';
+  let resolvedChecks: Array<{ title: string; resolution: string }> = [];
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -486,6 +535,15 @@ export async function POST(request: Request) {
       intakeData = liveIntake.hasIntake
         ? sanitizeClientStrategyIntake(liveIntake.formData)
         : null;
+
+      // getIncludedClientDiagnosticContext returns nothing unless the client consented to their
+      // diagnostic being reused as coaching context, so the consent check is the fetch itself -
+      // there is no path here that reaches an archetype the client did not agree to share.
+      const diagnostic = await getIncludedClientDiagnosticContext(paymentId);
+      archetypeName = diagnostic?.archetypeName || '';
+      archetypeSubmittedAt = diagnostic?.submittedAt || '';
+
+      resolvedChecks = await listClientCvVerifyResolutions(paymentId);
 
       if (!cvFile && !cvText.trim() && source) {
         const loaded = await loadClientStrategyCvText(source);
@@ -560,6 +618,9 @@ export async function POST(request: Request) {
             intakeData,
             cvFileName,
             cvPageCount,
+            archetypeName,
+            archetypeSubmittedAt,
+            resolvedChecks,
           }),
         },
       ],
