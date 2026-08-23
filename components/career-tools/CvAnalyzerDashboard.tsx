@@ -99,7 +99,7 @@ function getCvReportSections(result: CvAnalyzerResult): CvReportSection[] {
       lines: [
         `Positioning: ${result.scores.positioning}/100`,
         `Clarity: ${result.scores.clarity}/100`,
-        `Role fit: ${result.scores.roleFit}/100`,
+        `Role fit: ${result.scores.roleFit}/100${result.roleFitBasis ? ` (${result.roleFitBasis})` : ''}`,
         `ATS/readability: ${result.scores.atsReadability}/100`,
       ],
     },
@@ -117,9 +117,10 @@ function getCvReportSections(result: CvAnalyzerResult): CvReportSection[] {
     },
     {
       heading: 'Priority fixes',
-      lines: result.priorityFixes.map((item, index) => (
-        `${index + 1}. ${item.title}: ${item.fix}${item.whyItMatters ? ` Why it matters: ${item.whyItMatters}` : ''}`
-      )),
+      lines: result.priorityFixes.map((item, index) => {
+        const tag = item.kind === 'verify' ? '[Verify] ' : '';
+        return `${index + 1}. ${tag}${item.title}: ${item.fix}${item.whyItMatters ? ` Why it matters: ${item.whyItMatters}` : ''}`;
+      }),
     },
     {
       heading: 'Evidence gaps',
@@ -268,7 +269,7 @@ async function createDocxReportBlob(result: CvAnalyzerResult) {
   return Packer.toBlob(doc);
 }
 
-function ScoreCard({ label, value }: { label: string; value: number }) {
+function ScoreCard({ label, value, caption }: { label: string; value: number; caption?: string }) {
   const score = clampScore(value);
   return (
     <div className="rounded-[8px] border border-[#E4D8CB] bg-[#FCFBFA] p-4">
@@ -282,6 +283,7 @@ function ScoreCard({ label, value }: { label: string; value: number }) {
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E6DDD6]">
         <span className="block h-full rounded-full bg-[#C9AD98]" style={{ width: `${score}%` }} />
       </div>
+      {caption && <p className="mt-2.5 text-[11px] leading-[1.5] text-[#8C7466]">{caption}</p>}
     </div>
   );
 }
@@ -351,7 +353,7 @@ function DetailList({
   fixLabel = 'Do this',
 }: {
   title: string;
-  items: Array<{ title: string; detail?: string; whyItMatters?: string; fix?: string }>;
+  items: Array<{ kind?: 'fix' | 'verify'; title: string; detail?: string; whyItMatters?: string; fix?: string }>;
   detailLabel?: string;
   detailTone?: 'context' | 'action';
   fixLabel?: string;
@@ -372,10 +374,24 @@ function DetailList({
                 {index + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold leading-snug text-[#142334]">{item.title}</p>
+                <p className="text-[15px] font-semibold leading-snug text-[#142334]">
+                  {item.title}
+                  {item.kind === 'verify' && (
+                    <span className="ml-2 inline-block translate-y-[-1px] rounded-full bg-[#E4D8CB] px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-[0.12em] text-[#142334]">
+                      Verify
+                    </span>
+                  )}
+                </p>
                 {item.whyItMatters && <DetailBlock label="Why this matters" value={item.whyItMatters} tone="context" />}
                 {item.detail && <DetailBlock label={detailLabel} value={item.detail} tone={detailTone} />}
-                {item.fix && <DetailBlock label={fixLabel} value={item.fix} tone="action" />}
+                {/* A verify item is a question, not an instruction, so it must not wear an action label. */}
+                {item.fix && (
+                  <DetailBlock
+                    label={item.kind === 'verify' ? 'Confirm first' : fixLabel}
+                    value={item.fix}
+                    tone={item.kind === 'verify' ? 'context' : 'action'}
+                  />
+                )}
               </div>
             </div>
           </li>
@@ -919,7 +935,7 @@ export default function CvAnalyzerDashboard({
             <div className="grid gap-3 sm:grid-cols-2">
               <ScoreCard label="Positioning" value={result.scores.positioning} />
               <ScoreCard label="Clarity" value={result.scores.clarity} />
-              <ScoreCard label="Role fit" value={result.scores.roleFit} />
+              <ScoreCard label="Role fit" value={result.scores.roleFit} caption={result.roleFitBasis} />
               <ScoreCard label="ATS basics" value={result.scores.atsReadability} />
             </div>
 

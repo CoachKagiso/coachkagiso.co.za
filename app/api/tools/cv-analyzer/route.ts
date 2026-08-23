@@ -47,6 +47,21 @@ function compactString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+/**
+ * Role Fit is the one score whose meaning changes with the input: with a target role it measures fit
+ * against that role, without one the prompt scores directional clarity instead. Same label, different
+ * question, and nothing on the report said which. This is derived from the request rather than asked
+ * of the model, so it cannot drift from what was actually sent.
+ */
+function buildRoleFitBasis(targetRole: string) {
+  const firstLine = targetRole.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
+  if (!firstLine) {
+    return 'No target role given - scored on how clearly the CV signals a direction.';
+  }
+  const trimmed = firstLine.length > 120 ? `${firstLine.slice(0, 119).trimEnd()}...` : firstLine;
+  return `Measured against: ${trimmed}`;
+}
+
 function parseScore(value: unknown) {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -64,6 +79,31 @@ function stringList(value: unknown, limit: number) {
     .slice(0, limit)
     .map((item) => compactString(item))
     .filter(Boolean);
+}
+
+/**
+ * Priority fixes carry the one enum the model returns, so they are parsed here rather than through
+ * objectList: the kind has to be read off the same raw entry the strings came from, and objectList
+ * drops empty entries, which would slide every kind onto the wrong fix.
+ *
+ * An unrecognised or absent kind falls back to 'fix'. That is the safe direction - a verify item
+ * mislabelled as a fix reads as ordinary advice, where the reverse would hedge a real problem.
+ */
+function priorityFixList(value: unknown, limit: number) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, limit)
+    .map((item) => {
+      const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const kind: 'fix' | 'verify' = compactString(record.kind).toLowerCase() === 'verify' ? 'verify' : 'fix';
+      return {
+        kind,
+        title: compactString(record.title),
+        whyItMatters: compactString(record.whyItMatters),
+        fix: compactString(record.fix),
+      };
+    })
+    .filter((item) => Boolean(item.title || item.whyItMatters || item.fix));
 }
 
 function objectList<T extends Record<string, string>>(
@@ -100,6 +140,28 @@ ANALYSIS STANDARD
 - Never invent qualifications, employers, metrics, promotions, or outcomes.
 - If impact evidence is missing, name it as a gap and show how to rewrite without inventing facts.
 - Keep feedback direct, practical, and useful for a coaching session.
+
+VERIFY VS FIX
+Not inventing a fact is not the same as not asserting one. You can only see the page, so you cannot
+know whether something that looks wrong on it is actually wrong in the person's life. Every entry in
+priorityFixes therefore carries a "kind":
+- "fix" - a problem visible in the CV text itself. Duty-list language, a buried achievement, a vague
+  summary, a formatting choice. You are judging the writing, which is yours to judge.
+- "verify" - anything that depends on a fact you cannot check. A date that looks wrong, a gap between
+  roles, a title that may not match the real scope, a qualification that may still be in progress.
+  You are inferring something about the person's real life.
+Never instruct a correction on a "verify" item. Ask for confirmation first, then say what to do if it
+turns out to be wrong. Telling someone to fix something that was never broken costs you their trust in
+everything else on the page.
+Wrong: "Listing a start date of May 2025 is a typo. Correct it to 2024."
+Right: "The Santam start date reads May 2025. Confirm that is right - if it is a typo, correct it before
+the CV goes out; if the date is correct, leave it and expect to be asked about it."
+
+PRIORITY FIXES AND EVIDENCE GAPS ARE DIFFERENT LISTS
+They must never describe the same underlying problem. A priority fix is something to rewrite or
+restructure using what is already on the page. An evidence gap is a fact the person has to go and
+retrieve before anything can be written. If one issue needs both, put it in priorityFixes only and name
+the missing proof inside its "fix".
 
 ${renderReportRuleBlock('PLAIN LANGUAGE STANDARD', REPORT_PLAIN_LANGUAGE_RULES)}
 - Worked example: "the CV is unlikely to survive an ATS (the software that filters CVs before a person reads them)".
@@ -163,11 +225,16 @@ Role Fit:
 If no target role or job description was provided, score roleFit based on how clearly the CV signals a specific career direction.
 
 ATS/Readability:
-- 85-100: Clean formatting, standard section headers, no tables/columns/graphics that break parsing. Keywords present naturally.
-- 70-84: Mostly ATS-friendly but minor issues (unusual headers, light formatting quirks).
-- 50-69: Moderate ATS risk. Non-standard section names, tables, or missing keywords for the field.
+This score covers everything you put in atsNotes, not formatting alone - that list also carries SA red
+flags, missing credentials (NQF level, professional registrations), and sensitive data. Score the whole
+of it, or the number will tell the person they are fine while the notes underneath say they are not.
+- 85-100: Clean formatting, standard section headers, no tables/columns/graphics that break parsing. Keywords present naturally. Credentials the field screens on are stated.
+- 70-84: Mostly ATS-friendly but minor issues (unusual headers, light formatting quirks, one soft credential gap).
+- 50-69: Moderate ATS risk. Non-standard section names, tables, missing keywords for the field, or a credential recruiters filter on is absent.
 - 25-49: Significant ATS problems. Graphics, columns, unusual fonts, or critical keyword gaps.
 - 0-24: Likely unparseable by ATS. Heavy design, image-based, or severely non-standard formatting.
+Hard ceilings, applied after you pick a band: three or more substantive atsNotes entries caps this at
+74. Any sensitive-data flag caps it at 60. Where the score and the notes disagree, the notes win.
 
 OUTPUT RULES
 Respond only with valid JSON. No code fences. The only formatting mark permitted inside a string value is the bold mark described in EMPHASIS. Use this exact shape:
@@ -188,9 +255,10 @@ All score values must be integers from 0 to 100. Do not use a 1-10 scale.
   "strongestSignals": ["3-5 credible strengths visible in the CV"],
   "priorityFixes": [
     {
+      "kind": "fix or verify - see VERIFY VS FIX above. Default to fix.",
       "title": "Fix title",
       "whyItMatters": "Why this matters for the selected goal.",
-      "fix": "Specific action to take."
+      "fix": "Specific action to take, or the confirmation to ask for when kind is verify."
     }
   ],
   "evidenceGaps": [
@@ -224,6 +292,8 @@ All score values must be integers from 0 to 100. Do not use a 1-10 scale.
 Return 3-5 priorityFixes, 2-4 evidenceGaps, 1-3 rewriteSamples, 3-5 atsNotes, 3 interviewAngles, and 3 nextActions.
 
 REWRITE SAMPLE RULES:
+- Spread the samples across the CV. Do not stack two rewrites on the same role or section while another
+  role with the same weak language goes untouched - the person will fix the one you showed and leave the rest.
 - The "before" field MUST be a direct verbatim quote from the CV text provided. Do not paraphrase or invent a weak line.
 - If you cannot find a specific weak line to quote, set "before" to an empty string and focus the "after" on what should be added.
 - Never quote a "before" line that contains or sits next to sensitive data (ID number, date of birth, home address, salary, banking details). Skip that line and choose a different one to rewrite, or set "before" to an empty string.
@@ -272,7 +342,7 @@ function buildCvAnalyzerUserPrompt({
   ].join('\n');
 }
 
-function normalizeAnalyzerResult(value: unknown) {
+function normalizeAnalyzerResult(value: unknown, roleFitBasis: string) {
   const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const scores = record.scores && typeof record.scores === 'object' ? record.scores as Record<string, unknown> : {};
   const recruiterRead = record.recruiterRead && typeof record.recruiterRead === 'object'
@@ -284,6 +354,7 @@ function normalizeAnalyzerResult(value: unknown) {
 
   return {
     snapshot: compactString(record.snapshot),
+    roleFitBasis,
     scores: {
       positioning: clampScore(parseScore(scores.positioning)),
       clarity: clampScore(parseScore(scores.clarity)),
@@ -296,7 +367,7 @@ function normalizeAnalyzerResult(value: unknown) {
       possibleConcern: compactString(recruiterRead.possibleConcern),
     },
     strongestSignals: stringList(record.strongestSignals, 5),
-    priorityFixes: objectList(record.priorityFixes, 5, { title: '', whyItMatters: '', fix: '' }),
+    priorityFixes: priorityFixList(record.priorityFixes, 5),
     evidenceGaps: objectList(record.evidenceGaps, 4, { title: '', detail: '', fix: '' }),
     rewriteSamples: objectList(record.rewriteSamples, 3, { before: '', after: '', why: '' }),
     atsNotes: stringList(record.atsNotes, 5),
@@ -505,7 +576,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = normalizeAnalyzerResult(extractToolJsonObject(text));
+    const result = normalizeAnalyzerResult(extractToolJsonObject(text), buildRoleFitBasis(targetRole));
 
     if (!result.snapshot || !result.priorityFixes.length || !result.nextActions.length || !result.recommendedCoachMove.label) {
       return NextResponse.json({ error: 'The analyzer returned an incomplete report. Try again.' }, { status: 500 });
