@@ -5,7 +5,7 @@ import {
   buildCvCoachMoveRulesPrompt,
   isCvCoachMoveLabel,
 } from '@/lib/buying-flow';
-import { extractTextFromCvFile } from '@/lib/content/cv-extract';
+import { extractCvDocument } from '@/lib/content/cv-extract';
 import { extractToolJsonObject } from '@/lib/content/tools-ai';
 import { getClientCvSource, saveClientCvAnalysisReport, saveClientCvVersion } from '@/lib/client-cv-store';
 import { getClientLiveIntake } from '@/lib/client-intake-store';
@@ -168,6 +168,19 @@ ${renderReportRuleBlock('PLAIN LANGUAGE STANDARD', REPORT_PLAIN_LANGUAGE_RULES)}
 
 ${renderReportRuleBlock('EMPHASIS', REPORT_EMPHASIS_RULES)}
 
+WHAT YOU CANNOT SEE
+You are reading text pulled out of the original document. Layout did not survive the extraction.
+Columns, tables, text boxes, fonts, font sizes, colours, margins, white space, logos, icons and any
+photograph are all gone before the text reaches you - their absence from what you read is not evidence
+they were absent from the CV. Never state, imply, or score anything about them. "Remove the photo",
+"the two-column layout breaks parsing", "the font is unusual" are claims you have no way to check, and
+one of them landing on a CV that had no photo costs you the reader's trust in everything else.
+If layout genuinely matters for this person, raise it as a verify item asking Kagiso to look at the
+original document - he has it open, you do not.
+The document_facts block carries the two structural facts that do survive: the file name and, for PDFs
+only, the page count. Those you may use directly. When the page count is not available, say nothing
+about length in pages - word count is not a page count.
+
 SENSITIVE DATA RULES
 If the CV contains any of the following, flag it immediately in the first atsNotes entry and advise removal:
 - RSA ID number (13-digit number, or any national ID)
@@ -176,7 +189,6 @@ If the CV contains any of the following, flag it immediately in the first atsNot
 - B-BBEE status, race, ethnicity, or citizenship disclosures
 - Marital status, dependants, or next of kin
 - Date of birth or age
-- Photo (advise removal unless the specific industry requires it)
 - Salary history or current salary figures
 Do not reproduce any sensitive data in your output. Refer to it generically: "Your CV includes your ID number. Remove it."
 
@@ -189,7 +201,9 @@ Check for these common South African CV issues and include in atsNotes if found:
 - Seta learnership or short course credentials buried instead of highlighted (especially for career pivoters)
 - "Duties included" language instead of impact statements
 - Generic objective statement at the top ("Seeking a challenging position in a dynamic organisation")
-- CV exceeds 4 pages for non-academic roles
+- CV exceeds 4 pages for non-academic roles (only when document_facts gives you a page count)
+- A file name that would embarrass the person in a recruiter's inbox, or that does not identify them
+  (only when document_facts gives you a file name). "Firstname-Surname-CV" is the standard to aim at.
 
 GOAL-SPECIFIC ANALYSIS LENS
 Adjust your analysis emphasis based on the career goal:
@@ -225,14 +239,15 @@ Role Fit:
 If no target role or job description was provided, score roleFit based on how clearly the CV signals a specific career direction.
 
 ATS/Readability:
-This score covers everything you put in atsNotes, not formatting alone - that list also carries SA red
-flags, missing credentials (NQF level, professional registrations), and sensitive data. Score the whole
-of it, or the number will tell the person they are fine while the notes underneath say they are not.
-- 85-100: Clean formatting, standard section headers, no tables/columns/graphics that break parsing. Keywords present naturally. Credentials the field screens on are stated.
-- 70-84: Mostly ATS-friendly but minor issues (unusual headers, light formatting quirks, one soft credential gap).
-- 50-69: Moderate ATS risk. Non-standard section names, tables, missing keywords for the field, or a credential recruiters filter on is absent.
-- 25-49: Significant ATS problems. Graphics, columns, unusual fonts, or critical keyword gaps.
-- 0-24: Likely unparseable by ATS. Heavy design, image-based, or severely non-standard formatting.
+This score covers everything you put in atsNotes, not section headers alone - that list also carries SA
+red flags, missing credentials (NQF level, professional registrations), and sensitive data. Score the
+whole of it, or the number will tell the person they are fine while the notes underneath say they are not.
+Score only what the text and document_facts actually show you - see WHAT YOU CANNOT SEE above.
+- 85-100: Standard, recognisable section headings. Content reads cleanly in extracted order. Keywords present naturally. Credentials the field screens on are stated. Length suits the level.
+- 70-84: Mostly sound but minor issues - an unusual section name, a thin keyword set, or one soft credential gap.
+- 50-69: Moderate risk. Non-standard section names, scrambled or interleaved text, missing keywords for the field, or a credential recruiters filter on is absent.
+- 25-49: Significant problems. Several unrecognisable headings, badly disordered text, or critical keyword gaps.
+- 0-24: The extracted text is barely usable as a CV - no discernible structure or almost no substantive content.
 Hard ceilings, applied after you pick a band: three or more substantive atsNotes entries caps this at
 74. Any sensitive-data flag caps it at 60. Where the score and the notes disagree, the notes win.
 
@@ -314,6 +329,8 @@ function buildCvAnalyzerUserPrompt({
   goal,
   seniority,
   intakeData,
+  cvFileName,
+  cvPageCount,
 }: {
   analysisMode: AnalyzerMode;
   cvText: string;
@@ -322,6 +339,8 @@ function buildCvAnalyzerUserPrompt({
   goal: CvGoalContext;
   seniority: SeniorityContext;
   intakeData: Record<string, unknown> | null;
+  cvFileName: string;
+  cvPageCount: number | null;
 }) {
   const goalLabel = goal === 'auto_infer' ? 'Auto-infer from CV' : goal;
   const seniorityLabel = seniority === 'auto_infer' ? 'Auto-infer from CV' : seniority;
@@ -334,6 +353,12 @@ function buildCvAnalyzerUserPrompt({
     targetRole ? `Target role or job description:\n${targetRole}` : 'Target role or job description: Not provided',
     contextNotes ? `Kagiso context notes:\n${contextNotes}` : 'Kagiso context notes: Not provided',
     `</analysis_context>`,
+    `<document_facts>`,
+    cvFileName ? `File name: ${cvFileName}` : 'File name: Not available - the CV was pasted as text.',
+    cvPageCount === null
+      ? 'Pages: Not available - only PDFs report a page count, so say nothing about length in pages.'
+      : `Pages: ${cvPageCount}`,
+    `</document_facts>`,
     intakeData ? `<client_intake>\n${JSON.stringify(intakeData)}\n</client_intake>` : '',
     '',
     `<cv_text>`,
@@ -393,6 +418,10 @@ export async function POST(request: Request) {
   let rawSeniority = '';
   let cvFile: File | null = null;
   let paymentId = '';
+  // Structural facts about the uploaded document. They survive extraction where layout does not, so
+  // they are the only formatting evidence the analyst legitimately has.
+  let cvFileName = '';
+  let cvPageCount: number | null = null;
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -479,13 +508,20 @@ export async function POST(request: Request) {
         clientCvPath = saved.source.storagePath;
         clientCvFileName = saved.source.fileName;
       }
-      cvText = await extractTextFromCvFile(cvFile);
+      const extracted = await extractCvDocument(cvFile);
+      cvText = extracted.text;
+      cvFileName = cvFile.name;
+      cvPageCount = extracted.pageCount;
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : 'Could not extract text from that CV file.' },
         { status: 400 },
       );
     }
+  }
+
+  if (!cvFileName && clientCvFileName) {
+    cvFileName = clientCvFileName;
   }
 
   if (cvText.length < 300) {
@@ -522,6 +558,8 @@ export async function POST(request: Request) {
             goal: resolvedGoal,
             seniority: resolvedSeniority,
             intakeData,
+            cvFileName,
+            cvPageCount,
           }),
         },
       ],
