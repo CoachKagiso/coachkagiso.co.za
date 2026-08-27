@@ -20,9 +20,10 @@ interface BookingContentProps {
   booking: string;
   page: BookingPage;
   calUrl: string;
+  confirmPath?: string;
 }
 
-export default function BookingContent({ booking, page, calUrl }: BookingContentProps) {
+export default function BookingContent({ booking, page, calUrl, confirmPath }: BookingContentProps) {
   const sectionRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -108,7 +109,7 @@ export default function BookingContent({ booking, page, calUrl }: BookingContent
               </div>
             ) : (
               <>
-                <CalBookingEmbed calUrl={calUrl} />
+                <CalBookingEmbed calUrl={calUrl} confirmPath={confirmPath} />
                 <div className="mt-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <p className="text-[14px] leading-relaxed text-[#142334]/58">
                     If the calendar does not load, open the booking page directly.
