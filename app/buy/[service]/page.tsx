@@ -129,7 +129,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 {isManualPaymentMode
                   ? 'A direct handoff while checkout is being activated.'
                   : isAppointmentService
-                    ? 'Your time is accepted. Payment confirms it.'
+                    ? 'Your time is held. Payment confirms it.'
                   : isEventService
                     ? 'Secure your seat, then share your prep notes.'
                     : 'A clear handoff after checkout.'}
@@ -138,7 +138,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 {isManualPaymentMode
                   ? 'Online payment is being activated. Send Kagiso a purchase request and she will reply with the next step directly.'
                   : isAppointmentService
-                    ? `Your requested time has been accepted. Pay securely through ${providerName} to confirm it; you will not need to submit your details again.`
+                    ? `The time you picked is held for you. Pay securely through ${providerName} to confirm it; you will not need to submit your details again.`
                   : isEventService
                     ? `You will pay securely through ${providerName}, then return to a short prep form connected to your seat.`
                     : `You will pay securely through ${providerName}, then return to a private intake page connected to this order.`}
@@ -165,12 +165,12 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   isManualPaymentMode
                     ? { icon: FileText, title: 'Brief follows manually', detail: 'Once the payment route is confirmed, Kagiso will send the correct intake instructions for this service.' }
                     : isAppointmentService
-                      ? { icon: FileText, title: 'No repeated form', detail: 'The details from your accepted Cal.com request stay connected to this appointment.' }
+                      ? { icon: FileText, title: 'No repeated form', detail: 'The details you gave when you booked stay connected to this appointment.' }
                     : isEventService
                       ? { icon: FileText, title: 'Prep form', detail: 'Return automatically to the short prep form with your payment reference already attached.' }
                       : { icon: FileText, title: 'Private intake', detail: 'Return automatically to the brief form with your payment reference already attached.' },
                   isAppointmentService
-                    ? { icon: Clock3, title: 'Appointment confirmed', detail: 'Payment secures the time Kagiso already accepted for you.' }
+                    ? { icon: Clock3, title: 'Appointment confirmed', detail: 'Payment turns your held time into a confirmed appointment.' }
                     : isEventService
                     ? { icon: Clock3, title: 'Session access', detail: `The live session is ${service.turnaround}.` }
                     : { icon: Clock3, title: 'Delivery starts', detail: `Your ${service.turnaround} turnaround begins once the brief and required file are submitted.` },
@@ -236,7 +236,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     {isManualPaymentMode
                       ? 'Online checkout is temporarily paused for merchant verification. Your message keeps your place in the queue without sending you through a broken payment screen.'
                       : isAppointmentService
-                        ? 'This private checkout is tied to your accepted booking. Your appointment is confirmed once PayFast confirms payment.'
+                        ? 'This private checkout is tied to the time you booked. Your appointment is confirmed once PayFast confirms payment.'
                       : isEventService
                         ? 'After payment, your reference unlocks the prep form. Your spot is secured once PayFast confirms the payment.'
                         : 'After payment, your order reference unlocks the intake page. You will also receive a confirmation email after submitting your brief.'}
@@ -248,7 +248,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 <div role="alert" className="mt-8 border border-white/18 bg-white/[0.06] p-5">
                   <p className="text-[14px] font-semibold text-white">This private payment link is unavailable.</p>
                   <p className="mt-2 text-[13px] leading-relaxed text-white/68">
-                    It may have expired or been copied incorrectly. Reply to your acceptance email or WhatsApp Kagiso for a fresh link.
+                    It may have expired or been copied incorrectly. Reply to your booking email or WhatsApp Kagiso for a fresh link.
                   </p>
                 </div>
               ) : isAlreadyPaid ? (
@@ -257,7 +257,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     <CheckCircle2 className="h-5 w-5 text-[#C9AD98]" /> Payment already confirmed
                   </p>
                   <p className="mt-2 text-[13px] leading-relaxed text-white/68">
-                    This accepted appointment has already been paid. No second payment is needed.
+                    This appointment has already been paid. No second payment is needed.
                   </p>
                 </div>
               ) : isManualPaymentMode ? (
@@ -303,7 +303,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                 {(isManualPaymentMode
                   ? ['No failed checkout page while payment verification is pending', 'Kagiso will reply directly with the safest next step']
                     : isAppointmentService
-                      ? ['Private link tied to your accepted booking', 'No need to submit your details again']
+                      ? ['Private link tied to the time you booked', 'No need to submit your details again']
                     : isEventService
                       ? ['Card, EFT, PayShap, and supported PayFast options', 'Secure seat reference generated for this masterclass']
                       : ['Card, EFT, PayShap, and supported PayFast options', 'Secure payment reference generated for this order']
