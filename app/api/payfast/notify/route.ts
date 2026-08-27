@@ -211,7 +211,7 @@ export async function POST(request: Request) {
       source: 'payfast-itn',
       title: `New payment - ${service.title}`,
       description: service.kind === 'booking'
-        ? `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. The accepted appointment is confirmed; no additional intake is required.`
+        ? `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. The booked appointment is confirmed; no additional intake is required.`
         : `${buyerName || 'A client'} paid ${formatCurrency(amount)} for ${service.title}. Watch for the intake form.`,
       contactName: buyerName || null,
       contactEmail: buyerEmail || null,

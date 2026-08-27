@@ -30,7 +30,8 @@ export function getBookingPaymentSecret() {
 }
 
 export function getBookingPaymentServiceSlug(eventSlug: string) {
-  return EVENT_SERVICE_MAP[eventSlug] || null;
+  // Object.hasOwn keeps inherited keys such as 'constructor' from resolving to a service.
+  return Object.hasOwn(EVENT_SERVICE_MAP, eventSlug) ? EVENT_SERVICE_MAP[eventSlug] : null;
 }
 
 export function createBookingPaymentToken(
@@ -92,4 +93,18 @@ export function verifyBookingPaymentToken(token: string, secret: string, now = n
 export function getBookingPaymentId(serviceSlug: BookingPaymentServiceSlug, bookingUid: string) {
   const digest = createHash('sha256').update(`${serviceSlug}:${bookingUid}`).digest('hex').slice(0, 32);
   return `${serviceSlug}-${digest}`;
+}
+
+// The /book/<slug> pages use friendlier slugs than the Cal.com event types they embed.
+const BOOKING_PAGE_SERVICE_MAP: Record<string, BookingPaymentServiceSlug> = {
+  clarity: 'career-clarity',
+  'glow-up': 'glow-up-vip',
+};
+
+export function getBookingPaymentServiceForBookingPage(bookingSlug: string) {
+  return Object.hasOwn(BOOKING_PAGE_SERVICE_MAP, bookingSlug) ? BOOKING_PAGE_SERVICE_MAP[bookingSlug] : null;
+}
+
+export function buildBookingCheckoutPath(serviceSlug: BookingPaymentServiceSlug, token: string) {
+  return `/buy/${serviceSlug}?booking_token=${encodeURIComponent(token)}`;
 }

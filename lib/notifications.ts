@@ -73,7 +73,7 @@ export async function notifyKagisoPayment(input: {
   const isAppointmentService = input.service.kind === 'booking';
   const deadline = isEventService || isAppointmentService ? '' : formatDeadline(input.service, timestamp);
   const paymentNextStep = isAppointmentService
-    ? 'The accepted appointment is now paid. No additional intake form is required.'
+    ? 'The booked appointment is now paid. No additional intake form is required.'
     : isEventService
       ? 'Watch for the prep form before sending final session details.'
       : 'Watch for the intake form before starting delivery.';
