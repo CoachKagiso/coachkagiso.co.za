@@ -220,18 +220,18 @@ async function sendAcceptedBookingPaymentLink(input: {
   const firstName = name.split(/\s+/)[0] || 'there';
   const delivery = await sendTransactionalEmail({
     to: [{ email: input.email, name: name || undefined }],
-    subject: `Your ${service.title} request was accepted - payment is the final step`,
+    subject: `Your ${service.title} time is held - payment is the final step`,
     text: `Hi ${firstName},
 
-Kagiso has accepted your requested appointment for ${service.title}.
+The time you picked for ${service.title} is held for you.
 
 Complete the final payment step here to confirm your appointment:
 ${paymentUrl}
 
 Amount: ${formatCurrency(service.amount)}
-This private payment link is valid for ${BOOKING_PAYMENT_WINDOW_HOURS} hours.
+This private payment link is valid for ${BOOKING_PAYMENT_WINDOW_HOURS} hours. After that the time goes back into the calendar for someone else.
 
-You do not need to submit your details again. The information you shared with your booking request is already connected to the appointment.
+You do not need to submit your details again. The information you shared when you booked is already connected to the appointment.
 
 Talk soon,
 Kagiso`,
@@ -366,7 +366,7 @@ export async function POST(request: Request) {
       source: 'cal-webhook',
       title: `${paymentLink.sent ? 'Payment link sent' : 'Payment link needs forwarding'} - ${paymentLink.service.title}`,
       description: paymentLink.sent
-        ? `${bookerEmail} received the private checkout link after the booking was accepted.`
+        ? `${bookerEmail} booked a time and received the private checkout link. No action needed unless payment does not land.`
         : `The automatic email could not be confirmed. Open this notification and forward the private checkout link to ${bookerEmail}.`,
       contactName: getBookerName(payload) || null,
       contactEmail: bookerEmail,
