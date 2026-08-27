@@ -119,7 +119,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
   const isAppointmentService = service.kind === 'booking';
   const handoffItems = isAppointmentService
     ? [
-        { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your PayFast reference is connected to the appointment Kagiso accepted.' },
+        { icon: LockKeyhole, label: 'Payment confirmed', detail: 'Your PayFast reference is connected to the time you booked.' },
         { icon: CheckCircle2, label: 'Time secured', detail: 'You do not need to book again or repeat the information you already submitted.' },
         { icon: Clock3, label: 'Appointment next', detail: `Your service: ${service.turnaround}. Keep the Cal.com confirmation for the agreed date and time.` },
       ]
@@ -138,11 +138,11 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
     ? [
         {
           question: 'Do I need to fill in another form?',
-          answer: 'No. The information from your accepted Cal.com request is already connected to the appointment.',
+          answer: 'No. The information from your booking is already connected to the appointment.',
         },
         {
           question: 'Where are my appointment details?',
-          answer: 'Use the Cal.com confirmation for the accepted date, time, and meeting information.',
+          answer: 'Use the Cal.com confirmation for the date, time, and meeting information.',
         },
         {
           question: 'What if I need to change something?',
@@ -201,7 +201,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
             </p>
             <h1 className="mt-7 font-serif text-[50px] leading-[0.98] md:text-[76px]">
               {isAppointmentService
-                ? 'Your appointment is accepted, paid, and confirmed.'
+                ? 'Your appointment is booked, paid, and confirmed.'
                 : isEventService
                   ? 'Your seat is secured. Let&apos;s shape the room.'
                   : 'Your order is in. Let&apos;s make the brief count.'}
@@ -228,7 +228,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
                 <h2 className="mt-4 font-serif text-[38px] leading-tight">{service.turnaround}</h2>
                 <p className="mt-4 text-[15px] leading-relaxed text-[#142334]/70">
                   {isAppointmentService
-                    ? 'The accepted Cal.com time and your payment now form one confirmed appointment.'
+                    ? 'The time you booked and your payment now form one confirmed appointment.'
                     : isEventService
                     ? 'Your seat is confirmed. These prep notes help Kagiso make the session more specific and useful.'
                     : 'Your delivery clock starts once the intake form and required file are received.'}
@@ -281,7 +281,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
                   No more forms. You&apos;re confirmed.
                 </h2>
                 <p className="mt-5 text-[17px] leading-relaxed text-[#142334]/72">
-                  Keep your Cal.com confirmation for the accepted date, time, and meeting details. Kagiso now has the information you submitted and the confirmed payment for this appointment.
+                  Keep your Cal.com confirmation for the date, time, and meeting details. Kagiso now has the information you submitted and the confirmed payment for this appointment.
                 </p>
                 <p className="mt-5 border-t border-[#142334]/10 pt-5 text-[13px] leading-relaxed text-[#142334]/58">
                   Payment reference: {paymentId}
