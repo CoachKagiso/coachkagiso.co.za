@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
 import BookingContent from './BookingContent';
 import { bookingPages, type BookingSlug } from '@/lib/buying-flow';
+import { getBookingPaymentServiceForBookingPage } from '@/lib/booking-payment';
 
 type BookPageProps = {
   params: Promise<{ booking: string }>;
@@ -58,6 +59,8 @@ export default async function BookPage({ params }: BookPageProps) {
   if (!page) notFound();
 
   const calUrl = getBookingUrl(booking as BookingSlug);
+  // Only the paid bookings hand off to checkout; the free discovery call has nothing to pay for.
+  const confirmPath = getBookingPaymentServiceForBookingPage(booking) ? `/book/${booking}/confirm` : undefined;
   const faqEyebrow = page.mode === 'reservation' ? 'Before you register' : 'Before you book';
   const faqTitle = page.mode === 'reservation'
     ? 'The questions people usually ask before registering.'
@@ -71,7 +74,7 @@ export default async function BookPage({ params }: BookPageProps) {
     <main className="min-h-screen bg-[#FCFBFA] text-[#142334]">
       <FaqJsonLd items={page.faqs.map((item) => ({ question: item.question, answer: item.answer }))} />
       <Navbar />
-      <BookingContent booking={booking} page={page} calUrl={calUrl} />
+      <BookingContent booking={booking} page={page} calUrl={calUrl} confirmPath={confirmPath} />
       <PageFaq
         eyebrow={faqEyebrow}
         title={faqTitle}
