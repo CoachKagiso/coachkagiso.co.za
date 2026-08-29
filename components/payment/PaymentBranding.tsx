@@ -1,7 +1,16 @@
 import Image from 'next/image';
-import { paymentMethodLogos, paymentProcessorLogo } from '@/lib/payment-branding';
+import {
+  instalmentMethodLogos,
+  paymentMethodLogos,
+  paymentProcessorLogo,
+} from '@/lib/payment-branding';
+import { INSTALMENTS_ENABLED } from '@/lib/instalments';
 
 export default function PaymentBranding() {
+  const methods = INSTALMENTS_ENABLED
+    ? [...paymentMethodLogos, ...instalmentMethodLogos]
+    : paymentMethodLogos;
+
   return (
     <aside aria-label="Secure payment options" className="mt-5 border-t border-white/12 pt-5">
       <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
@@ -24,15 +33,21 @@ export default function PaymentBranding() {
           Available payment methods
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-4" role="list">
-          {paymentMethodLogos.map((method) => (
+          {methods.map((method) => (
             <div key={method.name} role="listitem" title={method.name} className="flex min-h-7 items-center justify-center">
-              <Image
-                src={method.src}
-                alt={method.name}
-                width={method.width}
-                height={method.height}
-                className={method.displayClassName}
-              />
+              {method.src ? (
+                <Image
+                  src={method.src}
+                  alt={method.name}
+                  width={method.width}
+                  height={method.height}
+                  className={method.displayClassName}
+                />
+              ) : (
+                <span className="text-[13px] font-semibold tracking-[0.02em] text-[#142334]/70">
+                  {method.name}
+                </span>
+              )}
             </div>
           ))}
         </div>

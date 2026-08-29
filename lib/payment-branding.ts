@@ -1,9 +1,10 @@
 export type PaymentBrandLogo = {
   name: string;
-  src: string;
-  width: number;
-  height: number;
-  displayClassName: string;
+  /** Omit while we are still waiting on the provider's logo asset. */
+  src?: string;
+  width?: number;
+  height?: number;
+  displayClassName?: string;
 };
 
 export const paymentProcessorLogo = {
@@ -61,4 +62,16 @@ export const paymentMethodLogos: PaymentBrandLogo[] = [
     height: 74,
     displayClassName: 'h-5 w-auto',
   },
+];
+
+/**
+ * Instalment methods, shown only once PayFast has activated them
+ * (see INSTALMENTS_ENABLED in lib/instalments.ts).
+ *
+ * These render as wordmarks until the official logo files are added to
+ * /public and wired up with src/width/height like the entries above.
+ */
+export const instalmentMethodLogos: PaymentBrandLogo[] = [
+  { name: 'Payflex' },
+  { name: 'MoreTyme' },
 ];
