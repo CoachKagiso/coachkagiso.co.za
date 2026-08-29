@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { ChevronDown, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GeoArchPattern } from '@/components/DecorativeMotifs';
+import { INSTALMENTS_ENABLED } from '@/lib/instalments';
 
-const faqs = [
+const baseFaqs = [
   {
     q: 'How long does a CV revamp take?',
     a: 'Typically 5-7 business days from the moment you submit your intake form. The process is careful because the goal is not a prettier document. The goal is clearer positioning.',
@@ -31,6 +32,15 @@ const faqs = [
     a: 'Because this is customised, time-intensive work, I do not offer refunds. I do work closely with you so the final result is clear, useful, and aligned to your goal.',
   },
 ];
+
+const instalmentFaq = {
+  q: 'Can I pay in instalments?',
+  a: 'Yes. Choose Payflex or MoreTyme on the PayFast screen and the amount is split into interest-free payments. Payflex takes a quarter today and the rest every two weeks. MoreTyme takes half today, then the balance over the next two months. Either way you pay no interest and no extra fees, and your work starts as soon as the first payment goes through. Approval and your spending limit are set by the provider, not by me.',
+};
+
+const faqs = INSTALMENTS_ENABLED
+  ? [...baseFaqs.slice(0, -1), instalmentFaq, baseFaqs[baseFaqs.length - 1]]
+  : baseFaqs;
 
 export default function FAQ() {
   return (

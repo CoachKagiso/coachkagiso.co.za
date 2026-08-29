@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
 import PaymentBranding from '@/components/payment/PaymentBranding';
+import InstalmentOptions from '@/components/payment/InstalmentOptions';
 import Reveal from '@/components/Reveal';
 import { asyncServices, formatCurrency, getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
 import {
@@ -226,6 +227,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                   {formatCurrency(service.amount)}
                 </p>
               )}
+              {isPayFastPaymentMode && <InstalmentOptions amount={checkoutAmount} />}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
                 {isAppointmentService ? 'Service' : isEventService ? 'Session' : 'Turnaround'}: {service.turnaround}. {isManualPaymentMode ? 'Kagiso will confirm the payment step directly while online checkout is being activated.' : `Payment is processed securely by ${providerName}.`}
               </p>
