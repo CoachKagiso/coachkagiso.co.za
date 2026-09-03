@@ -61,3 +61,28 @@ export function getAiProviderRequestOptions(provider: AiRequestProvider, model: 
 
   return {};
 }
+
+/**
+ * Builds the Settings "test connection" probe body. Reasoning-mandatory
+ * models think before answering and bill thinking from the same output
+ * budget, so the bare 20-token probe would be spent thinking before a single
+ * word is visible (or rejected outright). Those models get reasoning headroom
+ * plus an explicit low effort to keep the probe cheap, and no temperature
+ * override - reasoning models are tuned for their default sampling.
+ */
+export function buildAiConnectionTestBody(model: string): Record<string, unknown> {
+  const base = {
+    model,
+    messages: [{ role: 'user', content: 'Reply with the word CONNECTED only.' }],
+  };
+
+  if (modelRequiresReasoning(model)) {
+    return {
+      ...base,
+      max_tokens: withReasoningHeadroom(20),
+      reasoning: { effort: 'low' },
+    };
+  }
+
+  return { ...base, max_tokens: 20, temperature: 0 };
+}

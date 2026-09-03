@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buildAiConnectionTestBody } from '@/lib/ai-request';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 
 export const dynamic = 'force-dynamic';
@@ -28,12 +29,7 @@ export async function POST(request: Request) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: 'Reply with the word CONNECTED only.' }],
-      max_tokens: 20,
-      temperature: 0,
-    }),
+    body: JSON.stringify(buildAiConnectionTestBody(model)),
   });
 
   const responseText = await response.text();
