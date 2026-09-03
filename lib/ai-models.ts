@@ -36,7 +36,7 @@ export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'z-ai/glm-5.2';
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
 ] = [
   { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 63.1, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true },
-  { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 61, inputPrice: 1.25, outputPrice: 4.25, supportsVision: true },
+  { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 61, inputPrice: 1.25, outputPrice: 4.25, requiresReasoning: true, supportsVision: true },
   { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 60.9, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true },
   { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 60.9, inputPrice: 2.0, outputPrice: 10.0, supportsVision: true },
   { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 59.7, inputPrice: 2.6, outputPrice: 13.0, supportsVision: true },
@@ -45,7 +45,10 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // honest - unflagged it read OFF while reasoning was happening anyway - and
   // saves a wasted round trip on every call.
   { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true },
-  { value: 'z-ai/glm-5.3-flash', label: 'z-ai/glm-5.3-flash', intelligence: 59.5, inputPrice: 0.15, outputPrice: 0.50, supportsVision: true },
+  // Like its full-size sibling, the Flash variant uses forced thinking - Z.ai
+  // rejects `thinking.type: 'disabled'` for both, which surfaces on OpenRouter
+  // as a rejected `reasoning: { effort: 'none' }`.
+  { value: 'z-ai/glm-5.3-flash', label: 'z-ai/glm-5.3-flash', intelligence: 59.5, inputPrice: 0.15, outputPrice: 0.50, requiresReasoning: true, supportsVision: true },
   { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56.6, inputPrice: 2.0, outputPrice: 12.0, supportsVision: true },
   { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875, requiresReasoning: true, supportsVision: true },
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 52.6, inputPrice: 0.336, outputPrice: 1.056 },

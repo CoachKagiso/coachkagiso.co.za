@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAiProviderRequestOptions, isReasoningActive, withReasoningHeadroom } from '../lib/ai-request.ts';
+import { buildAiConnectionTestBody, getAiProviderRequestOptions, isReasoningActive, withReasoningHeadroom } from '../lib/ai-request.ts';
 import { getFallbackVisionModel, modelSupportsVision } from '../lib/ai-models.ts';
 
 test('disables OpenRouter reasoning when reasoningEnabled is false (default)', () => {
@@ -47,6 +47,27 @@ test('image requests fall back to a vision-capable model when the configured one
   assert.equal(modelSupportsVision('anthropic/claude-opus-5'), true);
   assert.ok(getFallbackVisionModel(), 'a vision-capable fallback must exist in the catalogue');
   assert.equal(modelSupportsVision(getFallbackVisionModel()), true);
+});
+
+test('the connection probe stays cheap for ordinary models', () => {
+  assert.deepEqual(buildAiConnectionTestBody('z-ai/glm-5.2'), {
+    model: 'z-ai/glm-5.2',
+    messages: [{ role: 'user', content: 'Reply with the word CONNECTED only.' }],
+    max_tokens: 20,
+    temperature: 0,
+  });
+});
+
+test('the connection probe gives reasoning-mandatory models room to think', () => {
+  // A 20-token budget would be spent thinking before a word is visible, so the
+  // probe carries headroom and an explicit low effort instead of failing.
+  for (const model of ['meta/muse-spark-1.3', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3', 'google/gemini-3.7-flash']) {
+    const body = buildAiConnectionTestBody(model);
+    assert.equal(body.model, model);
+    assert.deepEqual(body.reasoning, { effort: 'low' });
+    assert.ok(typeof body.max_tokens === 'number' && body.max_tokens > 20, `${model} probe needs thinking headroom`);
+    assert.ok(!('temperature' in body), `${model} probe must not override sampling`);
+  }
 });
 
 test('reasoning headroom scales with the answer budget, with a floor for short routes', () => {
