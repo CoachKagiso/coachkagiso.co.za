@@ -36,6 +36,7 @@ export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'z-ai/glm-5.2';
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
 ] = [
   { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 63.1, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true },
+  { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 61, inputPrice: 1.25, outputPrice: 4.25, supportsVision: true },
   { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 60.9, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true },
   { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 60.9, inputPrice: 2.0, outputPrice: 10.0, supportsVision: true },
   { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 59.7, inputPrice: 2.6, outputPrice: 13.0, supportsVision: true },
@@ -44,22 +45,15 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // honest - unflagged it read OFF while reasoning was happening anyway - and
   // saves a wasted round trip on every call.
   { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true },
-  { value: 'meta/muse-spark-1.2', label: 'meta/muse-spark-1.2', intelligence: 56.8, inputPrice: 1.25, outputPrice: 4.25, supportsVision: true },
+  { value: 'z-ai/glm-5.3-flash', label: 'z-ai/glm-5.3-flash', intelligence: 59.5, inputPrice: 0.15, outputPrice: 0.50, supportsVision: true },
   { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56.6, inputPrice: 2.0, outputPrice: 12.0, supportsVision: true },
   { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875, requiresReasoning: true, supportsVision: true },
   { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 52.6, inputPrice: 0.336, outputPrice: 1.056 },
   { value: 'deepseek/deepseek-v4-flash-0731', label: 'deepseek/deepseek-v4-flash-0731', intelligence: 52, inputPrice: 0.0786, outputPrice: 0.1572 },
-  { value: 'minimax/minimax-m3', label: 'minimax/minimax-m3', intelligence: 45.4, inputPrice: 0.23, outputPrice: 0.96, supportsVision: true },
-  { value: 'xiaomi/mimo-v2.5-pro', label: 'xiaomi/mimo-v2.5-pro', intelligence: 42, inputPrice: 0.44, outputPrice: 0.87 },
-  // Same input price as minimax with cheaper output, which is the half that
-  // matters for OCR: the images bill as input, but the pass emits the full
-  // transcript of every slide. Experimental, so treat availability as temporary.
+  // Cheap vision endpoint for OCR: the images bill as input, but the pass
+  // emits the full transcript of every slide. Experimental, so treat
+  // availability as temporary.
   { value: 'deepseek/deepseek-v4-flash-vision-exp', label: 'deepseek/deepseek-v4-flash-vision-exp', inputPrice: 0.22, outputPrice: 0.66, supportsVision: true, experimental: true },
-  // Free while cloaked, so it sorts first on price. requiresReasoning is not
-  // optional here: the endpoint rejects `reasoning: { effort: 'none' }` with a
-  // 400 rather than ignoring it, which made every generation fail while the
-  // Settings reasoning toggle was off.
-  { value: 'stealth/ox-alpha', label: 'stealth/ox-alpha', inputPrice: 0, outputPrice: 0, requiresReasoning: true, supportsVision: true, experimental: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
@@ -90,9 +84,8 @@ export function modelSupportsVision(model: unknown) {
 
 /**
  * Used when an image is attached but the configured model cannot read images.
- * For cost on high-volume tools the cheapest capable model would win, but the
- * free cloaked model (stealth/ox-alpha) is still proving stability, so it is
- * excluded from automatic fallback and only used when explicitly selected.
+ * Experimental endpoints are excluded from automatic fallback and only used
+ * when explicitly selected.
  */
 export function getFallbackVisionModel() {
   const visionModels = OPENROUTER_MODEL_OPTIONS.filter((option) => option.supportsVision);
