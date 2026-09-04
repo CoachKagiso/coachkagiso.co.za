@@ -25,6 +25,9 @@ const playfair = Playfair_Display({
 const poppins = Poppins({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
+  // Slide copy can carry italics now, and a synthesised oblique is not the same
+  // letterforms as the drawn ones.
+  style: ['normal', 'italic'],
   variable: '--font-poppins',
 });
 

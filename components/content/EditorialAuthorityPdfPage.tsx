@@ -14,6 +14,7 @@ import {
   SWIPE_ICON_PATHS,
   SWIPE_ICON_VIEW_BOX,
 } from '@/lib/content/carousel-swipe-icon';
+import { parseRichText } from '@/lib/content/rich-text';
 import type { CarouselSlide } from './ContentStudio';
 
 /**
@@ -123,21 +124,22 @@ function SwipeMark({ size }: { size: number }) {
   );
 }
 
-/** `**key phrase**` becomes a heavier run, matching the preview's rich text. */
+/** The marked-up copy as styled runs, matching the preview exactly. */
 function RichText({ text }: { text: string }) {
-  const parts = String(text ?? '').split(/\*\*(.+?)\*\*/g).filter((part) => part !== '');
-  if (parts.length <= 1) return <Text>{text}</Text>;
   return (
     <Text>
-      {parts.map((part, index) =>
-        index % 2 === 1 ? (
-          <Text key={`strong-${index}`} style={{ fontWeight: 700 }}>
-            {part}
-          </Text>
-        ) : (
-          <Text key={`plain-${index}`}>{part}</Text>
-        ),
-      )}
+      {parseRichText(text).map((run, index) => (
+        <Text
+          key={`run-${index}`}
+          style={{
+            fontWeight: run.bold ? 700 : 400,
+            fontStyle: run.italic ? 'italic' : 'normal',
+            textDecoration: run.underline ? 'underline' : 'none',
+          }}
+        >
+          {run.text}
+        </Text>
+      ))}
     </Text>
   );
 }

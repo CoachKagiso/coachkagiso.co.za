@@ -3,6 +3,7 @@ import {
   CAROUSEL_GLYPH_WIDTHS,
   type CarouselTypeFace,
 } from './carousel-type-metrics.ts';
+import { parseRichText } from './rich-text.ts';
 
 /**
  * Continuous type fitting for carousel slides.
@@ -32,19 +33,15 @@ const NEWLINE = String.fromCharCode(10);
 const TAB = String.fromCharCode(9);
 
 /**
- * Splits `**key phrase**` markers into runs.
+ * The copy as runs, with every style marker removed.
  *
- * Both renderers already turn these into strong spans, so a fit that ignored
- * them would under-measure every headline that uses one - and the reference
- * look is built on bolded key phrases.
+ * A fit that measured the markers would count `**` and `~~` as glyphs the
+ * reader never sees, and wrap the line early. Bold is the only flag that
+ * changes a width enough to matter here; italic and underline ride along on
+ * the regular face.
  */
 export function splitBoldRuns(text: string): Run[] {
-  const parts = String(text ?? '').split(/\*\*(.+?)\*\*/g);
-  const runs: Run[] = [];
-  parts.forEach((part, index) => {
-    if (part) runs.push({ text: part, bold: index % 2 === 1 });
-  });
-  return runs;
+  return parseRichText(text).map((run) => ({ text: run.text, bold: run.bold }));
 }
 
 function faceKey(typeface: CarouselFitTypeface, bold: boolean): CarouselTypeFace {
