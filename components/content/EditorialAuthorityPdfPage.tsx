@@ -1,6 +1,9 @@
 import React from 'react';
 import { Circle, G, Image, Path, Rect, Svg, Text, View } from '@react-pdf/renderer';
-import type { CarouselTemplateOption } from '@/lib/content/carousel-template-registry';
+import {
+  CAROUSEL_PDF_FONT_POPPINS,
+  type CarouselTemplateOption,
+} from '@/lib/content/carousel-template-registry';
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
@@ -262,7 +265,7 @@ export function EditorialAuthorityPdfContent({
             <Text
               style={{
                 color: '#B9927A',
-                fontFamily: 'Poppins',
+                fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
                 fontSize: size(m.identityFontSize),
                 fontWeight: m.wordmarkLightWeight,
                 letterSpacing: size(m.identityFontSize * 0.12),
@@ -278,7 +281,7 @@ export function EditorialAuthorityPdfContent({
             <Text
               style={{
                 color: '#B9927A',
-                fontFamily: 'Poppins',
+                fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
                 fontSize: size(m.handleFontSize),
                 fontWeight: 500,
                 lineHeight: m.identityLineHeight,
@@ -292,7 +295,7 @@ export function EditorialAuthorityPdfContent({
         <Text
           style={{
             color: palette.foreground,
-            fontFamily: 'Poppins',
+            fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
             fontSize: size(layout.headlineSize),
             fontWeight: 400,
             lineHeight: m.headlineLineHeight,
@@ -311,7 +314,7 @@ export function EditorialAuthorityPdfContent({
                 key={`${slide.id}-row-${lineIndex}`}
                 style={{
                   color: palette.foreground,
-                  fontFamily: 'Poppins',
+                  fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
                   fontSize: size(layout.bodySize),
                   fontWeight: 400,
                   lineHeight: m.bodyLineHeight,
@@ -327,7 +330,7 @@ export function EditorialAuthorityPdfContent({
           <Text
             style={{
               color: palette.accent,
-              fontFamily: 'Poppins',
+              fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
               fontSize: size(24),
               fontWeight: 700,
               letterSpacing: size(24 * 0.14),
@@ -343,7 +346,7 @@ export function EditorialAuthorityPdfContent({
           <Text
             style={{
               color: palette.muted,
-              fontFamily: 'Poppins',
+              fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
               fontSize: size(22),
               fontWeight: 400,
               marginTop: size(16),
@@ -366,7 +369,7 @@ export function EditorialAuthorityPdfContent({
         <Text
           style={{
             color: '#B9927A',
-            fontFamily: 'Poppins',
+            fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
             fontSize: size(m.footerFontSize),
             fontWeight: m.wordmarkLightWeight,
             letterSpacing: size(m.footerFontSize * 0.12),
@@ -383,7 +386,7 @@ export function EditorialAuthorityPdfContent({
           <Text
             style={{
               color: '#B9927A',
-              fontFamily: 'Poppins',
+              fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
               fontSize: size(m.footerFontSize),
               fontWeight: 700,
               letterSpacing: size(m.footerFontSize * 0.1),

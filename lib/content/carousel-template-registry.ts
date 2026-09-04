@@ -139,7 +139,18 @@ export const carouselStageEyebrows: CarouselStageEyebrows = {
 // Do not read CSS vars here: they resolve to off-brand Raleway / Noto Serif Display.
 export const CAROUSEL_EXPORT_FONT_SANS = 'Inter, "Helvetica Neue", Arial, sans-serif';
 export const CAROUSEL_EXPORT_FONT_SERIF = '"Playfair Display", Georgia, serif';
-export const CAROUSEL_EXPORT_FONT_POPPINS = 'Poppins, "Helvetica Neue", Arial, sans-serif';
+/**
+ * Inter sits behind Poppins as a fallback, not as decoration.
+ *
+ * Poppins carries almost none of the marks a list wants - no arrow, no tick, no
+ * star - so a browser would quietly substitute whatever the system had and the
+ * PDF, which substitutes nothing, would export holes. Inter carries all of them
+ * and is already registered in both lanes, so the two draw the same glyph.
+ */
+export const CAROUSEL_EXPORT_FONT_POPPINS = 'Poppins, Inter, "Helvetica Neue", Arial, sans-serif';
+
+/** The same chain for @react-pdf, which takes it as an array. */
+export const CAROUSEL_PDF_FONT_POPPINS = ['Poppins', 'Inter'] as const;
 /** Numerals only - the slide counter. Never body or headline copy. */
 export const CAROUSEL_EXPORT_FONT_BEBAS = '"Bebas Neue", "Helvetica Neue", Arial, sans-serif';
 

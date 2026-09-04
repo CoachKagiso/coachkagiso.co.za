@@ -12,12 +12,9 @@ import type { RichTextStyle } from '@/lib/content/rich-text';
  * Bold, italic and underline write markers that both lanes parse; ctrl/cmd-B,
  * -I and -U do the same from the keyboard.
  *
- * The insert list is short on purpose. Poppins carries the middot, the bullet
- * and the em dash, and nothing else on the usual list of arrows, ticks and
- * stars - checked against the font file rather than against a browser, which
- * would have silently substituted another face and hidden the gap until the
- * PDF came out with holes in it. Emoji are absent for the same reason: they
- * need an emoji source registered with @react-pdf or they export blank.
+ * The insert strip lies along the row rather than dropping below it, so it
+ * never covers the copy being edited, and scrolls sideways rather than
+ * wrapping, so the row keeps its height however many marks it holds.
  *
  * A whole component rather than a hook the editor could call, because the
  * fields are rendered inside a map over the slides - a hook there would run a
@@ -30,11 +27,33 @@ const STYLE_BUTTONS: Array<{ style: RichTextStyle; label: string; Icon: typeof B
   { style: 'underline', label: 'Underline', Icon: Underline },
 ];
 
-/** Only marks Poppins can draw. See the note above. */
-const INSERTS: Array<{ label: string; value: string }> = [
-  { label: '• bullet', value: '• ' },
-  { label: '· middot', value: '· ' },
-  { label: '— dash', value: ' — ' },
+/**
+ * Marks the renderers can actually draw.
+ *
+ * Poppins carries the bullet, the middot and the dash; Inter, chained behind it
+ * in both lanes, carries the arrows, the tick and the stars. Checked against the
+ * font files rather than a browser, which would have substituted another face
+ * and hidden the gap until the PDF exported with holes in it. Anything neither
+ * font has - the dashed arrow, the four-pointed star - is deliberately absent.
+ */
+const MARKS = [
+  '\u2022', '\u00b7', '\u2014', '\u2192', '\u21b3', '\u21d2',
+  '\u2713', '\u2605', '\u2606', '\u25c6', '\u2190', '\u2191', '\u2193',
+];
+
+/**
+ * The same set the personal brand toolbar offers.
+ *
+ * These are images in the PDF, not glyphs - no text font carries colour emoji -
+ * so the exported artwork is twemoji while the preview shows whatever the
+ * viewer's system draws. Same emoji, different hand.
+ */
+const EMOJI = [
+  '\u{1f44f}', '\u{1f64c}', '\u{1f4a1}', '\u{1f525}', '\u2705', '\u274c',
+  '\u{1f4c8}', '\u{1f4c9}', '\u{1f3af}', '\u{1f680}', '\u26a1', '\u{1f9e0}',
+  '\u{1f4ac}', '\u{1f440}', '\u{1f91d}', '\u2b50', '\u{1f4cc}', '\u{1f511}',
+  '\u270d\ufe0f', '\u{1f64f}', '\u{1f4af}', '\u23f1\ufe0f', '\u{1f4ca}', '\u{1f9e9}',
+  '\u27a1\ufe0f', '\u2b06\ufe0f', '\u{1f4a5}', '\u{1f331}',
 ];
 
 export function RichTextField({
@@ -99,8 +118,8 @@ export function RichTextField({
 
   return (
     <label className="mt-3 grid gap-2">
-      <span className="relative flex items-center gap-1.5">
-        <span className="studio-label">{label}</span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="studio-label shrink-0">{label}</span>
         {STYLE_BUTTONS.map(({ style, label: styleLabel, Icon }) => (
           <button
             key={style}
@@ -120,24 +139,32 @@ export function RichTextField({
           type="button"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setInsertOpen((open) => !open)}
-          title="Insert a mark"
+          title="Insert a mark or an emoji"
           aria-label={`Insert a mark into ${label}`}
           aria-expanded={insertOpen}
-          className="grid h-5 w-5 place-items-center rounded-[4px] border border-[#E4D8CB] bg-white text-[#8C7466] transition hover:border-[#142334] hover:text-[#142334]"
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded-[4px] border transition ${
+            insertOpen
+              ? 'border-[#4A3A2C] bg-[#4A3A2C] text-white'
+              : 'border-[#E4D8CB] bg-white text-[#8C7466] hover:border-[#142334] hover:text-[#142334]'
+          }`}
         >
           <Plus className="h-3 w-3" strokeWidth={2.5} />
         </button>
         {insertOpen && (
-          <span className="absolute left-0 top-6 z-20 grid gap-0.5 rounded-[6px] border border-[#E4D8CB] bg-white p-1 shadow-lg">
-            {INSERTS.map((snippet) => (
+          // A strip along the row rather than a panel below it: the fields sit
+          // shoulder to shoulder, and a panel would cover the copy being edited.
+          // It scrolls sideways instead of wrapping, so the row keeps its height.
+          <span className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-[4px] bg-[#4A3A2C] px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[...MARKS, ...EMOJI].map((mark) => (
               <button
-                key={snippet.label}
+                key={mark}
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => insert(snippet.value)}
-                className="rounded-[4px] px-2 py-1 text-left text-[12px] text-[#142334] hover:bg-[#F5F3EE]"
+                onClick={() => insert(`${mark} `)}
+                title={`Insert ${mark}`}
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-[3px] text-[13px] leading-none text-white/90 transition hover:bg-white/15"
               >
-                {snippet.label}
+                {mark}
               </button>
             ))}
           </span>
