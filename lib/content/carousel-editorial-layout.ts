@@ -45,8 +45,8 @@ export const carouselEditorialMetrics = {
    */
   numeralTracking: 0.1,
   progressGap: 14,
-  /** Counter to icon row. Wide on purpose: they are two separate marks. */
-  progressRowGap: 64,
+  /** Counter to icon row: clear of each other, still one band. */
+  progressRowGap: 40,
   iconSize: 36,
 
   /** The centred group. */
@@ -74,7 +74,7 @@ export const carouselEditorialMetrics = {
   wordmarkLightWeight: 400,
   wordmarkBoldWeight: 700,
   /** Avatar row to headline. Measured off the reference card. */
-  groupGap: 76,
+  groupGap: 56,
   /** Headline to body. */
   bodyGap: 28,
   /**
@@ -101,7 +101,7 @@ export const carouselEditorialMetrics = {
   bodyLineHeight: 1.5,
 
   /** Pinned footer: wordmark left, swipe cue right. */
-  footerFontSize: 26,
+  footerFontSize: 23,
   footerLineHeight: 1.2,
   swipeIconSize: 36,
 
