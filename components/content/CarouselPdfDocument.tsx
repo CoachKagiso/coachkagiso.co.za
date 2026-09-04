@@ -885,7 +885,6 @@ export function CarouselPdfDocument({
                 total={deck.length}
                 layout={layout}
                 palette={palette}
-                eyebrow={item.eyebrow}
                 profilePhotoUrl={profilePhotoUrl}
               />
             </Page>

@@ -33,8 +33,8 @@ export const CAROUSEL_EDITORIAL_WORDMARK = { light: 'COACH', bold: 'KAGISO' } as
 
 export const carouselEditorialMetrics = {
   padX: 96,
-  padTop: 140,
-  padBottom: 120,
+  padTop: 108,
+  padBottom: 100,
 
   /** Pinned top band: the progress strip over the utility icons. */
   progressFontSize: 24,
@@ -45,7 +45,8 @@ export const carouselEditorialMetrics = {
    */
   numeralTracking: 0.1,
   progressGap: 14,
-  progressRowGap: 26,
+  /** Counter to icon row. Wide on purpose: they are two separate marks. */
+  progressRowGap: 64,
   iconSize: 36,
 
   /** The centred group. */
@@ -55,14 +56,17 @@ export const carouselEditorialMetrics = {
   /**
    * Set explicitly, and tight.
    *
-   * Neither line carried a line height, so the preview inherited the app's
-   * (around 1.5, which put half a line of air between the name and the handle)
-   * while react-pdf applied its own default. The same block, two shapes, and
-   * neither of them the reference - where the handle sits directly under the
-   * name and the pair reads as one signature.
+   * Neither line carried a line height at first, so the preview inherited the
+   * app's while react-pdf applied its own default - the same block rendering
+   * two shapes, neither of them the reference. Setting the value was not enough
+   * on its own either: the lines are now stacked in a flex column with an
+   * explicit gap, so the space between them is one number rather than the sum
+   * of two line boxes and whatever leading is in scope.
    */
-  identityLineHeight: 1.12,
-  identityLineGap: 2,
+  identityLineHeight: 1.05,
+  identityLineGap: 4,
+  /** The handle sets a step larger than the wordmark above it. */
+  handleFontSize: 32,
   /**
    * The wordmark is one word set in two weights. Rendering it at a single
    * weight loses the emphasis the mark is built on.
@@ -92,13 +96,14 @@ export const carouselEditorialMetrics = {
   coverHeadlineMax: 64,
   headlineLineHeight: 1.28,
 
-  bodyMin: 20,
+  bodyMin: 23,
   bodyMax: 34,
   bodyLineHeight: 1.5,
 
   /** Pinned footer: wordmark left, swipe cue right. */
   footerFontSize: 26,
   footerLineHeight: 1.2,
+  swipeIconSize: 36,
 
   /** The body never takes more than this share of the free band. */
   bodyShare: 0.34,
@@ -170,7 +175,9 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
 
   const topBandHeight =
     m.progressFontSize * m.progressLineHeight + m.progressRowGap + m.iconSize;
-  const footerHeight = m.footerFontSize * m.footerLineHeight;
+  // The footer row is as tall as its tallest item, which is the swipe hand
+  // rather than the wordmark beside it.
+  const footerHeight = Math.max(m.footerFontSize * m.footerLineHeight, m.swipeIconSize);
   const bandHeight = Math.max(
     0,
     pageHeight - m.padTop - topBandHeight - m.padBottom - footerHeight,
@@ -178,7 +185,7 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
 
   const avatarRowHeight = Math.max(
     m.avatarSize,
-    m.identityFontSize * m.identityLineHeight * 2 + m.identityLineGap,
+    (m.identityFontSize + m.handleFontSize) * m.identityLineHeight + m.identityLineGap,
   );
 
   const body = String(input.body || '').trim();
