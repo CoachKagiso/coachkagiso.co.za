@@ -8,6 +8,7 @@ import {
   type CarouselTemplateOption,
 } from '@/lib/content/carousel-template-registry';
 import {
+  CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
@@ -150,12 +151,16 @@ export function EditorialAuthoritySlide({
                 color: '#B9927A',
                 fontFamily: font,
                 fontSize: px(m.identityFontSize),
-                fontWeight: 700,
+                fontWeight: m.wordmarkLightWeight,
                 letterSpacing: px(m.identityFontSize * 0.12),
+                lineHeight: m.identityLineHeight,
                 textTransform: 'uppercase',
               }}
             >
-              COACHKAGISO
+              {CAROUSEL_EDITORIAL_WORDMARK.light}
+              <span style={{ fontWeight: m.wordmarkBoldWeight }}>
+                {CAROUSEL_EDITORIAL_WORDMARK.bold}
+              </span>
             </p>
             <p
               style={{
@@ -163,6 +168,7 @@ export function EditorialAuthoritySlide({
                 fontFamily: font,
                 fontSize: px(m.identityFontSize),
                 fontWeight: 500,
+                lineHeight: m.identityLineHeight,
                 marginTop: px(m.identityLineGap),
               }}
             >
@@ -256,12 +262,16 @@ export function EditorialAuthoritySlide({
             color: '#B9927A',
             fontFamily: font,
             fontSize: px(m.footerFontSize),
-            fontWeight: 700,
+            fontWeight: m.wordmarkLightWeight,
             letterSpacing: px(m.footerFontSize * 0.12),
+            lineHeight: m.footerLineHeight,
             textTransform: 'uppercase',
           }}
         >
-          COACHKAGISO
+          {CAROUSEL_EDITORIAL_WORDMARK.light}
+          <span style={{ fontWeight: m.wordmarkBoldWeight }}>
+            {CAROUSEL_EDITORIAL_WORDMARK.bold}
+          </span>
         </p>
         <span
           style={{

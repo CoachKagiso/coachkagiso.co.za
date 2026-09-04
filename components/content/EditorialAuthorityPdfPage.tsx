@@ -2,6 +2,7 @@ import React from 'react';
 import { Circle, Image, Path, Rect, Svg, Text, View } from '@react-pdf/renderer';
 import type { CarouselTemplateOption } from '@/lib/content/carousel-template-registry';
 import {
+  CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
   layoutEditorialAuthoritySlide,
   type CarouselEditorialLayout,
@@ -234,12 +235,16 @@ export function EditorialAuthorityPdfContent({
                 color: '#B9927A',
                 fontFamily: 'Poppins',
                 fontSize: size(m.identityFontSize),
-                fontWeight: 700,
+                fontWeight: m.wordmarkLightWeight,
                 letterSpacing: size(m.identityFontSize * 0.12),
+                lineHeight: m.identityLineHeight,
                 textTransform: 'uppercase',
               }}
             >
-              COACHKAGISO
+              {CAROUSEL_EDITORIAL_WORDMARK.light}
+              <Text style={{ fontWeight: m.wordmarkBoldWeight }}>
+                {CAROUSEL_EDITORIAL_WORDMARK.bold}
+              </Text>
             </Text>
             <Text
               style={{
@@ -247,6 +252,7 @@ export function EditorialAuthorityPdfContent({
                 fontFamily: 'Poppins',
                 fontSize: size(m.identityFontSize),
                 fontWeight: 500,
+                lineHeight: m.identityLineHeight,
                 marginTop: size(m.identityLineGap),
               }}
             >
@@ -357,12 +363,16 @@ export function EditorialAuthorityPdfContent({
             color: '#B9927A',
             fontFamily: 'Poppins',
             fontSize: size(m.footerFontSize),
-            fontWeight: 700,
+            fontWeight: m.wordmarkLightWeight,
             letterSpacing: size(m.footerFontSize * 0.12),
+            lineHeight: m.footerLineHeight,
             textTransform: 'uppercase',
           }}
         >
-          COACHKAGISO
+          {CAROUSEL_EDITORIAL_WORDMARK.light}
+          <Text style={{ fontWeight: m.wordmarkBoldWeight }}>
+            {CAROUSEL_EDITORIAL_WORDMARK.bold}
+          </Text>
         </Text>
         <View style={{ alignItems: 'center', flexDirection: 'row', gap: size(10) }}>
           <Text
