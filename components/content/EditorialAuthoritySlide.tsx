@@ -10,6 +10,8 @@ import {
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIconDrop,
+  editorialIconViewBox,
   editorialIdentityLift,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
@@ -70,6 +72,9 @@ export function EditorialAuthoritySlide({
   // the type fit measured against.
   const { bodyPoints, bodyAsList } = layout;
   const iconStyle = { color: '#142334', height: px(m.iconSize), width: px(m.iconSize) };
+  // The envelope drops by this many grid units to reach the shared line; the
+  // badge has to travel with it.
+  const mailBadgeTop = (editorialIconDrop('mail') / 24) * m.iconSize - 3;
   const footerRowHeight = Math.max(m.footerFontSize * m.footerLineHeight, m.swipeIconSize);
   const bodyStyle = {
     color: palette.foreground,
@@ -116,9 +121,14 @@ export function EditorialAuthoritySlide({
             </span>
           ))}
         </div>
+        {/*
+          The viewBox on each mark is shifted so their ink ends on one line.
+          Bottom-aligning the boxes would do nothing - they are all the same
+          size already; it is the glyphs inside that sat on different lines.
+        */}
         <div style={{ alignItems: 'center', display: 'flex', gap: px(30) }} aria-hidden="true">
           <span style={{ display: 'inline-flex', position: 'relative' }}>
-            <Mail style={iconStyle} strokeWidth={1.8} />
+            <Mail style={iconStyle} strokeWidth={1.8} viewBox={editorialIconViewBox('mail')} />
             <span
               style={{
                 backgroundColor: '#C9AD98',
@@ -126,13 +136,15 @@ export function EditorialAuthoritySlide({
                 height: px(14),
                 position: 'absolute',
                 right: `-${px(3)}`,
-                top: `-${px(3)}`,
+                // Follows the envelope down, or it detaches from the corner it
+                // is meant to sit on.
+                top: px(mailBadgeTop),
                 width: px(14),
               }}
             />
           </span>
-          <Trash2 style={iconStyle} strokeWidth={1.8} />
-          <Upload style={iconStyle} strokeWidth={1.8} />
+          <Trash2 style={iconStyle} strokeWidth={1.8} viewBox={editorialIconViewBox('trash')} />
+          <Upload style={iconStyle} strokeWidth={1.8} viewBox={editorialIconViewBox('upload')} />
           <MoreHorizontal style={iconStyle} strokeWidth={2} />
         </div>
       </div>

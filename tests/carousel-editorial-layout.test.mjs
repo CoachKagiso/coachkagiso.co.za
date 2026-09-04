@@ -4,7 +4,10 @@ import test from 'node:test';
 import {
   CAROUSEL_EDITORIAL_BASE_WIDTH,
   CAROUSEL_EDITORIAL_WORDMARK,
+  CAROUSEL_ICON_INK_BOTTOM,
   carouselEditorialMetrics,
+  editorialIconDrop,
+  editorialIconViewBox,
   editorialIdentityLift,
   editorialIdentityOpticalLift,
   layoutEditorialAuthoritySlide,
@@ -333,4 +336,28 @@ test('the design offset is a distance, not a multiple, so both engines land toge
       `${engine}: ${applied} - ${correction} should leave the ${m.identityExtraLift}pt design offset`,
     );
   }
+});
+
+test('the utility marks are dropped onto one ink line', () => {
+  // Bottom-aligning the boxes does nothing: they are all the same size. It is
+  // the glyphs inside lucide's grid that sit on different lines - the bin runs
+  // to 22, the arrow to 21, the envelope only to 20.
+  const bottoms = Object.entries(CAROUSEL_ICON_INK_BOTTOM).map(
+    ([icon, inkBottom]) => inkBottom + editorialIconDrop(icon),
+  );
+  assert.equal(new Set(bottoms).size, 1, `after the drop they must share a line, got ${bottoms}`);
+
+  // Downward only, and the lowest mark is the one that does not move.
+  for (const icon of Object.keys(CAROUSEL_ICON_INK_BOTTOM)) {
+    assert.ok(editorialIconDrop(icon) >= 0, `${icon} must not rise`);
+  }
+  assert.equal(editorialIconDrop('trash'), 0, 'the lowest mark sets the line');
+  assert.equal(editorialIconViewBox('trash'), '0 0 24 24');
+  assert.equal(editorialIconViewBox('mail'), '0 -2 24 24');
+});
+
+test('the ellipsis is left out of the alignment on purpose', () => {
+  // A row of dots has no bottom to sit on. Dropped to the others' line it reads
+  // as having fallen off it, so it stays centred in its box.
+  assert.ok(!('ellipsis' in CAROUSEL_ICON_INK_BOTTOM));
 });

@@ -32,6 +32,40 @@ export const CAROUSEL_EDITORIAL_BASE_WIDTH = 1080;
 export const CAROUSEL_EDITORIAL_WORDMARK = { light: 'COACH', bold: 'KAGISO' } as const;
 
 /**
+ * Where each utility mark's ink ends inside lucide's 24-unit grid.
+ *
+ * They share a grid but do not fill it the same way - the bin runs to 22, the
+ * upload arrow to 21, the envelope only to 20 - so a row of equal boxes leaves
+ * the glyphs sitting on three different lines. Nudging each viewBox down by the
+ * difference lands them on one, and does it without moving the boxes, so the
+ * row's height and spacing are untouched.
+ *
+ * The ellipsis is deliberately absent. A row of dots has no bottom to sit on,
+ * and dropped to the others' line it reads as having fallen off it; box-centred
+ * is where it belongs.
+ */
+export const CAROUSEL_ICON_INK_BOTTOM = { mail: 20, trash: 22, upload: 21 } as const;
+
+export type CarouselUtilityIcon = keyof typeof CAROUSEL_ICON_INK_BOTTOM;
+
+/** The line they all sit on: the lowest of them. */
+const CAROUSEL_ICON_BASELINE = Math.max(...Object.values(CAROUSEL_ICON_INK_BOTTOM));
+
+/**
+ * The viewBox for one utility mark, shifted so its ink ends on the shared line.
+ * Same string in both lanes, so the preview and the PDF align identically.
+ */
+export function editorialIconViewBox(icon: CarouselUtilityIcon): string {
+  const drop = CAROUSEL_ICON_BASELINE - CAROUSEL_ICON_INK_BOTTOM[icon];
+  return `0 ${-drop} 24 24`;
+}
+
+/** The same shift in grid units, for anything positioned against the glyph. */
+export function editorialIconDrop(icon: CarouselUtilityIcon): number {
+  return CAROUSEL_ICON_BASELINE - CAROUSEL_ICON_INK_BOTTOM[icon];
+}
+
+/**
  * Poppins ink extents, in em, read off the shipped TTFs with fontkit.
  *
  * These are what the glyphs actually cover, not what their line boxes reserve.
