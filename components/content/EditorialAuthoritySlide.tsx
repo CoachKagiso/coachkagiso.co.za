@@ -13,7 +13,11 @@ import {
   editorialIdentityLift,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
-import { SWIPE_ICON_PATHS, SWIPE_ICON_VIEW_BOX } from '@/lib/content/carousel-swipe-icon';
+import {
+  SWIPE_ICON_COLOR,
+  SWIPE_ICON_PATHS,
+  SWIPE_ICON_VIEW_BOX,
+} from '@/lib/content/carousel-swipe-icon';
 import type { CarouselSlide } from './ContentStudio';
 
 /**
@@ -314,7 +318,7 @@ export function EditorialAuthoritySlide({
             style={{ height: px(m.swipeIconSize), width: px(m.swipeIconSize) }}
           >
             {SWIPE_ICON_PATHS.map((d) => (
-              <path key={d.slice(0, 24)} d={d} fill="#B76E79" />
+              <path key={d.slice(0, 24)} d={d} fill={SWIPE_ICON_COLOR} />
             ))}
           </svg>
         </span>

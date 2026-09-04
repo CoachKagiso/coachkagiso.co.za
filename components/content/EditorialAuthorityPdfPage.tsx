@@ -8,7 +8,11 @@ import {
   layoutEditorialAuthoritySlide,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
-import { SWIPE_ICON_PATHS, SWIPE_ICON_VIEW_BOX } from '@/lib/content/carousel-swipe-icon';
+import {
+  SWIPE_ICON_COLOR,
+  SWIPE_ICON_PATHS,
+  SWIPE_ICON_VIEW_BOX,
+} from '@/lib/content/carousel-swipe-icon';
 import type { CarouselSlide } from './ContentStudio';
 
 /**
@@ -97,7 +101,7 @@ function SwipeMark({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox={SWIPE_ICON_VIEW_BOX}>
       {SWIPE_ICON_PATHS.map((d) => (
-        <Path key={d.slice(0, 24)} d={d} fill="#B76E79" />
+        <Path key={d.slice(0, 24)} d={d} fill={SWIPE_ICON_COLOR} />
       ))}
     </Svg>
   );
