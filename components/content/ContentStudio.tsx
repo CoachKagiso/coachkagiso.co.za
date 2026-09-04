@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import Image from 'next/image';
 import {
@@ -12121,12 +12121,24 @@ function CarouselDraftEditor({
   record,
   isSaving,
   onSave,
+  onDraftChange,
+  onActiveSlideChange,
 }: {
   record: CarouselDraftRecord;
   isSaving: boolean;
   onSave: (record: CarouselDraftRecord, draft: CarouselDraftPayload) => void;
+  /** Every keystroke, so the rendered deck can follow along before a save. */
+  onDraftChange?: (draft: CarouselDraftPayload) => void;
+  /** Which slide the cursor is in, so the preview can scroll to the same one. */
+  onActiveSlideChange?: (slideId: string) => void;
 }) {
   const [draft, setDraft] = useState<CarouselDraftPayload>(record.draft);
+  // The preview renders from this rather than from the saved record, so the
+  // slide on the right is the slide being typed into.
+  useEffect(() => {
+    onDraftChange?.(draft);
+  }, [draft, onDraftChange]);
+
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(record.draft);
   const hasEnoughSlides = draft.slides.length >= carouselMinSlides;
   const hasValidSlides = draft.slides.every((slide) => slide.headline.trim());
@@ -12262,7 +12274,13 @@ function CarouselDraftEditor({
           );
 
           return (
-            <article key={slide.id} className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4">
+            <article
+              key={slide.id}
+              // Capture, so focus landing on any field inside counts as editing
+              // this slide - the preview follows the cursor, not a click target.
+              onFocusCapture={() => onActiveSlideChange?.(slide.id)}
+              className="rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-4"
+            >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-full bg-white font-serif text-[18px] text-[#C9AD98]">
@@ -12582,6 +12600,52 @@ function CarouselStudioPanel({
     : null;
   const latestRecord = selectedRecord || drafts[0] || null;
   const latestDraft = latestRecord?.draft || null;
+  const activeRecordIdForDraft = latestRecord?.item.id || null;
+
+  /**
+   * The editor's in-progress draft, so the rendered deck shows what is being
+   * typed rather than what was last saved.
+   *
+   * Kept with the id it belongs to: selecting a different draft leaves a stale
+   * payload here for a render, and without the check the preview would show one
+   * draft's slides under another's settings.
+   */
+  const [liveDraft, setLiveDraft] = useState<{ recordId: string; draft: CarouselDraftPayload } | null>(null);
+  const pendingDraft = liveDraft && liveDraft.recordId === activeRecordIdForDraft ? liveDraft.draft : null;
+  /**
+   * What the deck on the right is drawn from.
+   *
+   * Only the rendering reads this. Everything that mutates a draft and saves it
+   * - the quality fixes, the undo stack, the CTA picker - stays on the saved
+   * record, because applying a fix on top of the live draft would commit
+   * whatever else had been typed as a side effect of pressing an unrelated
+   * button, and leave the editor's own copy silently diverged.
+   *
+   * Deferred, so a keystroke lands in the field immediately and the deck, which
+   * re-fits type for every slide, catches up on the next frame rather than
+   * holding the keystroke up.
+   */
+  const previewDraft = useDeferredValue(pendingDraft || latestDraft);
+
+  /** Which slide the editor's cursor is in, so the preview can follow it. */
+  const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
+  const previewFrameRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const handleDraftChange = useCallback(
+    (draft: CarouselDraftPayload) => {
+      if (!activeRecordIdForDraft) return;
+      setLiveDraft({ recordId: activeRecordIdForDraft, draft });
+    },
+    [activeRecordIdForDraft],
+  );
+
+  // Scrolls inside the preview column only. The column is its own scroller at
+  // xl for exactly this reason: `nearest` on a page-level scroller would drag
+  // the editor off screen every time the cursor moved to another slide.
+  useEffect(() => {
+    if (!activeSlideId) return;
+    previewFrameRefs.current[activeSlideId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeSlideId]);
   const displayedAspectRatio = latestDraft?.aspectRatio || defaultAspectRatio;
   const displayedAspectOption = getCarouselAspectRatioOption(displayedAspectRatio, latestDraft?.platform);
   const displayedExportDimensions = getCarouselExportDimensions(displayedAspectOption);
@@ -12594,7 +12658,7 @@ function CarouselStudioPanel({
   const deckQualityReport = latestDraft ? buildCarouselDeckQualityReport(latestDraft, displayedTemplateOption) : null;
   const isSavingLatest = Boolean(latestRecord && savingDraftId === latestRecord.item.id);
   const activeRecordId = latestRecord?.item.id || null;
-  const renderedSlides: CarouselSlide[] = latestDraft?.slides || [
+  const renderedSlides: CarouselSlide[] = previewDraft?.slides || [
     {
       id: 'placeholder-1',
       role: 'cover',
@@ -13129,6 +13193,8 @@ function CarouselStudioPanel({
                 record={latestRecord}
                 isSaving={isSavingLatest}
                 onSave={onDraftSave}
+                onDraftChange={handleDraftChange}
+                onActiveSlideChange={setActiveSlideId}
               />
             )}
           </div>
@@ -13407,7 +13473,7 @@ function CarouselStudioPanel({
         )}
       </div>
 
-      <aside className="rounded-[8px] bg-[#142334] p-5 text-white">
+      <aside className="rounded-[8px] bg-[#142334] p-5 text-white xl:sticky xl:top-4 xl:max-h-[calc(100vh-32px)] xl:self-start xl:overflow-y-auto xl:overscroll-contain [scrollbar-gutter:stable]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Rendered slides</p>
@@ -13419,17 +13485,28 @@ function CarouselStudioPanel({
         </div>
         <div className="mt-5 grid gap-3">
           {renderedDeck.map((slide, index) => (
-            <CarouselSlideFrame
+            // Addressed by slide id, not by position: the deck drops empty
+            // slides, so the preview's index and the editor's do not match.
+            <div
               key={slide.id}
-              slide={slide}
-              index={index}
-              total={renderedDeck.length}
-              aspectOption={displayedAspectOption}
-              template={displayedTemplateOption}
-              layoutRecipe={displayedLayoutRecipeOption}
-              eyebrow={renderedEyebrows[index]}
-              profilePhotoUrl={profilePhotoUrl}
-            />
+              ref={(node) => {
+                previewFrameRefs.current[slide.id] = node;
+              }}
+              className={`rounded-[10px] transition-shadow ${
+                slide.id === activeSlideId ? 'shadow-[0_0_0_2px_#C9AD98]' : ''
+              }`}
+            >
+              <CarouselSlideFrame
+                slide={slide}
+                index={index}
+                total={renderedDeck.length}
+                aspectOption={displayedAspectOption}
+                template={displayedTemplateOption}
+                layoutRecipe={displayedLayoutRecipeOption}
+                eyebrow={renderedEyebrows[index]}
+                profilePhotoUrl={profilePhotoUrl}
+              />
+            </div>
           ))}
         </div>
       </aside>
