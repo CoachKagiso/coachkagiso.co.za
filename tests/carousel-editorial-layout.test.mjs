@@ -174,36 +174,39 @@ test('copy that cannot fit at all is reported rather than silently clipped', () 
   assert.equal(layout.overflows, true);
 });
 
-test('a list is what the author put on separate lines, and none of it is dropped', () => {
+test('the body keeps every line the author typed, blank ones included', () => {
+  // It used to split on runs of newlines and drop the empties, which made a
+  // body with a blank line between two lines identical to one without - so
+  // deleting that blank line changed nothing on the rendered side, and the
+  // preview could not be trusted to show what the copy said.
+  const withBlank = ['One.', '', 'Two.'].join(NEWLINE);
+  const withoutBlank = ['One.', 'Two.'].join(NEWLINE);
+
+  const spaced = layoutEditorialAuthoritySlide({ headline: 'Signs.', body: withBlank, ...PAGE });
+  const tight = layoutEditorialAuthoritySlide({ headline: 'Signs.', body: withoutBlank, ...PAGE });
+
+  assert.deepEqual(spaced.bodyRows, ['One.', '', 'Two.'], 'the blank line survives');
+  assert.deepEqual(tight.bodyRows, ['One.', 'Two.']);
+  assert.ok(spaced.bodyHeight > tight.bodyHeight, 'and it costs a line of height');
+  assert.equal(spaced.bodyLines, tight.bodyLines + 1);
+});
+
+test('nothing is dropped or shortened, punctuation included', () => {
   // The registry's body-point helper caps its output and strips full stops,
   // which is right for a card grid and would silently shorten an exported
   // slide here.
   const lines = ['One.', 'Two.', 'Three.', 'Four.', 'Five.', 'Six.', 'Seven.'];
-  const list = layoutEditorialAuthoritySlide({ headline: 'Signs.', body: lines.join(NEWLINE), ...PAGE });
+  const layout = layoutEditorialAuthoritySlide({ headline: 'Signs.', body: lines.join(NEWLINE), ...PAGE });
+  assert.deepEqual(layout.bodyRows, lines);
+});
 
-  assert.equal(list.bodyAsList, true);
-  assert.deepEqual(list.bodyPoints, lines, 'every line survives, punctuation included');
-
-  const paragraph = layoutEditorialAuthoritySlide({
+test('a paragraph is one row, not one row per sentence', () => {
+  const layout = layoutEditorialAuthoritySlide({
     headline: 'Signs.',
     body: 'One sentence. Then a second one. And a third for good measure.',
     ...PAGE,
   });
-  assert.equal(paragraph.bodyAsList, false, 'sentences are not a list');
-  assert.equal(paragraph.bodyPoints.length, 1);
-});
-
-test('the gap between list lines is part of the measured height', () => {
-  // Without it the fit measures a block shorter than the one it draws, and a
-  // list that "fits" runs into the footer.
-  const lines = ['One.', 'Two.', 'Three.', 'Four.'];
-  const layout = layoutEditorialAuthoritySlide({ headline: 'Signs.', body: lines.join(NEWLINE), ...PAGE });
-  const bare = layout.bodyLines * layout.bodySize * carouselEditorialMetrics.bodyLineHeight;
-
-  assert.equal(
-    Math.round(layout.bodyHeight - bare),
-    (lines.length - 1) * carouselEditorialMetrics.bodyItemGap,
-  );
+  assert.equal(layout.bodyRows.length, 1, 'sentences are not lines');
 });
 
 test('the preview and the export resolve the same slide', () => {
