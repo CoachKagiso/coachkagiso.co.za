@@ -154,7 +154,6 @@ export function EditorialAuthorityPdfContent({
   total,
   layout,
   palette,
-  eyebrow,
   profilePhotoUrl,
 }: {
   slide: CarouselSlide;
@@ -162,7 +161,6 @@ export function EditorialAuthorityPdfContent({
   total: number;
   layout: CarouselEditorialLayout;
   palette: CarouselTemplateOption['palette'];
-  eyebrow?: string;
   profilePhotoUrl?: string | null;
 }) {
   const m = carouselEditorialMetrics;
@@ -170,6 +168,7 @@ export function EditorialAuthorityPdfContent({
   // Shared with the preview, so the two lanes cannot disagree about whether
   // this body is a list - which would leave one of them measured wrong.
   const { bodyPoints, bodyAsList } = layout;
+  const footerRowHeight = Math.max(m.footerFontSize * m.footerLineHeight, m.swipeIconSize);
 
   return (
     <>
@@ -229,7 +228,7 @@ export function EditorialAuthorityPdfContent({
               }}
             />
           )}
-          <View>
+          <View style={{ gap: size(m.identityLineGap) }}>
             <Text
               style={{
                 color: '#B9927A',
@@ -250,32 +249,15 @@ export function EditorialAuthorityPdfContent({
               style={{
                 color: '#B9927A',
                 fontFamily: 'Poppins',
-                fontSize: size(m.identityFontSize),
+                fontSize: size(m.handleFontSize),
                 fontWeight: 500,
                 lineHeight: m.identityLineHeight,
-                marginTop: size(m.identityLineGap),
               }}
             >
               @coach.kagiso
             </Text>
           </View>
         </View>
-
-        {eyebrow ? (
-          <Text
-            style={{
-              color: palette.accent,
-              fontFamily: 'Poppins',
-              fontSize: size(22),
-              fontWeight: 600,
-              letterSpacing: size(22 * 0.2),
-              marginTop: size(m.groupGap),
-              textTransform: 'uppercase',
-            }}
-          >
-            {eyebrow}
-          </Text>
-        ) : null}
 
         <Text
           style={{
@@ -284,7 +266,7 @@ export function EditorialAuthorityPdfContent({
             fontSize: size(layout.headlineSize),
             fontWeight: 400,
             lineHeight: m.headlineLineHeight,
-            marginTop: eyebrow ? size(18) : size(m.groupGap),
+            marginTop: size(m.groupGap),
           }}
         >
           <RichText text={slide.headline} />
@@ -356,8 +338,15 @@ export function EditorialAuthorityPdfContent({
         ) : null}
       </View>
 
-      {/* Pinned: wordmark left, swipe cue right. */}
-      <View style={{ alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' }}>
+      {/* Pinned: wordmark left, swipe cue right, both centred in one row height. */}
+      <View
+        style={{
+          alignItems: 'center',
+          flexDirection: 'row',
+          height: size(footerRowHeight),
+          justifyContent: 'space-between',
+        }}
+      >
         <Text
           style={{
             color: '#B9927A',
@@ -382,12 +371,13 @@ export function EditorialAuthorityPdfContent({
               fontSize: size(m.footerFontSize),
               fontWeight: 700,
               letterSpacing: size(m.footerFontSize * 0.1),
+              lineHeight: m.footerLineHeight,
               textTransform: 'uppercase',
             }}
           >
             SWIPE
           </Text>
-          <SwipeHand size={size(36)} />
+          <SwipeHand size={size(m.swipeIconSize)} />
         </View>
       </View>
     </>

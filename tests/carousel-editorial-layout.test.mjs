@@ -251,10 +251,38 @@ test('the identity block carries its own line height', () => {
   assert.equal(typeof m.identityLineHeight, 'number');
   assert.ok(m.identityLineHeight < 1.3, 'the name and handle read as one signature');
 
-  // And the reserved row height has to be measured with that leading, or the
-  // group is sized against a block taller than the one drawn.
+  // And the reserved row height has to be measured with that leading and with
+  // both sizes - the handle sets a step larger than the wordmark above it - or
+  // the group is sized against a block other than the one drawn.
+  assert.ok(m.handleFontSize > m.identityFontSize, 'the handle is the larger of the two');
   const layout = layoutEditorialAuthoritySlide({ headline: 'Short.', body: '', ...PAGE });
-  const textHeight = m.identityFontSize * m.identityLineHeight * 2 + m.identityLineGap;
+  const textHeight = (m.identityFontSize + m.handleFontSize) * m.identityLineHeight + m.identityLineGap;
   assert.equal(layout.avatarRowHeight, Math.max(m.avatarSize, textHeight));
   assert.equal(layout.avatarRowHeight, m.avatarSize, 'the avatar is the taller of the two');
+});
+
+test('the footer band is as tall as the swipe hand, not the type beside it', () => {
+  // The hand is the taller of the two. Reserving only the line box left the
+  // wordmark and SWIPE aligned on an edge rather than on one line, and left the
+  // band that many points short.
+  const m = carouselEditorialMetrics;
+  const layout = layoutEditorialAuthoritySlide({ headline: 'Short.', body: '', ...PAGE });
+
+  assert.ok(m.swipeIconSize > m.footerFontSize * m.footerLineHeight, 'the hand is the taller item');
+  assert.equal(layout.footerHeight, m.swipeIconSize);
+});
+
+test('the pinned bands leave the group the rest of the page', () => {
+  const m = carouselEditorialMetrics;
+  const layout = layoutEditorialAuthoritySlide({ headline: 'Short.', body: '', ...PAGE });
+
+  assert.equal(
+    layout.padTop + layout.topBandHeight + layout.bandHeight + layout.footerHeight + layout.padBottom,
+    PAGE.height,
+    'every band has to account for the page exactly',
+  );
+  assert.equal(
+    layout.topBandHeight,
+    m.progressFontSize * m.progressLineHeight + m.progressRowGap + m.iconSize,
+  );
 });

@@ -11153,7 +11153,6 @@ function CarouselSlideFrame({
       total={total}
       layout={editorialLayout}
       palette={palette}
-      eyebrow={stageEyebrow || undefined}
       avatarSrc={avatarSrc}
       renderRichText={renderRichText}
     />

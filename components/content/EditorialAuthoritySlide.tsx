@@ -43,7 +43,6 @@ export function EditorialAuthoritySlide({
   total,
   layout,
   palette,
-  eyebrow,
   avatarSrc,
   renderRichText,
 }: {
@@ -52,7 +51,6 @@ export function EditorialAuthoritySlide({
   total: number;
   layout: CarouselEditorialLayout;
   palette: CarouselTemplateOption['palette'];
-  eyebrow?: string;
   avatarSrc: string;
   renderRichText: (text: string, strongWeight?: number) => ReactNode[];
 }) {
@@ -66,6 +64,7 @@ export function EditorialAuthoritySlide({
   // the type fit measured against.
   const { bodyPoints, bodyAsList } = layout;
   const iconStyle = { color: '#142334', height: px(m.iconSize), width: px(m.iconSize) };
+  const footerRowHeight = Math.max(m.footerFontSize * m.footerLineHeight, m.swipeIconSize);
   const bodyStyle = {
     color: palette.foreground,
     fontFamily: font,
@@ -145,7 +144,13 @@ export function EditorialAuthoritySlide({
               width: px(m.avatarSize),
             }}
           />
-          <div>
+          {/*
+            A flex column with one gap rather than two blocks and a margin.
+            Stacked the other way the space between the lines is the sum of two
+            line boxes plus whatever leading happens to be in scope, which is
+            how the gap survived being given an explicit line height.
+          */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: px(m.identityLineGap) }}>
             <p
               style={{
                 color: '#B9927A',
@@ -154,6 +159,7 @@ export function EditorialAuthoritySlide({
                 fontWeight: m.wordmarkLightWeight,
                 letterSpacing: px(m.identityFontSize * 0.12),
                 lineHeight: m.identityLineHeight,
+                margin: 0,
                 textTransform: 'uppercase',
               }}
             >
@@ -166,32 +172,16 @@ export function EditorialAuthoritySlide({
               style={{
                 color: '#B9927A',
                 fontFamily: font,
-                fontSize: px(m.identityFontSize),
+                fontSize: px(m.handleFontSize),
                 fontWeight: 500,
                 lineHeight: m.identityLineHeight,
-                marginTop: px(m.identityLineGap),
+                margin: 0,
               }}
             >
               @coach.kagiso
             </p>
           </div>
         </div>
-
-        {eyebrow ? (
-          <p
-            style={{
-              color: palette.accent,
-              fontFamily: font,
-              fontSize: px(22),
-              fontWeight: 600,
-              letterSpacing: px(22 * 0.2),
-              marginTop: px(m.groupGap),
-              textTransform: 'uppercase',
-            }}
-          >
-            {eyebrow}
-          </p>
-        ) : null}
 
         <h3
           style={{
@@ -201,7 +191,7 @@ export function EditorialAuthoritySlide({
             fontWeight: 400,
             letterSpacing: '-0.005em',
             lineHeight: m.headlineLineHeight,
-            marginTop: eyebrow ? px(18) : px(m.groupGap),
+            marginTop: px(m.groupGap),
           }}
         >
           {renderRichText(slide.headline)}
@@ -255,14 +245,24 @@ export function EditorialAuthoritySlide({
         ) : null}
       </div>
 
-      {/* Pinned: wordmark left, swipe cue right. */}
-      <div style={{ alignItems: 'flex-end', display: 'flex', justifyContent: 'space-between' }}>
-        <p
+      {/*
+        Pinned: wordmark left, swipe cue right.
+
+        Both sides are boxes of one height with their contents centred, rather
+        than two items of different heights aligned on an edge. The swipe hand
+        is taller than the type beside it, so an edge alignment left the
+        wordmark and SWIPE sitting on visibly different lines.
+      */}
+      <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}>
+        <span
           style={{
+            alignItems: 'center',
             color: '#B9927A',
+            display: 'flex',
             fontFamily: font,
             fontSize: px(m.footerFontSize),
             fontWeight: m.wordmarkLightWeight,
+            height: px(footerRowHeight),
             letterSpacing: px(m.footerFontSize * 0.12),
             lineHeight: m.footerLineHeight,
             textTransform: 'uppercase',
@@ -272,7 +272,7 @@ export function EditorialAuthoritySlide({
           <span style={{ fontWeight: m.wordmarkBoldWeight }}>
             {CAROUSEL_EDITORIAL_WORDMARK.bold}
           </span>
-        </p>
+        </span>
         <span
           style={{
             alignItems: 'center',
@@ -282,12 +282,17 @@ export function EditorialAuthoritySlide({
             fontSize: px(m.footerFontSize),
             fontWeight: 700,
             gap: px(10),
+            height: px(footerRowHeight),
             letterSpacing: px(m.footerFontSize * 0.1),
+            lineHeight: m.footerLineHeight,
             textTransform: 'uppercase',
           }}
         >
           SWIPE
-          <Hand style={{ color: '#B76E79', height: px(36), width: px(36) }} strokeWidth={1.6} />
+          <Hand
+            style={{ color: '#B76E79', height: px(m.swipeIconSize), width: px(m.swipeIconSize) }}
+            strokeWidth={1.6}
+          />
         </span>
       </div>
     </>
