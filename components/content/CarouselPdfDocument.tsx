@@ -28,6 +28,24 @@ Font.register({ family: 'Inter', fontWeight: 400, src: FONT('Inter-Regular.ttf')
 Font.register({ family: 'Inter', fontWeight: 500, src: FONT('Inter-Medium.ttf') });
 Font.register({ family: 'Inter', fontWeight: 600, src: FONT('Inter-SemiBold.ttf') });
 Font.register({ family: 'Inter', fontWeight: 700, src: FONT('Inter-Bold.ttf') });
+/**
+ * Inter's italic slots, pointing at the upright files on purpose.
+ *
+ * Inter sits behind Poppins as a fallback so the marks a list wants - the
+ * arrow, the tick, the star - have a font that carries them. @react-pdf loads
+ * every family in a chain at the requested style, so an italic run asked Inter
+ * for an italic it did not have and threw, taking the whole export with it
+ * rather than just the styling.
+ *
+ * Registering the upright file here is the fix rather than a workaround.
+ * Poppins comes first in the chain, so letters in an italic run are drawn by
+ * Poppins-Italic and Inter is only ever reached for glyphs Poppins lacks -
+ * which are symbols, and symbols do not slant. Google ships Inter only as a
+ * variable font, which @react-pdf cannot instance, so there is no italic file
+ * to point at even if one were wanted.
+ */
+Font.register({ family: 'Inter', fontWeight: 400, fontStyle: 'italic', src: FONT('Inter-Regular.ttf') });
+Font.register({ family: 'Inter', fontWeight: 700, fontStyle: 'italic', src: FONT('Inter-Bold.ttf') });
 Font.register({ family: 'Playfair Display', fontWeight: 500, src: FONT('PlayfairDisplay-Medium.ttf') });
 Font.register({ family: 'Playfair Display', fontWeight: 600, src: FONT('PlayfairDisplay-SemiBold.ttf') });
 Font.register({ family: 'Playfair Display', fontWeight: 700, src: FONT('PlayfairDisplay-Bold.ttf') });
