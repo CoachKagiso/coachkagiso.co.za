@@ -4,6 +4,7 @@ import type { CarouselTemplateOption } from '@/lib/content/carousel-template-reg
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIdentityOpticalLift,
   layoutEditorialAuthoritySlide,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
@@ -228,7 +229,14 @@ export function EditorialAuthorityPdfContent({
               }}
             />
           )}
-          <View style={{ gap: size(m.identityLineGap) }}>
+          <View
+            style={{
+              gap: size(m.identityLineGap),
+              // See the note in EditorialAuthoritySlide: centres the ink, not
+              // the boxes. Yoga centres the margin box the same way CSS does.
+              marginBottom: size(editorialIdentityOpticalLift() * 2),
+            }}
+          >
             <Text
               style={{
                 color: '#B9927A',

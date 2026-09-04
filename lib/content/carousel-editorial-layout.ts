@@ -31,6 +31,53 @@ export const CAROUSEL_EDITORIAL_BASE_WIDTH = 1080;
  */
 export const CAROUSEL_EDITORIAL_WORDMARK = { light: 'COACH', bold: 'KAGISO' } as const;
 
+/**
+ * Poppins ink extents, in em, read off the shipped TTFs with fontkit.
+ *
+ * These are what the glyphs actually cover, not what their line boxes reserve.
+ * The signature needs them because centring its boxes against the avatar leaves
+ * the type looking low: the wordmark is all caps and puts almost nothing below
+ * its baseline (0.007em), while the handle hangs the tail of a `g` well under
+ * its own (0.272em). Box-centred, ink-heavy at the bottom.
+ */
+const POPPINS_INK = {
+  ascent: 1.05,
+  descent: 0.35,
+  /** Ink above the baseline for an all-caps run. */
+  capRise: 0.706,
+  /** Ink below the baseline for the handle, which is the deepest descender. */
+  handleDrop: 0.272,
+} as const;
+
+/** Where a baseline falls inside its line box, measured from the box top. */
+function baselineOffset(fontSize: number, lineHeight: number): number {
+  const content = (POPPINS_INK.ascent + POPPINS_INK.descent) * fontSize;
+  return (fontSize * lineHeight - content) / 2 + POPPINS_INK.ascent * fontSize;
+}
+
+/**
+ * How far to lift the name-and-handle block so its ink, rather than its boxes,
+ * centres on the avatar beside it.
+ *
+ * Applied by the renderers as twice this value of bottom margin: under
+ * `align-items: center` the margin box is what gets centred, so adding it below
+ * moves the content up by half of it. Same arithmetic in CSS flexbox and in
+ * Yoga, which is what keeps the two lanes agreeing.
+ */
+export function editorialIdentityOpticalLift(): number {
+  const m = carouselEditorialMetrics;
+  const nameBaseline = baselineOffset(m.identityFontSize, m.identityLineHeight);
+  const handleLineTop = m.identityFontSize * m.identityLineHeight + m.identityLineGap;
+  const handleBaseline = handleLineTop + baselineOffset(m.handleFontSize, m.identityLineHeight);
+
+  const inkTop = nameBaseline - POPPINS_INK.capRise * m.identityFontSize;
+  const inkBottom = handleBaseline + POPPINS_INK.handleDrop * m.handleFontSize;
+  const blockHeight =
+    m.identityFontSize * m.identityLineHeight + m.identityLineGap + m.handleFontSize * m.identityLineHeight;
+
+  return Math.round(((inkTop + inkBottom) / 2 - blockHeight / 2) * 100) / 100;
+}
+
 export const carouselEditorialMetrics = {
   padX: 96,
   padTop: 108,
