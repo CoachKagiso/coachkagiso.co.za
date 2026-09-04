@@ -5,6 +5,7 @@ import {
   CAROUSEL_EDITORIAL_BASE_WIDTH,
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIdentityLift,
   editorialIdentityOpticalLift,
   layoutEditorialAuthoritySlide,
 } from '../lib/content/carousel-editorial-layout.ts';
@@ -293,11 +294,20 @@ test('the signature is lifted so its ink centres on the avatar, not its boxes', 
   // nothing below its baseline, while the handle hangs the tail of a g under
   // its own. The lift has to be upward, and small - it corrects a rendering
   // asymmetry, it is not a design offset anyone chose.
-  const lift = editorialIdentityOpticalLift();
+  const correction = editorialIdentityOpticalLift();
   const m = carouselEditorialMetrics;
   const blockHeight =
     m.identityFontSize * m.identityLineHeight + m.identityLineGap + m.handleFontSize * m.identityLineHeight;
 
-  assert.ok(lift > 0, 'the block moves up, because the ink hangs low');
-  assert.ok(lift < blockHeight * 0.15, `a lift of ${lift} against a ${blockHeight} block is a design change, not a correction`);
+  assert.ok(correction > 0, 'the block moves up, because the ink hangs low');
+  assert.ok(
+    correction < blockHeight * 0.1,
+    `a correction of ${correction} against a ${blockHeight} block is a design change, not arithmetic`,
+  );
+
+  // What the renderers apply is that correction times the steps the design
+  // asked for. Keeping the two apart is the point: the first re-derives itself
+  // if the type sizes change, the second does not.
+  assert.equal(editorialIdentityLift(), Math.round(correction * m.identityLiftSteps * 100) / 100);
+  assert.ok(Number.isInteger(m.identityLiftSteps) && m.identityLiftSteps >= 1);
 });

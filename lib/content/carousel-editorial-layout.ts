@@ -56,13 +56,9 @@ function baselineOffset(fontSize: number, lineHeight: number): number {
 }
 
 /**
- * How far to lift the name-and-handle block so its ink, rather than its boxes,
- * centres on the avatar beside it.
- *
- * Applied by the renderers as twice this value of bottom margin: under
- * `align-items: center` the margin box is what gets centred, so adding it below
- * moves the content up by half of it. Same arithmetic in CSS flexbox and in
- * Yoga, which is what keeps the two lanes agreeing.
+ * How far the name-and-handle block has to rise for its ink, rather than its
+ * boxes, to centre on the avatar beside it. One step, derived, no judgement in
+ * it. `editorialIdentityLift` is what the renderers actually apply.
  */
 export function editorialIdentityOpticalLift(): number {
   const m = carouselEditorialMetrics;
@@ -76,6 +72,19 @@ export function editorialIdentityOpticalLift(): number {
     m.identityFontSize * m.identityLineHeight + m.identityLineGap + m.handleFontSize * m.identityLineHeight;
 
   return Math.round(((inkTop + inkBottom) / 2 - blockHeight / 2) * 100) / 100;
+}
+
+/**
+ * The lift the renderers apply: the derived ink correction, times the steps the
+ * design asked for.
+ *
+ * Applied as twice this value of bottom margin, because `align-items: center`
+ * centres the margin box - adding it below moves the content up by half of it.
+ * Same arithmetic in CSS flexbox and in Yoga, which is what keeps the two lanes
+ * agreeing.
+ */
+export function editorialIdentityLift(): number {
+  return Math.round(editorialIdentityOpticalLift() * carouselEditorialMetrics.identityLiftSteps * 100) / 100;
 }
 
 export const carouselEditorialMetrics = {
@@ -114,6 +123,17 @@ export const carouselEditorialMetrics = {
   identityLineGap: 4,
   /** The handle sets a step larger than the wordmark above it. */
   handleFontSize: 32,
+  /**
+   * How many times the derived ink correction to apply to the signature.
+   *
+   * One step is arithmetic: it puts the block's ink centre on the avatar's
+   * centre, and is the most that can be justified from the font metrics. The
+   * second step is taste - the pair still read low against the circle at one,
+   * and this is where it was asked to sit. Kept as a multiplier rather than
+   * folded into the correction so the two stay distinguishable: change the
+   * type sizes and the first step re-derives itself, while this stays put.
+   */
+  identityLiftSteps: 2,
   /**
    * The wordmark is one word set in two weights. Rendering it at a single
    * weight loses the emphasis the mark is built on.
