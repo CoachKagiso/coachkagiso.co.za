@@ -10,7 +10,7 @@ import {
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
-  editorialIdentityOpticalLift,
+  editorialIdentityLift,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
 import type { CarouselSlide } from './ContentStudio';
@@ -158,7 +158,7 @@ export function EditorialAuthoritySlide({
               gap: px(m.identityLineGap),
               // Centres the ink on the avatar rather than the boxes. Twice the
               // lift, because align-items centres the margin box.
-              marginBottom: px(editorialIdentityOpticalLift() * 2),
+              marginBottom: px(editorialIdentityLift() * 2),
             }}
           >
             <p
