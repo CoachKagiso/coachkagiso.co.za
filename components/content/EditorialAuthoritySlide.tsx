@@ -80,7 +80,8 @@ export function EditorialAuthoritySlide({
     fontFamily: font,
     fontSize: px(layout.bodySize),
     fontWeight: 400,
-    lineHeight: m.bodyLineHeight,
+    letterSpacing: px(layout.bodySize * layout.bodyTracking),
+    lineHeight: layout.bodyLeading,
   } as const;
 
   return (
@@ -219,8 +220,8 @@ export function EditorialAuthoritySlide({
             fontFamily: font,
             fontSize: px(layout.headlineSize),
             fontWeight: 400,
-            letterSpacing: '-0.005em',
-            lineHeight: m.headlineLineHeight,
+            letterSpacing: px(layout.headlineSize * layout.headlineTracking),
+            lineHeight: layout.headlineLeading,
             marginTop: px(m.groupGap),
           }}
         >

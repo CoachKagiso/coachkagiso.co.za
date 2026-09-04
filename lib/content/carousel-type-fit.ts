@@ -48,17 +48,30 @@ function faceKey(typeface: CarouselFitTypeface, bold: boolean): CarouselTypeFace
   return `${typeface}${bold ? 700 : 400}` as CarouselTypeFace;
 }
 
-/** Width of one character in em. Unmapped characters take the mean lowercase width. */
-function charWidth(char: string, face: CarouselTypeFace): number {
+/**
+ * Width of one character in em, tracking included.
+ *
+ * Tracking has to be part of the measurement, not a style applied afterwards:
+ * a line set at +0.08em is eight percent wider than its glyphs, and a fit that
+ * ignored that would measure it narrow, wrap it late, and clip it in the export
+ * while the preview still looked right. CSS adds the space after every
+ * character, so this does too.
+ */
+function charWidth(char: string, face: CarouselTypeFace, tracking = 0): number {
   const width = CAROUSEL_GLYPH_WIDTHS[face][char];
-  return typeof width === 'number' ? width : CAROUSEL_GLYPH_FALLBACK[face];
+  return (typeof width === 'number' ? width : CAROUSEL_GLYPH_FALLBACK[face]) + tracking;
 }
 
 /** Width of a string in em, with no wrapping. */
-export function measureEm(text: string, typeface: CarouselFitTypeface, bold = false): number {
+export function measureEm(
+  text: string,
+  typeface: CarouselFitTypeface,
+  bold = false,
+  tracking = 0,
+): number {
   const face = faceKey(typeface, bold);
   let total = 0;
-  for (const char of text) total += charWidth(char, face);
+  for (const char of text) total += charWidth(char, face, tracking);
   return total;
 }
 
@@ -72,7 +85,7 @@ type Token = { text: string; em: number; breakBefore: boolean };
  * because a single word can span a style boundary - "cer" plus a bolded
  * "tainty" is one word and must wrap as one.
  */
-function tokenise(runs: Run[], typeface: CarouselFitTypeface): Token[] {
+function tokenise(runs: Run[], typeface: CarouselFitTypeface, tracking = 0): Token[] {
   const tokens: Token[] = [];
   let em = 0;
   let text = '';
@@ -99,7 +112,7 @@ function tokenise(runs: Run[], typeface: CarouselFitTypeface): Token[] {
         continue;
       }
       text += char;
-      em += charWidth(char, face);
+      em += charWidth(char, face, tracking);
     }
   }
   flush();
@@ -116,11 +129,12 @@ export function countWrappedLines(
   fontSize: number,
   maxWidth: number,
   typeface: CarouselFitTypeface,
+  tracking = 0,
 ): number {
-  const tokens = tokenise(splitBoldRuns(text), typeface);
+  const tokens = tokenise(splitBoldRuns(text), typeface, tracking);
   if (!tokens.length) return 0;
 
-  const spaceEm = measureEm(' ', typeface);
+  const spaceEm = measureEm(' ', typeface, false, tracking);
   const maxEm = maxWidth / fontSize;
   let lines = 1;
   let used = 0;
@@ -157,6 +171,8 @@ export type CarouselFitOptions = {
   typeface: CarouselFitTypeface;
   min: number;
   max: number;
+  /** Letter spacing in em, part of the width rather than applied after it. */
+  tracking?: number;
   /** Search granularity. Half a point is finer than any lane can render. */
   step?: number;
 };
@@ -172,10 +188,11 @@ export type CarouselFitOptions = {
 export function fitTypeSize(options: CarouselFitOptions): number {
   const { text, maxWidth, maxHeight, lineHeight, typeface, min, max } = options;
   const step = options.step ?? 0.5;
+  const tracking = options.tracking ?? 0;
   if (!String(text || '').trim()) return max;
 
   for (let size = max; size > min; size -= step) {
-    const lines = countWrappedLines(text, size, maxWidth, typeface);
+    const lines = countWrappedLines(text, size, maxWidth, typeface, tracking);
     if (lines * size * lineHeight <= maxHeight) return Math.round(size * 100) / 100;
   }
   return min;
