@@ -8,6 +8,7 @@ import {
   layoutEditorialAuthoritySlide,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
+import { SWIPE_ICON_PATHS, SWIPE_ICON_VIEW_BOX } from '@/lib/content/carousel-swipe-icon';
 import type { CarouselSlide } from './ContentStudio';
 
 /**
@@ -86,23 +87,18 @@ function UtilityIcons({ size }: { size: number }) {
   );
 }
 
-function SwipeHand({ size }: { size: number }) {
-  const common = {
-    stroke: '#B76E79',
-    strokeWidth: 1.6,
-    fill: 'none',
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  };
+/**
+ * Design Studio's "Swipe left icon", the same geometry the preview draws.
+ *
+ * A filled mark rather than a stroked one, so it takes a fill and no stroke -
+ * the lucide hand it replaced was the other way round.
+ */
+function SwipeMark({ size }: { size: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" {...common} />
-      <Path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" {...common} />
-      <Path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" {...common} />
-      <Path
-        d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
-        {...common}
-      />
+    <Svg width={size} height={size} viewBox={SWIPE_ICON_VIEW_BOX}>
+      {SWIPE_ICON_PATHS.map((d) => (
+        <Path key={d.slice(0, 24)} d={d} fill="#B76E79" />
+      ))}
     </Svg>
   );
 }
@@ -389,7 +385,7 @@ export function EditorialAuthorityPdfContent({
           >
             SWIPE
           </Text>
-          <SwipeHand size={size(m.swipeIconSize)} />
+          <SwipeMark size={size(m.swipeIconSize)} />
         </View>
       </View>
     </>
