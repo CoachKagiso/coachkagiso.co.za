@@ -63,6 +63,7 @@ import DesignStudioPanel, {
   type DesignStudioTextImport,
   type DesignStudioVaultImport,
 } from '@/components/content/DesignStudioPanel';
+import { AutoGrowTextarea } from '@/components/content/AutoGrowTextarea';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
@@ -12241,12 +12242,9 @@ function CarouselDraftEditor({
 
       <label className="mt-3 grid gap-2">
         <span className="studio-label">Post caption</span>
-        <textarea
+        <AutoGrowTextarea
           value={draft.caption}
-          onChange={(event) => updateDraftField('caption', event.target.value)}
-          onWheel={trapWheel}
-          rows={3}
-          className="studio-input resize-y px-3 py-3 leading-relaxed"
+          onChange={(next) => updateDraftField('caption', next)}
         />
       </label>
 
@@ -12308,7 +12306,9 @@ function CarouselDraftEditor({
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,0.58fr)_minmax(0,0.72fr)_minmax(0,0.9fr)_minmax(0,0.76fr)]">
+              {/* Headline used to sit in here; it is a sentence, not a picker, so it
+                  reads better full width directly above the body it heads. */}
+              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,0.58fr)_minmax(0,0.72fr)_minmax(0,0.76fr)]">
                 <label className="grid gap-2">
                   <span className="studio-label">Role</span>
                   <select
@@ -12338,14 +12338,6 @@ function CarouselDraftEditor({
                   </select>
                 </label>
                 <label className="grid gap-2">
-                  <span className="studio-label">Headline</span>
-                  <input
-                    value={slide.headline}
-                    onChange={(event) => updateSlide(slide.id, { headline: event.target.value })}
-                    className="studio-input h-11 px-3"
-                  />
-                </label>
-                <label className="grid gap-2">
                   <span className="studio-label">CTA</span>
                   <input
                     value={slide.cta || ''}
@@ -12357,13 +12349,19 @@ function CarouselDraftEditor({
               </div>
 
               <label className="mt-3 grid gap-2">
+                <span className="studio-label">Headline</span>
+                <input
+                  value={slide.headline}
+                  onChange={(event) => updateSlide(slide.id, { headline: event.target.value })}
+                  className="studio-input h-11 w-full px-3"
+                />
+              </label>
+
+              <label className="mt-3 grid gap-2">
                 <span className="studio-label">Body</span>
-                <textarea
+                <AutoGrowTextarea
                   value={slide.body}
-                  onChange={(event) => updateSlide(slide.id, { body: event.target.value })}
-                  onWheel={trapWheel}
-                  rows={3}
-                  className="studio-input resize-y px-3 py-3 leading-relaxed"
+                  onChange={(next) => updateSlide(slide.id, { body: next })}
                 />
               </label>
 
