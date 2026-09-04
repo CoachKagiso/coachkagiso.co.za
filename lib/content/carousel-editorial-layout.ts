@@ -49,8 +49,25 @@ const POPPINS_INK = {
   handleDrop: 0.272,
 } as const;
 
-/** Where a baseline falls inside its line box, measured from the box top. */
-function baselineOffset(fontSize: number, lineHeight: number): number {
+/**
+ * Which engine is drawing, because the two do not place a baseline the same way.
+ */
+export type CarouselTextEngine = 'css' | 'pdf';
+
+/**
+ * Where a baseline falls inside its line box, measured from the box top.
+ *
+ * CSS splits the difference between the line box and the font's content box
+ * (half-leading) and then drops by the ascent. react-pdf does not: it sets the
+ * baseline at the foot of the line box, full stop. Read out of a rendered PDF
+ * by walking its transform stack, the gap between them is real and grows with
+ * the type - 5.25 at the wordmark, 15.08 at a 52pt headline.
+ *
+ * Anything aligning ink against something else has to know which engine it is
+ * talking to, or the preview and the export disagree by that much.
+ */
+function baselineOffset(fontSize: number, lineHeight: number, engine: CarouselTextEngine): number {
+  if (engine === 'pdf') return fontSize * lineHeight;
   const content = (POPPINS_INK.ascent + POPPINS_INK.descent) * fontSize;
   return (fontSize * lineHeight - content) / 2 + POPPINS_INK.ascent * fontSize;
 }
@@ -60,11 +77,11 @@ function baselineOffset(fontSize: number, lineHeight: number): number {
  * boxes, to centre on the avatar beside it. One step, derived, no judgement in
  * it. `editorialIdentityLift` is what the renderers actually apply.
  */
-export function editorialIdentityOpticalLift(): number {
+export function editorialIdentityOpticalLift(engine: CarouselTextEngine): number {
   const m = carouselEditorialMetrics;
-  const nameBaseline = baselineOffset(m.identityFontSize, m.identityLineHeight);
+  const nameBaseline = baselineOffset(m.identityFontSize, m.identityLineHeight, engine);
   const handleLineTop = m.identityFontSize * m.identityLineHeight + m.identityLineGap;
-  const handleBaseline = handleLineTop + baselineOffset(m.handleFontSize, m.identityLineHeight);
+  const handleBaseline = handleLineTop + baselineOffset(m.handleFontSize, m.identityLineHeight, engine);
 
   const inkTop = nameBaseline - POPPINS_INK.capRise * m.identityFontSize;
   const inkBottom = handleBaseline + POPPINS_INK.handleDrop * m.handleFontSize;
@@ -75,16 +92,21 @@ export function editorialIdentityOpticalLift(): number {
 }
 
 /**
- * The lift the renderers apply: the derived ink correction, times the steps the
- * design asked for.
+ * The lift the renderers apply: the engine's ink correction plus the design
+ * offset. The first differs between engines, the second does not, so the ink
+ * lands the same distance above the avatar's centre in both.
  *
  * Applied as twice this value of bottom margin, because `align-items: center`
  * centres the margin box - adding it below moves the content up by half of it.
- * Same arithmetic in CSS flexbox and in Yoga, which is what keeps the two lanes
- * agreeing.
+ * Same arithmetic in CSS flexbox and in Yoga, which is what makes the two lanes
+ * agree once the baseline difference is accounted for.
  */
-export function editorialIdentityLift(): number {
-  return Math.round(editorialIdentityOpticalLift() * carouselEditorialMetrics.identityLiftSteps * 100) / 100;
+export function editorialIdentityLift(engine: CarouselTextEngine): number {
+  return (
+    Math.round(
+      (editorialIdentityOpticalLift(engine) + carouselEditorialMetrics.identityExtraLift) * 100,
+    ) / 100
+  );
 }
 
 export const carouselEditorialMetrics = {
@@ -124,16 +146,16 @@ export const carouselEditorialMetrics = {
   /** The handle sets a step larger than the wordmark above it. */
   handleFontSize: 32,
   /**
-   * How many times the derived ink correction to apply to the signature.
+   * How far above the avatar's centre the signature's ink should finally sit.
    *
-   * One step is arithmetic: it puts the block's ink centre on the avatar's
-   * centre, and is the most that can be justified from the font metrics. The
-   * second step is taste - the pair still read low against the circle at one,
-   * and this is where it was asked to sit. Kept as a multiplier rather than
-   * folded into the correction so the two stay distinguishable: change the
-   * type sizes and the first step re-derives itself, while this stays put.
+   * Separate from, and added to, the correction that centres it - and an
+   * absolute distance rather than a multiple of that correction. It was a
+   * multiplier first, which quietly made the offset engine-dependent: the
+   * correction is 4.09 under CSS and 9.51 under react-pdf, so doubling it put
+   * the preview 4pt above centre and the PDF 9pt above. A design offset is a
+   * distance somebody chose. It is the same distance in both.
    */
-  identityLiftSteps: 2,
+  identityExtraLift: 4,
   /**
    * The wordmark is one word set in two weights. Rendering it at a single
    * weight loses the emphasis the mark is built on.

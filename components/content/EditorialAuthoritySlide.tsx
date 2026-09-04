@@ -158,7 +158,7 @@ export function EditorialAuthoritySlide({
               gap: px(m.identityLineGap),
               // Centres the ink on the avatar rather than the boxes. Twice the
               // lift, because align-items centres the margin box.
-              marginBottom: px(editorialIdentityLift() * 2),
+              marginBottom: px(editorialIdentityLift('css') * 2),
             }}
           >
             <p
