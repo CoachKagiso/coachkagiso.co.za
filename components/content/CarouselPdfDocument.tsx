@@ -53,6 +53,20 @@ Font.register({ family: 'Bebas Neue', fontWeight: 400, src: FONT('BebasNeue-Regu
 // word", it is "this word is nothing". Every word in the document became empty,
 // so the PDF exported with its layout, icons and avatar intact and not one
 // glyph of text on it.
+/**
+ * Emoji as images, because no text font carries them in colour and @react-pdf
+ * substitutes nothing - without this they export as gaps while showing fine in
+ * the preview, which is the worst of both.
+ *
+ * Fetched per glyph at render time. A failure here is logged and skipped rather
+ * than thrown, so an unreachable CDN costs the emoji and not the whole export -
+ * checked by pointing it at a dead host.
+ */
+Font.registerEmojiSource({
+  format: 'png',
+  url: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/72x72/',
+});
+
 try {
   Font.registerHyphenationCallback((word) => [word]);
 } catch {
