@@ -64,6 +64,7 @@ import DesignStudioPanel, {
   type DesignStudioVaultImport,
 } from '@/components/content/DesignStudioPanel';
 import { AutoGrowTextarea } from '@/components/content/AutoGrowTextarea';
+import { BoldableField } from '@/components/content/BoldableField';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
@@ -12366,22 +12367,21 @@ function CarouselDraftEditor({
                 </label>
               </div>
 
-              <label className="mt-3 grid gap-2">
-                <span className="studio-label">Headline</span>
-                <input
-                  value={slide.headline}
-                  onChange={(event) => updateSlide(slide.id, { headline: event.target.value })}
-                  className="studio-input h-11 w-full px-3"
-                />
-              </label>
+              {/* Both carry `**bold**` into the rendered slide, so both get the
+                  control. The caption above does not - it goes to LinkedIn as
+                  plain text, where the markers would publish as asterisks. */}
+              <BoldableField
+                label="Headline"
+                value={slide.headline}
+                onChange={(next) => updateSlide(slide.id, { headline: next })}
+              />
 
-              <label className="mt-3 grid gap-2">
-                <span className="studio-label">Body</span>
-                <AutoGrowTextarea
-                  value={slide.body}
-                  onChange={(next) => updateSlide(slide.id, { body: next })}
-                />
-              </label>
+              <BoldableField
+                label="Body"
+                multiline
+                value={slide.body}
+                onChange={(next) => updateSlide(slide.id, { body: next })}
+              />
 
               <label className="mt-3 grid gap-2">
                 <span className="studio-label">Visual suggestion</span>
