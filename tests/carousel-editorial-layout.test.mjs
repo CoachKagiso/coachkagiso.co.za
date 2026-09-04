@@ -5,6 +5,7 @@ import {
   CAROUSEL_EDITORIAL_BASE_WIDTH,
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIdentityOpticalLift,
   layoutEditorialAuthoritySlide,
 } from '../lib/content/carousel-editorial-layout.ts';
 import {
@@ -285,4 +286,18 @@ test('the pinned bands leave the group the rest of the page', () => {
     layout.topBandHeight,
     m.progressFontSize * m.progressLineHeight + m.progressRowGap + m.iconSize,
   );
+});
+
+test('the signature is lifted so its ink centres on the avatar, not its boxes', () => {
+  // Box-centred, the pair reads low: the wordmark is all caps and puts almost
+  // nothing below its baseline, while the handle hangs the tail of a g under
+  // its own. The lift has to be upward, and small - it corrects a rendering
+  // asymmetry, it is not a design offset anyone chose.
+  const lift = editorialIdentityOpticalLift();
+  const m = carouselEditorialMetrics;
+  const blockHeight =
+    m.identityFontSize * m.identityLineHeight + m.identityLineGap + m.handleFontSize * m.identityLineHeight;
+
+  assert.ok(lift > 0, 'the block moves up, because the ink hangs low');
+  assert.ok(lift < blockHeight * 0.15, `a lift of ${lift} against a ${blockHeight} block is a design change, not a correction`);
 });

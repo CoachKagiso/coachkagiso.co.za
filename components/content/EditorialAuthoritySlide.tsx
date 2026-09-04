@@ -10,6 +10,7 @@ import {
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIdentityOpticalLift,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
 import type { CarouselSlide } from './ContentStudio';
@@ -150,7 +151,16 @@ export function EditorialAuthoritySlide({
             line boxes plus whatever leading happens to be in scope, which is
             how the gap survived being given an explicit line height.
           */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: px(m.identityLineGap) }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: px(m.identityLineGap),
+              // Centres the ink on the avatar rather than the boxes. Twice the
+              // lift, because align-items centres the margin box.
+              marginBottom: px(editorialIdentityOpticalLift() * 2),
+            }}
+          >
             <p
               style={{
                 color: '#B9927A',
