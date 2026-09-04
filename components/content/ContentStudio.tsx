@@ -68,8 +68,13 @@ import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
 import type { CarouselPdfSlide } from '@/components/content/CarouselPdfDocument';
+import { EditorialAuthoritySlide } from '@/components/content/EditorialAuthoritySlide';
+import { layoutEditorialAuthoritySlide } from '@/lib/content/carousel-editorial-layout';
 import {
+  CAROUSEL_EXPORT_FONT_BEBAS,
+  CAROUSEL_EXPORT_FONT_POPPINS,
   CAROUSEL_EXPORT_FONT_SANS,
+  CAROUSEL_PREVIEW_BASE_WIDTH,
   CAROUSEL_EXPORT_FONT_SERIF,
   DEFAULT_CAROUSEL_ASPECT_RATIO,
   DEFAULT_CAROUSEL_LAYOUT_RECIPE,
@@ -10789,6 +10794,27 @@ function CarouselSlideFrame({
   const overflowFlag = !exportDimensions && (textStats.bodyWords > 58 || textStats.totalChars > 360);
   const exportScale = exportDimensions ? exportDimensions.width / 600 : 1;
   const exportSize = (value: number) => `${Math.round(value * exportScale * 100) / 100}px`;
+  // Editorial Authority resolves its own geometry and type sizes. Both this lane
+  // and the react-pdf document call the same function, which is the only reason
+  // the PNG and the PDF can be trusted to be the same slide.
+  const editorialWidth = exportDimensions ? exportDimensions.width : CAROUSEL_PREVIEW_BASE_WIDTH;
+  const editorialLayout = isEditorialAuthority
+    ? layoutEditorialAuthoritySlide({
+        headline: slide.headline,
+        body: slide.body,
+        isCover,
+        width: editorialWidth,
+        height: Math.round(editorialWidth * (aspectOption.exportHeight / aspectOption.exportWidth)),
+      })
+    : null;
+  const editorialPadding = editorialLayout
+    ? [
+        `${Math.round(editorialLayout.padTop * editorialLayout.scale * 100) / 100}px`,
+        `${Math.round(editorialLayout.padX * editorialLayout.scale * 100) / 100}px`,
+        `${Math.round(editorialLayout.padBottom * editorialLayout.scale * 100) / 100}px`,
+      ].join(' ')
+    : null;
+
   const exportFrameStyles = exportDimensions
     ? {
         width: `${exportDimensions.width}px`,
@@ -11120,7 +11146,18 @@ function CarouselSlideFrame({
     );
   };
 
-  const contentArea = (
+  const contentArea = editorialLayout ? (
+    <EditorialAuthoritySlide
+      slide={slide}
+      index={index}
+      total={total}
+      layout={editorialLayout}
+      palette={palette}
+      eyebrow={stageEyebrow || undefined}
+      avatarSrc={avatarSrc}
+      renderRichText={renderRichText}
+    />
+  ) : (
     <>
       {isCover ? (
         <>
@@ -11627,7 +11664,11 @@ function CarouselSlideFrame({
       data-carousel-slide-role={role}
       data-carousel-composition={composition}
       className={`relative flex w-full overflow-hidden rounded-[8px] border ${
-        exportDimensions ? '' : 'min-h-[240px] p-5 shadow-lg shadow-black/15'
+        exportDimensions
+          ? ''
+          : editorialLayout
+            ? 'min-h-[240px] shadow-lg shadow-black/15'
+            : 'min-h-[240px] p-5 shadow-lg shadow-black/15'
       }`}
       style={{
         aspectRatio: aspectOption.cssRatio,
@@ -11639,9 +11680,17 @@ function CarouselSlideFrame({
             : undefined,
         backgroundSize: isCareerNotes ? '100% 100%, 24px 24px, 28px 28px' : undefined,
         color: palette.foreground,
-        borderColor: isCover ? 'transparent' : palette.border,
-        fontFamily: 'var(--font-sans)',
+        // The reference look is edge to edge, so the exported frame carries no
+        // border. The preview keeps a hairline, otherwise a light slide has no
+        // visible edge against the studio's own background.
+        borderColor: editorialLayout
+          ? (exportDimensions ? 'transparent' : palette.border)
+          : isCover
+            ? 'transparent'
+            : palette.border,
+        fontFamily: editorialLayout ? CAROUSEL_EXPORT_FONT_POPPINS : 'var(--font-sans)',
         ...exportFrameStyles,
+        ...(editorialPadding ? { padding: editorialPadding } : {}),
       }}
     >
       {isBold && !isCover && (
@@ -11793,8 +11842,18 @@ function CarouselSlideFrame({
       <div
         className="relative z-10 flex w-full flex-col justify-between"
         style={{
-          gap: exportDimensions ? exportSize(20) : undefined,
-          padding: exportDimensions ? undefined : isCover ? '24px 20px' : undefined,
+          gap: editorialLayout ? 0 : exportDimensions ? exportSize(20) : undefined,
+          // Editorial Authority pins only the top and footer rows; the group
+          // between them centres itself, so this column must not distribute the
+          // space as well or the two fight and the avatar drifts.
+          justifyContent: editorialLayout ? 'flex-start' : undefined,
+          padding: editorialLayout
+            ? undefined
+            : exportDimensions
+              ? undefined
+              : isCover
+                ? '24px 20px'
+                : undefined,
         }}
       >
         {contentArea}
@@ -11857,6 +11916,8 @@ function getCarouselExportFontFamilies() {
   return {
     sans: CAROUSEL_EXPORT_FONT_SANS,
     serif: CAROUSEL_EXPORT_FONT_SERIF,
+    poppins: CAROUSEL_EXPORT_FONT_POPPINS,
+    bebas: CAROUSEL_EXPORT_FONT_BEBAS,
   };
 }
 
@@ -11873,6 +11934,13 @@ async function waitForCarouselExportFonts(element: HTMLElement) {
     `500 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
     `600 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
     `700 16px ${CAROUSEL_EXPORT_FONT_SERIF}`,
+    // Editorial Authority. Without the wait the clone rasterises in a fallback
+    // face at different metrics, and the fitted type stops fitting.
+    `400 16px ${CAROUSEL_EXPORT_FONT_POPPINS}`,
+    `500 16px ${CAROUSEL_EXPORT_FONT_POPPINS}`,
+    `600 16px ${CAROUSEL_EXPORT_FONT_POPPINS}`,
+    `700 16px ${CAROUSEL_EXPORT_FONT_POPPINS}`,
+    `400 16px ${CAROUSEL_EXPORT_FONT_BEBAS}`,
   ];
 
   await Promise.all(requests.map((request) => document.fonts.load(request).catch(() => null)));
@@ -11966,6 +12034,26 @@ async function captureCarouselSlideCanvas(
           [data-carousel-export-slide="true"] h2,
           [data-carousel-export-slide="true"] h3 {
             font-family: ${fonts.serif} !important;
+          }
+
+          /* Last, so it beats the serif rule above at equal specificity.
+             Editorial Authority sets its headlines in Poppins, and the blanket
+             h3 rule would otherwise drag them back to Playfair in the PNG only. */
+          [data-carousel-template="editorial_authority"],
+          [data-carousel-template="editorial_authority"] h1,
+          [data-carousel-template="editorial_authority"] h2,
+          [data-carousel-template="editorial_authority"] h3,
+          [data-carousel-template="editorial_authority"] p,
+          [data-carousel-template="editorial_authority"] li,
+          [data-carousel-template="editorial_authority"] span {
+            font-family: ${fonts.poppins} !important;
+          }
+
+          /* After the rule above, which would otherwise catch the counter: the
+             slide numbers are the one thing on this template set in Bebas. */
+          [data-carousel-template="editorial_authority"] [data-carousel-numerals="true"],
+          [data-carousel-template="editorial_authority"] [data-carousel-numerals="true"] span {
+            font-family: ${fonts.bebas} !important;
           }
         `;
         clonedDocument.head.append(fontStyle);

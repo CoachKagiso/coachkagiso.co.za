@@ -1,0 +1,285 @@
+'use client';
+
+import React, { type ReactNode } from 'react';
+import { Hand, Mail, MoreHorizontal, Trash2, Upload } from 'lucide-react';
+import {
+  CAROUSEL_EXPORT_FONT_BEBAS,
+  CAROUSEL_EXPORT_FONT_POPPINS,
+  type CarouselTemplateOption,
+} from '@/lib/content/carousel-template-registry';
+import {
+  carouselEditorialMetrics,
+  type CarouselEditorialLayout,
+} from '@/lib/content/carousel-editorial-layout';
+import type { CarouselSlide } from './ContentStudio';
+
+/**
+ * Editorial Authority, drawn as one piece.
+ *
+ * The other five templates share `CarouselSlideFrame`'s three-branch body
+ * (cover / cta / everything else) and its composition panels. This one does
+ * not, for two reasons the reference look depends on:
+ *
+ * 1. The avatar and handle belong to the centred group, not the pinned header.
+ *    Sitting in the header glued them to the top of the slide beside the
+ *    progress strip, half a page from the headline they are meant to sign.
+ *    Here the only pinned rows are the progress strip, the icon row and the
+ *    footer; everything else is one block with auto margins, so longer copy
+ *    grows the group around its centre and lifts the avatar rather than
+ *    leaving a hole in the middle of the slide.
+ *
+ * 2. There are no panels. Card grids, quote rails, evidence boxes and their
+ *    "Why it holds" labels all read as UI chrome on a template whose whole
+ *    argument is flat type on paper. Every composition renders as type here.
+ *
+ * Geometry and type sizes come from `layoutEditorialAuthoritySlide` rather than
+ * from this file, so the react-pdf lane can compute exactly the same slide
+ * server-side where there is no DOM to measure in.
+ */
+export function EditorialAuthoritySlide({
+  slide,
+  index,
+  total,
+  layout,
+  palette,
+  eyebrow,
+  avatarSrc,
+  renderRichText,
+}: {
+  slide: CarouselSlide;
+  index: number;
+  total: number;
+  layout: CarouselEditorialLayout;
+  palette: CarouselTemplateOption['palette'];
+  eyebrow?: string;
+  avatarSrc: string;
+  renderRichText: (text: string, strongWeight?: number) => ReactNode[];
+}) {
+  const m = carouselEditorialMetrics;
+  /** Base-space (1080-wide) value to a rendered pixel string. */
+  const px = (base: number) => `${Math.round(base * layout.scale * 100) / 100}px`;
+  const font = CAROUSEL_EXPORT_FONT_POPPINS;
+  const numeralFont = CAROUSEL_EXPORT_FONT_BEBAS;
+  // Whether the body sets as separate lines is decided by the layout, not here:
+  // a list carries a gap between its items, and that gap is part of the height
+  // the type fit measured against.
+  const { bodyPoints, bodyAsList } = layout;
+  const iconStyle = { color: '#142334', height: px(m.iconSize), width: px(m.iconSize) };
+  const bodyStyle = {
+    color: palette.foreground,
+    fontFamily: font,
+    fontSize: px(layout.bodySize),
+    fontWeight: 400,
+    lineHeight: m.bodyLineHeight,
+  } as const;
+
+  return (
+    <>
+      {/* Pinned: progress strip over the utility icons, right aligned. */}
+      <div
+        style={{
+          alignItems: 'flex-end',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: px(m.progressRowGap),
+        }}
+      >
+        <div
+          // The export clone forces Poppins onto every span in this template, so
+          // the numerals carry a marker the Bebas rule can target after it.
+          data-carousel-numerals="true"
+          style={{ display: 'flex', gap: px(m.progressGap) }}
+          aria-label={`Slide ${index + 1} of ${total}`}
+        >
+          {Array.from({ length: total }, (_, progressIndex) => (
+            <span
+              key={`progress-${progressIndex}`}
+              style={{
+                color: progressIndex === index ? '#B9927A' : '#B9B0A8',
+                fontFamily: numeralFont,
+                fontSize: px(m.progressFontSize),
+                fontWeight: 400,
+                letterSpacing: px(m.progressFontSize * m.numeralTracking),
+              }}
+            >
+              {String(progressIndex + 1).padStart(2, '0')}
+            </span>
+          ))}
+        </div>
+        <div style={{ alignItems: 'center', display: 'flex', gap: px(30) }} aria-hidden="true">
+          <span style={{ display: 'inline-flex', position: 'relative' }}>
+            <Mail style={iconStyle} strokeWidth={1.8} />
+            <span
+              style={{
+                backgroundColor: '#C9AD98',
+                borderRadius: '9999px',
+                height: px(14),
+                position: 'absolute',
+                right: `-${px(3)}`,
+                top: `-${px(3)}`,
+                width: px(14),
+              }}
+            />
+          </span>
+          <Trash2 style={iconStyle} strokeWidth={1.8} />
+          <Upload style={iconStyle} strokeWidth={1.8} />
+          <MoreHorizontal style={iconStyle} strokeWidth={2} />
+        </div>
+      </div>
+
+      {/* The centred group. The auto margins are what lift the avatar as copy grows. */}
+      <div style={{ margin: 'auto 0', width: '100%' }}>
+        <div style={{ alignItems: 'center', display: 'flex', gap: px(m.avatarTextGap) }}>
+          {/* Plain img (not next/image) so html2canvas captures it in PNG export. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={avatarSrc}
+            alt="Coach Kagiso"
+            crossOrigin="anonymous"
+            style={{
+              border: `${px(3)} solid #B76E79`,
+              borderRadius: '9999px',
+              height: px(m.avatarSize),
+              objectFit: 'cover',
+              width: px(m.avatarSize),
+            }}
+          />
+          <div>
+            <p
+              style={{
+                color: '#B9927A',
+                fontFamily: font,
+                fontSize: px(m.identityFontSize),
+                fontWeight: 700,
+                letterSpacing: px(m.identityFontSize * 0.12),
+                textTransform: 'uppercase',
+              }}
+            >
+              COACHKAGISO
+            </p>
+            <p
+              style={{
+                color: '#B9927A',
+                fontFamily: font,
+                fontSize: px(m.identityFontSize),
+                fontWeight: 500,
+                marginTop: px(m.identityLineGap),
+              }}
+            >
+              @coach.kagiso
+            </p>
+          </div>
+        </div>
+
+        {eyebrow ? (
+          <p
+            style={{
+              color: palette.accent,
+              fontFamily: font,
+              fontSize: px(22),
+              fontWeight: 600,
+              letterSpacing: px(22 * 0.2),
+              marginTop: px(m.groupGap),
+              textTransform: 'uppercase',
+            }}
+          >
+            {eyebrow}
+          </p>
+        ) : null}
+
+        <h3
+          style={{
+            color: palette.foreground,
+            fontFamily: font,
+            fontSize: px(layout.headlineSize),
+            fontWeight: 400,
+            letterSpacing: '-0.005em',
+            lineHeight: m.headlineLineHeight,
+            marginTop: eyebrow ? px(18) : px(m.groupGap),
+          }}
+        >
+          {renderRichText(slide.headline)}
+        </h3>
+
+        {slide.body ? (
+          bodyAsList ? (
+            <ul style={{ listStyle: 'none', marginTop: px(m.bodyGap) }}>
+              {bodyPoints.map((point, pointIndex) => (
+                <li
+                  key={`${slide.id}-line-${pointIndex}`}
+                  style={pointIndex ? { ...bodyStyle, marginTop: px(m.bodyItemGap) } : bodyStyle}
+                >
+                  {renderRichText(point)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ ...bodyStyle, marginTop: px(m.bodyGap) }}>{renderRichText(slide.body)}</p>
+          )
+        ) : null}
+
+        {slide.cta ? (
+          <p
+            style={{
+              color: palette.accent,
+              fontFamily: font,
+              fontSize: px(24),
+              fontWeight: 700,
+              letterSpacing: px(24 * 0.14),
+              marginTop: px(m.bodyGap),
+              textTransform: 'uppercase',
+            }}
+          >
+            {slide.cta}
+          </p>
+        ) : null}
+
+        {slide.footnote ? (
+          <p
+            style={{
+              color: palette.muted,
+              fontFamily: font,
+              fontSize: px(22),
+              fontWeight: 400,
+              marginTop: px(16),
+            }}
+          >
+            {slide.footnote}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Pinned: wordmark left, swipe cue right. */}
+      <div style={{ alignItems: 'flex-end', display: 'flex', justifyContent: 'space-between' }}>
+        <p
+          style={{
+            color: '#B9927A',
+            fontFamily: font,
+            fontSize: px(m.footerFontSize),
+            fontWeight: 700,
+            letterSpacing: px(m.footerFontSize * 0.12),
+            textTransform: 'uppercase',
+          }}
+        >
+          COACHKAGISO
+        </p>
+        <span
+          style={{
+            alignItems: 'center',
+            color: '#B9927A',
+            display: 'flex',
+            fontFamily: font,
+            fontSize: px(m.footerFontSize),
+            fontWeight: 700,
+            gap: px(10),
+            letterSpacing: px(m.footerFontSize * 0.1),
+            textTransform: 'uppercase',
+          }}
+        >
+          SWIPE
+          <Hand style={{ color: '#B76E79', height: px(36), width: px(36) }} strokeWidth={1.6} />
+        </span>
+      </div>
+    </>
+  );
+}

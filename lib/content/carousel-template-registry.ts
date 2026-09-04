@@ -139,6 +139,19 @@ export const carouselStageEyebrows: CarouselStageEyebrows = {
 // Do not read CSS vars here: they resolve to off-brand Raleway / Noto Serif Display.
 export const CAROUSEL_EXPORT_FONT_SANS = 'Inter, "Helvetica Neue", Arial, sans-serif';
 export const CAROUSEL_EXPORT_FONT_SERIF = '"Playfair Display", Georgia, serif';
+export const CAROUSEL_EXPORT_FONT_POPPINS = 'Poppins, "Helvetica Neue", Arial, sans-serif';
+/** Numerals only - the slide counter. Never body or headline copy. */
+export const CAROUSEL_EXPORT_FONT_BEBAS = '"Bebas Neue", "Helvetica Neue", Arial, sans-serif';
+
+/**
+ * Which face a template sets its type in.
+ *
+ * A field rather than another `template.value === 'editorial_authority'` branch:
+ * the renderer already carries six of those, and typography is a property of
+ * the look, not a special case. Both lanes map this to their own font handle -
+ * a CSS variable in the preview, a registered @react-pdf family in the PDF.
+ */
+export type CarouselTypeface = 'inter' | 'playfair' | 'poppins';
 
 const defaultCarouselFurniture: CarouselFurniture = {
   wordmark: 'COACH KAGISO',
@@ -203,6 +216,12 @@ export type CarouselTemplateOption = {
   label: string;
   bestFor: string;
   description: string;
+  /**
+   * The template's primary face, used for headlines. Body copy follows it when
+   * it is a sans; a `playfair` template keeps Inter for body copy, which is how
+   * the serif templates have always been drawn.
+   */
+  typeface: CarouselTypeface;
   palette: CarouselTemplatePalette;
   furniture: CarouselFurniture;
   designDirection: {
@@ -451,34 +470,45 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     value: 'editorial_authority',
     label: 'Editorial Authority',
     bestFor: 'LinkedIn authority decks',
-    description: 'Refined, quiet, high-trust slides with strong editorial hierarchy.',
-    furniture: defaultCarouselFurniture,
+    description: 'Light paper authority slides with avatar, progress strip, and swipe close. Quiet, high-trust, editorial.',
+    typeface: 'poppins',
+    furniture: {
+      ...defaultCarouselFurniture,
+      wordmark: 'COACHKAGISO',
+      wordmarkWeight: 700,
+      wordmarkTracking: '0.08em',
+      wordmarkColor: '#B9927A',
+      footerLeft: 'COACHKAGISO',
+      footerColor: '#B9927A',
+      footerRight: 'SWIPE',
+      footerRightLast: 'SWIPE',
+    },
     palette: {
-      background: '#E8E3DF',
+      background: '#F5F2ED',
       foreground: '#142334',
       muted: '#A09086',
       accent: '#C9AD98',
       panel: '#FFFFFF',
-      border: '#CDC6C3',
+      border: '#D9CFC6',
       chipBackground: '#142334',
       chipText: '#FFFFFF',
     },
     designDirection: {
       label: 'Editorial authority',
-      mood: 'Print-led, restrained, and high trust. It should feel like a career column, not a social template.',
-      typography: 'Serif display headlines, calm sans body copy, small uppercase metadata.',
+      mood: 'Light paper, restrained, and high trust. It should feel like a career column with a personal handle, not a social template.',
+      typography: 'Sans-led statement type with bold key phrases, calm sans body copy, small copper metadata.',
       posture: [
-        'Use whitespace, borders, and hierarchy before decoration.',
-        'Keep one warm accent and use it sparingly.',
-        'Make each slide feel like a page from the same editorial deck.',
+        'Use whitespace, a top progress strip, and hierarchy before decoration.',
+        'Show the coach avatar and handle so each slide feels personally signed.',
+        'Keep one warm copper accent and close with a quiet SWIPE cue.',
       ],
       tokens: {
-        background: '#E8E3DF',
+        background: '#F5F2ED',
         surface: '#FFFFFF',
         ink: '#142334',
         muted: '#A09086',
         accent: '#C9AD98',
-        border: '#CDC6C3',
+        border: '#D9CFC6',
       },
     },
     layoutRecipe: authorityFramework,
@@ -511,6 +541,7 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Editorial Career Notes',
     bestFor: 'Premium career frameworks',
     description: 'Print-inspired career-note slides with oversized serif type, fine rules, and Rodeo Dust movement cues.',
+    typeface: 'playfair',
     furniture: defaultCarouselFurniture,
     palette: {
       background: '#E4D8CB',
@@ -570,6 +601,7 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Warm Coaching',
     bestFor: 'Instagram relationship posts',
     description: 'Soft, human, calm frames for reassurance, reflection, and trust.',
+    typeface: 'playfair',
     furniture: defaultCarouselFurniture,
     palette: {
       background: '#E4D8CB',
@@ -629,6 +661,7 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Soft Diagnostic Cards',
     bestFor: 'Emotional diagnostic posts',
     description: 'Soft textured diagnostic frames with speech-card layering and human note-like emphasis.',
+    typeface: 'playfair',
     furniture: defaultCarouselFurniture,
     palette: {
       background: '#E8E3DF',
@@ -689,6 +722,7 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Bold Diagnostic',
     bestFor: 'Hooks, myths, sharp reframes',
     description: 'High-contrast, decisive slides for stopping the scroll and naming the problem.',
+    typeface: 'playfair',
     furniture: defaultCarouselFurniture,
     palette: {
       background: '#142334',
@@ -749,6 +783,7 @@ export const carouselTemplateOptions: CarouselTemplateOption[] = [
     label: 'Signature Narrative',
     bestFor: 'Launch & story decks',
     description: 'Progress strip, handle, swipe cue, personal story beats, event CTA.',
+    typeface: 'playfair',
     furniture: signatureNarrativeFurniture,
     palette: {
       background: '#E8E3DF',
