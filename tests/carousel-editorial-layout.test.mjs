@@ -292,22 +292,45 @@ test('the pinned bands leave the group the rest of the page', () => {
 test('the signature is lifted so its ink centres on the avatar, not its boxes', () => {
   // Box-centred, the pair reads low: the wordmark is all caps and puts almost
   // nothing below its baseline, while the handle hangs the tail of a g under
-  // its own. The lift has to be upward, and small - it corrects a rendering
+  // its own. The correction is derived, and small - it fixes a rendering
   // asymmetry, it is not a design offset anyone chose.
-  const correction = editorialIdentityOpticalLift();
   const m = carouselEditorialMetrics;
   const blockHeight =
     m.identityFontSize * m.identityLineHeight + m.identityLineGap + m.handleFontSize * m.identityLineHeight;
 
-  assert.ok(correction > 0, 'the block moves up, because the ink hangs low');
-  assert.ok(
-    correction < blockHeight * 0.1,
-    `a correction of ${correction} against a ${blockHeight} block is a design change, not arithmetic`,
-  );
+  for (const engine of ['css', 'pdf']) {
+    const correction = editorialIdentityOpticalLift(engine);
+    assert.ok(correction > 0, `${engine}: the block moves up, because the ink hangs low`);
+    assert.ok(
+      correction < blockHeight * 0.2,
+      `${engine}: a correction of ${correction} against a ${blockHeight} block is a design change, not arithmetic`,
+    );
+  }
+});
 
-  // What the renderers apply is that correction times the steps the design
-  // asked for. Keeping the two apart is the point: the first re-derives itself
-  // if the type sizes change, the second does not.
-  assert.equal(editorialIdentityLift(), Math.round(correction * m.identityLiftSteps * 100) / 100);
-  assert.ok(Number.isInteger(m.identityLiftSteps) && m.identityLiftSteps >= 1);
+test('the two engines need different corrections, because they set baselines differently', () => {
+  // CSS puts the baseline at half-leading plus the ascent; react-pdf puts it at
+  // the foot of the line box. Read out of a rendered PDF, that leaves react-pdf
+  // drawing every line lower inside its own box - and a signature aligned
+  // against a photo lands visibly low in the export while looking right in the
+  // app. If these two ever come out equal, that difference has been lost.
+  assert.ok(
+    editorialIdentityOpticalLift('pdf') > editorialIdentityOpticalLift('css'),
+    'react-pdf sits lower in its line box, so it needs the larger correction',
+  );
+});
+
+test('the design offset is a distance, not a multiple, so both engines land together', () => {
+  // It was a multiple of the correction first, which quietly made the offset
+  // engine-dependent: 4pt above centre in the preview, 9pt in the PDF, from one
+  // number. Whatever the correction, what is left over must be the same.
+  const m = carouselEditorialMetrics;
+  for (const engine of ['css', 'pdf']) {
+    const applied = editorialIdentityLift(engine);
+    const correction = editorialIdentityOpticalLift(engine);
+    assert.ok(
+      Math.abs(applied - correction - m.identityExtraLift) < 0.02,
+      `${engine}: ${applied} - ${correction} should leave the ${m.identityExtraLift}pt design offset`,
+    );
+  }
 });

@@ -234,7 +234,7 @@ export function EditorialAuthorityPdfContent({
               gap: size(m.identityLineGap),
               // See the note in EditorialAuthoritySlide: centres the ink, not
               // the boxes. Yoga centres the margin box the same way CSS does.
-              marginBottom: size(editorialIdentityLift() * 2),
+              marginBottom: size(editorialIdentityLift('pdf') * 2),
             }}
           >
             <Text
