@@ -185,6 +185,10 @@ export function EditorialAuthorityPdfContent({
                 fontSize: size(m.progressFontSize),
                 fontWeight: 400,
                 letterSpacing: size(m.progressFontSize * m.numeralTracking),
+                // Explicit, because the layout reserves this much for the top
+                // band. Left off, the preview inherited the app's leading and
+                // made the band taller than the band the group was fitted to.
+                lineHeight: m.progressLineHeight,
               }}
             >
               {String(progressIndex + 1).padStart(2, '0')}
