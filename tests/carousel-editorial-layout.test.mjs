@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   CAROUSEL_EDITORIAL_BASE_WIDTH,
+  CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
   layoutEditorialAuthoritySlide,
 } from '../lib/content/carousel-editorial-layout.ts';
@@ -227,4 +228,33 @@ test('empty copy does not produce a broken layout', () => {
   assert.equal(layout.bodyLines, 0);
   assert.equal(layout.overflows, false);
   assert.ok(layout.groupHeight > 0, 'the avatar row still occupies the group');
+});
+
+test('the wordmark splits without changing what it spells', () => {
+  // It is drawn as two runs so COACH can sit lighter than KAGISO. If the split
+  // ever drifts from the furniture string, the slide quietly says something
+  // other than the brand name.
+  const joined = CAROUSEL_EDITORIAL_WORDMARK.light + CAROUSEL_EDITORIAL_WORDMARK.bold;
+  const editorial = carouselTemplateOptions.find((option) => option.value === 'editorial_authority');
+  assert.equal(joined, editorial.furniture.wordmark);
+  assert.ok(
+    carouselEditorialMetrics.wordmarkBoldWeight > carouselEditorialMetrics.wordmarkLightWeight,
+    'the second half has to be the heavier one',
+  );
+});
+
+test('the identity block carries its own line height', () => {
+  // Without one the preview inherits the app's (around 1.5, which pushes the
+  // handle half a line clear of the name) while react-pdf applies a different
+  // default - the same block rendering two different shapes.
+  const m = carouselEditorialMetrics;
+  assert.equal(typeof m.identityLineHeight, 'number');
+  assert.ok(m.identityLineHeight < 1.3, 'the name and handle read as one signature');
+
+  // And the reserved row height has to be measured with that leading, or the
+  // group is sized against a block taller than the one drawn.
+  const layout = layoutEditorialAuthoritySlide({ headline: 'Short.', body: '', ...PAGE });
+  const textHeight = m.identityFontSize * m.identityLineHeight * 2 + m.identityLineGap;
+  assert.equal(layout.avatarRowHeight, Math.max(m.avatarSize, textHeight));
+  assert.equal(layout.avatarRowHeight, m.avatarSize, 'the avatar is the taller of the two');
 });

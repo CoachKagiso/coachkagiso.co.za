@@ -21,6 +21,16 @@ import { countWrappedLines, fitTypeSize } from './carousel-type-fit.ts';
 /** Everything below is expressed against a 1080px-wide slide. */
 export const CAROUSEL_EDITORIAL_BASE_WIDTH = 1080;
 
+/**
+ * The wordmark, split where its emphasis falls: light COACH, bold KAGISO.
+ *
+ * Hardcoded like the handle beside it, and for the same reason - the furniture
+ * carries `wordmark: 'COACHKAGISO'` as one string, and there is no rule that
+ * splits an arbitrary wordmark at the right place. See the note in
+ * EditorialAuthoritySlide about what a skin can and cannot reach here.
+ */
+export const CAROUSEL_EDITORIAL_WORDMARK = { light: 'COACH', bold: 'KAGISO' } as const;
+
 export const carouselEditorialMetrics = {
   padX: 96,
   padTop: 140,
@@ -39,10 +49,26 @@ export const carouselEditorialMetrics = {
   iconSize: 36,
 
   /** The centred group. */
-  avatarSize: 116,
+  avatarSize: 132,
   avatarTextGap: 24,
   identityFontSize: 30,
-  identityLineGap: 4,
+  /**
+   * Set explicitly, and tight.
+   *
+   * Neither line carried a line height, so the preview inherited the app's
+   * (around 1.5, which put half a line of air between the name and the handle)
+   * while react-pdf applied its own default. The same block, two shapes, and
+   * neither of them the reference - where the handle sits directly under the
+   * name and the pair reads as one signature.
+   */
+  identityLineHeight: 1.12,
+  identityLineGap: 2,
+  /**
+   * The wordmark is one word set in two weights. Rendering it at a single
+   * weight loses the emphasis the mark is built on.
+   */
+  wordmarkLightWeight: 400,
+  wordmarkBoldWeight: 700,
   /** Avatar row to headline. Measured off the reference card. */
   groupGap: 76,
   /** Headline to body. */
@@ -152,7 +178,7 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
 
   const avatarRowHeight = Math.max(
     m.avatarSize,
-    m.identityFontSize * 1.2 * 2 + m.identityLineGap,
+    m.identityFontSize * m.identityLineHeight * 2 + m.identityLineGap,
   );
 
   const body = String(input.body || '').trim();
