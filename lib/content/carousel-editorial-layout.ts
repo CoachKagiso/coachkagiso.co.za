@@ -233,6 +233,45 @@ export const carouselEditorialMetrics = {
  * the preview renders at 600, and a pre-scaled value passed through a second
  * scaling step is a bug that looks like a design decision.
  */
+/**
+ * Per-field type settings a slide may carry.
+ *
+ * `sizeStep` moves the ceiling the fit starts from, it does not replace the
+ * fit: the copy still shrinks if it would overrun the band, so a slide can be
+ * tuned without any risk of clipping in the export. Tracking and leading are
+ * absolute, and both are fed into the measurement rather than applied on top of
+ * it - a line tracked wide is wider, and a line led loose is taller, and a fit
+ * that did not know would wrap late and clip.
+ */
+export type CarouselTypeSettings = {
+  /** Steps of `typeSizeStep` points against the field's design ceiling. */
+  sizeStep?: number;
+  /** Letter spacing, in em. */
+  tracking?: number;
+  /** Line height, as a multiple of the font size. */
+  leading?: number;
+};
+
+/** The bounds a control should offer, and what each field starts from. */
+export const CAROUSEL_TYPE_LIMITS = {
+  /** One step of the size control, in points at 1080. */
+  sizeStep: 4,
+  minSizeStep: -3,
+  maxSizeStep: 3,
+  minTracking: -0.03,
+  maxTracking: 0.12,
+  trackingStep: 0.01,
+  minLeading: 0.9,
+  maxLeading: 2,
+  leadingStep: 0.04,
+} as const;
+
+/** Clamps a setting to what the control offers, so a stored value cannot escape it. */
+function clamp(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
 export type CarouselEditorialLayout = {
   /** Multiply every number below by this to render at the target width. */
   scale: number;
@@ -257,6 +296,11 @@ export type CarouselEditorialLayout = {
    * measure. `bodyLines` above is the count after wrapping; this is the source.
    */
   bodyRows: string[];
+  /** What the renderers should actually set, after the steps and the clamps. */
+  headlineTracking: number;
+  headlineLeading: number;
+  bodyTracking: number;
+  bodyLeading: number;
   groupHeight: number;
   /** True when the copy still does not fit at the smallest size we will set. */
   overflows: boolean;
@@ -267,6 +311,8 @@ export type CarouselEditorialInput = {
   body?: string | null;
   /** Cover slides set their headline a step larger. */
   isCover?: boolean;
+  headlineType?: CarouselTypeSettings;
+  bodyType?: CarouselTypeSettings;
   /** Rendered slide width, e.g. 1080 for export or 600 for the preview. */
   width: number;
   /** Rendered slide height, e.g. 1350 for 4:5 or 1080 for square. */
@@ -304,7 +350,23 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
 
   const body = String(input.body || '').trim();
   const headline = String(input.headline || '').trim();
-  const headlineMax = input.isCover ? m.coverHeadlineMax : m.headlineMax;
+
+  const limits = CAROUSEL_TYPE_LIMITS;
+  const resolve = (settings: CarouselTypeSettings | undefined, defaultLeading: number) => ({
+    sizeStep: clamp(settings?.sizeStep, limits.minSizeStep, limits.maxSizeStep, 0),
+    tracking: clamp(settings?.tracking, limits.minTracking, limits.maxTracking, 0),
+    leading: clamp(settings?.leading, limits.minLeading, limits.maxLeading, defaultLeading),
+  });
+  const headlineType = resolve(input.headlineType, m.headlineLineHeight);
+  const bodyType = resolve(input.bodyType, m.bodyLineHeight);
+
+  // The step moves the ceiling; the floor does not move with it, because the
+  // floor is what stops a long slide shrinking into nothing.
+  const headlineMax = Math.max(
+    m.headlineMin,
+    (input.isCover ? m.coverHeadlineMax : m.headlineMax) + headlineType.sizeStep * limits.sizeStep,
+  );
+  const bodyMax = Math.max(m.bodyMin, m.bodyMax + bodyType.sizeStep * limits.sizeStep);
 
   /**
    * The body exactly as it was typed: one entry per line, blank lines included.
@@ -330,16 +392,17 @@ b` the same slide - so deleting the blank line between two
   const bodyLinesAt = (size: number) =>
     bodyRows.reduce(
       // An empty line still takes a line.
-      (total, line) => total + (line ? countWrappedLines(line, size, contentWidth, 'poppins') : 1),
+      (total, line) =>
+        total + (line ? countWrappedLines(line, size, contentWidth, 'poppins', bodyType.tracking) : 1),
       0,
     );
 
-  const bodyHeightAt = (size: number, lines: number) => lines * size * m.bodyLineHeight;
+  const bodyHeightAt = (size: number, lines: number) => lines * size * bodyType.leading;
 
   const fitBody = (budget: number) => {
     if (!body) return { size: 0, lines: 0, height: 0 };
     let size = m.bodyMin;
-    for (let candidate = m.bodyMax; candidate > m.bodyMin; candidate -= 0.5) {
+    for (let candidate = bodyMax; candidate > m.bodyMin; candidate -= 0.5) {
       if (bodyHeightAt(candidate, bodyLinesAt(candidate)) <= budget) {
         size = Math.round(candidate * 100) / 100;
         break;
@@ -354,13 +417,14 @@ b` the same slide - so deleting the blank line between two
       text: headline,
       maxWidth: contentWidth,
       maxHeight: budget,
-      lineHeight: m.headlineLineHeight,
+      lineHeight: headlineType.leading,
       typeface: 'poppins',
       min: m.headlineMin,
       max: headlineMax,
+      tracking: headlineType.tracking,
     });
-    const lines = countWrappedLines(headline, size, contentWidth, 'poppins');
-    return { size, lines, height: lines * size * m.headlineLineHeight };
+    const lines = countWrappedLines(headline, size, contentWidth, 'poppins', headlineType.tracking);
+    return { size, lines, height: lines * size * headlineType.leading };
   };
 
   // The body starts on a capped share of the band so that a long body cannot
@@ -373,7 +437,7 @@ b` the same slide - so deleting the blank line between two
   let fittedBody = fitBody(bodyBudget);
   let fittedHeadline = fitHeadline(
     Math.max(
-      m.headlineMin * m.headlineLineHeight,
+      m.headlineMin * headlineType.leading,
       bandHeight - avatarRowHeight - m.groupGap - (body ? m.bodyGap + fittedBody.height : 0),
     ),
   );
@@ -382,11 +446,11 @@ b` the same slide - so deleting the blank line between two
     const spare =
       bandHeight - avatarRowHeight - m.groupGap - fittedHeadline.height - m.bodyGap;
     if (fittedBody.height <= spare) break;
-    bodyBudget = Math.max(m.bodyMin * m.bodyLineHeight, spare);
+    bodyBudget = Math.max(m.bodyMin * bodyType.leading, spare);
     fittedBody = fitBody(bodyBudget);
     fittedHeadline = fitHeadline(
       Math.max(
-        m.headlineMin * m.headlineLineHeight,
+        m.headlineMin * headlineType.leading,
         bandHeight - avatarRowHeight - m.groupGap - m.bodyGap - fittedBody.height,
       ),
     );
@@ -424,6 +488,10 @@ b` the same slide - so deleting the blank line between two
     bodyLines,
     bodyHeight,
     bodyRows,
+    headlineTracking: headlineType.tracking,
+    headlineLeading: headlineType.leading,
+    bodyTracking: bodyType.tracking,
+    bodyLeading: bodyType.leading,
     groupHeight,
     overflows,
   };

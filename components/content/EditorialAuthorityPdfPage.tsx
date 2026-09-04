@@ -298,7 +298,8 @@ export function EditorialAuthorityPdfContent({
             fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
             fontSize: size(layout.headlineSize),
             fontWeight: 400,
-            lineHeight: m.headlineLineHeight,
+            letterSpacing: size(layout.headlineSize * layout.headlineTracking),
+            lineHeight: layout.headlineLeading,
             marginTop: size(m.groupGap),
           }}
         >
@@ -317,7 +318,8 @@ export function EditorialAuthorityPdfContent({
                   fontFamily: [...CAROUSEL_PDF_FONT_POPPINS],
                   fontSize: size(layout.bodySize),
                   fontWeight: 400,
-                  lineHeight: m.bodyLineHeight,
+                  letterSpacing: size(layout.bodySize * layout.bodyTracking),
+                  lineHeight: layout.bodyLeading,
                 }}
               >
                 {line ? <RichText text={line} /> : ' '}

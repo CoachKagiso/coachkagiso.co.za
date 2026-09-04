@@ -72,7 +72,11 @@ import { StudioTab } from '@/components/content/tabs/StudioTab';
 import { VaultTab } from '@/components/content/tabs/VaultTab';
 import type { CarouselPdfSlide } from '@/components/content/CarouselPdfDocument';
 import { EditorialAuthoritySlide } from '@/components/content/EditorialAuthoritySlide';
-import { layoutEditorialAuthoritySlide } from '@/lib/content/carousel-editorial-layout';
+import {
+  carouselEditorialMetrics,
+  layoutEditorialAuthoritySlide,
+  type CarouselTypeSettings,
+} from '@/lib/content/carousel-editorial-layout';
 import {
   CAROUSEL_EXPORT_FONT_BEBAS,
   CAROUSEL_EXPORT_FONT_POPPINS,
@@ -487,6 +491,9 @@ type ExtractedFramework = {
 
 export type CarouselSlide = {
   id: string;
+  /** Per-field type tuning. Absent means the template's own defaults. */
+  headlineType?: CarouselTypeSettings;
+  bodyType?: CarouselTypeSettings;
   role: CarouselSlideRole;
   composition: CarouselComposition;
   headline: string;
@@ -10805,6 +10812,8 @@ function CarouselSlideFrame({
     ? layoutEditorialAuthoritySlide({
         headline: slide.headline,
         body: slide.body,
+        headlineType: slide.headlineType,
+        bodyType: slide.bodyType,
         isCover,
         width: editorialWidth,
         height: Math.round(editorialWidth * (aspectOption.exportHeight / aspectOption.exportWidth)),
@@ -11897,6 +11906,10 @@ function sanitizeCarouselDraft(draft: CarouselDraftPayload, fallbackTitle: strin
         ...(slide.cta?.trim() ? { cta: slide.cta.trim() } : {}),
         ...(slide.visualSuggestion?.trim() ? { visualSuggestion: slide.visualSuggestion.trim() } : {}),
         ...(slide.footnote?.trim() ? { footnote: slide.footnote.trim() } : {}),
+        // Kept as authored; the layout clamps them, so a stored draft cannot
+        // carry a value the controls could not have produced.
+        ...(slide.headlineType ? { headlineType: slide.headlineType } : {}),
+        ...(slide.bodyType ? { bodyType: slide.bodyType } : {}),
       };
     }),
   };
@@ -12374,6 +12387,9 @@ function CarouselDraftEditor({
                 label="Headline"
                 value={slide.headline}
                 onChange={(next) => updateSlide(slide.id, { headline: next })}
+                type={slide.headlineType}
+                onTypeChange={(next) => updateSlide(slide.id, { headlineType: next })}
+                defaultLeading={carouselEditorialMetrics.headlineLineHeight}
               />
 
               <RichTextField
@@ -12381,6 +12397,9 @@ function CarouselDraftEditor({
                 multiline
                 value={slide.body}
                 onChange={(next) => updateSlide(slide.id, { body: next })}
+                type={slide.bodyType}
+                onTypeChange={(next) => updateSlide(slide.id, { bodyType: next })}
+                defaultLeading={carouselEditorialMetrics.bodyLineHeight}
               />
 
               <label className="mt-3 grid gap-2">
