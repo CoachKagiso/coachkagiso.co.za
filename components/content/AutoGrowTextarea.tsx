@@ -24,16 +24,24 @@ export function AutoGrowTextarea({
   onChange,
   minRows = 3,
   className,
+  onElement,
   ...rest
 }: {
   value: string;
   onChange: (value: string) => void;
   minRows?: number;
   className?: string;
+  /** The element itself, for callers that need to drive its selection. */
+  onElement?: (element: HTMLTextAreaElement | null) => void;
 } & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'rows' | 'className'>) {
   // A callback ref held in state, so the measure re-runs when the element
   // mounts - slides are added, removed and reordered under this.
   const [element, setElement] = useState<HTMLTextAreaElement | null>(null);
+
+  const captureElement = (node: HTMLTextAreaElement | null) => {
+    setElement(node);
+    onElement?.(node);
+  };
 
   useEffect(() => {
     if (!element) return;
@@ -46,7 +54,7 @@ export function AutoGrowTextarea({
   return (
     <textarea
       {...rest}
-      ref={setElement}
+      ref={captureElement}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       rows={minRows}
