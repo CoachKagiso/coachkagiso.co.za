@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import { Inter, Playfair_Display, Dancing_Script } from 'next/font/google';
+import { Inter, Playfair_Display, Dancing_Script, Poppins, Bebas_Neue } from 'next/font/google';
 import SmoothScroll from '@/components/SmoothScroll';
 import CookieNotice from '@/components/CookieNotice';
 import MouseTrail from '@/components/MouseTrail';
@@ -15,6 +15,27 @@ const inter = Inter({
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-serif',
+});
+
+// Poppins is the carousel's Editorial Authority face. Loaded here rather than
+// inside the studio so the preview, the html2canvas PNG clone and the rest of
+// the app all resolve the same family, and so the weights the slide actually
+// sets (400 for body type, 700 for the bolded key phrases) are guaranteed
+// present rather than synthesised.
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-poppins',
+});
+
+// The carousel's numerals. Bebas Neue shares Poppins' cap height almost exactly
+// (0.700 against 0.701) so the progress strip sits on the same optical line, but
+// sets about a fifth narrower - which is what keeps an eleven-slide strip from
+// crowding the icons beneath it.
+const bebasNeue = Bebas_Neue({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-bebas',
 });
 
 const dancingScript = Dancing_Script({
@@ -92,7 +113,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} ${dancingScript.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} ${poppins.variable} ${bebasNeue.variable} ${dancingScript.variable}`} suppressHydrationWarning>
       <body className="cursor-none font-sans antialiased text-[#142334] bg-white" suppressHydrationWarning>
         <OrganizationJsonLd />
         <MouseTrail />

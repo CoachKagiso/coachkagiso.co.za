@@ -1,0 +1,385 @@
+import React from 'react';
+import { Circle, Image, Path, Rect, Svg, Text, View } from '@react-pdf/renderer';
+import type { CarouselTemplateOption } from '@/lib/content/carousel-template-registry';
+import {
+  carouselEditorialMetrics,
+  layoutEditorialAuthoritySlide,
+  type CarouselEditorialLayout,
+} from '@/lib/content/carousel-editorial-layout';
+import type { CarouselSlide } from './ContentStudio';
+
+/**
+ * Editorial Authority as a vector page.
+ *
+ * The counterpart to `EditorialAuthoritySlide`, and deliberately the same
+ * shape: one pinned band at the top, one at the bottom, and a group between
+ * them with auto margins so it centres itself and lifts the avatar as copy
+ * grows. Both lanes take their geometry and their fitted type sizes from
+ * `layoutEditorialAuthoritySlide`, which is what keeps the PDF and the PNG the
+ * same slide rather than two interpretations of one.
+ *
+ * The PDF renders at 1080 wide, which is the layout module's base space, so
+ * every number here is used unscaled.
+ */
+
+const ICON_STROKE = '#142334';
+
+/**
+ * The four utility marks from the reference slide.
+ *
+ * Redrawn as Svg because @react-pdf cannot render the lucide React components
+ * the preview uses. Path data is copied from lucide (ISC) at the same 24-unit
+ * grid, so the two lanes draw the same glyphs.
+ */
+function UtilityIcons({ size }: { size: number }) {
+  const common = {
+    stroke: ICON_STROKE,
+    strokeWidth: 1.8,
+    fill: 'none',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  const dotSize = size * 0.38;
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.84 }}>
+      <View style={{ position: 'relative' }}>
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" {...common} />
+          <Rect x="2" y="4" width="20" height="16" rx="2" {...common} />
+        </Svg>
+        <View
+          style={{
+            backgroundColor: '#C9AD98',
+            borderRadius: dotSize / 2,
+            height: dotSize,
+            position: 'absolute',
+            right: -dotSize * 0.2,
+            top: -dotSize * 0.2,
+            width: dotSize,
+          }}
+        />
+      </View>
+
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Path d="M10 11v6" {...common} />
+        <Path d="M14 11v6" {...common} />
+        <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" {...common} />
+        <Path d="M3 6h18" {...common} />
+        <Path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...common} />
+      </Svg>
+
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Path d="M12 3v12" {...common} />
+        <Path d="m17 8-5-5-5 5" {...common} />
+        <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...common} />
+      </Svg>
+
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Circle cx="12" cy="12" r="1.4" fill={ICON_STROKE} />
+        <Circle cx="19" cy="12" r="1.4" fill={ICON_STROKE} />
+        <Circle cx="5" cy="12" r="1.4" fill={ICON_STROKE} />
+      </Svg>
+    </View>
+  );
+}
+
+function SwipeHand({ size }: { size: number }) {
+  const common = {
+    stroke: '#B76E79',
+    strokeWidth: 1.6,
+    fill: 'none',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" {...common} />
+      <Path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" {...common} />
+      <Path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" {...common} />
+      <Path
+        d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+        {...common}
+      />
+    </Svg>
+  );
+}
+
+/** `**key phrase**` becomes a heavier run, matching the preview's rich text. */
+function RichText({ text }: { text: string }) {
+  const parts = String(text ?? '').split(/\*\*(.+?)\*\*/g).filter((part) => part !== '');
+  if (parts.length <= 1) return <Text>{text}</Text>;
+  return (
+    <Text>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <Text key={`strong-${index}`} style={{ fontWeight: 700 }}>
+            {part}
+          </Text>
+        ) : (
+          <Text key={`plain-${index}`}>{part}</Text>
+        ),
+      )}
+    </Text>
+  );
+}
+
+export function resolveEditorialPdfLayout(
+  slide: CarouselSlide,
+  role: CarouselSlide['role'],
+  page: { width: number; height: number },
+): CarouselEditorialLayout {
+  return layoutEditorialAuthoritySlide({
+    headline: slide.headline,
+    body: slide.body,
+    isCover: role === 'cover',
+    width: page.width,
+    height: page.height,
+  });
+}
+
+/** Page padding for an Editorial Authority page, straight from the layout. */
+export function editorialPdfPagePadding(layout: CarouselEditorialLayout) {
+  return {
+    paddingTop: layout.padTop * layout.scale,
+    paddingBottom: layout.padBottom * layout.scale,
+    paddingHorizontal: layout.padX * layout.scale,
+  };
+}
+
+export function EditorialAuthorityPdfContent({
+  slide,
+  index,
+  total,
+  layout,
+  palette,
+  eyebrow,
+  profilePhotoUrl,
+}: {
+  slide: CarouselSlide;
+  index: number;
+  total: number;
+  layout: CarouselEditorialLayout;
+  palette: CarouselTemplateOption['palette'];
+  eyebrow?: string;
+  profilePhotoUrl?: string | null;
+}) {
+  const m = carouselEditorialMetrics;
+  const size = (base: number) => base * layout.scale;
+  // Shared with the preview, so the two lanes cannot disagree about whether
+  // this body is a list - which would leave one of them measured wrong.
+  const { bodyPoints, bodyAsList } = layout;
+
+  return (
+    <>
+      {/* Pinned: progress strip over the utility icons, right aligned. */}
+      <View style={{ alignItems: 'flex-end', gap: size(m.progressRowGap) }}>
+        <View style={{ flexDirection: 'row', gap: size(m.progressGap) }}>
+          {Array.from({ length: total }).map((_, progressIndex) => (
+            <Text
+              key={`progress-${progressIndex}`}
+              style={{
+                color: progressIndex === index ? '#B9927A' : '#B9B0A8',
+                fontFamily: 'Bebas Neue',
+                fontSize: size(m.progressFontSize),
+                fontWeight: 400,
+                letterSpacing: size(m.progressFontSize * m.numeralTracking),
+              }}
+            >
+              {String(progressIndex + 1).padStart(2, '0')}
+            </Text>
+          ))}
+        </View>
+        <UtilityIcons size={size(m.iconSize)} />
+      </View>
+
+      {/*
+        The centred group.
+
+        `flex: 1` plus `justifyContent: center` rather than the auto margins the
+        preview uses. Yoga resolves auto margins here against an unbounded
+        height, which pushed the type off the page entirely and spilled a
+        four-slide deck onto five pages - a blank-looking PDF with the icons
+        still on it. This gives the same result the browser gets: the group
+        takes the space between the pinned rows and centres itself inside it.
+      */}
+      <View style={{ flex: 1, justifyContent: 'center', width: '100%' }}>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: size(m.avatarTextGap) }}>
+          {profilePhotoUrl ? (
+            // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf Image has no alt prop; the handle beside it names the avatar.
+            <Image
+              src={profilePhotoUrl}
+              style={{
+                borderColor: '#B76E79',
+                borderRadius: size(m.avatarSize) / 2,
+                borderWidth: size(3),
+                height: size(m.avatarSize),
+                objectFit: 'cover',
+                width: size(m.avatarSize),
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                backgroundColor: '#E4D8CB',
+                borderRadius: size(m.avatarSize) / 2,
+                height: size(m.avatarSize),
+                width: size(m.avatarSize),
+              }}
+            />
+          )}
+          <View>
+            <Text
+              style={{
+                color: '#B9927A',
+                fontFamily: 'Poppins',
+                fontSize: size(m.identityFontSize),
+                fontWeight: 700,
+                letterSpacing: size(m.identityFontSize * 0.12),
+                textTransform: 'uppercase',
+              }}
+            >
+              COACHKAGISO
+            </Text>
+            <Text
+              style={{
+                color: '#B9927A',
+                fontFamily: 'Poppins',
+                fontSize: size(m.identityFontSize),
+                fontWeight: 500,
+                marginTop: size(m.identityLineGap),
+              }}
+            >
+              @coach.kagiso
+            </Text>
+          </View>
+        </View>
+
+        {eyebrow ? (
+          <Text
+            style={{
+              color: palette.accent,
+              fontFamily: 'Poppins',
+              fontSize: size(22),
+              fontWeight: 600,
+              letterSpacing: size(22 * 0.2),
+              marginTop: size(m.groupGap),
+              textTransform: 'uppercase',
+            }}
+          >
+            {eyebrow}
+          </Text>
+        ) : null}
+
+        <Text
+          style={{
+            color: palette.foreground,
+            fontFamily: 'Poppins',
+            fontSize: size(layout.headlineSize),
+            fontWeight: 400,
+            lineHeight: m.headlineLineHeight,
+            marginTop: eyebrow ? size(18) : size(m.groupGap),
+          }}
+        >
+          <RichText text={slide.headline} />
+        </Text>
+
+        {slide.body ? (
+          bodyAsList ? (
+            <View style={{ marginTop: size(m.bodyGap) }}>
+              {bodyPoints.map((point, pointIndex) => (
+                <Text
+                  key={`${slide.id}-line-${pointIndex}`}
+                  style={{
+                    color: palette.foreground,
+                    fontFamily: 'Poppins',
+                    fontSize: size(layout.bodySize),
+                    fontWeight: 400,
+                    lineHeight: m.bodyLineHeight,
+                    marginTop: pointIndex ? size(m.bodyItemGap) : 0,
+                  }}
+                >
+                  <RichText text={point} />
+                </Text>
+              ))}
+            </View>
+          ) : (
+            <Text
+              style={{
+                color: palette.foreground,
+                fontFamily: 'Poppins',
+                fontSize: size(layout.bodySize),
+                fontWeight: 400,
+                lineHeight: m.bodyLineHeight,
+                marginTop: size(m.bodyGap),
+              }}
+            >
+              <RichText text={slide.body} />
+            </Text>
+          )
+        ) : null}
+
+        {slide.cta ? (
+          <Text
+            style={{
+              color: palette.accent,
+              fontFamily: 'Poppins',
+              fontSize: size(24),
+              fontWeight: 700,
+              letterSpacing: size(24 * 0.14),
+              marginTop: size(m.bodyGap),
+              textTransform: 'uppercase',
+            }}
+          >
+            {slide.cta}
+          </Text>
+        ) : null}
+
+        {slide.footnote ? (
+          <Text
+            style={{
+              color: palette.muted,
+              fontFamily: 'Poppins',
+              fontSize: size(22),
+              fontWeight: 400,
+              marginTop: size(16),
+            }}
+          >
+            {slide.footnote}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Pinned: wordmark left, swipe cue right. */}
+      <View style={{ alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text
+          style={{
+            color: '#B9927A',
+            fontFamily: 'Poppins',
+            fontSize: size(m.footerFontSize),
+            fontWeight: 700,
+            letterSpacing: size(m.footerFontSize * 0.12),
+            textTransform: 'uppercase',
+          }}
+        >
+          COACHKAGISO
+        </Text>
+        <View style={{ alignItems: 'center', flexDirection: 'row', gap: size(10) }}>
+          <Text
+            style={{
+              color: '#B9927A',
+              fontFamily: 'Poppins',
+              fontSize: size(m.footerFontSize),
+              fontWeight: 700,
+              letterSpacing: size(m.footerFontSize * 0.1),
+              textTransform: 'uppercase',
+            }}
+          >
+            SWIPE
+          </Text>
+          <SwipeHand size={size(36)} />
+        </View>
+      </View>
+    </>
+  );
+}

@@ -7,15 +7,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const payload: { deck: CarouselPdfSlide[]; template: CarouselTemplateOption } = await request.json();
-    const { deck, template } = payload;
+    const payload: { deck: CarouselPdfSlide[]; template: CarouselTemplateOption; profilePhotoUrl?: string | null } = await request.json();
+    const { deck, template, profilePhotoUrl } = payload;
 
     if (!Array.isArray(deck) || !deck.length) {
       return NextResponse.json({ error: 'Deck is required' }, { status: 400 });
     }
 
     const buffer = await renderToBuffer(
-      <CarouselPdfDocument deck={deck} template={template} />,
+      <CarouselPdfDocument deck={deck} template={template} profilePhotoUrl={profilePhotoUrl || null} />,
     );
 
     return new NextResponse(buffer as BodyInit, {
