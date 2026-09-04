@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave } from '../lib/openrouter-key-settings.ts';
+import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave, resolveOpenRouterTestKey } from '../lib/openrouter-key-settings.ts';
 import { PRIMARY_MODEL_TOOLS, SECONDARY_MODEL_TOOLS } from '../lib/zai-pinned-tools.ts';
 
 const savedConfig = {
@@ -36,6 +36,14 @@ test('replaces the saved OpenRouter key only when a new key is supplied', () => 
 test('detects that a saved OpenRouter key exists without exposing it', () => {
   assert.equal(hasConfiguredOpenRouterKey(savedConfig), true);
   assert.equal(hasConfiguredOpenRouterKey({ openrouter_api_key: '' }), false);
+});
+
+test('the connection test prefers a fresh key, then saved, then env', () => {
+  assert.equal(resolveOpenRouterTestKey('new-key', 'saved-key', 'env-key'), 'new-key');
+  assert.equal(resolveOpenRouterTestKey('', 'saved-key', 'env-key'), 'saved-key');
+  assert.equal(resolveOpenRouterTestKey('   ', '', 'env-key'), 'env-key');
+  assert.equal(resolveOpenRouterTestKey('', '', ''), '');
+  assert.equal(resolveOpenRouterTestKey(null, undefined, 42), '');
 });
 
 test('never persists the server-derived Z.ai configured flag', () => {
