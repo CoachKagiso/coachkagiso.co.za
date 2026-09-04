@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave } from '../lib/openrouter-key-settings.ts';
-import { SECONDARY_MODEL_TOOLS } from '../lib/zai-pinned-tools.ts';
+import { PRIMARY_MODEL_TOOLS, SECONDARY_MODEL_TOOLS } from '../lib/zai-pinned-tools.ts';
 
 const savedConfig = {
   primary_model: 'z-ai/glm-5.2',
@@ -53,5 +53,21 @@ test('every secondary-model tool is listed with a stable id and a dashboard loca
   for (const tool of SECONDARY_MODEL_TOOLS) {
     assert.ok(tool.label.trim(), `${tool.id} needs a label`);
     assert.ok(tool.where.trim(), `${tool.id} needs a dashboard location`);
+  }
+});
+
+test('every primary-model tool is listed with a stable id and a dashboard location', () => {
+  assert.equal(PRIMARY_MODEL_TOOLS.length, 8);
+  assert.equal(new Set(PRIMARY_MODEL_TOOLS.map((tool) => tool.id)).size, 8);
+  for (const tool of PRIMARY_MODEL_TOOLS) {
+    assert.ok(tool.label.trim(), `${tool.id} needs a label`);
+    assert.ok(tool.where.trim(), `${tool.id} needs a dashboard location`);
+  }
+});
+
+test('no tool is claimed by both the primary and the secondary model', () => {
+  const secondaryIds = new Set(SECONDARY_MODEL_TOOLS.map((tool) => tool.id));
+  for (const tool of PRIMARY_MODEL_TOOLS) {
+    assert.ok(!secondaryIds.has(tool.id), `${tool.id} must run on exactly one model`);
   }
 });

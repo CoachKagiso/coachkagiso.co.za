@@ -44,7 +44,7 @@ import {
   OPENROUTER_MODEL_OPTIONS,
   modelRequiresReasoning,
 } from '@/lib/ai-models';
-import { SECONDARY_MODEL_TOOLS } from '@/lib/zai-pinned-tools';
+import { PRIMARY_MODEL_TOOLS, SECONDARY_MODEL_TOOLS } from '@/lib/zai-pinned-tools';
 import type {
   AiConfigSettings,
   AssistantPreferences,
@@ -1248,20 +1248,36 @@ export default function SettingsPageComponent({
                   This icon marks a model that can read image attachments.
                 </p>
                 <p className="rounded-[8px] bg-[#FEF3C7] px-4 py-3 text-[12px] font-semibold text-[#92400E]">Transform mode always uses the active model. This is required for the copyright guardrail to function reliably.</p>
-                <div className="grid gap-2 rounded-[8px] border border-[#E8DDD2] bg-white px-4 py-3">
-                  <p className="text-[13px] font-semibold text-[#142334]">Tools that run on the secondary model</p>
+                <div className="grid gap-3 rounded-[8px] border border-[#E8DDD2] bg-white px-4 py-3">
+                  <p className="text-[13px] font-semibold text-[#142334]">Which model runs each tool</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid content-start gap-1.5">
+                      <p className="text-[12px] font-semibold text-[#142334]">Primary · Active model</p>
+                      <p className="break-all text-[11px] text-[#9A9A9A]">{primaryModel}</p>
+                      <ul className="grid gap-1 text-[12px] text-[#6B6B6B]">
+                        {PRIMARY_MODEL_TOOLS.map((tool) => (
+                          <li key={tool.id}>
+                            {tool.label} <span className="text-[#9A9A9A]">({tool.where})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="grid content-start gap-1.5">
+                      <p className="text-[12px] font-semibold text-[#142334]">Secondary · Quick tasks model</p>
+                      <p className="break-all text-[11px] text-[#9A9A9A]">{secondaryModel}</p>
+                      <ul className="grid gap-1 text-[12px] text-[#6B6B6B]">
+                        {SECONDARY_MODEL_TOOLS.map((tool) => (
+                          <li key={tool.id}>
+                            {tool.label} <span className="text-[#9A9A9A]">({tool.where})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                   <p className="text-[12px] leading-relaxed text-[#6B6B6B]">
-                    These {SECONDARY_MODEL_TOOLS.length} high-volume tools use the
-                    {' '}<span className="font-semibold text-[#142334]">secondary model</span> above rather than the primary one,
-                    so they stay cheap to run. Change the secondary model and they follow it.
+                    The {SECONDARY_MODEL_TOOLS.length} secondary tools are high-volume, so they follow the cheaper
+                    model. Change either model above and its column follows it.
                   </p>
-                  <ul className="grid gap-1 text-[12px] text-[#6B6B6B]">
-                    {SECONDARY_MODEL_TOOLS.map((tool) => (
-                      <li key={tool.id}>
-                        {tool.label} <span className="text-[#9A9A9A]">({tool.where})</span>
-                      </li>
-                    ))}
-                  </ul>
                   <p className="text-[12px] leading-relaxed text-[#6B6B6B]">
                     Caption Writer and Reply Writer accept image attachments. If the secondary model cannot read
                     images, those requests automatically use an image-capable model instead.
