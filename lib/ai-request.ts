@@ -54,9 +54,14 @@ export function getAiProviderRequestOptions(provider: AiRequestProvider, model: 
   }
 
   // Sending the disable to an endpoint that mandates reasoning is rejected outright, so those
-  // models fall through to their own default instead.
+  // models get the cheapest effort they accept instead. Falling through to the provider default
+  // would mean max effort: minutes of thinking that eats the output budget before a word of the
+  // answer is visible.
   if (!reasoningEnabled && !modelRequiresReasoning(model)) {
     return { reasoning: { effort: 'none' } };
+  }
+  if (!reasoningEnabled) {
+    return { reasoning: { effort: 'low' } };
   }
 
   return {};
