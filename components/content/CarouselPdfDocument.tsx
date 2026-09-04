@@ -38,6 +38,10 @@ Font.register({ family: 'Poppins', fontWeight: 400, src: FONT('Poppins-Regular.t
 Font.register({ family: 'Poppins', fontWeight: 500, src: FONT('Poppins-Medium.ttf') });
 Font.register({ family: 'Poppins', fontWeight: 600, src: FONT('Poppins-SemiBold.ttf') });
 Font.register({ family: 'Poppins', fontWeight: 700, src: FONT('Poppins-Bold.ttf') });
+// Real italics, because a slide can now carry them. Synthesised obliques are
+// not an option here: @react-pdf draws the upright face when it has no italic.
+Font.register({ family: 'Poppins', fontWeight: 400, fontStyle: 'italic', src: FONT('Poppins-Italic.ttf') });
+Font.register({ family: 'Poppins', fontWeight: 700, fontStyle: 'italic', src: FONT('Poppins-BoldItalic.ttf') });
 // The slide counter. One weight is all Bebas Neue ships.
 Font.register({ family: 'Bebas Neue', fontWeight: 400, src: FONT('BebasNeue-Regular.ttf') });
 

@@ -1,5 +1,7 @@
+import { RICH_TEXT_MARKERS, type RichTextStyle } from './rich-text.ts';
+
 /**
- * Toggling `**bold**` around a text selection.
+ * Toggling a style's markers around a text selection.
  *
  * The slide renderers already read these markers - both lanes split on
  * `**...**` and set that run heavier - so this is only about writing them, and
@@ -9,9 +11,7 @@
  * arithmetic is worth testing without a DOM.
  */
 
-const MARKER = '**';
-
-export type BoldSelection = { value: string; start: number; end: number };
+export type MarkedSelection = { value: string; start: number; end: number };
 
 /**
  * Wraps the selection in markers, or removes them if they are already there.
@@ -24,7 +24,13 @@ export type BoldSelection = { value: string; start: number; end: number };
  * With nothing selected it inserts an empty pair and puts the caret inside, so
  * the shortcut can be pressed before typing rather than after.
  */
-export function toggleBoldMarkers(value: string, start: number, end: number): BoldSelection {
+export function toggleTextMarkers(
+  value: string,
+  start: number,
+  end: number,
+  style: RichTextStyle = 'bold',
+): MarkedSelection {
+  const MARKER = RICH_TEXT_MARKERS[style];
   const from = Math.max(0, Math.min(start, end, value.length));
   const to = Math.max(0, Math.min(Math.max(start, end), value.length));
 
@@ -76,7 +82,16 @@ export function toggleBoldMarkers(value: string, start: number, end: number): Bo
   };
 }
 
-/** Whether a keyboard event is the bold shortcut, on either platform. */
-export function isBoldShortcut(event: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
-  return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b';
+/** Which style a keyboard event asks for, on either platform, or null. */
+export function styleShortcut(event: {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}): RichTextStyle | null {
+  if (!event.metaKey && !event.ctrlKey) return null;
+  const key = event.key.toLowerCase();
+  if (key === 'b') return 'bold';
+  if (key === 'i') return 'italic';
+  if (key === 'u') return 'underline';
+  return null;
 }

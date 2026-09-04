@@ -64,7 +64,8 @@ import DesignStudioPanel, {
   type DesignStudioVaultImport,
 } from '@/components/content/DesignStudioPanel';
 import { AutoGrowTextarea } from '@/components/content/AutoGrowTextarea';
-import { BoldableField } from '@/components/content/BoldableField';
+import { parseRichText } from '@/lib/content/rich-text';
+import { RichTextField } from '@/components/content/RichTextField';
 import { HomeTab } from '@/components/content/tabs/HomeTab';
 import { SignalBriefsTab } from '@/components/content/tabs/SignalBriefsTab';
 import { StudioTab } from '@/components/content/tabs/StudioTab';
@@ -10849,20 +10850,19 @@ function CarouselSlideFrame({
 
   // Editorial Authority renders **bold** spans as strong runs so the reference
   // look (regular sans with bold key phrases) works without rewriting copy.
-  const renderRichText = (text: string, strongWeight = 700): ReactNode[] => {
-    const parts = text.split(/\*\*(.+?)\*\*/g).filter((part) => part !== '');
-    if (parts.length <= 1) return [text];
-    return parts.map((part, partIndex) => {
-      const isStrong = partIndex % 2 === 1;
-      return isStrong ? (
-        <strong key={`rich-${index}-${partIndex}`} style={{ fontWeight: strongWeight }}>
-          {part}
-        </strong>
-      ) : (
-        <span key={`rich-${index}-${partIndex}`}>{part}</span>
-      );
-    });
-  };
+  const renderRichText = (text: string, strongWeight = 700): ReactNode[] =>
+    parseRichText(text).map((run, runIndex) => (
+      <span
+        key={`rich-${index}-${runIndex}`}
+        style={{
+          fontWeight: run.bold ? strongWeight : undefined,
+          fontStyle: run.italic ? 'italic' : undefined,
+          textDecoration: run.underline ? 'underline' : undefined,
+        }}
+      >
+        {run.text}
+      </span>
+    ));
 
   const renderTopProgress = () => (
     <div
@@ -12370,13 +12370,13 @@ function CarouselDraftEditor({
               {/* Both carry `**bold**` into the rendered slide, so both get the
                   control. The caption above does not - it goes to LinkedIn as
                   plain text, where the markers would publish as asterisks. */}
-              <BoldableField
+              <RichTextField
                 label="Headline"
                 value={slide.headline}
                 onChange={(next) => updateSlide(slide.id, { headline: next })}
               />
 
-              <BoldableField
+              <RichTextField
                 label="Body"
                 multiline
                 value={slide.body}
