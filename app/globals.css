@@ -602,6 +602,27 @@ html:not(.has-custom-cursor) body.cursor-none {
   text-transform: uppercase;
 }
 
+/* The insert strips run past their edge more often than not, so the scrollbar
+   is the only thing telling anyone the rest of the set is there. Slim, in the
+   studio's own colours, rather than hidden. */
+.insert-strip {
+  scrollbar-width: thin;
+  scrollbar-color: #d8ccbe transparent;
+}
+
+.insert-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.insert-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.insert-strip::-webkit-scrollbar-thumb {
+  background: #d8ccbe;
+  border-radius: 999px;
+}
+
 .studio-input {
   border: 1px solid #e4d8cb;
   border-radius: 8px;

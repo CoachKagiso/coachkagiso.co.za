@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Bold, Italic, Plus, Underline } from 'lucide-react';
+import { Bold, Italic, Plus, Smile, Underline } from 'lucide-react';
 import { AutoGrowTextarea } from '@/components/content/AutoGrowTextarea';
 import { styleShortcut, toggleTextMarkers } from '@/lib/content/text-markers';
 import type { RichTextStyle } from '@/lib/content/rich-text';
@@ -12,9 +12,14 @@ import type { RichTextStyle } from '@/lib/content/rich-text';
  * Bold, italic and underline write markers that both lanes parse; ctrl/cmd-B,
  * -I and -U do the same from the keyboard.
  *
- * The insert strip lies along the row rather than dropping below it, so it
- * never covers the copy being edited, and scrolls sideways rather than
- * wrapping, so the row keeps its height however many marks it holds.
+ * The insert strips lie along the row rather than dropping below it, so they
+ * never cover the copy being edited, and scroll sideways rather than wrapping,
+ * so the row keeps its height.
+ *
+ * Marks and emoji get their own button. Sharing one strip put 41 items in a
+ * space that shows about 22 of them, so most of the emoji sat off the right
+ * edge - and with the scrollbar hidden there was nothing to say they were
+ * there at all. They are two sets, and they are now two strips.
  *
  * A whole component rather than a hook the editor could call, because the
  * fields are rendered inside a map over the slides - a hook there would run a
@@ -56,6 +61,11 @@ const EMOJI = [
   '\u27a1\ufe0f', '\u2b06\ufe0f', '\u{1f4a5}', '\u{1f331}',
 ];
 
+const STRIPS = [
+  { key: 'marks' as const, Icon: Plus, title: 'Insert a mark' },
+  { key: 'emoji' as const, Icon: Smile, title: 'Insert an emoji' },
+];
+
 export function RichTextField({
   label,
   value,
@@ -70,7 +80,7 @@ export function RichTextField({
   placeholder?: string;
 }) {
   const [element, setElement] = useState<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  const [insertOpen, setInsertOpen] = useState(false);
+  const [openStrip, setOpenStrip] = useState<'marks' | 'emoji' | null>(null);
 
   /** Puts the selection back after React has written the new value. */
   const restore = useCallback(
@@ -98,7 +108,6 @@ export function RichTextField({
 
   const insert = useCallback(
     (snippet: string) => {
-      setInsertOpen(false);
       const at = element?.selectionStart ?? value.length;
       onChange(value.slice(0, at) + snippet + value.slice(element?.selectionEnd ?? at));
       restore(at + snippet.length, at + snippet.length);
@@ -135,34 +144,38 @@ export function RichTextField({
             <Icon className="h-3 w-3" strokeWidth={2.5} />
           </button>
         ))}
-        <button
-          type="button"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setInsertOpen((open) => !open)}
-          title="Insert a mark or an emoji"
-          aria-label={`Insert a mark into ${label}`}
-          aria-expanded={insertOpen}
-          className={`grid h-5 w-5 shrink-0 place-items-center rounded-[4px] border transition ${
-            insertOpen
-              ? 'border-[#4A3A2C] bg-[#4A3A2C] text-white'
-              : 'border-[#E4D8CB] bg-white text-[#8C7466] hover:border-[#142334] hover:text-[#142334]'
-          }`}
-        >
-          <Plus className="h-3 w-3" strokeWidth={2.5} />
-        </button>
-        {insertOpen && (
-          // A strip along the row rather than a panel below it: the fields sit
-          // shoulder to shoulder, and a panel would cover the copy being edited.
-          // It scrolls sideways instead of wrapping, so the row keeps its height.
-          <span className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-[4px] bg-[#4A3A2C] px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {[...MARKS, ...EMOJI].map((mark) => (
+        {STRIPS.map(({ key, Icon, title }) => (
+          <button
+            key={key}
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setOpenStrip((open) => (open === key ? null : key))}
+            title={title}
+            aria-label={`${title} in ${label}`}
+            aria-expanded={openStrip === key}
+            className={`grid h-5 w-5 shrink-0 place-items-center rounded-[4px] border transition ${
+              openStrip === key
+                ? 'border-[#142334] bg-[#142334] text-white'
+                : 'border-[#E4D8CB] bg-white text-[#8C7466] hover:border-[#142334] hover:text-[#142334]'
+            }`}
+          >
+            <Icon className="h-3 w-3" strokeWidth={2.5} />
+          </button>
+        ))}
+        {openStrip && (
+          // A strip along the row, not a panel below it: the fields sit shoulder
+          // to shoulder and a panel would cover the copy being edited. The
+          // scrollbar is left visible on purpose - hidden, a strip that runs
+          // past its edge looks like a list that stops there.
+          <span className="insert-strip flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-[4px] border border-[#E4D8CB] bg-white px-1.5 py-1">
+            {(openStrip === 'marks' ? MARKS : EMOJI).map((mark) => (
               <button
                 key={mark}
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => insert(`${mark} `)}
                 title={`Insert ${mark}`}
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-[3px] text-[13px] leading-none text-white/90 transition hover:bg-white/15"
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-[3px] text-[13px] leading-none text-[#142334] transition hover:bg-[#F5F3EE]"
               >
                 {mark}
               </button>
