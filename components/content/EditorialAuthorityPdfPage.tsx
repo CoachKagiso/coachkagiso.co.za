@@ -1,9 +1,10 @@
 import React from 'react';
-import { Circle, Image, Path, Rect, Svg, Text, View } from '@react-pdf/renderer';
+import { Circle, G, Image, Path, Rect, Svg, Text, View } from '@react-pdf/renderer';
 import type { CarouselTemplateOption } from '@/lib/content/carousel-template-registry';
 import {
   CAROUSEL_EDITORIAL_WORDMARK,
   carouselEditorialMetrics,
+  editorialIconDrop,
   editorialIdentityLift,
   layoutEditorialAuthoritySlide,
   type CarouselEditorialLayout,
@@ -47,13 +48,24 @@ function UtilityIcons({ size }: { size: number }) {
     strokeLinejoin: 'round' as const,
   };
   const dotSize = size * 0.38;
+  const mailBadgeTop = (editorialIconDrop('mail') / 24) * size - dotSize * 0.2;
+  /**
+   * The same drop the preview gets from a shifted viewBox, applied as a group
+   * transform instead: react-pdf parses only the width and height out of a
+   * viewBox and discards its origin, so a shifted one renders unmoved. The
+   * number comes from the shared helper either way, so the two lanes align to
+   * the same line.
+   */
+  const shift = (icon: 'mail' | 'trash' | 'upload') => `translate(0, ${editorialIconDrop(icon)})`;
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.84 }}>
       <View style={{ position: 'relative' }}>
         <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" {...common} />
-          <Rect x="2" y="4" width="20" height="16" rx="2" {...common} />
+          <G transform={shift('mail')}>
+            <Path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" {...common} />
+            <Rect x="2" y="4" width="20" height="16" rx="2" {...common} />
+          </G>
         </Svg>
         <View
           style={{
@@ -62,24 +74,28 @@ function UtilityIcons({ size }: { size: number }) {
             height: dotSize,
             position: 'absolute',
             right: -dotSize * 0.2,
-            top: -dotSize * 0.2,
+            top: mailBadgeTop,
             width: dotSize,
           }}
         />
       </View>
 
       <Svg width={size} height={size} viewBox="0 0 24 24">
-        <Path d="M10 11v6" {...common} />
-        <Path d="M14 11v6" {...common} />
-        <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" {...common} />
-        <Path d="M3 6h18" {...common} />
-        <Path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...common} />
+        <G transform={shift('trash')}>
+          <Path d="M10 11v6" {...common} />
+          <Path d="M14 11v6" {...common} />
+          <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" {...common} />
+          <Path d="M3 6h18" {...common} />
+          <Path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...common} />
+        </G>
       </Svg>
 
       <Svg width={size} height={size} viewBox="0 0 24 24">
-        <Path d="M12 3v12" {...common} />
-        <Path d="m17 8-5-5-5 5" {...common} />
-        <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...common} />
+        <G transform={shift('upload')}>
+          <Path d="M12 3v12" {...common} />
+          <Path d="m17 8-5-5-5 5" {...common} />
+          <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...common} />
+        </G>
       </Svg>
 
       <Svg width={size} height={size} viewBox="0 0 24 24">
