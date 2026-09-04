@@ -10,7 +10,7 @@
 - **Brand**: Coach Kagiso — career coaching (Tebogo Shabangu; assistant greets with "Coach Kagiso"). Public site: `https://coachkagiso.co.za`. Zoho mailbox: `hello@coachkagiso.co.za`. Google Calendar id: `tebogo.shabangu3@gmail.com`.
 - **Repo**: `G:\AntiGravity Projects\coach-kagiso`. Git: clean at `e72ac43` ("add visible edge to assistant panel and stop clean dashboard styles from stripping it" — the Phase 1 fix, pushed).
 - **Stack** (from `package.json`):
-  - Next.js `^16.2.4` (App Router), `output: 'standalone'`, Turbopack, dev server on port **4000**.
+  - Next.js `^16.2.4` (App Router), `output: 'standalone'`, Turbopack, dev server on port **4100**.
   - React `^19.2.1`, TypeScript `5.9.3`, Tailwind CSS `4.1.11`.
   - `@supabase/supabase-js ^2.105.1`, `pg ^8.21.0`.
   - `html2canvas ^1.4.1`, `jspdf ^4.2.1` (client-side image/PDF export), `@react-pdf/renderer ^4.5.1` (server PDF), `docx ^9.6.1` (CV builder .docx), `mammoth`, `pdf-parse`, `pdfjs-dist` (legacy build, CV text extraction).
