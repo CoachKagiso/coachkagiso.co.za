@@ -22,8 +22,14 @@ test('allows OpenRouter model default reasoning when reasoningEnabled is true', 
 });
 
 test('never sends the reasoning disable to an endpoint that mandates reasoning', () => {
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'google/gemini-3.7-flash'), {});
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'google/gemini-3.7-flash', true), {});
+  // Toggle off means the cheapest effort the endpoint accepts - never the provider
+  // default (max), which would spend the output budget thinking before answering.
+  for (const model of ['google/gemini-3.7-flash', 'z-ai/glm-5.3', 'z-ai/glm-5.3-flash', 'meta/muse-spark-1.3']) {
+    assert.deepEqual(getAiProviderRequestOptions('openrouter', model), {
+      reasoning: { effort: 'low' },
+    });
+    assert.deepEqual(getAiProviderRequestOptions('openrouter', model, true), {});
+  }
 });
 
 test('treats a reasoning-mandatory model as reasoning-active even with the toggle off', () => {
