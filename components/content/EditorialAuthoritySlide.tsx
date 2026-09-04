@@ -1,7 +1,7 @@
 'use client';
 
 import React, { type ReactNode } from 'react';
-import { Hand, Mail, MoreHorizontal, Trash2, Upload } from 'lucide-react';
+import { Mail, MoreHorizontal, Trash2, Upload } from 'lucide-react';
 import {
   CAROUSEL_EXPORT_FONT_BEBAS,
   CAROUSEL_EXPORT_FONT_POPPINS,
@@ -13,6 +13,7 @@ import {
   editorialIdentityLift,
   type CarouselEditorialLayout,
 } from '@/lib/content/carousel-editorial-layout';
+import { SWIPE_ICON_PATHS, SWIPE_ICON_VIEW_BOX } from '@/lib/content/carousel-swipe-icon';
 import type { CarouselSlide } from './ContentStudio';
 
 /**
@@ -303,10 +304,19 @@ export function EditorialAuthoritySlide({
           }}
         >
           SWIPE
-          <Hand
-            style={{ color: '#B76E79', height: px(m.swipeIconSize), width: px(m.swipeIconSize) }}
-            strokeWidth={1.6}
-          />
+          {/*
+            Design Studio's "Swipe left icon" rather than a lucide hand. It is a
+            filled mark, so it takes a fill and no stroke.
+          */}
+          <svg
+            viewBox={SWIPE_ICON_VIEW_BOX}
+            aria-hidden="true"
+            style={{ height: px(m.swipeIconSize), width: px(m.swipeIconSize) }}
+          >
+            {SWIPE_ICON_PATHS.map((d) => (
+              <path key={d.slice(0, 24)} d={d} fill="#B76E79" />
+            ))}
+          </svg>
         </span>
       </div>
     </>
