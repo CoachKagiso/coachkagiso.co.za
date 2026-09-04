@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { loadAiConfig } from '@/lib/ai-config';
 import { buildAiConnectionTestBody } from '@/lib/ai-request';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
+import { resolveOpenRouterTestKey } from '@/lib/openrouter-key-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +14,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = String(body?.apiKey || '').trim();
   const model = String(body?.model || '').trim();
+  if (!model) {
+    return NextResponse.json({ error: 'A model is required.' }, { status: 400 });
+  }
 
-  if (!apiKey || !model) {
-    return NextResponse.json({ error: 'API key and model are required.' }, { status: 400 });
+  // A blank key field means "use the saved one" - the key is never sent back to the
+  // browser, so the test resolves it server-side from saved settings, then env.
+  const savedConfig = await loadAiConfig();
+  const apiKey = resolveOpenRouterTestKey(body?.apiKey, savedConfig.openrouter_api_key, process.env.OPENROUTER_API_KEY);
+  if (!apiKey) {
+    return NextResponse.json({ error: 'No OpenRouter API key saved yet. Paste it above, then test again.' }, { status: 400 });
   }
 
   const headers: Record<string, string> = {

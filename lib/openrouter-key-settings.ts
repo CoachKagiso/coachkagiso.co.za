@@ -11,6 +11,18 @@ export function hasConfiguredOpenRouterKey(value: unknown) {
   return typeof config.openrouter_api_key === 'string' && Boolean(config.openrouter_api_key.trim());
 }
 
+/**
+ * Picks the key the Settings connection test should use. A freshly pasted key wins, then the
+ * saved one, then the server env fallback - so switching models never requires pasting the key
+ * again just to press Test. Pure so the priority order is unit-testable; the route supplies env.
+ */
+export function resolveOpenRouterTestKey(submittedKey: unknown, savedKey: unknown, envKey: unknown): string {
+  for (const candidate of [submittedKey, savedKey, envKey]) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return '';
+}
+
 export function mergeOpenRouterKeyForSave(currentValue: unknown, nextValue: unknown): ConfigRecord {
   const current = asConfigRecord(currentValue);
   const next = asConfigRecord(nextValue);
