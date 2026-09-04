@@ -10,6 +10,14 @@
  * filled mark, not a stroked one, so callers set a fill and no stroke.
  */
 
+/**
+ * The colour Design Studio ships the asset in - its `defaultColor` on the
+ * `brand_swipe_left` entry. The mark took the rose the lucide hand had used
+ * when it first replaced it; this is the asset's own ink, which is also the
+ * template's foreground.
+ */
+export const SWIPE_ICON_COLOR = '#142334';
+
 export const SWIPE_ICON_VIEW_BOX = '-10.5 0 136 136';
 
 export const SWIPE_ICON_PATHS = [

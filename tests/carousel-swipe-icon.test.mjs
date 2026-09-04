@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 
 import {
+  SWIPE_ICON_COLOR,
   SWIPE_ICON_PATHS,
   SWIPE_ICON_VIEW_BOX,
 } from '../lib/content/carousel-swipe-icon.ts';
@@ -28,4 +29,16 @@ test('it is a filled mark, which is why the renderers set a fill and no stroke',
   const svg = readFileSync(SOURCE, 'utf8');
   assert.match(svg, /<path\s+d="[^"]+"\s+fill="/, 'the asset paths carry a fill');
   assert.ok(SWIPE_ICON_PATHS.length >= 2, 'the hand and its arc are separate paths');
+});
+
+test('it is drawn in the colour Design Studio ships the asset in', () => {
+  // The mark took the rose the lucide hand had used when it first replaced it,
+  // which was nobody's decision - just what was already there. This is the
+  // asset's own defaultColor, and the test keeps the two from parting company
+  // if the entry is ever recoloured.
+  const panel = readFileSync('components/content/DesignStudioPanel.tsx', 'utf8');
+  const entry = panel.slice(panel.indexOf('brand_swipe_left: {'));
+  const defaultColor = /defaultColor: '([^']+)'/.exec(entry)[1];
+
+  assert.equal(SWIPE_ICON_COLOR, defaultColor);
 });
