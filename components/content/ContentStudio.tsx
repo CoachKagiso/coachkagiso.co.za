@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Download,
   FileText,
+  Hand,
   Image as ImageIcon,
   LayoutDashboard,
   ArrowUp,
@@ -29,6 +30,7 @@ import {
   Mail,
   MessageSquare,
   Mic2,
+  MoreHorizontal,
   Palette,
   PenLine,
   Plus,
@@ -115,7 +117,7 @@ import {
 } from '@/lib/content/carousel-skins';
 import type { CarouselTemplateOption, CarouselTemplatePalette } from '@/lib/content/carousel-template-registry';
 import { buildTemplateFillPrompt, countPlaceholders, replaceSlidesInOutput, splitRebuildOutput, splitSlidePreamble } from '@/lib/content/carousel-template';
-import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview } from '@/lib/content/utils';
+import { extractCleanTitle, extractOutputMetadata, extractPostBody, extractPreview, splitTopicAndStrategicNote } from '@/lib/content/utils';
 import {
   cleanMessyMiddleNotes,
   getBacklogNotesKind,
@@ -2596,16 +2598,27 @@ function buildManifestoSeriesPromptBlock(selection: CreateSelection, settings: M
   ].join('\n');
 }
 
+export type CreatePromptSignals = {
+  topArchetype?: string;
+  topService?: string;
+  commonAnxieties?: string[];
+};
+
 function buildCreateUserPrompt(
   selection: CreateSelection,
   topicValue: string,
   pillarFocus: CreatePillarFocus = 'auto',
   manifestoSettings: ManifestoSeriesSettings = defaultManifestoSettings,
+  signals?: CreatePromptSignals,
 ) {
   const platformLabel = selection.platform ? createPlatformLabels[selection.platform] : '';
   const contentType = findContentTypeOption(selection);
   const subType = contentType?.subTypes.find((item) => item.id === selection.subType);
   const angle = findAngleOption(selection);
+  const { cleanTopic, strategicNote } = splitTopicAndStrategicNote(topicValue);
+  const topAnxiety = (signals?.commonAnxieties || []).map((a) => String(a).trim()).filter(Boolean).join(', ');
+  const topArchetype = typeof signals?.topArchetype === 'string' ? signals.topArchetype.trim() : '';
+  const topService = typeof signals?.topService === 'string' ? signals.topService.trim() : '';
   const carouselSlideCountPrompt = selection.angle === 'this_not_that'
     ? 'Create a cover slide, 5 to 7 comparison slides, and a final close slide. This angle overrides generic Quick, Full, or Auto slide count controls.'
     : getCarouselSlideCountOption(selection.carouselSlideCount).prompt;
@@ -2625,14 +2638,17 @@ function buildCreateUserPrompt(
     : '';
   return [
     `Platform: ${platformLabel}`,
-    `Content type: ${contentType?.label || selection.contentType || ''}${subType ? ` (${subType.label})` : ''}`,
-    `Angle: ${angle?.label || selection.angle || ''}`,
-    `Register: ${getRegisterLabel(selection.angleRegister)}`,
+    `Content type: ${contentType?.label || selection.contentType || ''} / Subtype: ${subType ? subType.label : 'auto'}`,
+    `Angle: ${angle?.label || selection.angle || ''} / Register: ${getRegisterLabel(selection.angleRegister)}`,
     `Pillar: ${getPillarFocusPrompt(pillarFocus)}`,
+    topAnxiety ? `TOP ANXIETY: ${topAnxiety}` : '',
+    topArchetype ? `TOP ARCHETYPE: ${topArchetype}` : '',
+    topService ? `TOP SERVICE: ${topService}` : '',
     carouselStructuredOutput,
     buildCaptionReelPromptBlock(selection),
     buildManifestoSeriesPromptBlock(selection, manifestoSettings),
-    `Topic: ${topicValue.trim() || 'Suggest the strongest topic from the dashboard signal and selected angle.'}`,
+    `Topic: ${cleanTopic || 'Suggest the strongest topic from the dashboard signal and selected angle.'}`,
+    strategicNote ? `Strategic Note: ${strategicNote}` : '',
   ]
     .filter((item) => item && !item.endsWith(': '))
     .join('\n');
@@ -3915,7 +3931,10 @@ function titleFromMessyMiddle(text: string) {
 }
 
 function cleanDraftContent(aiOutput: string) {
-  return extractPostBody(aiOutput) || aiOutput.trim();
+  // Paragraph breaks are structural: trim the ends and collapse 3+ newlines
+  // to a double, but never flatten \n\n into spaces.
+  const body = extractPostBody(aiOutput) || aiOutput;
+  return body.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function buildPlanDays(dayCount: CalendarPlanLength = 30) {
@@ -5734,8 +5753,13 @@ export default function ContentStudio({
       }
       const result = await callAi(
         deriveCreateMode(selectionToUse),
-        buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse, manifestoSettings),
+        buildCreateUserPrompt(selectionToUse, topicToUse, pillarToUse, manifestoSettings, {
+          topArchetype: context.topArchetype,
+          topService: context.topService,
+          commonAnxieties: context.commonAnxieties,
+        }),
         selectionToUse,
+        { register: selectionToUse.angleRegister },
       );
       if (selectionToUse.contentType === 'carousel') {
         const carouselDraft = buildCarouselDraftFromAiOutput(result, selectionToUse, topicToUse, pillarToUse);
@@ -6946,6 +6970,7 @@ export default function ContentStudio({
               setCarouselStudioError(null);
             }}
             onStartDraft={() => navigateContent('studio', { topic: context.strongestTheme })}
+            profilePhotoUrl={profilePhotoUrl}
           />
         )}
 
@@ -10723,6 +10748,7 @@ function CarouselSlideFrame({
   exportDimensions,
   frameRef,
   eyebrow,
+  profilePhotoUrl,
 }: {
   slide: CarouselSlide;
   index: number;
@@ -10733,15 +10759,18 @@ function CarouselSlideFrame({
   exportDimensions?: { width: number; height: number };
   frameRef?: Ref<HTMLElement>;
   eyebrow?: string;
+  profilePhotoUrl?: string | null;
 }) {
   const isBold = template.value === 'bold_diagnostic';
   const isCareerNotes = template.value === 'editorial_career_notes';
   const isSoftCards = template.value === 'soft_diagnostic_cards';
   const isWarm = template.value === 'warm_coaching' || isSoftCards;
   const isEditorial = template.value === 'editorial_authority' || isCareerNotes;
+  const isEditorialAuthority = template.value === 'editorial_authority';
   const isSignature = template.value === 'signature_narrative';
   const palette = template.palette;
   const furniture = template.furniture;
+  const avatarSrc = profilePhotoUrl || '/images/author/ck-profile.png';
   const role = slide.role || getDefaultCarouselSlideRole((layoutRecipe || template.layoutRecipe).value, index, total);
   const stageEyebrow = eyebrow ?? '';
   const bodyPoints = getCarouselSlideBodyPoints(slide.body);
@@ -10790,7 +10819,167 @@ function CarouselSlideFrame({
     );
   };
 
-  const renderHeader = () => (
+  // Editorial Authority renders **bold** spans as strong runs so the reference
+  // look (regular sans with bold key phrases) works without rewriting copy.
+  const renderRichText = (text: string, strongWeight = 700): ReactNode[] => {
+    const parts = text.split(/\*\*(.+?)\*\*/g).filter((part) => part !== '');
+    if (parts.length <= 1) return [text];
+    return parts.map((part, partIndex) => {
+      const isStrong = partIndex % 2 === 1;
+      return isStrong ? (
+        <strong key={`rich-${index}-${partIndex}`} style={{ fontWeight: strongWeight }}>
+          {part}
+        </strong>
+      ) : (
+        <span key={`rich-${index}-${partIndex}`}>{part}</span>
+      );
+    });
+  };
+
+  const renderTopProgress = () => (
+    <div
+      className="flex items-center tabular-nums"
+      style={{ gap: exportDimensions ? exportSize(8) : '8px' }}
+      aria-label={`Slide ${index + 1} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, progressIndex) => {
+        const active = progressIndex === index;
+        return (
+          <span
+            key={`progress-${progressIndex}`}
+            className="font-semibold"
+            style={{
+              color: active ? '#B9927A' : '#B9B0A8',
+              fontFamily: 'var(--font-sans)',
+              fontSize: exportDimensions ? exportSize(13.3) : '13px',
+              letterSpacing: exportDimensions ? exportSize(1.3) : '0.05em',
+            }}
+          >
+            {String(progressIndex + 1).padStart(2, '0')}
+          </span>
+        );
+      })}
+    </div>
+  );
+
+  const renderIconRow = () => {
+    const iconSize = exportDimensions ? exportSize(20) : '20px';
+    const iconStyle = { color: '#142334', height: iconSize, width: iconSize };
+    return (
+      <div
+        className="flex items-center"
+        style={{ gap: exportDimensions ? exportSize(20) : '20px' }}
+        aria-hidden="true"
+      >
+        <span className="relative inline-flex">
+          <Mail style={iconStyle} strokeWidth={1.8} />
+          <span
+            className="absolute rounded-full"
+            style={{
+              backgroundColor: '#C9AD98',
+              height: exportDimensions ? exportSize(10) : '10px',
+              right: exportDimensions ? `-${exportSize(2)}` : '-2px',
+              top: exportDimensions ? `-${exportSize(2)}` : '-2px',
+              width: exportDimensions ? exportSize(10) : '10px',
+            }}
+          />
+        </span>
+        <Trash2 style={iconStyle} strokeWidth={1.8} />
+        <Upload style={iconStyle} strokeWidth={1.8} />
+        <MoreHorizontal style={iconStyle} strokeWidth={2} />
+      </div>
+    );
+  };
+
+  const renderAvatarBlock = () => {
+    const avatarSize = exportDimensions ? exportSize(56) : '56px';
+    return (
+      <div
+        className="flex items-center"
+        style={{ gap: exportDimensions ? exportSize(14) : '14px' }}
+      >
+        {/* Plain img (not next/image) so html2canvas captures it in PNG export. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={avatarSrc}
+          alt="Coach Kagiso"
+          crossOrigin="anonymous"
+          style={{
+            border: `${exportDimensions ? exportSize(2) : '2px'} solid #B76E79`,
+            borderRadius: '9999px',
+            height: avatarSize,
+            objectFit: 'cover',
+            width: avatarSize,
+          }}
+        />
+        <div>
+          <p
+            className="font-bold uppercase"
+            style={{
+              color: '#B9927A',
+              fontFamily: 'var(--font-sans)',
+              fontSize: exportDimensions ? exportSize(17) : '17px',
+              letterSpacing: exportDimensions ? exportSize(2.4) : '0.12em',
+            }}
+          >
+            COACHKAGISO
+          </p>
+          <p
+            className="font-medium"
+            style={{
+              color: '#B9927A',
+              fontFamily: 'var(--font-sans)',
+              fontSize: exportDimensions ? exportSize(17) : '17px',
+              marginTop: exportDimensions ? exportSize(2) : '2px',
+            }}
+          >
+            @coach.kagiso
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSwipeCue = () => (
+    <span
+      className="flex items-center font-bold uppercase"
+      style={{
+        color: '#B9927A',
+        fontFamily: 'var(--font-sans)',
+        fontSize: exportDimensions ? exportSize(14.4) : '14px',
+        gap: exportDimensions ? exportSize(6) : '6px',
+        letterSpacing: exportDimensions ? exportSize(2) : '0.1em',
+      }}
+    >
+      SWIPE
+      <Hand
+        style={{
+          color: '#B76E79',
+          height: exportDimensions ? exportSize(20) : '20px',
+          width: exportDimensions ? exportSize(20) : '20px',
+        }}
+        strokeWidth={1.6}
+      />
+    </span>
+  );
+
+  const renderHeader = () => {
+    // Reference look: progress strip + utility icons top-right, avatar + handle
+    // below on the left. No pill counter, no ink wordmark up top.
+    if (isEditorialAuthority) {
+      return (
+        <div className="flex flex-col" style={{ gap: exportDimensions ? exportSize(28) : '28px' }}>
+          <div className="flex items-start justify-end" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
+            <div className="flex flex-col items-end" style={{ gap: exportDimensions ? exportSize(14) : '14px' }}>
+              {renderTopProgress()}
+              {renderIconRow()}
+            </div>
+          </div>
+          {renderAvatarBlock()}
+        </div>
+      );
+    }
+    return (
     <div className="flex items-start justify-between" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
       <div className="flex items-center gap-3" style={{ gap: exportDimensions ? exportSize(12) : '12px' }}>
         <div>
@@ -10838,9 +11027,30 @@ function CarouselSlideFrame({
         renderCounter()
       )}
     </div>
-  );
+    );
+  };
 
-  const renderFooter = () => (
+  const renderFooter = () => {
+    // Reference look: copper wordmark left, SWIPE + hand right. No dash/domain.
+    if (isEditorialAuthority) {
+      return (
+        <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
+          <p
+            className="font-bold uppercase"
+            style={{
+              color: '#B9927A',
+              fontFamily: 'var(--font-sans)',
+              fontSize: exportDimensions ? exportSize(14.4) : '14px',
+              letterSpacing: exportDimensions ? exportSize(2.4) : '0.12em',
+            }}
+          >
+            COACHKAGISO
+          </p>
+          {renderSwipeCue()}
+        </div>
+      );
+    }
+    return (
     <div className="flex items-end justify-between" style={{ gap: exportDimensions ? exportSize(16) : '16px' }}>
       {furniture.counter === 'strip' ? (
         <div className="flex items-center gap-2" style={{ gap: exportDimensions ? exportSize(8) : '8px' }}>
@@ -10907,7 +11117,8 @@ function CarouselSlideFrame({
         {index === total - 1 ? furniture.footerRightLast : furniture.footerRight}
       </p>
     </div>
-  );
+    );
+  };
 
   const contentArea = (
     <>
@@ -10942,18 +11153,20 @@ function CarouselSlideFrame({
               </p>
             )}
             <h3
-              className="font-serif leading-[1.0] tracking-[-0.01em]"
+              className={isEditorialAuthority ? 'font-sans font-normal leading-[1.15]' : 'font-serif leading-[1.0] tracking-[-0.01em]'}
               style={{
-                fontFamily: 'var(--font-serif)',
+                fontFamily: isEditorialAuthority ? 'var(--font-sans)' : 'var(--font-serif)',
                 fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
                 fontStyle: isSoftCards ? 'italic' : undefined,
-                letterSpacing: 0,
-                lineHeight: isCareerNotes ? 0.92 : 1.0,
+                fontWeight: isEditorialAuthority ? 400 : undefined,
+                letterSpacing: isEditorialAuthority ? '-0.005em' : 0,
+                lineHeight: isEditorialAuthority ? 1.15 : isCareerNotes ? 0.92 : 1.0,
                 maxWidth: exportDimensions ? `${42 * 14.4 * exportScale}px` : undefined,
               }}
             >
-              {slide.headline}
+              {isEditorialAuthority ? renderRichText(slide.headline) : slide.headline}
             </h3>
+            {isEditorialAuthority ? null : (
             <div
               className="mt-4 h-[3px] w-16 rounded-full"
               style={{
@@ -10963,6 +11176,7 @@ function CarouselSlideFrame({
                 width: exportDimensions ? exportSize(48) : undefined,
               }}
             />
+            )}
             {slide.body && (
               isSoftCards ? (
                 <div
@@ -10983,13 +11197,14 @@ function CarouselSlideFrame({
                   className="mt-4 max-w-[42ch] font-normal leading-relaxed"
                   style={{
                     color: isBold ? 'rgba(255,255,255,0.68)' : palette.foreground,
+                    fontFamily: isEditorialAuthority ? 'var(--font-sans)' : undefined,
                     fontSize: exportDimensions ? exportSize(20) : '20px',
                     marginTop: exportDimensions ? exportSize(16) : undefined,
                     maxWidth: exportDimensions ? `${42 * 20 * exportScale}px` : undefined,
                     lineHeight: 1.5,
                   }}
                 >
-                  {slide.body}
+                  {isEditorialAuthority ? renderRichText(slide.body) : slide.body}
                 </p>
               )
             )}
@@ -11030,7 +11245,7 @@ function CarouselSlideFrame({
                     className="rounded-full border font-bold uppercase"
                     style={{
                       borderColor: palette.border,
-                      color: isBold ? 'rgba(255,255,255,0.65)' : palette.muted,
+                      color: isBold ? 'rgba(255,255,255,0.65)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                       fontSize: exportDimensions ? exportSize(12.2) : '12px',
                       letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
                       padding: exportDimensions ? `${exportSize(3)} ${exportSize(10)}` : '3px 10px',
@@ -11042,15 +11257,17 @@ function CarouselSlideFrame({
               </div>
             )}
             <h3
-              className="font-serif leading-[1.0] tracking-[-0.01em]"
+              className={isEditorialAuthority ? 'font-sans font-normal leading-[1.15]' : 'font-serif leading-[1.0] tracking-[-0.01em]'}
               style={{
-                fontFamily: 'var(--font-serif)',
+                fontFamily: isEditorialAuthority ? 'var(--font-sans)' : 'var(--font-serif)',
                 fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
-                lineHeight: 1.0,
+                fontWeight: isEditorialAuthority ? 400 : undefined,
+                lineHeight: isEditorialAuthority ? 1.15 : 1.0,
               }}
             >
-              {slide.headline}
+              {isEditorialAuthority ? renderRichText(slide.headline) : slide.headline}
             </h3>
+            {isEditorialAuthority ? null : (
             <div
               className="mt-3 h-[2px] w-12 rounded-full"
               style={{
@@ -11060,6 +11277,7 @@ function CarouselSlideFrame({
                 width: exportDimensions ? exportSize(48) : undefined,
               }}
             />
+            )}
             {slide.body && (
               <div
                 className="mt-5 max-w-[40ch] rounded-[8px] border p-4 leading-relaxed"
@@ -11104,7 +11322,7 @@ function CarouselSlideFrame({
               <p
                 className="mt-3 font-medium"
                 style={{
-                  color: palette.muted,
+                  color: (isEditorialAuthority ? palette.foreground : palette.muted),
                   fontSize: exportDimensions ? exportSize(13.3) : '13px',
                   marginTop: exportDimensions ? exportSize(12) : undefined,
                 }}
@@ -11127,13 +11345,15 @@ function CarouselSlideFrame({
             }}
           >
             <h3
-              className="font-serif leading-[1.02] tracking-[-0.008em]"
+              className={isEditorialAuthority ? 'font-sans font-normal leading-[1.15]' : 'font-serif leading-[1.02] tracking-[-0.008em]'}
               style={{
-                fontFamily: 'var(--font-serif)',
+                fontFamily: isEditorialAuthority ? 'var(--font-sans)' : 'var(--font-serif)',
                 fontSize: exportDimensions ? exportSize(resolvedHeadlineSize) : `${resolvedHeadlineSize}px`,
+                fontWeight: isEditorialAuthority ? 400 : undefined,
+                lineHeight: isEditorialAuthority ? 1.15 : undefined,
               }}
             >
-              {slide.headline}
+              {isEditorialAuthority ? renderRichText(slide.headline) : slide.headline}
             </h3>
             {composition === 'card_grid' && bodyPoints.length > 1 ? (
               <div
@@ -11151,7 +11371,7 @@ function CarouselSlideFrame({
                     style={{
                       backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : palette.panel,
                       borderColor: isBold ? 'rgba(255,255,255,0.12)' : palette.border,
-                      color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                      color: isBold ? 'rgba(255,255,255,0.78)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                       fontSize: exportDimensions ? exportSize(20) : '20px',
                       padding: exportDimensions ? exportSize(12) : undefined,
                       boxShadow: isBold ? 'none' : '0 1px 3px rgba(20,35,52,0.06)',
@@ -11179,7 +11399,7 @@ function CarouselSlideFrame({
               <ol
                 className="mt-4 grid max-w-[42ch] gap-2 font-semibold leading-relaxed"
                 style={{
-                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                  color: isBold ? 'rgba(255,255,255,0.76)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                   fontSize: exportDimensions ? exportSize(20) : '20px',
                   gap: exportDimensions ? exportSize(6) : undefined,
                   marginTop: exportDimensions ? exportSize(16) : undefined,
@@ -11229,7 +11449,7 @@ function CarouselSlideFrame({
                 <p
                   className="font-semibold leading-relaxed"
                   style={{
-                    color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                    color: isBold ? 'rgba(255,255,255,0.76)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                     fontSize: exportDimensions ? exportSize(20) : '20px',
                   }}
                 >
@@ -11265,7 +11485,7 @@ function CarouselSlideFrame({
                       className="font-bold uppercase"
                       style={{
                         color: pointIndex === 0
-                          ? isBold ? 'rgba(255,255,255,0.4)' : palette.muted
+                          ? isBold ? 'rgba(255,255,255,0.4)' : (isEditorialAuthority ? palette.foreground : palette.muted)
                           : palette.accent,
                         fontSize: exportDimensions ? exportSize(12.2) : '12px',
                         letterSpacing: exportDimensions ? exportSize(1.7) : '0.14em',
@@ -11276,7 +11496,7 @@ function CarouselSlideFrame({
                     <p
                       className="mt-2 font-semibold leading-snug"
                       style={{
-                        color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                        color: isBold ? 'rgba(255,255,255,0.78)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                         fontSize: exportDimensions ? exportSize(16) : '16px',
                         marginTop: exportDimensions ? exportSize(8) : undefined,
                       }}
@@ -11291,7 +11511,7 @@ function CarouselSlideFrame({
                 className="mt-4 relative max-w-[40ch] rounded-[8px] px-5 py-4 font-medium leading-relaxed"
                 style={{
                   backgroundColor: isBold ? 'rgba(255,255,255,0.06)' : isWarm ? 'rgba(201,173,152,0.08)' : palette.panel,
-                  color: isBold ? 'rgba(255,255,255,0.82)' : palette.muted,
+                  color: isBold ? 'rgba(255,255,255,0.82)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                   fontSize: exportDimensions ? exportSize(20) : '20px',
                   marginTop: exportDimensions ? exportSize(16) : undefined,
                   maxWidth: exportDimensions ? `${40 * 20 * exportScale}px` : undefined,
@@ -11355,7 +11575,7 @@ function CarouselSlideFrame({
                 <p
                   className="mt-3 font-semibold leading-relaxed"
                   style={{
-                    color: isBold ? 'rgba(255,255,255,0.78)' : palette.muted,
+                    color: isBold ? 'rgba(255,255,255,0.78)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                     fontSize: exportDimensions ? exportSize(20) : '20px',
                     marginTop: exportDimensions ? exportSize(12) : undefined,
                   }}
@@ -11367,7 +11587,7 @@ function CarouselSlideFrame({
               <p
                 className="mt-3 max-w-[40ch] font-medium leading-relaxed"
                 style={{
-                  color: isBold ? 'rgba(255,255,255,0.76)' : palette.muted,
+                  color: isBold ? 'rgba(255,255,255,0.76)' : (isEditorialAuthority ? palette.foreground : palette.muted),
                   fontSize: exportDimensions ? exportSize(20) : '20px',
                   marginTop: exportDimensions ? exportSize(12) : undefined,
                   maxWidth: exportDimensions ? `${40 * 20 * exportScale}px` : undefined,
@@ -12249,6 +12469,7 @@ function CarouselStudioPanel({
   selectedDraftId,
   onDraftSelect,
   onStartDraft,
+  profilePhotoUrl,
 }: {
   // CHANGE O: custom CTA templates are fetched from the templates API.
   adminKey?: string;
@@ -12258,6 +12479,7 @@ function CarouselStudioPanel({
   defaultLayoutRecipe: CarouselLayoutRecipe;
   savingDraftId: string | null;
   error: string | null;
+  profilePhotoUrl?: string | null;
   onDefaultAspectRatioChange: (value: CarouselAspectRatio) => void;
   onDefaultTemplateChange: (value: CarouselTemplate) => void;
   onDefaultLayoutRecipeChange: (value: CarouselLayoutRecipe) => void;
@@ -12561,7 +12783,7 @@ function CarouselStudioPanel({
             const res = await fetch('/api/carousel-pdf', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ deck: pdfSlides, template: displayedTemplateOption }),
+              body: JSON.stringify({ deck: pdfSlides, template: displayedTemplateOption, profilePhotoUrl: profilePhotoUrl || null }),
             });
             if (res.ok) {
               const filename = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] || `${baseName}.pdf`;
@@ -13121,6 +13343,7 @@ function CarouselStudioPanel({
               template={displayedTemplateOption}
               layoutRecipe={displayedLayoutRecipeOption}
               eyebrow={renderedEyebrows[index]}
+              profilePhotoUrl={profilePhotoUrl}
             />
           ))}
         </div>
@@ -13146,6 +13369,7 @@ function CarouselStudioPanel({
               layoutRecipe={displayedLayoutRecipeOption}
               exportDimensions={displayedExportDimensions}
               eyebrow={renderedEyebrows[index]}
+              profilePhotoUrl={profilePhotoUrl}
               frameRef={(node) => {
                 exportSlideFrameRefs.current[index] = node;
               }}

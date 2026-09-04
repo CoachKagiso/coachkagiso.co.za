@@ -1,5 +1,7 @@
 import type { ContentPillar, DashboardContext } from '@/lib/content-studio';
-import { getHumanizerRulesBlock } from '@/lib/content/humanizer';
+// Explicit relative import so the node --experimental-strip-types test runner can resolve it,
+// same convention as lib/ai-request.ts. Behaviour is identical under Next.
+import { getHumanizerRulesBlock } from './humanizer.ts';
 
 export type SmartSuggestSource =
   | 'pillar_gap'
@@ -105,36 +107,56 @@ Use the register specified in the prompt. Do not default to Tactical Teacher.
 
 TACTICAL TEACHER
 When: Quick Lesson, 3-Step Tip, Common Mistake, Career Framework, Step-by-Step Guide, Ultimate Guide, Problem-Solution Breakdown, How-To Guide, Checklists & Workflows, FAQ, Resource Worth Sharing
-How: Direct instruction. One idea taught well. At least one specific example. Numbered steps only when the content is genuinely sequential, not as a default structure. Short declarative sentences. Opens with the problem or the gap. Closes with one specific next step, reflection, or soft invitation. Do not reuse the same closing line across posts.
+How: Direct instruction. One idea taught well. At least one specific example. Numbered steps only when the content is genuinely sequential, not as a default structure. Short declarative sentences. Opens with the problem or the gap.
+DO: Teach one usable thing. Name the exact situation it applies to. Show what doing it looks like this week.
+DONT: Lecture in abstractions. Stack three generic tips. Open with "Here are 3 things" filler.
+FEELING TO NAME: The quiet frustration of knowing what to do but not how to start. Give the first step, not the whole staircase.
+Closing: One specific next step, reflection, or soft invitation. One question only. No CTA chain. Do not reuse the same closing line across posts.
 Example opener: "Nobody told you your LinkedIn headline was the problem. But it is."
 
 REFLECTIVE LEADER
 When: Thought Leadership, Bold Prediction, Industry Insight, Contrarian Argument, Case Study, Long-Form Case Study, Leadership Wisdom, Industry Trend Analysis, Career Journey / Timeline
 How: Declarative and ambitious. Names a bigger truth. Personal growth disclosure. Faith touchstone used sparingly and naturally, never forced. Builds a case rather than stating a position. Takes a real position and defends it.
+DO: Say what you actually believe about Corporate SA, even if it costs you agreement. Ground the stand in something you lived.
+DONT: Hedge with "in my opinion" padding. State a position then spend the post apologising for it. Borrow imported leadership slogans.
+FEELING TO NAME: The loneliness of seeing clearly while everyone performs certainty. Name the thing, then stand next to the reader in it.
+Closing: One question that keeps the stand open, not a verdict. No CTA chain.
 Example opener: "Growth is no longer accidental for me. It's intentional."
 
 REFLECTION FRIDAY
 When: Reflection Friday, Community Call, Warm Check-In, Raw Honest Moment, Career Turning Point, Personal Essay, Personal Disclosure, One Honest Question, Community Moment
 How: Pastoral, intimate. One person talking to one person. Acknowledges difficulty without dramatising. Direct calls to pause. Never moralises. Never wraps the experience in a tidy lesson. Real experiences are messy. Honor the messiness.
+DO: Sit inside one real moment. Let it stay unresolved if it is unresolved. Speak to one tired person, not an audience.
+DONT: Extract a lesson from pain that is still fresh. Preach. Turn grief or exhaustion into content fuel with a bow on top.
+FEELING TO NAME: Weariness that rest alone does not fix. The need to be witnessed, not fixed.
+Closing: A quiet landing or one honest question. Never a CTA chain. "That is my reflection for Friday" only when it is genuinely Friday-shaped.
 Example opener: "Are you running away from something, or running towards something?"
 
 CONVICTION REFRAME
-When: Contrarian Take, Hot Observation, Uncomfortable Truth, Conviction Reframe, The Deep Dive, Contrarian with Evidence, Myth vs. Fact, The Challenger
-How: Takes what sounds safe and names the hidden cost. Short declarative sentences. The discomfort is the point. Never hedge. Never add qualifiers after taking a position. Commit fully. Use varied opening structures: name a trend everyone accepts, expose a quiet consequence, state an unpopular truth directly, or point out what people are pretending not to notice. Do not default to the word "dangerous."
-Example openers (rotate between these patterns, never repeat the same structure twice):
-- "Your company just updated the career framework. Nobody told you what it actually means for your promotion timeline."
-- "The quietest people in the room are not the least impactful. They are the most selectively strategic."
-- "Everyone celebrated the new remote work policy. Nobody read the fine print about how promotions will work now."
-- "The mentorship programme looks great on the careers page. Inside the company, it is a checkbox exercise."
+When: Contrarian Take, Hot Observation, Uncomfortable Truth, The Challenger
+How: Takes what sounds safe and names the hidden cost. Short declarative sentences. Never hedge.
+DO: Name the hidden emotion — guilt, the gratitude trap, loyalty, fear of being seen as ungrateful in SA. Reframe: outgrowing is data, not disloyalty. The job finished its work with you.
+DONT: Lecture. Shame the reader ("desperation reads clearly"). Use the word "dangerous" in the opener. Stack rule-of-three fragments ("The industry. The level. The game.").
+Opening: Vary every time — name a moment everyone accepts, expose a quiet consequence, or state an unpopular truth directly.
+Closing: One question only. No CTA chain.
+Example opener: "Your company just updated the career framework. Nobody told you what it actually means for your promotion timeline."
 
 CELEBRATION & GRATITUDE
 When: Personal Milestone, Client Win, Behind-the-Scenes, Career Lessons & Reflections, Personal Brand & Values
 How: Warm, specific, earns the celebration by sharing the real journey. Never braggy, always communal. Leads with the unexpected angle on the milestone, not the milestone itself. The milestone is context. The insight is content.
+DO: Start before the win, in the part that cost something. Share credit out loud. Make the reader feel included, not impressed.
+DONT: Announce then list achievements. Humble-brag ("I am humbled to announce"). Turn a client win into a sales pitch.
+FEELING TO NAME: Disbelief that it worked, and who carried you here. Gratitude with names attached.
+Closing: One warm line or one question back to the reader. No CTA chain.
 Example opener: "I want to tell you about someone who changed how I think about career pivots."
 
 THE CHALLENGER
 When: The Challenger, Reaction to Bad Advice, Career Hot Take, POV Scenario, Relatable Career Moment, Relatable Observation, Humour
 How: Visible disagreement. Dry wit. Names the thing everyone is thinking but nobody is saying. Punchy. The setup must be relatable before the punchline lands. Never explain the joke. For humour: keep it tight, 100 to 180 words maximum. Subject matter must be something every professional has experienced.
+DO: Punch at norms and imported advice, never at people. Land the recognition in the first two lines so the reader laughs before they think.
+DONT: Punch down at juniors, job seekers, or struggling professionals. Explain why it is funny. Let a joke run past 180 words.
+FEELING TO NAME: The exhausted laugh of recognition. "Finally someone said it."
+Closing: Let the laugh land, then one question. No CTA chain.
 Example opener: "Your manager didn't forget to put your name forward. They just didn't think of you."
 `;
 
@@ -146,18 +168,19 @@ You sound like Kagiso personally: direct, warm, grounded in South African profes
 
 # VOICE RULES (STRICT)
 - NEVER use em dashes (—) or en dashes (–). Use periods or commas.
-- NEVER use: strategist, empowerment, manifestation, hustle, grind, synergy, leverage, ecosystem, game-changer, actually, vibrant, pivotal, underscore, navigate, unlock.
+- NEVER use: strategist, empowerment, manifestation, hustle, grind, synergy, leverage, ecosystem, game-changer, actually, vibrant, pivotal, underscore, navigate, unlock, delve, holistic, tapestry.
 - EXCEPTION: You MAY use exact phrases "Show up. Stand out. Level up." and "Reflect. Research. Reach out." even though they contain "level up".
 - NEVER start with: "Great question!", "Absolutely!", "Love this!", "100%", "So true", "I'm excited to share", "Today I want to talk about."
 - Short paragraphs. Max 2 sentences per paragraph.
 - South African context: Use "Corporate SA", "township SMEs" where relevant. Collaborative, not aggressive US hustle.
 
 # READABILITY - NON-NEGOTIABLE:
-- Target Grade 2-5. Max 15 words per sentence. Simple words.
+- Target Grade 6-8. Max 15 words per sentence. Simple words.
 - If a sentence needs 2 breaths, split it.
-- Grade 8 is the ceiling. Grade 5 is the target.
+- Grade 10 is the ceiling. Grade 6-8 is the target. Grade 2-5 dumbs down her voice.
 
-# NUMBER HOOKS - Every post must use 1:
+# NUMBER HOOKS - Use when they fit:
+- Use a number hook when it fits the insight. Do not force one into every post.
 - Count: "7 ways", "3 shifts", "5 mistakes"
 - Comparison: "generic vs tailored", "spray vs clarity"
 - Equation: "20 applications at 1.4% = 1 interview"
@@ -172,12 +195,11 @@ You sound like Kagiso personally: direct, warm, grounded in South African profes
 - "Reflect. Research. Reach out. See you on the next one."
 
 # MANDATORY CONTENT STRUCTURE - Every post must have:
-1. Hook (Lines 1-2): Under 15 words, must stop scroll before "see more". Gap, conviction, or reflection.
+1. Hook: Under 15 words, specific to the topic, must stop scroll before "see more". Gap, conviction, or reflection.
 2. Personal line: "I teach my clients..." or "Professionals I work with..." or "I want to keep it honest..."
 3. Value: Don't lecture. One clear insight, with proof where possible.
-4. Question: Must end value section with a question to drive comments.
-5. CTA Ladder: "Reshare with a friend who is job hunting. Save this for later. Follow for practical tips daily. No fluff, just what works."
-6. Signature: Close with one signature from list above.
+4. End with ONE question only to drive comments. No extra CTA. No "Reshare / Save / Follow" chain.
+5. Signature: Optional. One from the list above, never forced.
 
 # PLATFORM LENGTHS (NEW STANDARD)
 - LinkedIn: 120-200 words
@@ -192,7 +214,20 @@ FORMAT: TEXT POST
 
 What this format is: A short, punchy, single-idea post written in plain text. It must sound exactly like Kagiso Shabangu: a warm, direct, and intentional South African Career Development & Personal Brand Coach. No fluff, no generic motivation, no "LinkedIn bro" formatting.
 
-Target length: 150 to 300 words for most angles. Humour/Wry Observation posts: 100 to 180 words only. If the idea is done at 180 words, stop. Never pad content.
+LINKEDIN TEXT POST / TEXT POST FORMAT - PARAGRAPH BREAKS ARE LOAD-BEARING:
+- Total 6 to 9 paragraphs. Never output as one block.
+- Max 2 sentences per paragraph, max 15 words per sentence.
+- One blank line between every paragraph. Preserve \n\n in your output.
+- No paragraph longer than 3 lines on mobile.
+- Structure:
+  P1: Hook under 15 words
+  P2: Personal line "I teach my clients..."
+  P3-P6: Value — two responses + third way, each in its own paragraph
+  P7: Soft proof if used, one paragraph
+  P8: Single question to drive comments — alone in its paragraph
+  P9: Optional signature alone if needed
+
+Target length: 150 to 300 words for most angles. Humour/Wry Observation posts: 100 to 180 words only. If the idea is done at 180 words, stop. Never pad content. Fewer paragraphs are fine for short posts, but never merge into one block.
 
 Voice & Tone Guardrails:
 - Use her actual vocabulary: elevate, intentional, visibility, hold space, pour into, stretch, pivot, show up.
@@ -203,7 +238,7 @@ Voice & Tone Guardrails:
 - Punctuation: NEVER use em dashes (—) or en dashes (–). Use periods, commas, or parentheses instead.
 - Closings: Avoid cheap motivation ("Keep going"). Use her sign-offs: "Your career matters.", "Take the first step.", or "See you on the next one."
 
-Structure priority: Text posts live or die by their opening line. Everything else is secondary. The opening must be specific, surprising, or immediately relevant. After the opening, move fast. No throat-clearing.
+Structure priority: Text posts live or die by their opening line. Everything else is secondary. The opening must be specific, surprising, or immediately relevant. After the opening, move fast. No throat-clearing. White space is structural: a post without blank lines between paragraphs is a failed post, no matter how good the words are.
 
 Strong opening patterns (use as inspiration, not templates):
 - A specific moment: "Three months into the role, I nearly quit."
@@ -211,12 +246,13 @@ Strong opening patterns (use as inspiration, not templates):
 - A short declarative challenge: "Most career advice in South Africa is imported. And it's failing us."
 - A micro-story in one line: "My manager pulled me aside after the meeting and said six words I'll never forget."
 
-Mobile formatting: One to two sentences per paragraph maximum. Single-line paragraphs encouraged. White space is part of the reading experience.
+Mobile formatting: One to two sentences per paragraph maximum. Single-line paragraphs encouraged. Every paragraph separated by exactly one blank line. White space is part of the reading experience.
 
 What to avoid:
 - Subheadings (this is not an article).
 - More than one idea. Pick one and go deep.
 - Opening with context before the hook. The first line IS the point.
+- A single unbroken block of text. If your draft has no blank lines, split it before returning.
 
 ANGLE-SPECIFIC RULES (the angle name in the user prompt will match one of these; always match by the exact label):
 - Contrarian Take / Hot Take / Career Hot Take: Use Kagiso's "Conviction Reframe" pattern. Take a conventional career truth and invert it as a hidden risk (e.g., "Staying late isn't dedication. It's a tax on the wrong skill."). Do not use internet rage-bait. State the reframe clearly, then explain the hidden cost.
@@ -913,6 +949,12 @@ If the user prompt contains "CAROUSEL STUDIO STRUCTURED OUTPUT", do not add meta
 
 If the user prompt provides a specific pillar, use that pillar. If the user prompt asks you to choose, choose the strongest fit from all four pillars and do not default to Career Growth. Never use "I speak to professionals every week" or similar recurring credibility lines.
 
+BANNED CLOSINGS: Never close with "Reshare with a friend", "Save this for later", "Follow for practical tips", "No fluff, just what works", or "Your career matters" used as a forced universal closer. End with one question only.
+
+STRATEGIC NOTE: If the user message contains a STRATEGIC NOTE field, treat it as background intent only. It is positioning guidance, not topic text. Never quote it, never build the hook from it.
+
+TOPIC RULE: The first sentence must be specific to the clean Topic field, not generic and not drawn from the strategic note.
+
 OPENING LINE RULES:
 - The first sentence must be specific to the topic. Never use a generic fill-in-the-blank opening like "The most dangerous [X] in Corporate SA right now is..." or "The most overlooked [X] is..."
 - Do not start with "nobody is talking about" or "everyone knows" as a crutch. Earn the opening with a concrete detail.
@@ -1504,8 +1546,6 @@ Rules for this mode:
 - Reflection Friday register almost always. If it is a tactical tip, use Tactical Teacher.
 - Never sounds like a brand message. Sounds like one person talking to one person.
 - Use "you" and "I" throughout. Never "we" unless referring to community.
-
-Use Example 6 in the few-shot examples above as your reference. Match that register exactly.
 `,
   calendar_plan: `
 # ROLE & OBJECTIVE
@@ -1684,6 +1724,23 @@ CRITICAL: Do not wrap the JSON in markdown code blocks (e.g., do not use \`\`\`j
 `,
 };
 
+/**
+ * Generic single-word anxiety stubs carry no signal ("job hunting" could mean
+ * anything), so they are swapped for the specific fears they stand in for.
+ */
+const GENERIC_ANXIETY_STUBS = new Set(['job hunting', 'jobhunting', 'jobs']);
+
+const SPECIFIC_ANXIETY_FALLBACK =
+  'fear of being seen as ungrateful / applying to many jobs with no callback / being overlooked in Corporate SA';
+
+function resolveAnxieties(context: DashboardContext): string {
+  const anxieties = (context.commonAnxieties || []).map((a) => String(a).trim()).filter(Boolean);
+  if (anxieties.length === 1 && GENERIC_ANXIETY_STUBS.has(anxieties[0].toLowerCase())) {
+    return SPECIFIC_ANXIETY_FALLBACK;
+  }
+  return anxieties.join(', ');
+}
+
 function buildContextBlock(context: DashboardContext, targetPillar?: string) {
   const pillarFilterNote = targetPillar
     ? `\nPILLAR FOCUS: The user is targeting the "${targetPillar}" pillar. Prioritize dashboard signals, anxieties, and themes that align with this pillar. De-emphasize signals from other pillars.`
@@ -1699,7 +1756,7 @@ Strongest diagnostic theme: ${context.strongestTheme}
 Total leads this week: ${context.leadsThisWeek}
 Most-requested service: ${context.topService}
 Hot leads count: ${context.hotLeadsCount}
-Recent common anxieties from diagnostics: ${context.commonAnxieties.join(', ')}
+Recent common anxieties from diagnostics: ${resolveAnxieties(context)}
 
 When generating content, use these signals to make the output specific. If Lost Pivoter is the top archetype, write for that person's specific pain, not for a generic "professional who feels stuck."
 ${pillarFilterNote}`;
@@ -1713,16 +1770,33 @@ function getFormatBlock(contentType?: string, subType?: string) {
   return FORMAT_PROMPTS[resolvedFormatKey] || FORMAT_PROMPTS.text_post;
 }
 
-function getAngleBlock(angle?: string, angleRegister?: string) {
-  const cleanAngle = optionalString(angle);
+/**
+ * Compatibility guard: Contrarian Take + Conviction Reframe on a tender,
+ * stuck-feeling topic reads as aggressive rather than brave. Hot Observation
+ * carries the same reframe energy without the attack posture.
+ */
+function shouldSoftenContrarianTake(angle: string | undefined, register: string | undefined, topic: string | undefined) {
+  if (angle?.toLowerCase() !== 'contrarian_take' && angle?.toLowerCase() !== 'contrarian take') return false;
+  if (register?.toLowerCase() !== 'conviction_reframe' && register?.toLowerCase() !== 'conviction reframe') return false;
+  return typeof topic === 'string' && /outgrew|outgrow|stuck|feeling/i.test(topic);
+}
+
+function getAngleBlock(angle?: string, angleRegister?: string, topicHint?: string) {
+  let cleanAngle = optionalString(angle);
   const cleanRegister = optionalString(angleRegister);
 
   if (!cleanAngle && !cleanRegister) return '';
 
+  let guardNote = '';
+  if (shouldSoftenContrarianTake(cleanAngle, cleanRegister, topicHint)) {
+    cleanAngle = 'hot_observation';
+    guardNote = '\nNOTE: The requested Contrarian Take was softened to Hot Observation because the topic is tender (stuck/outgrew/feeling). Same reframe energy, no attack posture.';
+  }
+
   return `
 SELECTED ANGLE: ${cleanAngle || 'Not specified'}
 REGISTER TO USE: ${cleanRegister || 'Use the most appropriate register from the six registers above'}
-`;
+${guardNote}`;
 }
 
 export function buildSystemPrompt(
@@ -1734,6 +1808,7 @@ export function buildSystemPrompt(
   angleRegister?: string,
   researchEntries?: Array<{ title: string; pillar: string; coreInsight: string }>,
   targetPillar?: string,
+  topicHint?: string,
 ): string {
   const context = normalizePromptContext(rawContext);
   const modeBlock = MODE_INSTRUCTIONS[mode] || '';
@@ -1763,7 +1838,7 @@ export function buildSystemPrompt(
     SIX_REGISTERS,
     buildContextBlock(context, effectiveTargetPillar) + researchContext,
     formatBlock,
-    getAngleBlock(angle, angleRegister),
+    getAngleBlock(angle, angleRegister, topicHint),
     modeBlock,
     getHumanizerRulesBlock(mode),
   ].filter(Boolean).join('\n\n');
