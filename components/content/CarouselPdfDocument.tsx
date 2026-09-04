@@ -26,15 +26,32 @@ Font.register({ family: 'Playfair Display', fontWeight: 500, src: FONT('Playfair
 Font.register({ family: 'Playfair Display', fontWeight: 600, src: FONT('PlayfairDisplay-SemiBold.ttf') });
 Font.register({ family: 'Playfair Display', fontWeight: 700, src: FONT('PlayfairDisplay-Bold.ttf') });
 
-// CHANGE: disable hyphenation so text wraps at word boundaries only and no
-// mid-word hyphens appear in the exported PDF. Returns the whole word back so
-// the layout engine never splits it.
+// Disable hyphenation so text wraps at word boundaries only and no mid-word
+// hyphens appear in the exported PDF.
+//
+// The callback must hand the word back as a single part. It previously returned
+// `['']` - an array holding an empty string - which is not "do not split this
+// word", it is "this word is nothing". Every word in the document became empty,
+// so the PDF exported with its layout, icons and avatar intact and not one
+// glyph of text on it.
 try {
-  Font.registerHyphenationCallback(() => ['']);
+  Font.registerHyphenationCallback((word) => [word]);
 } catch {
   // registerHyphenationCallback is opt-in on supported versions; ignore if absent.
 }
 
+/**
+ * The page, in points, passed to every `<Page>` as its `size` prop.
+ *
+ * It has to be the prop: width and height set only in `styles.page` are content
+ * box styles, and react-pdf still lays the page out at its A4 default. Every
+ * export came out 595pt wide with a height that grew or shrank to fit whatever
+ * was on it, so no two slides in a deck were the same shape.
+ *
+ * Not paired with `wrap={false}`, tempting as that is for a format where one
+ * slide is one page: it makes the page shrink to its content instead, which
+ * gives back the ragged heights this prop exists to fix.
+ */
 export const CAROUSEL_PDF_PAGE = { width: 1080, height: 1350 } as const;
 export const CAROUSEL_PDF_SIDE_PAD = 96;
 export const CAROUSEL_PDF_VERT_PAD = 140;
@@ -704,6 +721,7 @@ export function CarouselPdfDocument({
         return (
           <Page
             key={`pdf-${item.slide.id}-${index}`}
+            size={CAROUSEL_PDF_PAGE}
             style={[
               styles.page,
               {
