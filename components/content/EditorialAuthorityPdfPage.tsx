@@ -182,9 +182,9 @@ export function EditorialAuthorityPdfContent({
 }) {
   const m = carouselEditorialMetrics;
   const size = (base: number) => base * layout.scale;
-  // Shared with the preview, so the two lanes cannot disagree about whether
-  // this body is a list - which would leave one of them measured wrong.
-  const { bodyPoints, bodyAsList } = layout;
+  // Shared with the preview, so the two lanes cannot disagree about the shape
+  // the fit measured. Blank rows are kept: they are what the author typed.
+  const { bodyRows } = layout;
   const footerRowHeight = Math.max(m.footerFontSize * m.footerLineHeight, m.swipeIconSize);
 
   return (
@@ -300,39 +300,25 @@ export function EditorialAuthorityPdfContent({
           <RichText text={slide.headline} />
         </Text>
 
-        {slide.body ? (
-          bodyAsList ? (
-            <View style={{ marginTop: size(m.bodyGap) }}>
-              {bodyPoints.map((point, pointIndex) => (
-                <Text
-                  key={`${slide.id}-line-${pointIndex}`}
-                  style={{
-                    color: palette.foreground,
-                    fontFamily: 'Poppins',
-                    fontSize: size(layout.bodySize),
-                    fontWeight: 400,
-                    lineHeight: m.bodyLineHeight,
-                    marginTop: pointIndex ? size(m.bodyItemGap) : 0,
-                  }}
-                >
-                  <RichText text={point} />
-                </Text>
-              ))}
-            </View>
-          ) : (
-            <Text
-              style={{
-                color: palette.foreground,
-                fontFamily: 'Poppins',
-                fontSize: size(layout.bodySize),
-                fontWeight: 400,
-                lineHeight: m.bodyLineHeight,
-                marginTop: size(m.bodyGap),
-              }}
-            >
-              <RichText text={slide.body} />
-            </Text>
-          )
+        {bodyRows.length ? (
+          <View style={{ marginTop: size(m.bodyGap) }}>
+            {bodyRows.map((line, lineIndex) => (
+              // See the note in EditorialAuthoritySlide: a non-breaking space
+              // gives an empty row exactly one line box.
+              <Text
+                key={`${slide.id}-row-${lineIndex}`}
+                style={{
+                  color: palette.foreground,
+                  fontFamily: 'Poppins',
+                  fontSize: size(layout.bodySize),
+                  fontWeight: 400,
+                  lineHeight: m.bodyLineHeight,
+                }}
+              >
+                {line ? <RichText text={line} /> : ' '}
+              </Text>
+            ))}
+          </View>
         ) : null}
 
         {slide.cta ? (

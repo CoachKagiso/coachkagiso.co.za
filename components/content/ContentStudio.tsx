@@ -12640,11 +12640,15 @@ function CarouselStudioPanel({
   );
 
   // Scrolls inside the preview column only. The column is its own scroller at
-  // xl for exactly this reason: `nearest` on a page-level scroller would drag
-  // the editor off screen every time the cursor moved to another slide.
+  // xl for exactly this reason: on a page-level scroller this would drag the
+  // editor off screen every time the cursor moved to another slide.
+  //
+  // Centred rather than `nearest`, which parks the slide against whichever edge
+  // it came from with nothing either side of it. Centred, the slide before and
+  // the slide after stay half in frame, so the deck still reads as a sequence.
   useEffect(() => {
     if (!activeSlideId) return;
-    previewFrameRefs.current[activeSlideId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    previewFrameRefs.current[activeSlideId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [activeSlideId]);
   const displayedAspectRatio = latestDraft?.aspectRatio || defaultAspectRatio;
   const displayedAspectOption = getCarouselAspectRatioOption(displayedAspectRatio, latestDraft?.platform);

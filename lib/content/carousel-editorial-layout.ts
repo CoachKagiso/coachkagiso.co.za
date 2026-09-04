@@ -200,12 +200,6 @@ export const carouselEditorialMetrics = {
   groupGap: 56,
   /** Headline to body. */
   bodyGap: 28,
-  /**
-   * Between list lines. Without it a wrapped item runs straight into the next
-   * one and three points read as one paragraph, which is the failure mode of
-   * setting a list as plain type instead of cards.
-   */
-  bodyItemGap: 16,
 
   /**
    * The headline sets at `headlineMax` and only comes down when the copy stops
@@ -258,14 +252,11 @@ export type CarouselEditorialLayout = {
   bodyLines: number;
   bodyHeight: number;
   /**
-   * The body split into points, and whether it should be set as separate lines.
-   *
-   * Decided here rather than in each renderer because the answer changes the
-   * height - a list carries a gap between its items - and a lane that decided
-   * for itself could draw a list the fit had measured as a paragraph.
+   * The body's rows, exactly as typed, blank ones included. Split here rather
+   * than in each renderer so a lane cannot draw a shape the fit did not
+   * measure. `bodyLines` above is the count after wrapping; this is the source.
    */
-  bodyPoints: string[];
-  bodyAsList: boolean;
+  bodyRows: string[];
   groupHeight: number;
   /** True when the copy still does not fit at the smallest size we will set. */
   overflows: boolean;
@@ -315,27 +306,35 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
   const headline = String(input.headline || '').trim();
   const headlineMax = input.isCover ? m.coverHeadlineMax : m.headlineMax;
 
-  // A list is what the author wrote on separate lines - nothing else.
-  //
-  // The registry's `getCarouselSlideBodyPoints` also splits on sentence ends
-  // and caps the result, which is right for a card grid and wrong here: it
-  // turns an ordinary three-sentence paragraph into a list, and it drops
-  // anything past the cap. Copy that reaches an exported slide must never be
-  // silently shortened by a layout decision.
-  const bodyPoints = body
-    .split(new RegExp(String.fromCharCode(10) + '+'))
-    .map((point) => point.trim())
-    .filter(Boolean);
-  const bodyAsList = bodyPoints.length > 1;
+  /**
+   * The body exactly as it was typed: one entry per line, blank lines included.
+   *
+   * It used to split on runs of newlines and drop the empties, which made
+   * `a
+
+b` and `a
+b` the same slide - so deleting the blank line between two
+   * lines changed nothing on the rendered side, and there was no way to tell
+   * from the preview what the copy actually said. Every line is kept now,
+   * including the empty ones, and an empty line occupies a line.
+   *
+   * That also retires the invented gap between items. The author's own blank
+   * line is the separation; adding more on top of it was this layout guessing
+   * at spacing the copy already expressed.
+   */
+  const bodyRows = body.length
+    ? body.split(String.fromCharCode(10)).map((line) => line.trimEnd())
+    : [];
 
   /** Wrapped line count for the body as it will actually be drawn. */
   const bodyLinesAt = (size: number) =>
-    bodyAsList
-      ? bodyPoints.reduce((total, point) => total + countWrappedLines(point, size, contentWidth, 'poppins'), 0)
-      : countWrappedLines(body, size, contentWidth, 'poppins');
+    bodyRows.reduce(
+      // An empty line still takes a line.
+      (total, line) => total + (line ? countWrappedLines(line, size, contentWidth, 'poppins') : 1),
+      0,
+    );
 
-  const bodyHeightAt = (size: number, lines: number) =>
-    lines * size * m.bodyLineHeight + (bodyAsList ? (bodyPoints.length - 1) * m.bodyItemGap : 0);
+  const bodyHeightAt = (size: number, lines: number) => lines * size * m.bodyLineHeight;
 
   const fitBody = (budget: number) => {
     if (!body) return { size: 0, lines: 0, height: 0 };
@@ -424,8 +423,7 @@ export function layoutEditorialAuthoritySlide(input: CarouselEditorialInput): Ca
     bodySize,
     bodyLines,
     bodyHeight,
-    bodyPoints,
-    bodyAsList,
+    bodyRows,
     groupHeight,
     overflows,
   };

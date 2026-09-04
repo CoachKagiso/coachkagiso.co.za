@@ -67,10 +67,9 @@ export function EditorialAuthoritySlide({
   const px = (base: number) => `${Math.round(base * layout.scale * 100) / 100}px`;
   const font = CAROUSEL_EXPORT_FONT_POPPINS;
   const numeralFont = CAROUSEL_EXPORT_FONT_BEBAS;
-  // Whether the body sets as separate lines is decided by the layout, not here:
-  // a list carries a gap between its items, and that gap is part of the height
-  // the type fit measured against.
-  const { bodyPoints, bodyAsList } = layout;
+  // The body's rows come from the layout, so the lane cannot draw a shape the
+  // fit did not measure. Blank rows are kept: they are what the author typed.
+  const { bodyRows } = layout;
   const iconStyle = { color: '#142334', height: px(m.iconSize), width: px(m.iconSize) };
   // The envelope drops by this many grid units to reach the shared line; the
   // badge has to travel with it.
@@ -228,21 +227,17 @@ export function EditorialAuthoritySlide({
           {renderRichText(slide.headline)}
         </h3>
 
-        {slide.body ? (
-          bodyAsList ? (
-            <ul style={{ listStyle: 'none', marginTop: px(m.bodyGap) }}>
-              {bodyPoints.map((point, pointIndex) => (
-                <li
-                  key={`${slide.id}-line-${pointIndex}`}
-                  style={pointIndex ? { ...bodyStyle, marginTop: px(m.bodyItemGap) } : bodyStyle}
-                >
-                  {renderRichText(point)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ ...bodyStyle, marginTop: px(m.bodyGap) }}>{renderRichText(slide.body)}</p>
-          )
+        {bodyRows.length ? (
+          <ul style={{ listStyle: 'none', marginTop: px(m.bodyGap) }}>
+            {bodyRows.map((line, lineIndex) => (
+              // A non-breaking space rather than an explicit height, so an empty
+              // row takes exactly one line box in both lanes without either of
+              // them needing to know what that measures.
+              <li key={`${slide.id}-row-${lineIndex}`} style={bodyStyle}>
+                {line ? renderRichText(line) : ' '}
+              </li>
+            ))}
+          </ul>
         ) : null}
 
         {slide.cta ? (
