@@ -152,6 +152,20 @@ function extractJsonMetadata(raw: string): ExtractedPostMetadata | null {
 }
 
 /**
+ * Smart Suggest topics sometimes carry meta-notes ("Positions Kagiso as ...",
+ * "This is original ideation ..."). The first part is the writable topic; the
+ * rest is positioning guidance that must not leak into the hook or first line.
+ */
+export function splitTopicAndStrategicNote(topicValue: string): { cleanTopic: string; strategicNote: string } {
+  const match = topicValue.match(/^(.*?)(Positions Kagiso as|This is original ideation)([\s\S]*)$/i);
+  if (!match) return { cleanTopic: topicValue.trim(), strategicNote: '' };
+  return {
+    cleanTopic: (match[1] || '').trim() || topicValue.trim(),
+    strategicNote: `${match[2]}${match[3]}`.trim(),
+  };
+}
+
+/**
  * Separates model metadata from the actual post body so the dashboard can
  * display context without putting those labels into copied social content.
  */

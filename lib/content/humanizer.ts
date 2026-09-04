@@ -108,6 +108,7 @@ OUTPUT CHECKLIST (run mentally before returning)
 ==============================
 
 Before you return text, scan it for:
+- Any engagement bait: /Reshare with a friend|Save this for later|Follow for practical tips|No fluff/i. Cut the sentence.
 - Any em dash (—) or en dash (–). Zero tolerance.
 - Any word from the AI vocabulary block above. Cut or replace.
 - Any "not only X but Y" or "it's not just about X, it's Y" construction. Cut.
@@ -119,6 +120,7 @@ Before you return text, scan it for:
 - Boldface mid-sentence. Remove.
 - Curly quotes. Replace with straight.
 - Emojis. Remove.
+- Fewer than 4 blank lines between paragraphs. Split the longest paragraph into 2-sentence chunks until there is breathing space.
 
 If the text passes this scan and a human would not immediately identify it as AI-generated, return it. Otherwise rewrite.
 `;
@@ -182,6 +184,157 @@ const SPACED_EM_DASH_PATTERN = /(\s)—(\s)/g;
 const DOUBLE_HYPHEN_PATTERN = /(\s)--(\s)/g;
 const CURLY_DOUBLE_QUOTES = /[“”]/g;
 const CURLY_SINGLE_QUOTES = /[‘’]/g;
+
+/**
+ * Sentences that exist only to farm engagement. Matched case-insensitively;
+ * the whole sentence is dropped, not rewritten.
+ */
+const ENGAGEMENT_BAIT_PATTERN = /reshare with a friend|save this for later|follow for practical tips|no fluff,?\s+just what works/i;
+
+/**
+ * Banned vocabulary with a neutral in-voice replacement. Word-boundary
+ * matched so "leveraged buyout" still becomes "influence buyout" only when
+ * the standalone word appears - these are Kagiso-voice swaps, not finance terms.
+ */
+const BANNED_VOCAB_SWAPS: Array<[RegExp, string]> = [
+  [/\bleverage\b/gi, 'influence'],
+  [/\bunlock\b/gi, 'open'],
+  [/\bdelve\b/gi, 'explore'],
+];
+
+function preserveCapital(replacement: string, original: string): string {
+  if (original[0] && original[0] === original[0].toUpperCase()) {
+    return replacement[0].toUpperCase() + replacement.slice(1);
+  }
+  return replacement;
+}
+
+/**
+ * Splits body text into paragraphs on blank lines. Every sentence-level repair
+ * below runs INSIDE one paragraph at a time - joining or filtering must never
+ * reach across a \n\n boundary and collapse the reader's breathing space.
+ */
+function splitParagraphs(text: string): string[] {
+  return text.split(/\n{2,}/).map((p) => p.trim());
+}
+
+function joinParagraphs(paragraphs: string[]): string {
+  return paragraphs.filter((p) => p.length > 0).join('\n\n');
+}
+
+/**
+ * Joins staccato rule-of-three fragments ("The industry. The level. The game.")
+ * into one flowing sentence ("The industry, the level, the game.").
+ * Paragraph-local: never merges across a blank line.
+ */
+function joinFragmentRuns(text: string): string {
+  return joinParagraphs(
+    splitParagraphs(text).map((paragraph) =>
+      paragraph.replace(/(?:^|[.!?]\s+)((?:The [^.?!]{1,40}[.?!]\s*){3,})/g, (match, run: string) => {
+        const fragments = run.match(/The [^.?!]{1,40}[.?!]/g);
+        if (!fragments || fragments.length < 3) return match;
+        const prefix = match.slice(0, match.indexOf(fragments[0]));
+        const joined =
+          fragments[0].replace(/[.?!]$/, '') +
+          fragments.slice(1).map((f) => ', ' + f.charAt(0).toLowerCase() + f.slice(1).replace(/[.?!]$/, '')).join('') +
+          '.';
+        return prefix + joined;
+      }),
+    ),
+  );
+}
+
+function stripEngagementBait(text: string): { text: string; removed: number } {
+  let removed = 0;
+  const cleaned = splitParagraphs(text).map((paragraph) => {
+    const sentences = paragraph.split(/(?<=[.!?…])\s+/);
+    const kept = sentences.filter((sentence) => !ENGAGEMENT_BAIT_PATTERN.test(sentence));
+    removed += sentences.length - kept.length;
+    return kept.join(' ').trim();
+  });
+  return { text: joinParagraphs(cleaned), removed };
+}
+
+function countSentences(paragraph: string): number {
+  return paragraph.split(/(?<=[.!?…])\s+/).filter((s) => s.trim().length > 0).length;
+}
+
+function chunkParagraph(paragraph: string): string[] {
+  const sentences = paragraph.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    chunks.push(sentences.slice(i, i + 2).join(' '));
+  }
+  return chunks;
+}
+
+/**
+ * LinkedIn posts without blank lines read as a wall. If the text has fewer
+ * than 4 paragraph breaks, repeatedly split the longest over-long paragraph
+ * into 2-sentence chunks until there is breathing space or nothing left to split.
+ */
+function ensureParagraphBreaks(text: string): { text: string; added: number } {
+  const paragraphs = splitParagraphs(text);
+  let added = 0;
+  for (;;) {
+    const breaks = paragraphs.length - 1;
+    if (breaks >= 4) break;
+    let longest = -1;
+    for (let i = 0; i < paragraphs.length; i += 1) {
+      if (countSentences(paragraphs[i]) > 2 && (longest === -1 || paragraphs[i].length > paragraphs[longest].length)) {
+        longest = i;
+      }
+    }
+    if (longest === -1) break;
+    paragraphs.splice(longest, 1, ...chunkParagraph(paragraphs[longest]));
+    added += 1;
+  }
+  return { text: joinParagraphs(paragraphs), added };
+}
+
+function swapBannedVocab(text: string): { text: string; count: number } {
+  let out = text;
+  let count = 0;
+  for (const [pattern, replacement] of BANNED_VOCAB_SWAPS) {
+    out = out.replace(pattern, (hit) => {
+      count += 1;
+      return preserveCapital(replacement, hit);
+    });
+  }
+  return { text: out, count };
+}
+
+/**
+ * Enforced post-filter: instruction-only rules leak, so the highest-signal
+ * tells are repaired programmatically before the text reaches the reader.
+ * Runs the mechanical dash/quote pass first, then bait removal, vocab swaps,
+ * then fragment joining. Safe to run on prose; do NOT run on strict-JSON
+ * outputs (callers gate on shouldInjectHumanizerRules, same as the prompt).
+ */
+export function enforceHumanizer(text: string): HumanizeResult {
+  const changes: { pattern: string; count: number }[] = [];
+  const mechanical = applyMechanicalHumanizerPasses(text);
+  let out = mechanical.text;
+  for (const change of mechanical.changes) changes.push(change);
+
+  const bait = stripEngagementBait(out);
+  out = bait.text;
+  if (bait.removed > 0) changes.push({ pattern: 'engagement_bait', count: bait.removed });
+
+  const vocab = swapBannedVocab(out);
+  out = vocab.text;
+  if (vocab.count > 0) changes.push({ pattern: 'banned_vocab', count: vocab.count });
+
+  const beforeFragments = out;
+  out = joinFragmentRuns(out);
+  if (out !== beforeFragments) changes.push({ pattern: 'fragment_run', count: 1 });
+
+  const breaks = ensureParagraphBreaks(out);
+  out = breaks.text;
+  if (breaks.added > 0) changes.push({ pattern: 'paragraph_breaks', count: breaks.added });
+
+  return { text: out, changes };
+}
 
 export function applyMechanicalHumanizerPasses(text: string): HumanizeResult {
   const changes: { pattern: string; count: number }[] = [];
