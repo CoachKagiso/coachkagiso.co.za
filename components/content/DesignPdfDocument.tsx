@@ -259,6 +259,7 @@ function applyTransform(text: string, transform?: 'none' | 'uppercase') {
 function TextLayer({ layer }: { layer: DesignPdfLayer }) {
   const family = mapFontFamily(layer.fontFamily);
   const radii = getLayerRadii(layer);
+  const centred = layer.textAlign === 'center';
   const runs = layer.runs?.length
     ? layer.runs
     : [{
@@ -281,11 +282,21 @@ function TextLayer({ layer }: { layer: DesignPdfLayer }) {
         // The preview only centres the copy in its box when the box is centred;
         // left- and right-aligned text starts at the top. Centring everything
         // here is what floated captions away from where they were placed.
-        justifyContent: layer.textAlign === 'center' ? 'center' : 'flex-start',
+        justifyContent: centred ? 'center' : 'flex-start',
       }}
     >
       <Text
         style={{
+          // Top-aligned copy is positioned rather than laid out in the box.
+          //
+          // React PDF drops a line that does not fit the height it is given,
+          // and its line box is the font's full ascent-plus-descent whenever
+          // the layer's line height is tighter than that - which for a display
+          // face is most of the time. A text layer auto-fitted to the browser's
+          // tighter line box therefore lost its text completely, silently, in
+          // both the PDF and the PNG drawn from it. Taking the height off lets
+          // the line exist; the canvas lets it overflow too.
+          ...(centred ? {} : { position: 'absolute', top: 0, left: 0, right: 0 }),
           fontFamily: family,
           ...(mapFontWeight(family, layer.fontWeight) ? { fontWeight: mapFontWeight(family, layer.fontWeight) } : {}),
           fontSize: layer.fontSize || 16,

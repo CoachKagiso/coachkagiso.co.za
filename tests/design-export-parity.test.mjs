@@ -21,6 +21,7 @@ import {
   mapPdfFontFamily,
   mapPdfFontWeight,
 } from '../lib/content/design-pdf-support.ts';
+import { collectDesignFontSpecs } from '../lib/content/design-font-specs.ts';
 
 // The exported file is the artefact that leaves the building, and nobody
 // notices it disagreeing with the canvas until after they have posted it. These
@@ -269,4 +270,48 @@ test('a canvas resize that grows the frame grows the type too', () => {
   const layer = scaleDesignLayerGeometry({ x: 10, y: 10, width: 100, height: 50, fontSize: 21, strokeWidth: 3 }, scale)
   assert.equal(layer.fontSize, 42)
   assert.equal(layer.strokeWidth, 6)
+})
+
+test('the capture waits for the weight a run actually uses, not just 400 and 700', () => {
+  // Un-bolding an inline run sets 500. It was never loaded, so html2canvas drew
+  // it in a fallback whose glyphs are a different width - the text then sits at
+  // a width it was not laid out at.
+  const specs = collectDesignFontSpecs([
+    { fontFamily: '"Poppins", sans-serif', fontWeight: '500', fontStyle: 'normal' },
+    { fontFamily: '"Poppins", sans-serif', fontWeight: '700', fontStyle: 'normal' },
+  ]);
+  assert.ok(specs.includes('500 16px "Poppins"'), specs.join(' | '));
+  assert.ok(specs.includes('700 16px "Poppins"'), specs.join(' | '));
+})
+
+test('italic is asked for as italic', () => {
+  const specs = collectDesignFontSpecs([
+    { fontFamily: 'Poppins', fontWeight: '400', fontStyle: 'italic' },
+  ]);
+  assert.deepEqual(specs, ['italic 400 16px "Poppins"'])
+})
+
+test('generic keywords are skipped - there is nothing to fetch', () => {
+  const specs = collectDesignFontSpecs([
+    { fontFamily: '"Playfair Display", Georgia, serif', fontWeight: '600', fontStyle: 'normal' },
+  ]);
+  assert.deepEqual(specs, ['600 16px "Playfair Display"', '600 16px "Georgia"'])
+})
+
+test('the same face asked for twice is loaded once', () => {
+  const specs = collectDesignFontSpecs([
+    { fontFamily: 'Inter', fontWeight: '400', fontStyle: 'normal' },
+    { fontFamily: 'Inter', fontWeight: '400', fontStyle: 'normal' },
+    { fontFamily: 'Inter', fontWeight: '600', fontStyle: 'normal' },
+  ]);
+  assert.deepEqual(specs.sort(), ['400 16px "Inter"', '600 16px "Inter"'])
+})
+
+test('a node with no font family contributes nothing', () => {
+  assert.deepEqual(collectDesignFontSpecs([{ fontFamily: '', fontWeight: '400', fontStyle: 'normal' }]), [])
+})
+
+test('a missing weight falls back to 400 rather than an unparseable shorthand', () => {
+  const specs = collectDesignFontSpecs([{ fontFamily: 'Inter', fontWeight: '', fontStyle: '' }]);
+  assert.deepEqual(specs, ['400 16px "Inter"'])
 })
