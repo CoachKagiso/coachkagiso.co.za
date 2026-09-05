@@ -72,9 +72,22 @@ import {
   type CarouselSlideRole,
   type CarouselTemplate,
 } from '@/lib/content/carousel-template-registry';
+import {
+  getCircleGeometry,
+  getLineGeometry,
+  getRoundedRectanglePath as buildRoundedRectanglePath,
+  getShapePolygonPoints,
+  normalizeShapeRadii,
+} from '@/lib/content/design-shape-geometry';
+import { getDesignGroupScale, scaleDesignGroupChild } from '@/lib/content/design-group-layout';
+import { getExportFidelityNotice } from '@/lib/content/design-pdf-support';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
-import type { DesignPdfInput } from '@/components/content/DesignPdfDocument';
+import type {
+  DesignPdfInput,
+  DesignPdfLayer,
+  DesignVectorFeatureReport,
+} from '@/components/content/DesignPdfDocument';
 import {
   DESIGN_DOCUMENT_LEGACY_STORAGE_KEY,
   clearLocalDesignMirror,
@@ -2307,6 +2320,149 @@ function readAssetLibrarySnapshot(): Record<string, DesignAsset> {
   }
 }
 
+type DesignPdfImageResolver = (asset: DesignAsset | undefined, color?: string) => Promise<string | undefined>;
+
+/**
+ * Resolves a layer's asset to the bitmap the PDF should draw.
+ *
+ * The important word is *should*. The old lane handed React PDF the asset's
+ * stored `src`, which is the artwork before the canvas touched it - so a brand
+ * icon the user had recoloured came back in its original ink. Recolouring
+ * happens here, through the same helper the raster lane uses, and the result is
+ * cached per asset and colour so a page full of one icon rasterises once.
+ */
+function createDesignPdfImageResolver(
+  rasteriseSvgDataUrl: (src: string, naturalWidth?: number, naturalHeight?: number) => Promise<string | undefined>,
+): DesignPdfImageResolver {
+  const cache = new Map<string, Promise<string | undefined>>();
+
+  return (asset, color) => {
+    if (!asset) return Promise.resolve(undefined);
+    const tint = canRecolorDesignAsset(asset) ? color || asset.defaultColor || '#142334' : '';
+    const cacheKey = `${asset.id}::${tint}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    const request = (async () => {
+      if (!isSvgDesignAsset(asset)) return asset.src;
+      const source = tint ? await getExportableRecoloredSvgDataUrl(asset.src, tint) : asset.src;
+      // React PDF cannot read SVG, so vector artwork becomes a bitmap - but a
+      // generously sized one, and only the artwork.
+      return rasteriseSvgDataUrl(source, asset.naturalWidth, asset.naturalHeight);
+    })().catch(() => undefined);
+
+    cache.set(cacheKey, request);
+    return request;
+  };
+}
+
+/**
+ * One layer model to one PDF payload, for every caller.
+ *
+ * There used to be two copies of this - one for the export button, one for the
+ * CTA template appended to a carousel - and they carried the same omissions,
+ * so fixing either left the other still wrong. There is one now.
+ */
+async function buildDesignPdfLayers(
+  layers: DesignLayer[],
+  assets: Record<string, DesignAsset>,
+  resolveImage: DesignPdfImageResolver,
+  depth = 0,
+): Promise<DesignPdfLayer[]> {
+  const built: DesignPdfLayer[] = [];
+
+  for (const layer of layers) {
+    const base = {
+      id: layer.id,
+      type: layer.type,
+      x: layer.x,
+      y: layer.y,
+      width: layer.width,
+      height: layer.height,
+      rotation: layer.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      flipX: layer.flipX,
+      flipY: layer.flipY,
+      borderRadius: getLayerBaseBorderRadius(layer),
+      // All four corners, not one. The inspector has always offered them
+      // separately and the export has always collapsed them.
+      radii: getLayerCornerRadii(layer),
+      // Recorded rather than dropped: a payload-only caller has no other way to
+      // know the design wanted an effect this lane cannot draw.
+      hasUnsupportedEffects: Boolean(
+        layer.shadowEnabled || layer.outlineEnabled || (layer.blurEnabled && (layer.blurAmount ?? 0) > 0),
+      ),
+    };
+
+    if (layer.type === 'text') {
+      built.push({
+        ...base,
+        text: layer.text,
+        // The styled spans, from the same splitter the canvas draws with, so a
+        // bolded phrase is bold in the PDF too.
+        runs: getTextLayerSegments(layer).map((segment) => ({
+          text: segment.text,
+          fontWeight: segment.style.fontWeight,
+          fontStyle: segment.style.fontStyle,
+          textDecoration: segment.style.textDecoration,
+          textTransform: segment.style.textTransform,
+        })),
+        fontFamily: layer.fontFamily,
+        fontSize: layer.fontSize,
+        fontWeight: layer.fontWeight,
+        color: layer.color,
+        lineHeight: layer.lineHeight,
+        textAlign: layer.textAlign,
+        backgroundColor: layer.backgroundColor,
+        borderColor: layer.borderColor,
+        padding: layer.padding,
+        letterSpacing: layer.letterSpacing,
+        textTransform: layer.textTransform,
+        textDecoration: layer.textDecoration,
+        fontStyle: layer.fontStyle,
+      });
+      continue;
+    }
+
+    if (layer.type === 'shape') {
+      built.push({
+        ...base,
+        shape: layer.shape,
+        fillColor: layer.fillColor,
+        strokeColor: layer.strokeColor,
+        strokeWidth: layer.strokeWidth,
+      });
+      continue;
+    }
+
+    const asset = assets[layer.assetId];
+    const groupedLayers = asset ? getSavedGroupLayers(asset) : [];
+
+    if (asset && groupedLayers.length && depth < 5) {
+      // A saved group's `src` is a transparent placeholder - drawing it is how
+      // groups came out of the export as blank space. Draw the children, scaled
+      // into this layer's box by the rule the preview uses.
+      const bounds = getSavedGroupBounds(asset);
+      const scale = getDesignGroupScale(layer.width, layer.height, bounds.width, bounds.height);
+      built.push({
+        ...base,
+        groupLayers: await buildDesignPdfLayers(
+          groupedLayers.map((child) => scaleDesignGroupChild(child, scale) as DesignLayer),
+          assets,
+          resolveImage,
+          depth + 1,
+        ),
+      });
+      continue;
+    }
+
+    built.push({ ...base, imageSrc: await resolveImage(asset, layer.color), fit: layer.fit });
+  }
+
+  return built;
+}
+
 export async function loadCtaTemplatePdfInput(
   templateId: string,
   adminKey?: string,
@@ -2321,64 +2477,17 @@ export async function loadCtaTemplatePdfInput(
 
   const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
   const assets = readAssetLibrarySnapshot();
-  const layers = [];
-
-  for (const layer of page.layers) {
-    const base = {
-      id: layer.id,
-      type: layer.type,
-      x: layer.x,
-      y: layer.y,
-      width: layer.width,
-      height: layer.height,
-      rotation: layer.rotation,
-      opacity: layer.opacity,
-      visible: layer.visible,
-      flipX: layer.flipX,
-      flipY: layer.flipY,
-      borderRadius: getLayerBaseBorderRadius(layer),
-    };
-
-    if (layer.type === 'text') {
-      layers.push({
-        ...base,
-        text: layer.text,
-        fontFamily: layer.fontFamily,
-        fontSize: layer.fontSize,
-        fontWeight: layer.fontWeight,
-        color: layer.color,
-        lineHeight: layer.lineHeight,
-        textAlign: layer.textAlign,
-        backgroundColor: layer.backgroundColor,
-        padding: layer.padding,
-        letterSpacing: layer.letterSpacing,
-        textTransform: layer.textTransform,
-        textDecoration: layer.textDecoration,
-        fontStyle: layer.fontStyle,
-      });
-    } else if (layer.type === 'shape') {
-      layers.push({
-        ...base,
-        shape: layer.shape,
-        fillColor: layer.fillColor,
-        strokeColor: layer.strokeColor,
-        strokeWidth: layer.strokeWidth,
-      });
-    } else {
-      const asset = assets[layer.assetId];
-      const imageSrc = asset
-        ? (isSvgDesignAsset(asset)
-            ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
-            : asset.src)
-        : undefined;
-      layers.push({ ...base, imageSrc, fit: layer.fit });
-    }
-  }
 
   return {
     width: record.width,
     height: record.height,
-    pages: [{ id: page.id, background: page.background, layers }],
+    pages: [
+      {
+        id: page.id,
+        background: page.background,
+        layers: await buildDesignPdfLayers(page.layers, assets, createDesignPdfImageResolver(rasteriseSvgDataUrl)),
+      },
+    ],
   };
 }
 
@@ -3258,12 +3367,16 @@ function rotatePoint(x: number, y: number, angleDegrees: number) {
 
 function createUngroupedLayerSnapshot(layer: DesignLayer, groupedLayer: DesignAssetLayer, asset: DesignAsset): DesignLayer {
   const bounds = getSavedGroupBounds(asset);
-  const scaleX = groupedLayer.width / Math.max(1, bounds.width);
-  const scaleY = groupedLayer.height / Math.max(1, bounds.height);
-  const scaledWidth = layer.width * scaleX;
-  const scaledHeight = layer.height * scaleY;
-  let localCenterX = (layer.x - bounds.x + layer.width / 2) * scaleX;
-  let localCenterY = (layer.y - bounds.y + layer.height / 2) * scaleY;
+  // The same scaling the group is drawn with. This function has always scaled
+  // the child's box - it was the only one of the three places that did - but it
+  // left type size and stroke width at their stored values, so ungrouping a
+  // resized group shrank the boxes and left the words the size they were.
+  const scale = getDesignGroupScale(groupedLayer.width, groupedLayer.height, bounds.width, bounds.height);
+  const scaled = scaleDesignGroupChild(layer, scale) as DesignLayer;
+  const scaledWidth = layer.width * scale.x;
+  const scaledHeight = layer.height * scale.y;
+  let localCenterX = (layer.x - bounds.x + layer.width / 2) * scale.x;
+  let localCenterY = (layer.y - bounds.y + layer.height / 2) * scale.y;
 
   if (groupedLayer.flipX) localCenterX = groupedLayer.width - localCenterX;
   if (groupedLayer.flipY) localCenterY = groupedLayer.height - localCenterY;
@@ -3277,7 +3390,7 @@ function createUngroupedLayerSnapshot(layer: DesignLayer, groupedLayer: DesignAs
   );
 
   return {
-    ...layer,
+    ...scaled,
     id: createDesignId(layer.type),
     x: Math.round((groupCenterX + rotatedCenter.x - scaledWidth / 2) * 10) / 10,
     y: Math.round((groupCenterY + rotatedCenter.y - scaledHeight / 2) * 10) / 10,
@@ -4029,30 +4142,6 @@ function getLayerCompactPreviewLabel(layer: DesignLayer, assetLibrary: Record<st
   return compact || layer.name;
 }
 
-function getStarPoints(width: number, height: number, strokeWidth: number) {
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const outerRadius = Math.max(0, Math.min(width, height) / 2 - strokeWidth);
-  const innerRadius = outerRadius * 0.45;
-
-  return Array.from({ length: 10 }, (_, index) => {
-    const angle = -Math.PI / 2 + index * (Math.PI / 5);
-    const radius = index % 2 === 0 ? outerRadius : innerRadius;
-    return `${centerX + Math.cos(angle) * radius},${centerY + Math.sin(angle) * radius}`;
-  }).join(' ');
-}
-
-function getPolygonShapePoints(shape: Exclude<DesignShapeKind, 'rectangle' | 'circle' | 'line' | 'star'>, width: number, height: number, strokeWidth: number) {
-  const inset = Math.max(strokeWidth / 2, 1);
-  if (shape === 'triangle') {
-    return `${width / 2},${inset} ${width - inset},${height - inset} ${inset},${height - inset}`;
-  }
-  if (shape === 'diamond') {
-    return `${width / 2},${inset} ${width - inset},${height / 2} ${width / 2},${height - inset} ${inset},${height / 2}`;
-  }
-  return `${width * 0.26},${inset} ${width * 0.74},${inset} ${width - inset},${height / 2} ${width * 0.74},${height - inset} ${width * 0.26},${height - inset} ${inset},${height / 2}`;
-}
-
 function slugifyFileName(value: string) {
   return value
     .toLowerCase()
@@ -4308,6 +4397,7 @@ async function captureDesignCanvas(
   html2canvas: typeof import('html2canvas').default,
   options?: {
     transparentBackground?: boolean;
+    backgroundEffectsOnly?: boolean;
     visibleLayerIds?: string[];
     pixelScale?: DesignExportScale;
   },
@@ -4391,7 +4481,7 @@ async function captureDesignCanvas(
           clonedCanvas.style.boxShadow = 'none';
           clonedCanvas.style.transform = 'none';
           clonedCanvas.style.transformOrigin = 'top left';
-          if (options?.transparentBackground) {
+          if (options?.transparentBackground || options?.backgroundEffectsOnly) {
             clonedCanvas.style.background = 'transparent';
             clonedCanvas.style.backgroundColor = 'transparent';
           }
@@ -4411,13 +4501,13 @@ async function captureDesignCanvas(
         clonedDocument.querySelectorAll<HTMLElement>('[data-design-text-measure="true"]').forEach((node) => {
           node.style.display = 'none';
         });
-        if (options?.transparentBackground) {
+        if (options?.transparentBackground && !options?.backgroundEffectsOnly) {
           clonedDocument.querySelectorAll<HTMLElement>('[data-design-background-effects="true"]').forEach((node) => {
             node.style.display = 'none';
           });
         }
         clonedDocument.querySelectorAll<HTMLElement>('[data-design-layer-id]').forEach((node) => {
-          if (visibleLayerIds && !visibleLayerIds.has(node.dataset.designLayerId || '')) {
+          if (options?.backgroundEffectsOnly || (visibleLayerIds && !visibleLayerIds.has(node.dataset.designLayerId || ''))) {
             node.style.display = 'none';
           }
           node.style.boxShadow = 'none';
@@ -4945,67 +5035,26 @@ function trapDesignWheel(event: React.WheelEvent<HTMLElement>) {
 }
 
 function getNormalizedRectangleRadii(layer: DesignShapeLayer, width: number, height: number) {
-  const raw = getLayerCornerRadii(layer);
-  const maxRadius = Math.max(0, Math.min(width, height) / 2);
-  const radii = {
-    topLeft: clamp(raw.topLeft, 0, maxRadius),
-    topRight: clamp(raw.topRight, 0, maxRadius),
-    bottomRight: clamp(raw.bottomRight, 0, maxRadius),
-    bottomLeft: clamp(raw.bottomLeft, 0, maxRadius),
-  };
-  const scale = Math.min(
-    1,
-    radii.topLeft + radii.topRight > 0 ? width / (radii.topLeft + radii.topRight) : 1,
-    radii.bottomLeft + radii.bottomRight > 0 ? width / (radii.bottomLeft + radii.bottomRight) : 1,
-    radii.topLeft + radii.bottomLeft > 0 ? height / (radii.topLeft + radii.bottomLeft) : 1,
-    radii.topRight + radii.bottomRight > 0 ? height / (radii.topRight + radii.bottomRight) : 1,
-  );
-
-  return {
-    topLeft: radii.topLeft * scale,
-    topRight: radii.topRight * scale,
-    bottomRight: radii.bottomRight * scale,
-    bottomLeft: radii.bottomLeft * scale,
-  };
+  return normalizeShapeRadii(getLayerCornerRadii(layer), width, height);
 }
 
 function getRoundedRectanglePath(layer: DesignShapeLayer, strokeWidth: number) {
-  const halfStroke = strokeWidth / 2;
-  const x = halfStroke;
-  const y = halfStroke;
-  const width = Math.max(0, layer.width - strokeWidth);
-  const height = Math.max(0, layer.height - strokeWidth);
-  const radii = getNormalizedRectangleRadii(layer, width, height);
-  const right = x + width;
-  const bottom = y + height;
-
-  return [
-    `M ${x + radii.topLeft} ${y}`,
-    `H ${right - radii.topRight}`,
-    radii.topRight ? `Q ${right} ${y} ${right} ${y + radii.topRight}` : `L ${right} ${y}`,
-    `V ${bottom - radii.bottomRight}`,
-    radii.bottomRight ? `Q ${right} ${bottom} ${right - radii.bottomRight} ${bottom}` : `L ${right} ${bottom}`,
-    `H ${x + radii.bottomLeft}`,
-    radii.bottomLeft ? `Q ${x} ${bottom} ${x} ${bottom - radii.bottomLeft}` : `L ${x} ${bottom}`,
-    `V ${y + radii.topLeft}`,
-    radii.topLeft ? `Q ${x} ${y} ${x + radii.topLeft} ${y}` : `L ${x} ${y}`,
-    'Z',
-  ].join(' ');
+  return buildRoundedRectanglePath(layer.width, layer.height, getLayerCornerRadii(layer), strokeWidth);
 }
 
 function ShapeLayerBody({ layer }: { layer: DesignShapeLayer }) {
   const strokeWidth = Math.max(layer.strokeWidth, 0);
-  const halfStroke = strokeWidth / 2;
   const fill = layer.shape === 'line' ? 'transparent' : layer.fillColor;
 
   if (layer.shape === 'line') {
+    const line = getLineGeometry(layer.width, layer.height);
     return (
       <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${layer.width} ${layer.height}`} preserveAspectRatio="none" aria-hidden="true">
         <line
-          x1={0}
-          y1={layer.height / 2}
-          x2={layer.width}
-          y2={layer.height / 2}
+          x1={line.x1}
+          y1={line.y1}
+          x2={line.x2}
+          y2={line.y2}
           stroke={layer.strokeColor}
           strokeOpacity={1}
           strokeLinecap="round"
@@ -5031,13 +5080,13 @@ function ShapeLayerBody({ layer }: { layer: DesignShapeLayer }) {
   }
 
   if (layer.shape === 'circle') {
-    const radius = Math.max(0, Math.min(layer.width, layer.height) / 2 - halfStroke);
+    const circle = getCircleGeometry(layer.width, layer.height, strokeWidth);
     return (
       <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${layer.width} ${layer.height}`} preserveAspectRatio="none" aria-hidden="true">
         <circle
-          cx={layer.width / 2}
-          cy={layer.height / 2}
-          r={radius}
+          cx={circle.cx}
+          cy={circle.cy}
+          r={circle.r}
           fill={fill}
           fillOpacity={1}
           stroke={layer.strokeColor}
@@ -5048,14 +5097,10 @@ function ShapeLayerBody({ layer }: { layer: DesignShapeLayer }) {
     );
   }
 
-  const points = layer.shape === 'star'
-    ? getStarPoints(layer.width, layer.height, strokeWidth)
-    : getPolygonShapePoints(layer.shape, layer.width, layer.height, strokeWidth);
-
   return (
     <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${layer.width} ${layer.height}`} preserveAspectRatio="none" aria-hidden="true">
       <polygon
-        points={points}
+        points={getShapePolygonPoints(layer.shape, layer.width, layer.height, strokeWidth)}
         fill={fill}
         fillOpacity={1}
         stroke={layer.strokeColor}
@@ -5254,18 +5299,27 @@ function BrandIconSvg({ kind, color }: { kind: DesignBrandIconKind; color: strin
 
 function GroupedAssetLayerBody({
   asset,
+  layer,
   assetLibrary,
   depth,
 }: {
   asset: DesignAsset;
+  layer: DesignAssetLayer;
   assetLibrary: Record<string, DesignAsset>;
   depth: number;
 }) {
-  const groupLayers = getSavedGroupLayers(asset);
   const bounds = getSavedGroupBounds(asset);
+  // The children are stored in the space the selection occupied when it was
+  // saved; this is the box they have to fit now. Scaling the numbers rather
+  // than applying a CSS transform is what lets the PDF lane land on the same
+  // geometry - it has the arithmetic, not a browser.
+  const scale = getDesignGroupScale(layer.width, layer.height, bounds.width, bounds.height);
+  const groupLayers = getSavedGroupLayers(asset).map(
+    (childLayer) => scaleDesignGroupChild(childLayer, scale) as DesignLayer,
+  );
   const virtualDesign = {
-    width: Math.max(1, bounds.width),
-    height: Math.max(1, bounds.height),
+    width: Math.max(1, layer.width),
+    height: Math.max(1, layer.height),
   } as DesignDocument;
 
   return (
@@ -5332,7 +5386,7 @@ function DesignAssetBody({
   const assetColor = layer.color || asset.defaultColor || '#142334';
 
   if (asset.groupedLayers?.length && depth < 5) {
-    return <GroupedAssetLayerBody asset={asset} assetLibrary={assetLibrary} depth={depth} />;
+    return <GroupedAssetLayerBody asset={asset} layer={layer} assetLibrary={assetLibrary} depth={depth} />;
   }
 
   if (asset.recolorable && asset.iconKind) {
@@ -5401,10 +5455,31 @@ function DesignAssetPreview({ asset, assetLibrary }: { asset: DesignAsset; asset
   const assetColor = asset.defaultColor || '#142334';
 
   if (asset.groupedLayers?.length) {
+    // The thumbnail is a real render of the group, so it needs a real box to
+    // scale into. Fit the group's own proportions to the 48px-tall well rather
+    // than handing it the well's size and distorting it.
+    const bounds = getSavedGroupBounds(asset);
+    const thumbHeight = 48;
+    const thumbWidth = Math.max(1, Math.round((bounds.width / Math.max(1, bounds.height)) * thumbHeight));
+    const thumbLayer = {
+      id: `${asset.id}-thumb`,
+      type: 'asset',
+      name: asset.name,
+      assetId: asset.id,
+      x: 0,
+      y: 0,
+      width: thumbWidth,
+      height: thumbHeight,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      fit: 'contain',
+    } as DesignAssetLayer;
+
     return (
-      <span className="block h-16 rounded-[6px] bg-white p-2">
-        <span className="block h-full w-full">
-          <GroupedAssetLayerBody asset={asset} assetLibrary={assetLibrary} depth={0} />
+      <span className="flex h-16 items-center justify-center overflow-hidden rounded-[6px] bg-white p-2">
+        <span className="block" style={{ height: `${thumbHeight}px`, width: `${thumbWidth}px` }}>
+          <GroupedAssetLayerBody asset={asset} layer={thumbLayer} assetLibrary={assetLibrary} depth={0} />
         </span>
       </span>
     );
@@ -8525,9 +8600,10 @@ export default function DesignStudioPanel({
         blob,
         `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}@${exportPixelScale}x.png`,
       );
+      const fidelityNotice = getExportFidelityNotice(collectDesignVectorFeatures(exportDesign));
       setExportState({
         busy: false,
-        message: `PNG exported at ${exportedWidth}x${exportedHeight}.`,
+        message: `PNG exported at ${exportedWidth}x${exportedHeight}.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
         tone: 'info',
       });
     } catch (error) {
@@ -8546,85 +8622,105 @@ export default function DesignStudioPanel({
   // text, shapes, rotation - stays as real PDF objects.
   async function buildVectorPdfInput(exportDesign: DesignDocument) {
     const { rasteriseSvgDataUrl } = await import('@/lib/content/svg-raster');
-    const imageCache = new Map<string, string>();
-
-    const resolveImage = async (asset: DesignAsset | undefined) => {
-      if (!asset) return undefined;
-      const cached = imageCache.get(asset.id);
-      if (cached) return cached;
-      const resolved = isSvgDesignAsset(asset)
-        ? await rasteriseSvgDataUrl(asset.src, asset.naturalWidth, asset.naturalHeight)
-        : asset.src;
-      if (resolved) imageCache.set(asset.id, resolved);
-      return resolved;
-    };
+    const resolveImage = createDesignPdfImageResolver(rasteriseSvgDataUrl);
+    const backgrounds = await captureDesignBackgroundEffects(exportDesign);
 
     const pages = [];
     for (const page of exportDesign.pages) {
-      const layers = [];
-      for (const layer of page.layers) {
-        const base = {
-          id: layer.id,
-          type: layer.type,
-          x: layer.x,
-          y: layer.y,
-          width: layer.width,
-          height: layer.height,
-          rotation: layer.rotation,
-          opacity: layer.opacity,
-          visible: layer.visible,
-          flipX: layer.flipX,
-          flipY: layer.flipY,
-          borderRadius: getLayerBaseBorderRadius(layer),
-        };
-
-        if (layer.type === 'text') {
-          layers.push({
-            ...base,
-            text: layer.text,
-            fontFamily: layer.fontFamily,
-            fontSize: layer.fontSize,
-            fontWeight: layer.fontWeight,
-            color: layer.color,
-            lineHeight: layer.lineHeight,
-            textAlign: layer.textAlign,
-            backgroundColor: layer.backgroundColor,
-            padding: layer.padding,
-            letterSpacing: layer.letterSpacing,
-            textTransform: layer.textTransform,
-            textDecoration: layer.textDecoration,
-            fontStyle: layer.fontStyle,
-          });
-        } else if (layer.type === 'shape') {
-          layers.push({
-            ...base,
-            shape: layer.shape,
-            fillColor: layer.fillColor,
-            strokeColor: layer.strokeColor,
-            strokeWidth: layer.strokeWidth,
-          });
-        } else {
-          layers.push({
-            ...base,
-            imageSrc: await resolveImage(assetLibrary[layer.assetId]),
-            fit: layer.fit,
-          });
-        }
-      }
-      pages.push({ id: page.id, background: page.background, layers });
+      pages.push({
+        id: page.id,
+        background: page.background,
+        backgroundImage: backgrounds.get(page.id),
+        layers: await buildDesignPdfLayers(page.layers, assetLibrary, resolveImage),
+      });
     }
 
     return { width: exportDesign.width, height: exportDesign.height, pages };
   }
 
-  function collectDesignFontFamilies(exportDesign: DesignDocument) {
-    const families: string[] = [];
-    exportDesign.pages.forEach((page) => {
-      page.layers.forEach((layer) => {
-        if (layer.type === 'text' && layer.visible) families.push(layer.fontFamily);
-      });
+  /**
+   * The paper texture, page by page, as a transparent PNG.
+   *
+   * Grain, notebook rules and the grid are CSS gradients in the preview; a PDF
+   * has no gradients of that shape and React PDF has no CSS. Photographing the
+   * preview's own overlay node is the only way the two can agree, and it costs
+   * one capture per page with every layer hidden.
+   *
+   * The one thing it cannot carry is the blend mode - html2canvas has no
+   * support for `mix-blend-mode`, so the grain composites as plain alpha here.
+   * That is the same approximation the PNG export already makes, so the two
+   * exports match each other as well as the preview's overall look.
+   */
+  async function captureDesignBackgroundEffects(exportDesign: DesignDocument) {
+    const captured = new Map<string, string>();
+    const pagesWithEffects = exportDesign.pages.filter((page) => {
+      const effects = getPageBackgroundEffects(page.backgroundEffects);
+      return effects.grain || effects.noise || effects.notebookLines || effects.ruledLines || effects.gridLines;
     });
-    return families;
+    if (!pagesWithEffects.length) return captured;
+
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      await waitForNextDesignPaint();
+
+      for (const page of pagesWithEffects) {
+        const element = findExportCanvasForPage(page.id);
+        if (!element) continue;
+        const canvas = await captureDesignCanvas(element, exportDesign, html2canvas, {
+          backgroundEffectsOnly: true,
+          pixelScale: exportPixelScale,
+        });
+        captured.set(page.id, canvas.toDataURL('image/png'));
+        releaseDesignExportCanvas(canvas);
+      }
+    } catch (error) {
+      // A missing texture is better than a failed export, but it is a real
+      // difference from the preview, so say so rather than swallowing it.
+      console.warn('Could not capture the page texture for the vector PDF:', error);
+    }
+
+    return captured;
+  }
+
+  /**
+   * What the design asks of the vector lane, for the blocker to judge.
+   *
+   * Collected from the layer model rather than the DOM, and including the
+   * inline runs - a single bolded word inside a brush-script headline is enough
+   * to make a vector PDF differ from the canvas, and it is invisible in a scan
+   * of layer-level properties.
+   */
+  function collectDesignVectorFeatures(exportDesign: DesignDocument): DesignVectorFeatureReport {
+    const fontFamilies: string[] = [];
+    const syntheticBoldFamilies: string[] = [];
+    let usesItalic = false;
+    let usesLayerEffects = false;
+
+    const visit = (layers: DesignLayer[], depth: number) => {
+      layers.forEach((layer) => {
+        if (!layer.visible) return;
+        if (layer.shadowEnabled || layer.outlineEnabled || (layer.blurEnabled && (layer.blurAmount ?? 0) > 0)) {
+          usesLayerEffects = true;
+        }
+
+        if (layer.type === 'text') {
+          fontFamilies.push(layer.fontFamily);
+          getTextLayerSegments(layer).forEach((segment) => {
+            if (segment.style.fontStyle === 'italic') usesItalic = true;
+            if ((segment.style.fontWeight ?? 400) >= 700) syntheticBoldFamilies.push(layer.fontFamily);
+          });
+        }
+
+        if (layer.type === 'asset' && depth < 5) {
+          const asset = assetLibrary[layer.assetId];
+          const grouped = asset ? getSavedGroupLayers(asset) : [];
+          if (grouped.length) visit(grouped, depth + 1);
+        }
+      });
+    };
+
+    exportDesign.pages.forEach((page) => visit(page.layers, 0));
+    return { fontFamilies, syntheticBoldFamilies, usesItalic, usesLayerEffects };
   }
 
   async function exportPdf() {
@@ -8645,7 +8741,8 @@ export default function DesignStudioPanel({
     // and nothing clipped by the viewport. Raster stays as the fallback.
     try {
       const { getVectorExportBlocker, renderDesignPdfBlob } = await import('@/components/content/DesignPdfDocument');
-      const blocker = getVectorExportBlocker(collectDesignFontFamilies(exportDesign));
+      const features = collectDesignVectorFeatures(exportDesign);
+      const blocker = getVectorExportBlocker(features);
 
       if (blocker) {
         // A vector PDF with substituted fonts looks wrong in a way that is hard
@@ -8660,9 +8757,10 @@ export default function DesignStudioPanel({
         const input = await buildVectorPdfInput(exportDesign);
         const blob = await renderDesignPdfBlob(input);
         downloadBlob(blob, `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
+        const fidelityNotice = getExportFidelityNotice(features);
         setExportState({
           busy: false,
-          message: `Vector PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}. Text stays sharp at any zoom.`,
+          message: `Vector PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'}. Text stays sharp at any zoom.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
           tone: 'info',
         });
         return;
@@ -8729,9 +8827,10 @@ export default function DesignStudioPanel({
       }
 
       downloadBlob(pdf.output('blob'), `${slugifyFileName(`${exportDesign.title}-all-pages`)}.pdf`);
+      const fidelityNotice = getExportFidelityNotice(collectDesignVectorFeatures(exportDesign));
       setExportState({
         busy: false,
-        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'} at ${exportDesign.width}x${exportDesign.height}, ${exportPixelScale}x detail.`,
+        message: `PDF exported with ${exportDesign.pages.length} page${exportDesign.pages.length === 1 ? '' : 's'} at ${exportDesign.width}x${exportDesign.height}, ${exportPixelScale}x detail.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
         tone: 'info',
       });
     } catch (error) {
