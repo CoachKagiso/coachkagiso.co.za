@@ -1,5 +1,5 @@
 /**
- * How a saved group fits the box it was dropped into.
+ * Fitting a layer's geometry into a different box.
  *
  * A saved group is a selection of layers frozen into a reusable asset. Its
  * children keep their own coordinates - the space the selection occupied when
@@ -15,7 +15,9 @@
  * placeholder, so groups exported as empty space.
  *
  * Both lanes now scale the children through here, so they agree by
- * construction rather than by coincidence.
+ * construction rather than by coincidence - and so does the canvas itself:
+ * changing the aspect ratio, rotating the canvas, or applying a saved template
+ * at another size all resize every layer, and all had the same omission.
  *
  * Boxes scale per axis, because a group stretched wider should get wider.
  * Everything measured in one dimension - type size, stroke width, corner radius
@@ -23,7 +25,7 @@
  * text readable instead of distorted.
  */
 
-export type DesignGroupScale = {
+export type DesignBoxScale = {
   /** Horizontal box scale. */
   x: number;
   /** Vertical box scale. */
@@ -32,18 +34,18 @@ export type DesignGroupScale = {
   detail: number;
 };
 
-export function getDesignGroupScale(
-  layerWidth: number,
-  layerHeight: number,
-  groupWidth: number,
-  groupHeight: number,
-): DesignGroupScale {
-  const x = layerWidth / Math.max(1, groupWidth);
-  const y = layerHeight / Math.max(1, groupHeight);
+export function getDesignBoxScale(
+  targetWidth: number,
+  targetHeight: number,
+  sourceWidth: number,
+  sourceHeight: number,
+): DesignBoxScale {
+  const x = targetWidth / Math.max(1, sourceWidth);
+  const y = targetHeight / Math.max(1, sourceHeight);
   return { x, y, detail: Math.min(x, y) };
 }
 
-/** The numeric fields of a layer that have to travel with the group's box. */
+/** The numeric fields of a layer that have to travel with its box. */
 type ScalableLayerGeometry = {
   x: number;
   y: number;
@@ -69,8 +71,8 @@ function scaleDetail(value: number | undefined, scale: number) {
   return typeof value === 'number' ? value * scale : value;
 }
 
-/** One child of a saved group, placed and sized for the frame it is drawn in. */
-export function scaleDesignGroupChild<T extends ScalableLayerGeometry>(child: T, scale: DesignGroupScale): T {
+/** A layer placed and sized for the frame it is drawn in. */
+export function scaleDesignLayerGeometry<T extends ScalableLayerGeometry>(child: T, scale: DesignBoxScale): T {
   return {
     ...child,
     x: child.x * scale.x,
