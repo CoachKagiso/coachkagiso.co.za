@@ -9,9 +9,9 @@ import {
   normalizeShapeRadii,
 } from '../lib/content/design-shape-geometry.ts';
 import {
-  getDesignGroupScale,
-  scaleDesignGroupChild,
-} from '../lib/content/design-group-layout.ts';
+  getDesignBoxScale,
+  scaleDesignLayerGeometry,
+} from '../lib/content/design-layer-scale.ts';
 import {
   EMBEDDABLE_BRAND_FONTS,
   emptyVectorFeatureReport,
@@ -92,12 +92,12 @@ test('a star has ten points and a waist at 45% of its radius', () => {
 test('a saved group is scaled into the box it was dropped into', () => {
   // Groups are saved at the size of the selection and inserted at the asset
   // library's default size, so the two are almost never the same.
-  const scale = getDesignGroupScale(340, 260, 680, 520);
+  const scale = getDesignBoxScale(340, 260, 680, 520);
   assert.equal(scale.x, 0.5);
   assert.equal(scale.y, 0.5);
   assert.equal(scale.detail, 0.5);
 
-  const child = scaleDesignGroupChild(
+  const child = scaleDesignLayerGeometry(
     { x: 100, y: 200, width: 300, height: 80, fontSize: 48, strokeWidth: 6, borderRadius: 12 },
     scale,
   );
@@ -111,20 +111,20 @@ test('a saved group is scaled into the box it was dropped into', () => {
 });
 
 test('a stretched group scales type by the smaller axis, not the wider one', () => {
-  const scale = getDesignGroupScale(800, 200, 400, 200);
+  const scale = getDesignBoxScale(800, 200, 400, 200);
   assert.equal(scale.x, 2);
   assert.equal(scale.y, 1);
   assert.equal(scale.detail, 1, 'type must not double because the frame got wider');
 
-  const child = scaleDesignGroupChild({ x: 10, y: 10, width: 100, height: 50, fontSize: 20 }, scale);
+  const child = scaleDesignLayerGeometry({ x: 10, y: 10, width: 100, height: 50, fontSize: 20 }, scale);
   assert.equal(child.width, 200);
   assert.equal(child.height, 50);
   assert.equal(child.fontSize, 20);
 });
 
 test('scaling a group child leaves untouched fields alone', () => {
-  const scale = getDesignGroupScale(100, 100, 200, 200);
-  const child = scaleDesignGroupChild({ x: 0, y: 0, width: 10, height: 10, fontSize: undefined }, scale);
+  const scale = getDesignBoxScale(100, 100, 200, 200);
+  const child = scaleDesignLayerGeometry({ x: 0, y: 0, width: 10, height: 10, fontSize: undefined }, scale);
   assert.equal(child.fontSize, undefined, 'an absent size stays absent rather than becoming NaN');
 });
 
@@ -242,3 +242,31 @@ test('several problems are reported together, not one at a time', () => {
   assert.match(blocker, /no bold weight/);
   assert.match(blocker, /italic/);
 });
+
+test('resizing the canvas carries the type with the box', () => {
+  // Switching 9:16 to 4:5 keeps the width and compresses the height. The box
+  // has always followed; the type size used to stay where it was, so the copy
+  // no longer fitted the frame it had been laid out in.
+  const scale = getDesignBoxScale(1080, 1350, 1080, 1920);
+  assert.equal(scale.x, 1);
+  assert.ok(Math.abs(scale.y - 0.703125) < 1e-9);
+  assert.ok(Math.abs(scale.detail - 0.703125) < 1e-9);
+
+  const heading = scaleDesignLayerGeometry(
+    { x: 90, y: 400, width: 900, height: 200, fontSize: 64, letterSpacing: 2, borderRadius: 16 },
+    scale,
+  );
+  assert.equal(heading.width, 900, 'width is untouched when only the height changes');
+  assert.ok(Math.abs(heading.height - 140.625) < 1e-9);
+  assert.ok(Math.abs(heading.fontSize - 45) < 1e-9, 'type shrinks with the frame');
+  assert.ok(Math.abs(heading.letterSpacing - 1.40625) < 1e-9);
+  assert.ok(Math.abs(heading.borderRadius - 11.25) < 1e-9);
+})
+
+test('a canvas resize that grows the frame grows the type too', () => {
+  const scale = getDesignBoxScale(2160, 2700, 1080, 1350)
+  assert.equal(scale.detail, 2)
+  const layer = scaleDesignLayerGeometry({ x: 10, y: 10, width: 100, height: 50, fontSize: 21, strokeWidth: 3 }, scale)
+  assert.equal(layer.fontSize, 42)
+  assert.equal(layer.strokeWidth, 6)
+})

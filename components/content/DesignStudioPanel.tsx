@@ -79,7 +79,7 @@ import {
   getShapePolygonPoints,
   normalizeShapeRadii,
 } from '@/lib/content/design-shape-geometry';
-import { getDesignGroupScale, scaleDesignGroupChild } from '@/lib/content/design-group-layout';
+import { getDesignBoxScale, scaleDesignLayerGeometry } from '@/lib/content/design-layer-scale';
 import { getExportFidelityNotice } from '@/lib/content/design-pdf-support';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
@@ -2450,11 +2450,11 @@ async function buildDesignPdfLayers(
       // groups came out of the export as blank space. Draw the children, scaled
       // into this layer's box by the rule the preview uses.
       const bounds = getSavedGroupBounds(asset);
-      const scale = getDesignGroupScale(layer.width, layer.height, bounds.width, bounds.height);
+      const scale = getDesignBoxScale(layer.width, layer.height, bounds.width, bounds.height);
       built.push({
         ...base,
         groupLayers: await buildDesignPdfLayers(
-          groupedLayers.map((child) => scaleDesignGroupChild(child, scale) as DesignLayer),
+          groupedLayers.map((child) => scaleDesignLayerGeometry(child, scale) as DesignLayer),
           assets,
           resolveImage,
           depth + 1,
@@ -3236,12 +3236,22 @@ function resizeLayerForCanvas(layer: DesignLayer, currentWidth: number, currentH
     } as DesignLayer;
   }
 
+  // Type size, stroke width and corner radii travel with the box.
+  //
+  // They did not, and only the box was scaled - so switching aspect ratio, or
+  // rotating the canvas, or applying a saved template at another size, left
+  // every text layer at its old point size inside a box that had moved and
+  // resized around it. On a shrink the copy then overflows the frame it was
+  // laid out in, which reads as "the positions are off" and is the same
+  // omission that made saved groups spill out of their own frame.
+  const scale = getDesignBoxScale(nextWidth, nextHeight, currentWidth, currentHeight);
+
   if (layer.type === 'shape' && layer.shape === 'circle') {
     const centerX = (layer.x + layer.width / 2) * scaleX;
     const centerY = (layer.y + layer.height / 2) * scaleY;
     const size = Math.max(24, layer.width * Math.min(scaleX, scaleY));
     return {
-      ...layer,
+      ...scaleDesignLayerGeometry(layer, scale),
       x: centerX - size / 2,
       y: centerY - size / 2,
       width: size,
@@ -3249,13 +3259,7 @@ function resizeLayerForCanvas(layer: DesignLayer, currentWidth: number, currentH
     } as DesignLayer;
   }
 
-  return {
-    ...layer,
-    x: layer.x * scaleX,
-    y: layer.y * scaleY,
-    width: layer.width * scaleX,
-    height: layer.height * scaleY,
-  } as DesignLayer;
+  return scaleDesignLayerGeometry(layer, scale) as DesignLayer;
 }
 
 function resizeDesignCanvas(design: DesignDocument, nextWidth: number, nextHeight: number) {
@@ -3377,8 +3381,8 @@ function createUngroupedLayerSnapshot(layer: DesignLayer, groupedLayer: DesignAs
   // the child's box - it was the only one of the three places that did - but it
   // left type size and stroke width at their stored values, so ungrouping a
   // resized group shrank the boxes and left the words the size they were.
-  const scale = getDesignGroupScale(groupedLayer.width, groupedLayer.height, bounds.width, bounds.height);
-  const scaled = scaleDesignGroupChild(layer, scale) as DesignLayer;
+  const scale = getDesignBoxScale(groupedLayer.width, groupedLayer.height, bounds.width, bounds.height);
+  const scaled = scaleDesignLayerGeometry(layer, scale) as DesignLayer;
   const scaledWidth = layer.width * scale.x;
   const scaledHeight = layer.height * scale.y;
   let localCenterX = (layer.x - bounds.x + layer.width / 2) * scale.x;
@@ -5319,9 +5323,9 @@ function GroupedAssetLayerBody({
   // saved; this is the box they have to fit now. Scaling the numbers rather
   // than applying a CSS transform is what lets the PDF lane land on the same
   // geometry - it has the arithmetic, not a browser.
-  const scale = getDesignGroupScale(layer.width, layer.height, bounds.width, bounds.height);
+  const scale = getDesignBoxScale(layer.width, layer.height, bounds.width, bounds.height);
   const groupLayers = getSavedGroupLayers(asset).map(
-    (childLayer) => scaleDesignGroupChild(childLayer, scale) as DesignLayer,
+    (childLayer) => scaleDesignLayerGeometry(childLayer, scale) as DesignLayer,
   );
   const virtualDesign = {
     width: Math.max(1, layer.width),
