@@ -151,6 +151,7 @@ type DesignFontFamily =
   | 'serif'
   | 'sans'
   | 'interTight'
+  | 'poppins'
   | 'hand'
   | 'alohaLover'
   | 'daughterHand'
@@ -1878,6 +1879,11 @@ const designFontOptions: Array<{ value: DesignFontFamily; label: string; fontFam
   { value: 'serif', label: 'Serif', fontFamily: 'var(--font-serif), "Playfair Display", Georgia, serif' },
   { value: 'sans', label: 'Sans', fontFamily: 'var(--font-sans), "Inter", "Helvetica Neue", Arial, sans-serif' },
   { value: 'interTight', label: 'Inter', fontFamily: 'var(--font-primary), "Inter", "Helvetica Neue", Arial, sans-serif' },
+  // Already loaded app-wide for the carousel's Editorial Authority face, at the
+  // four weights and both styles - so it needs no new @font-face here, and it
+  // is the one family in the studio whose italics are drawn rather than
+  // synthesised.
+  { value: 'poppins', label: 'Poppins', fontFamily: 'var(--font-poppins), "Poppins", "Helvetica Neue", Arial, sans-serif' },
   { value: 'hand', label: 'Hand', fontFamily: '"Comic Sans MS", "Segoe Print", "Bradley Hand", cursive' },
   { value: 'alohaLover', label: 'Aloha Lover', fontFamily: '"Aloha Lover", "Segoe Print", cursive' },
   { value: 'daughterHand', label: 'Daughter Hand', fontFamily: '"Daughter Hand", "Segoe Print", cursive' },
@@ -8693,7 +8699,7 @@ export default function DesignStudioPanel({
   function collectDesignVectorFeatures(exportDesign: DesignDocument): DesignVectorFeatureReport {
     const fontFamilies: string[] = [];
     const syntheticBoldFamilies: string[] = [];
-    let usesItalic = false;
+    const italicFamilies: string[] = [];
     let usesLayerEffects = false;
 
     const visit = (layers: DesignLayer[], depth: number) => {
@@ -8706,7 +8712,7 @@ export default function DesignStudioPanel({
         if (layer.type === 'text') {
           fontFamilies.push(layer.fontFamily);
           getTextLayerSegments(layer).forEach((segment) => {
-            if (segment.style.fontStyle === 'italic') usesItalic = true;
+            if (segment.style.fontStyle === 'italic') italicFamilies.push(layer.fontFamily);
             if ((segment.style.fontWeight ?? 400) >= 700) syntheticBoldFamilies.push(layer.fontFamily);
           });
         }
@@ -8720,7 +8726,7 @@ export default function DesignStudioPanel({
     };
 
     exportDesign.pages.forEach((page) => visit(page.layers, 0));
-    return { fontFamilies, syntheticBoldFamilies, usesItalic, usesLayerEffects };
+    return { fontFamilies, syntheticBoldFamilies, italicFamilies, usesLayerEffects };
   }
 
   async function exportPdf() {

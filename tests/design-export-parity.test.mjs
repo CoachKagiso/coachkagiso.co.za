@@ -17,6 +17,7 @@ import {
   emptyVectorFeatureReport,
   getExportFidelityNotice,
   getVectorExportBlocker,
+  pdfFontHasItalic,
   mapPdfFontFamily,
   mapPdfFontWeight,
 } from '../lib/content/design-pdf-support.ts';
@@ -141,12 +142,12 @@ test('every font the studio offers is either embeddable or blocked, never substi
   const studioFonts = [
     'serif', 'sans', 'interTight', 'hand', 'alohaLover', 'daughterHand', 'heroIn',
     'bableya', 'linebrush', 'mibrush', 'walesiaSignatureBrush', 'walkingDream',
-    'sweetBulky', 'simpleNotes', 'kaliebLuxury',
+    'sweetBulky', 'simpleNotes', 'kaliebLuxury', 'poppins',
   ];
   const allowed = studioFonts.filter((family) => getVectorExportBlocker([family]) === null);
   assert.deepEqual(
     allowed.slice().sort(),
-    ['sans', 'serif', 'interTight', ...Object.keys(EMBEDDABLE_BRAND_FONTS)].sort(),
+    ['sans', 'serif', 'interTight', 'poppins', ...Object.keys(EMBEDDABLE_BRAND_FONTS)].sort(),
     'only the body families and the six brand faces with files may pass',
   );
   for (const family of studioFonts) {
@@ -166,9 +167,27 @@ test('the two body families pass and map to their registered faces', () => {
   assert.equal(mapPdfFontFamily('interTight'), 'Inter');
 });
 
-test('italic blocks the vector lane, because there is no italic file', () => {
-  const report = { ...emptyVectorFeatureReport(), fontFamilies: ['sans'], usesItalic: true };
-  assert.match(getVectorExportBlocker(report), /italic/);
+test('italic blocks a family whose italic would only be a slanted regular', () => {
+  const report = { ...emptyVectorFeatureReport(), fontFamilies: ['sans'], italicFamilies: ['sans'] };
+  assert.match(getVectorExportBlocker(report), /no italic font file/);
+});
+
+test('italic does not block Poppins, which ships a drawn italic', () => {
+  const report = { ...emptyVectorFeatureReport(), fontFamilies: ['poppins'], italicFamilies: ['poppins'] };
+  assert.equal(getVectorExportBlocker(report), null);
+  assert.equal(pdfFontHasItalic('poppins'), true);
+  assert.equal(pdfFontHasItalic('sans'), false);
+  assert.equal(pdfFontHasItalic('serif'), false);
+});
+
+test('Poppins is embeddable, multi-weight, and maps to its own face', () => {
+  assert.equal(getVectorExportBlocker(['poppins']), null);
+  assert.equal(mapPdfFontFamily('poppins'), 'Poppins');
+  // All four registered weights resolve to themselves rather than collapsing.
+  assert.equal(mapPdfFontWeight('Poppins', 400), 400);
+  assert.equal(mapPdfFontWeight('Poppins', 500), 500);
+  assert.equal(mapPdfFontWeight('Poppins', 600), 600);
+  assert.equal(mapPdfFontWeight('Poppins', 700), 700);
 });
 
 test('a shadow, outline or blur is reported, not used to force the raster lane', () => {
@@ -216,7 +235,7 @@ test('several problems are reported together, not one at a time', () => {
   const blocker = getVectorExportBlocker({
     fontFamilies: ['sweetBulky'],
     syntheticBoldFamilies: ['linebrush'],
-    usesItalic: true,
+    italicFamilies: ['sans'],
     usesLayerEffects: false,
   });
   assert.match(blocker, /sweetBulky/);

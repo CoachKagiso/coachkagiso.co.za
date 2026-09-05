@@ -30,27 +30,46 @@ export const CORE_PDF_FONT_FAMILIES: Record<string, string> = {
   serif: 'Playfair Display',
   sans: 'Inter',
   interTight: 'Inter',
+  poppins: 'Poppins',
 };
 
 /**
  * The families registered at more than one weight. Everything else is a single
  * face, so asking one for bold hands back the regular without complaint.
  */
-export const MULTI_WEIGHT_PDF_FONTS = new Set(['Inter', 'Playfair Display']);
+export const MULTI_WEIGHT_PDF_FONTS = new Set(['Inter', 'Playfair Display', 'Poppins']);
+
+/**
+ * The families with real italic files behind them.
+ *
+ * Everywhere else italic is the browser slanting an upright face, and there is
+ * nothing to embed - which is why italic used to block the vector lane
+ * outright. Poppins is the exception: it ships Italic and BoldItalic, already
+ * self-hosted for the carousel. So the question is per family, not global, and
+ * a Poppins design may use italic and still export as vector.
+ *
+ * A family must never be asked for a style it was not registered at - React PDF
+ * throws on an unresolved face and takes the whole document with it.
+ */
+export const ITALIC_CAPABLE_PDF_FONTS = new Set(['Poppins']);
+
+export function pdfFontHasItalic(family: string) {
+  return ITALIC_CAPABLE_PDF_FONTS.has(mapPdfFontFamily(family));
+}
 
 /** What a design asks of the vector lane, for the blocker to judge. */
 export type DesignVectorFeatureReport = {
   fontFamilies: string[];
   /** Families asked for a weight they were not registered at. */
   syntheticBoldFamilies: string[];
-  /** Italic is synthesised by the browser and has no registered face here. */
-  usesItalic: boolean;
+  /** Families asked for italic. Only some have a drawn italic to embed. */
+  italicFamilies: string[];
   /** Drop shadow, outline and blur are all CSS filters; a PDF has no filters. */
   usesLayerEffects: boolean;
 };
 
 export function emptyVectorFeatureReport(): DesignVectorFeatureReport {
-  return { fontFamilies: [], syntheticBoldFamilies: [], usesItalic: false, usesLayerEffects: false };
+  return { fontFamilies: [], syntheticBoldFamilies: [], italicFamilies: [], usesLayerEffects: false };
 }
 
 export function mapPdfFontFamily(family?: string) {
@@ -116,8 +135,15 @@ export function getVectorExportBlocker(report: DesignVectorFeatureReport | strin
     reasons.push(`${describeList(syntheticBold)} ${syntheticBold.length === 1 ? 'has' : 'have'} no bold weight`);
   }
 
-  if (normalized.usesItalic) {
-    reasons.push('italic text has no italic font file, only a slanted regular');
+  // Only the families that have no drawn italic. Poppins does, so a Poppins
+  // design in italic is no reason to fall back.
+  const syntheticItalic = [...new Set(normalized.italicFamilies)].filter(
+    (family) => !pdfFontHasItalic(family) && (CORE_PDF_FONT_FAMILIES[family] || EMBEDDABLE_BRAND_FONTS[family]),
+  );
+  if (syntheticItalic.length) {
+    reasons.push(
+      `${describeList(syntheticItalic)} ${syntheticItalic.length === 1 ? 'has' : 'have'} no italic font file, only a slanted regular`,
+    );
   }
 
   // Layer effects are deliberately not a blocker. They are a real difference
