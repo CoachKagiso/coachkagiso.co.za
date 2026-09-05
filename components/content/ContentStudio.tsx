@@ -12886,25 +12886,29 @@ function CarouselStudioPanel({
         tone: 'info',
       });
 
+      // The deck as the vector renderer wants it. Both lanes build from this
+      // now: the PNG is a rasterised page of the same document rather than a
+      // separate photograph of the preview.
+      const pdfSlides: CarouselPdfSlide[] = renderedDeck.map((slide, index) => {
+        const role = slide.role || getDefaultCarouselSlideRole(displayedLayoutRecipe, index, renderedDeck.length);
+        const composition = slide.composition === 'auto' ? 'note_card' : slide.composition;
+        const baseSize = getCarouselHeadlineSize(composition as CarouselComposition, getCarouselSlideTextStats(slide));
+        // The PDF page is 1080x1350 = 1.8x the 600px studio preview, so scale
+        // the headline by the same export ratio used by the raster lane.
+        const headlineSize = Math.round(baseSize * (displayedExportDimensions.width / 600));
+        return {
+          slide,
+          role,
+          composition,
+          headlineSize,
+          eyebrow: renderedEyebrows[index] || '',
+        };
+      });
+
       if (mode === 'pdf') {
         // CHANGE I: vector PDF rendered server-side via /api/carousel-pdf using
         // @react-pdf/renderer's renderToBuffer. Text stays selectable and crisp
-        // at 200%/400%. The PNG lane (2x raster) below is untouched.
-        const pdfSlides: CarouselPdfSlide[] = renderedDeck.map((slide, index) => {
-          const role = slide.role || getDefaultCarouselSlideRole(displayedLayoutRecipe, index, renderedDeck.length);
-          const composition = slide.composition === 'auto' ? 'note_card' : slide.composition;
-          const baseSize = getCarouselHeadlineSize(composition as CarouselComposition, getCarouselSlideTextStats(slide));
-          // The PDF page is 1080x1350 = 1.8x the 600px studio preview, so scale
-          // the headline by the same export ratio used by the raster lane.
-          const headlineSize = Math.round(baseSize * (displayedExportDimensions.width / 600));
-          return {
-            slide,
-            role,
-            composition,
-            headlineSize,
-            eyebrow: renderedEyebrows[index] || '',
-          };
-        });
+        // at 200%/400%.
 
         // CHANGE W: append the custom CTA slide as real vector pages. It is a
         // design document rather than a carousel slide, so it is built by the
@@ -13006,6 +13010,58 @@ function CarouselStudioPanel({
         return;
       }
 
+      // CHANGE Y: the PNG frames are pages of the vector document, rasterised.
+      //
+      // They used to be html2canvas photographs of the preview, and html2canvas
+      // does not lay text out - it asks the browser where a run sits, then
+      // draws the string itself at a baseline from its own hidden probe. That
+      // probe reads about half an em low, growing with type size, so every
+      // frame carried its type lower than the studio showed it while the boxes
+      // around it stayed exact. That is the "looks low in the file, right in
+      // the app" this deck has had all along.
+      //
+      // Rendering the same document the PDF button renders and rasterising the
+      // page makes the two exports the same artefact at two resolutions.
+      let renderedFromVector = false;
+      try {
+        setExportState({ busy: true, mode, message: 'Rendering slides from the vector document...', tone: 'info' });
+        const response = await fetch('/api/carousel-pdf', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ deck: pdfSlides, template: displayedTemplateOption, profilePhotoUrl: profilePhotoUrl || null }),
+        });
+        if (!response.ok) throw new Error(`carousel-pdf responded ${response.status}`);
+        const pdfBytes = await (await response.blob()).arrayBuffer();
+        if (!pdfBytes.byteLength) throw new Error('carousel-pdf returned an empty document');
+
+        const { rasterisePdfPageToBlob } = await import('@/lib/content/pdf-raster');
+        for (const [position, target] of exportTargets.entries()) {
+          const slideNumber = target.index + 1;
+          setExportState({
+            busy: true,
+            mode,
+            message: `Rendering slide ${slideNumber} (${position + 1} of ${exportTargets.length}) at ${exportPixelScale}x...`,
+            tone: 'info',
+          });
+          // The document holds the whole deck even on a partial export, so the
+          // slide's own index picks the page rather than its place in the
+          // selection.
+          const blob = await rasterisePdfPageToBlob(pdfBytes, slideNumber, exportPixelScale);
+          downloadBlob(blob, `${baseName}-slide-${String(slideNumber).padStart(2, '0')}@${exportPixelScale}x.png`);
+        }
+        renderedFromVector = true;
+        setExportState({
+          busy: false,
+          mode,
+          message: `Downloaded ${exportTargets.length} PNG frame${exportTargets.length === 1 ? '' : 's'} at ${dimensions.width * exportPixelScale}x${dimensions.height * exportPixelScale}.`,
+          tone: 'info',
+        });
+      } catch (vectorError) {
+        console.warn('Vector PNG failed, falling back to the canvas capture:', vectorError);
+      }
+
+      if (renderedFromVector) return;
+
       // CHANGE J/K: capture, download and free one frame at a time so a 3x
       // export of a ten-slide deck never holds half a gigabyte of canvases.
       const html2canvas = (await import('html2canvas')).default;
@@ -13016,7 +13072,7 @@ function CarouselStudioPanel({
         setExportState({
           busy: true,
           mode,
-          message: `Rendering slide ${slideNumber} (${position + 1} of ${elements.length}) at ${exportPixelScale}x...`,
+          message: `Capturing slide ${slideNumber} (${position + 1} of ${elements.length}) at ${exportPixelScale}x...`,
           tone: 'info',
         });
         const canvas = await captureCarouselSlideCanvas(element, dimensions, html2canvas, exportPixelScale);
@@ -13028,7 +13084,7 @@ function CarouselStudioPanel({
       setExportState({
         busy: false,
         mode,
-        message: `Downloaded ${elements.length} PNG frame${elements.length === 1 ? '' : 's'} at ${dimensions.width * exportPixelScale}x${dimensions.height * exportPixelScale}.`,
+        message: `Downloaded ${elements.length} PNG frame${elements.length === 1 ? '' : 's'} at ${dimensions.width * exportPixelScale}x${dimensions.height * exportPixelScale}, captured from the preview because the vector render was unavailable.`,
         tone: 'info',
       });
     } catch (error) {

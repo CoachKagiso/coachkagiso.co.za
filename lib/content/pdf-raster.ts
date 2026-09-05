@@ -14,6 +14,20 @@
  * rather than from a photograph of it.
  */
 
+/**
+ * How long a page render may take before it is abandoned.
+ *
+ * pdf.js drives rasterisation from `requestAnimationFrame`, and that does not
+ * fire in a document the browser is not painting - a backgrounded tab, a
+ * minimised window. Without a bound, switching away mid-export leaves the
+ * render waiting for a frame that never arrives: no error, no file, a progress
+ * message that never changes. The same trap `waitForNextDesignPaint` exists to
+ * avoid on the capture lane.
+ *
+ * Generous, because a real 3x page on a slow machine is allowed to be slow.
+ */
+const RENDER_TIMEOUT_MS = 20_000;
+
 export async function rasterisePdfPageToBlob(
   data: ArrayBuffer,
   pageNumber: number,
@@ -41,7 +55,24 @@ export async function rasterisePdfPageToBlob(
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Could not prepare the PNG canvas.');
 
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    const task = page.render({ canvas, canvasContext: context, viewport });
+    let timeoutId: number | undefined;
+    try {
+      await Promise.race([
+        task.promise,
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(
+            () => reject(new Error('The PDF page took too long to draw - the tab may have been in the background.')),
+            RENDER_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch (error) {
+      task.cancel();
+      throw error;
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     // A large export is tens of megabytes of RGBA; free it once it is a blob.
