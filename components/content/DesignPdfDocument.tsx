@@ -25,6 +25,7 @@ import {
   getVectorExportBlocker,
   mapPdfFontFamily as mapFontFamily,
   mapPdfFontWeight as mapFontWeight,
+  pdfFontHasItalic,
   type DesignVectorFeatureReport,
 } from '@/lib/content/design-pdf-support';
 
@@ -61,6 +62,15 @@ function registerDesignPdfFonts() {
   Font.register({ family: 'Playfair Display', fontWeight: 500, src: `${BASE}/fonts/PlayfairDisplay-Medium.ttf` });
   Font.register({ family: 'Playfair Display', fontWeight: 600, src: `${BASE}/fonts/PlayfairDisplay-SemiBold.ttf` });
   Font.register({ family: 'Playfair Display', fontWeight: 700, src: `${BASE}/fonts/PlayfairDisplay-Bold.ttf` });
+  Font.register({ family: 'Poppins', fontWeight: 400, src: `${BASE}/fonts/Poppins-Regular.ttf` });
+  Font.register({ family: 'Poppins', fontWeight: 500, src: `${BASE}/fonts/Poppins-Medium.ttf` });
+  Font.register({ family: 'Poppins', fontWeight: 600, src: `${BASE}/fonts/Poppins-SemiBold.ttf` });
+  Font.register({ family: 'Poppins', fontWeight: 700, src: `${BASE}/fonts/Poppins-Bold.ttf` });
+  // The only drawn italics in the studio. Registered at both weights, because
+  // an italic run inside a bold heading resolves 700-italic and would throw if
+  // only the 400 slot existed.
+  Font.register({ family: 'Poppins', fontWeight: 400, fontStyle: 'italic', src: `${BASE}/fonts/Poppins-Italic.ttf` });
+  Font.register({ family: 'Poppins', fontWeight: 700, fontStyle: 'italic', src: `${BASE}/fonts/Poppins-BoldItalic.ttf` });
 
   // Registered from the same table the blocker checks against, so a family can
   // never be allowed through by one and missing from the other.
@@ -171,7 +181,7 @@ export type DesignPdfInput = {
 export function getDesignPdfFeatureReport(design: DesignPdfInput): DesignVectorFeatureReport {
   const fontFamilies: string[] = [];
   const syntheticBoldFamilies: string[] = [];
-  let usesItalic = false;
+  const italicFamilies: string[] = [];
   let usesLayerEffects = false;
 
   const visit = (layers: DesignPdfLayer[]) => {
@@ -187,14 +197,14 @@ export function getDesignPdfFeatureReport(design: DesignPdfInput): DesignVectorF
         ? layer.runs
         : [{ fontWeight: layer.fontWeight, fontStyle: layer.fontStyle }];
       runs.forEach((run) => {
-        if ((run.fontStyle ?? layer.fontStyle) === 'italic') usesItalic = true;
+        if ((run.fontStyle ?? layer.fontStyle) === 'italic') italicFamilies.push(family);
         if ((run.fontWeight ?? layer.fontWeight ?? 400) >= 700) syntheticBoldFamilies.push(family);
       });
     });
   };
 
   design.pages.forEach((page) => visit(page.layers));
-  return { fontFamilies, syntheticBoldFamilies, usesItalic, usesLayerEffects };
+  return { fontFamilies, syntheticBoldFamilies, italicFamilies, usesLayerEffects };
 }
 
 function getLayerRadii(layer: DesignPdfLayer): DesignCornerRadii {
@@ -292,11 +302,18 @@ function TextLayer({ layer }: { layer: DesignPdfLayer }) {
         */}
         {runs.map((run, index) => {
           const weight = mapFontWeight(family, run.fontWeight ?? layer.fontWeight);
+          // Asking a family for a style it was not registered at throws and
+          // takes the whole document with it, so italic is emitted only where
+          // there is a drawn face to resolve. The blocker keeps the other
+          // families out of this lane; this is the second lock on the same door.
+          const italic =
+            (run.fontStyle ?? layer.fontStyle) === 'italic' && pdfFontHasItalic(layer.fontFamily || 'sans');
           return (
             <Text
               key={`${layer.id}-run-${index}`}
               style={{
                 ...(weight ? { fontWeight: weight } : {}),
+                ...(italic ? { fontStyle: 'italic' as const } : {}),
                 ...((run.textDecoration ?? layer.textDecoration) === 'underline'
                   ? { textDecoration: 'underline' }
                   : {}),
