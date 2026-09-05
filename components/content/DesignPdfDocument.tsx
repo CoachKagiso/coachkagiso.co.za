@@ -1,15 +1,32 @@
 import React from 'react';
 import {
+  Circle,
   Document,
   Font,
   Image,
+  Line,
   Page,
-  Svg,
+  Path,
   Polygon,
+  Svg,
   Text,
   View,
   pdf,
 } from '@react-pdf/renderer';
+import {
+  getCircleGeometry,
+  getLineGeometry,
+  getRoundedRectanglePath,
+  getShapePolygonPoints,
+  type DesignCornerRadii,
+} from '@/lib/content/design-shape-geometry';
+import {
+  EMBEDDABLE_BRAND_FONTS,
+  getVectorExportBlocker,
+  mapPdfFontFamily as mapFontFamily,
+  mapPdfFontWeight as mapFontWeight,
+  type DesignVectorFeatureReport,
+} from '@/lib/content/design-pdf-support';
 
 // Vector PDF export for Design Studio.
 //
@@ -19,36 +36,17 @@ import {
 // text stays sharp at any zoom, rotations are exact rather than approximated by
 // a rasteriser, and nothing can be clipped by the browser viewport.
 //
-// Fonts are the constraint. React PDF embeds TTF/OTF only, so the woff/woff2
-// brand faces cannot be used here. Rather than silently substituting a font and
-// shipping a PDF that looks wrong, `getVectorExportBlocker` reports the problem
-// and the caller falls back to the raster lane.
+// The rule this file lives by: it may only draw what the preview draws. Every
+// time the two disagree the user sees it, and always after the fact - the
+// export is the artefact that leaves the building. Where a feature genuinely
+// cannot be drawn as vector (a blurred layer, a font that only exists as
+// woff2), `getVectorExportBlocker` says so and the caller falls back to the
+// raster lane, which can. Silently dropping the feature is never an option.
+//
+// Shape geometry comes from `lib/content/design-shape-geometry` - the same
+// module the preview draws from - so a circle here is the circle there.
 
 const BASE = typeof window !== 'undefined' ? window.location.origin : '';
-
-/** Brand faces available as OTF/TTF, so embeddable in a PDF. */
-const embeddableBrandFonts: Record<string, string> = {
-  // Converted from the shipped woff2 with wawoff2; the source is CFF, so it
-  // decompresses straight to a .otf React PDF can embed.
-  daughterHand: '/fonts/brand/daughter-hand.otf',
-  linebrush: '/fonts/brand/linebrush.otf',
-  mibrush: '/fonts/brand/mibrush-regular.otf',
-  simpleNotes: '/fonts/brand/simple-notes-regular.otf',
-  walesiaSignatureBrush: '/fonts/brand/walesia-signature-brush.otf',
-  walkingDream: '/fonts/brand/walking-dream.otf',
-};
-
-/**
- * Faces that exist only as woff/woff2. React PDF cannot parse those, so a design
- * using one cannot be exported as vector without changing how it looks.
- */
-const nonEmbeddableFonts = new Set([
-  'alohaLover',
-  'bableya',
-  'heroIn',
-  'kaliebLuxury',
-  'hand', // Comic Sans / system fallback - not ours to embed.
-]);
 
 let fontsRegistered = false;
 
@@ -64,7 +62,9 @@ function registerDesignPdfFonts() {
   Font.register({ family: 'Playfair Display', fontWeight: 600, src: `${BASE}/fonts/PlayfairDisplay-SemiBold.ttf` });
   Font.register({ family: 'Playfair Display', fontWeight: 700, src: `${BASE}/fonts/PlayfairDisplay-Bold.ttf` });
 
-  for (const [key, path] of Object.entries(embeddableBrandFonts)) {
+  // Registered from the same table the blocker checks against, so a family can
+  // never be allowed through by one and missing from the other.
+  for (const [key, path] of Object.entries(EMBEDDABLE_BRAND_FONTS)) {
     Font.register({ family: key, src: `${BASE}${path}` });
   }
 
@@ -75,6 +75,17 @@ function registerDesignPdfFonts() {
     // Optional on some versions; wrapping still works without it.
   }
 }
+
+export { getVectorExportBlocker };
+export type { DesignVectorFeatureReport };
+
+export type DesignPdfTextRun = {
+  text: string;
+  fontWeight?: number;
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline';
+  textTransform?: 'none' | 'uppercase';
+};
 
 // The panel owns the real types; this module only needs the shape it draws.
 export type DesignPdfLayer = {
@@ -90,8 +101,12 @@ export type DesignPdfLayer = {
   flipX?: boolean;
   flipY?: boolean;
   borderRadius?: number;
+  /** Per-corner radii; the preview has always had four, the export had one. */
+  radii?: DesignCornerRadii;
   // text
   text?: string;
+  /** The styled spans of the copy. One run means no inline formatting. */
+  runs?: DesignPdfTextRun[];
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: number;
@@ -99,6 +114,7 @@ export type DesignPdfLayer = {
   lineHeight?: number;
   textAlign?: 'left' | 'center' | 'right';
   backgroundColor?: string;
+  borderColor?: string;
   padding?: number;
   letterSpacing?: number;
   textTransform?: 'none' | 'uppercase';
@@ -107,6 +123,18 @@ export type DesignPdfLayer = {
   // asset - already resolved to a raster data URI by the caller
   imageSrc?: string;
   fit?: 'contain' | 'cover';
+  /**
+   * A saved group draws its own children rather than an image: the asset's
+   * `src` is a transparent placeholder, so drawing it produced a blank box.
+   * Coordinates are in the group's own space, scaled by the box it sits in.
+   */
+  groupLayers?: DesignPdfLayer[];
+  /**
+   * Set when the layer asks for a shadow, outline or blur. A PDF has no filters,
+   * so this is the flag that sends the design to the raster lane instead of
+   * quietly flattening the effect away.
+   */
+  hasUnsupportedEffects?: boolean;
   // shape
   shape?: 'rectangle' | 'circle' | 'triangle' | 'diamond' | 'hexagon' | 'star' | 'line';
   fillColor?: string;
@@ -118,6 +146,12 @@ export type DesignPdfPage = {
   id: string;
   background: string;
   layers: DesignPdfLayer[];
+  /**
+   * The paper texture - grain, grid, ruled lines - as a full-bleed raster.
+   * These are CSS gradient overlays in the preview, and the export used to
+   * leave them out entirely, so every design came back on blank stock.
+   */
+  backgroundImage?: string;
 };
 
 export type DesignPdfInput = {
@@ -127,62 +161,60 @@ export type DesignPdfInput = {
 };
 
 /**
- * Returns a human-readable reason the design cannot be drawn as vector, or null
- * when it can. Checked before rendering so the caller can fall back cleanly
- * rather than producing a PDF with substituted fonts.
+ * The same report, read off a built payload.
+ *
+ * The carousel export appends a CTA design it loads as a payload and never sees
+ * as layers, so it needs its own way to ask the question. It used to check only
+ * the font names, and only at the layer level - an italic or bolded run inside
+ * the CTA slipped straight past it.
  */
-export function getVectorExportBlocker(fontFamilies: string[]): string | null {
-  const blocked = [...new Set(fontFamilies)].filter((family) => nonEmbeddableFonts.has(family));
-  if (blocked.length === 0) return null;
-  return `${blocked.join(', ')} ${blocked.length === 1 ? 'is' : 'are'} only available as a web font, which cannot be embedded in a vector PDF`;
+export function getDesignPdfFeatureReport(design: DesignPdfInput): DesignVectorFeatureReport {
+  const fontFamilies: string[] = [];
+  const syntheticBoldFamilies: string[] = [];
+  let usesItalic = false;
+  let usesLayerEffects = false;
+
+  const visit = (layers: DesignPdfLayer[]) => {
+    layers.forEach((layer) => {
+      if (!layer.visible) return;
+      if (layer.hasUnsupportedEffects) usesLayerEffects = true;
+      if (layer.groupLayers?.length) visit(layer.groupLayers);
+      if (layer.type !== 'text') return;
+
+      const family = layer.fontFamily || 'sans';
+      fontFamilies.push(family);
+      const runs = layer.runs?.length
+        ? layer.runs
+        : [{ fontWeight: layer.fontWeight, fontStyle: layer.fontStyle }];
+      runs.forEach((run) => {
+        if ((run.fontStyle ?? layer.fontStyle) === 'italic') usesItalic = true;
+        if ((run.fontWeight ?? layer.fontWeight ?? 400) >= 700) syntheticBoldFamilies.push(family);
+      });
+    });
+  };
+
+  design.pages.forEach((page) => visit(page.layers));
+  return { fontFamilies, syntheticBoldFamilies, usesItalic, usesLayerEffects };
 }
 
-function mapFontFamily(family?: string) {
-  if (!family) return 'Inter';
-  if (family === 'serif') return 'Playfair Display';
-  if (family === 'sans' || family === 'interTight') return 'Inter';
-  if (embeddableBrandFonts[family]) return family;
-  return 'Inter';
+function getLayerRadii(layer: DesignPdfLayer): DesignCornerRadii {
+  const base = layer.borderRadius || 0;
+  return layer.radii ?? { topLeft: base, topRight: base, bottomRight: base, bottomLeft: base };
 }
 
-/** Inter and Playfair are registered per weight; brand faces have one weight. */
-function mapFontWeight(family: string, weight?: number) {
-  if (family !== 'Inter' && family !== 'Playfair Display') return undefined;
-  const requested = weight || 400;
-  if (family === 'Playfair Display') {
-    if (requested >= 700) return 700;
-    return requested >= 600 ? 600 : 500;
-  }
-  if (requested >= 700) return 700;
-  if (requested >= 600) return 600;
-  if (requested >= 500) return 500;
-  return 400;
+function hasAnyRadius(radii: DesignCornerRadii) {
+  return Boolean(radii.topLeft || radii.topRight || radii.bottomRight || radii.bottomLeft);
 }
 
-function polygonPoints(shape: string, width: number, height: number) {
-  switch (shape) {
-    case 'triangle':
-      return `${width / 2},0 ${width},${height} 0,${height}`;
-    case 'diamond':
-      return `${width / 2},0 ${width},${height / 2} ${width / 2},${height} 0,${height / 2}`;
-    case 'hexagon':
-      return `${width * 0.25},0 ${width * 0.75},0 ${width},${height / 2} ${width * 0.75},${height} ${width * 0.25},${height} 0,${height / 2}`;
-    case 'star': {
-      const cx = width / 2;
-      const cy = height / 2;
-      const outer = Math.min(width, height) / 2;
-      const inner = outer * 0.42;
-      const points: string[] = [];
-      for (let index = 0; index < 10; index += 1) {
-        const radius = index % 2 === 0 ? outer : inner;
-        const angle = (Math.PI / 5) * index - Math.PI / 2;
-        points.push(`${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`);
-      }
-      return points.join(' ');
-    }
-    default:
-      return '';
-  }
+/** React PDF takes the four corners individually, same as CSS. */
+function radiiStyle(radii: DesignCornerRadii) {
+  if (!hasAnyRadius(radii)) return {};
+  return {
+    borderTopLeftRadius: radii.topLeft,
+    borderTopRightRadius: radii.topRight,
+    borderBottomRightRadius: radii.bottomRight,
+    borderBottomLeftRadius: radii.bottomLeft,
+  };
 }
 
 function LayerFrame({ layer, children }: { layer: DesignPdfLayer; children: React.ReactNode }) {
@@ -210,10 +242,22 @@ function LayerFrame({ layer, children }: { layer: DesignPdfLayer; children: Reac
   );
 }
 
+function applyTransform(text: string, transform?: 'none' | 'uppercase') {
+  return transform === 'uppercase' ? text.toUpperCase() : text;
+}
+
 function TextLayer({ layer }: { layer: DesignPdfLayer }) {
   const family = mapFontFamily(layer.fontFamily);
-  const weight = mapFontWeight(family, layer.fontWeight);
-  const value = layer.textTransform === 'uppercase' ? (layer.text || '').toUpperCase() : layer.text || '';
+  const radii = getLayerRadii(layer);
+  const runs = layer.runs?.length
+    ? layer.runs
+    : [{
+        text: layer.text || '',
+        fontWeight: layer.fontWeight,
+        fontStyle: layer.fontStyle,
+        textDecoration: layer.textDecoration,
+        textTransform: layer.textTransform,
+      }];
 
   return (
     <View
@@ -221,25 +265,47 @@ function TextLayer({ layer }: { layer: DesignPdfLayer }) {
         width: '100%',
         height: '100%',
         ...(layer.backgroundColor ? { backgroundColor: layer.backgroundColor } : {}),
-        ...(layer.borderRadius ? { borderRadius: layer.borderRadius } : {}),
+        ...(layer.borderColor ? { borderWidth: 1.5, borderColor: layer.borderColor } : {}),
+        ...radiiStyle(radii),
         ...(layer.padding ? { padding: layer.padding } : {}),
-        justifyContent: 'center',
+        // The preview only centres the copy in its box when the box is centred;
+        // left- and right-aligned text starts at the top. Centring everything
+        // here is what floated captions away from where they were placed.
+        justifyContent: layer.textAlign === 'center' ? 'center' : 'flex-start',
       }}
     >
       <Text
         style={{
           fontFamily: family,
-          ...(weight ? { fontWeight: weight } : {}),
+          ...(mapFontWeight(family, layer.fontWeight) ? { fontWeight: mapFontWeight(family, layer.fontWeight) } : {}),
           fontSize: layer.fontSize || 16,
           color: layer.color || '#142334',
           lineHeight: layer.lineHeight || 1.2,
           textAlign: layer.textAlign || 'left',
           ...(layer.letterSpacing ? { letterSpacing: layer.letterSpacing } : {}),
-          ...(layer.textDecoration === 'underline' ? { textDecoration: 'underline' } : {}),
-          ...(layer.fontStyle === 'italic' ? { fontStyle: 'italic' } : {}),
         }}
       >
-        {value}
+        {/*
+          One nested Text per styled span. Selecting three words and bolding
+          them is the whole point of the inline toolbar, and the export used to
+          send the flat string - so the emphasis simply was not there.
+        */}
+        {runs.map((run, index) => {
+          const weight = mapFontWeight(family, run.fontWeight ?? layer.fontWeight);
+          return (
+            <Text
+              key={`${layer.id}-run-${index}`}
+              style={{
+                ...(weight ? { fontWeight: weight } : {}),
+                ...((run.textDecoration ?? layer.textDecoration) === 'underline'
+                  ? { textDecoration: 'underline' }
+                  : {}),
+              }}
+            >
+              {applyTransform(run.text, run.textTransform ?? layer.textTransform)}
+            </Text>
+          );
+        })}
       </Text>
     </View>
   );
@@ -247,42 +313,88 @@ function TextLayer({ layer }: { layer: DesignPdfLayer }) {
 
 function ShapeLayer({ layer }: { layer: DesignPdfLayer }) {
   const shape = layer.shape || 'rectangle';
-  const fill = layer.fillColor && layer.fillColor !== 'transparent' ? layer.fillColor : undefined;
-  const stroke = layer.strokeWidth ? layer.strokeColor : undefined;
+  const strokeWidth = Math.max(layer.strokeWidth || 0, 0);
+  const fill = layer.fillColor && layer.fillColor !== 'transparent' ? layer.fillColor : 'none';
+  const stroke = strokeWidth > 0 ? layer.strokeColor : undefined;
 
-  if (shape === 'rectangle' || shape === 'circle' || shape === 'line') {
-    const radius = shape === 'circle'
-      ? Math.min(layer.width, layer.height) / 2
-      : layer.borderRadius || 0;
+  // Every shape is drawn as SVG, from the same geometry the preview uses.
+  // Approximating a circle with a border radius and a line with a thin box is
+  // what made a circle in a tall frame come back as a stadium, and dropped
+  // every rule to the top of its own box.
+  const common = {
+    width: layer.width,
+    height: layer.height,
+    viewBox: `0 0 ${layer.width} ${layer.height}`,
+  };
+
+  if (shape === 'line') {
+    const line = getLineGeometry(layer.width, layer.height);
     return (
-      <View
-        style={{
-          width: '100%',
-          height: shape === 'line' ? Math.max(1, layer.strokeWidth || 1) : '100%',
-          ...(fill ? { backgroundColor: fill } : {}),
-          ...(shape === 'line' && layer.strokeColor ? { backgroundColor: layer.strokeColor } : {}),
-          ...(radius ? { borderRadius: radius } : {}),
-          ...(stroke && shape !== 'line'
-            ? { borderWidth: layer.strokeWidth, borderColor: layer.strokeColor }
-            : {}),
-        }}
-      />
+      <Svg {...common}>
+        <Line
+          x1={line.x1}
+          y1={line.y1}
+          x2={line.x2}
+          y2={line.y2}
+          stroke={layer.strokeColor}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+      </Svg>
+    );
+  }
+
+  if (shape === 'rectangle') {
+    return (
+      <Svg {...common}>
+        <Path
+          d={getRoundedRectanglePath(layer.width, layer.height, getLayerRadii(layer), strokeWidth)}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      </Svg>
+    );
+  }
+
+  if (shape === 'circle') {
+    const circle = getCircleGeometry(layer.width, layer.height, strokeWidth);
+    return (
+      <Svg {...common}>
+        <Circle cx={circle.cx} cy={circle.cy} r={circle.r} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      </Svg>
     );
   }
 
   return (
-    <Svg width={layer.width} height={layer.height} viewBox={`0 0 ${layer.width} ${layer.height}`}>
+    <Svg {...common}>
       <Polygon
-        points={polygonPoints(shape, layer.width, layer.height)}
-        fill={fill || 'none'}
+        points={getShapePolygonPoints(shape, layer.width, layer.height, strokeWidth)}
+        fill={fill}
         stroke={stroke}
-        strokeWidth={layer.strokeWidth || 0}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
       />
     </Svg>
   );
 }
 
 function AssetLayer({ layer }: { layer: DesignPdfLayer }) {
+  // A saved group carries its children, not a picture of them. They arrive
+  // already scaled into this box by `lib/content/design-group-layout`, the same
+  // module the canvas scales them with, so there is nothing to do here but draw.
+  if (layer.groupLayers?.length) {
+    return (
+      <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+        {layer.groupLayers
+          .filter((child) => child.visible)
+          .map((child) => (
+            <DesignPdfLayerView key={child.id} layer={child} />
+          ))}
+      </View>
+    );
+  }
+
   if (!layer.imageSrc) return null;
   return (
     // This is React PDF's Image primitive, not an HTML img: there is no alt
@@ -294,9 +406,23 @@ function AssetLayer({ layer }: { layer: DesignPdfLayer }) {
         width: '100%',
         height: '100%',
         objectFit: layer.fit === 'cover' ? 'cover' : 'contain',
-        ...(layer.borderRadius ? { borderRadius: layer.borderRadius } : {}),
+        ...radiiStyle(getLayerRadii(layer)),
       }}
     />
+  );
+}
+
+function DesignPdfLayerView({ layer }: { layer: DesignPdfLayer }) {
+  return (
+    <LayerFrame layer={layer}>
+      {layer.type === 'text' ? (
+        <TextLayer layer={layer} />
+      ) : layer.type === 'shape' ? (
+        <ShapeLayer layer={layer} />
+      ) : (
+        <AssetLayer layer={layer} />
+      )}
+    </LayerFrame>
   );
 }
 
@@ -313,18 +439,17 @@ export function buildDesignPdfPages(design: DesignPdfInput, keyPrefix = 'design'
       size={{ width: design.width, height: design.height }}
       style={{ position: 'relative', backgroundColor: page.background || '#FFFFFF' }}
     >
+      {page.backgroundImage ? (
+        // eslint-disable-next-line jsx-a11y/alt-text
+        <Image
+          src={page.backgroundImage}
+          style={{ position: 'absolute', left: 0, top: 0, width: design.width, height: design.height }}
+        />
+      ) : null}
       {page.layers
         .filter((layer) => layer.visible)
         .map((layer) => (
-          <LayerFrame key={layer.id} layer={layer}>
-            {layer.type === 'text' ? (
-              <TextLayer layer={layer} />
-            ) : layer.type === 'shape' ? (
-              <ShapeLayer layer={layer} />
-            ) : (
-              <AssetLayer layer={layer} />
-            )}
-          </LayerFrame>
+          <DesignPdfLayerView key={layer.id} layer={layer} />
         ))}
     </Page>
   ));
@@ -361,6 +486,16 @@ export function scaleDesignPdfInput(
         fontSize: size(layer.fontSize),
         padding: size(layer.padding),
         borderRadius: size(layer.borderRadius),
+        // The four corners travel with the box, or a scaled-down card keeps
+        // full-size corners and reads as a pill.
+        radii: layer.radii
+          ? {
+              topLeft: layer.radii.topLeft * scale,
+              topRight: layer.radii.topRight * scale,
+              bottomRight: layer.radii.bottomRight * scale,
+              bottomLeft: layer.radii.bottomLeft * scale,
+            }
+          : undefined,
         strokeWidth: size(layer.strokeWidth),
         letterSpacing: size(layer.letterSpacing),
       })),

@@ -12914,19 +12914,21 @@ function CarouselStudioPanel({
         let ctaNotice = '';
         if (latestDraft.customCtaTemplateId && !isPartialExport) {
           try {
-            const [{ loadCtaTemplatePdfInput }, { buildDesignPdfPages, scaleDesignPdfInput, getVectorExportBlocker }] =
-              await Promise.all([
-                import('@/components/content/DesignStudioPanel'),
-                import('@/components/content/DesignPdfDocument'),
-              ]);
+            const [
+              { loadCtaTemplatePdfInput },
+              { buildDesignPdfPages, scaleDesignPdfInput, getDesignPdfFeatureReport, getVectorExportBlocker },
+            ] = await Promise.all([
+              import('@/components/content/DesignStudioPanel'),
+              import('@/components/content/DesignPdfDocument'),
+            ]);
             const ctaInput = await loadCtaTemplatePdfInput(latestDraft.customCtaTemplateId, adminKey);
             if (!ctaInput) {
               ctaNotice = ' The custom CTA template is no longer saved, so it was left out.';
             } else {
-              const ctaFonts = ctaInput.pages.flatMap((page) =>
-                page.layers.filter((layer) => layer.type === 'text').map((layer) => layer.fontFamily || ''),
-              );
-              const blocker = getVectorExportBlocker(ctaFonts);
+              // The whole payload, not just the layer-level font names: an
+              // italic or bolded run inside the CTA is just as capable of
+              // making the appended page differ from the design it came from.
+              const blocker = getVectorExportBlocker(getDesignPdfFeatureReport(ctaInput));
               if (blocker) {
                 ctaNotice = ` The custom CTA was left out: ${blocker}.`;
               } else {
