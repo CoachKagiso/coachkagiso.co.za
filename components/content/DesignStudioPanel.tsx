@@ -80,7 +80,8 @@ import {
   normalizeShapeRadii,
 } from '@/lib/content/design-shape-geometry';
 import { getDesignBoxScale, scaleDesignLayerGeometry } from '@/lib/content/design-layer-scale';
-import { getExportFidelityNotice } from '@/lib/content/design-pdf-support';
+import { collectDesignFontSpecs } from '@/lib/content/design-font-specs';
+import { getExportFidelityNotice, getVectorExportBlocker } from '@/lib/content/design-pdf-support';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import FilterDropdown from '@/components/FilterDropdown';
 import type {
@@ -4168,27 +4169,24 @@ function getCompactVaultHeading(value: string) {
 async function waitForDesignFonts(element: HTMLElement) {
   if (!('fonts' in document)) return;
   await document.fonts.ready;
+
+  // Read the faces off the nodes about to be captured rather than guessing at
+  // them. Every span carries its own resolved weight and style - that is where
+  // an inline bold or a 500 lives - so this covers what a list of families
+  // cannot: the run inside a heading, and the children of a saved group.
   const nodes = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
-  const families = new Set<string>();
-  nodes.forEach((node) => {
-    const style = getComputedStyle(node);
-    if (!style.fontFamily) return;
-    style.fontFamily.split(',').forEach((part) => {
-      const cleaned = part.trim().replace(/^["']|["']$/g, '');
-      if (cleaned) families.add(cleaned);
-    });
-  });
-  await Promise.all(
-    Array.from(families).map((family) =>
-      document.fonts.load(`16px "${family}"`).catch(() => null),
-    ),
+  const specs = collectDesignFontSpecs(
+    nodes.map((node) => {
+      const style = getComputedStyle(node);
+      return { fontFamily: style.fontFamily, fontWeight: style.fontWeight, fontStyle: style.fontStyle };
+    }),
   );
-  await Promise.all(
-    Array.from(families).map((family) =>
-      document.fonts.load(`700 16px "${family}"`).catch(() => null),
-    ),
-  );
+
+  await Promise.all(specs.map((spec) => document.fonts.load(spec).catch(() => null)));
   await document.fonts.ready;
+  // A face that arrives changes metrics, and html2canvas reads geometry from
+  // the live layout. Give the browser the frame it needs to reflow with it.
+  await waitForNextDesignPaint();
 }
 
 async function canvasToPngBlob(canvas: HTMLCanvasElement) {
@@ -4371,10 +4369,15 @@ function preloadAllDesignFonts() {
       if (cleaned) families.add(cleaned);
     });
   });
+  // The inspector offers 300 to 900 in hundreds, and the export used to warm
+  // only 400. A single-weight brand face rejects the ones it does not have,
+  // which is why every load is caught rather than awaited for success.
+  const weights = [300, 400, 500, 600, 700, 800, 900];
+  const specs = Array.from(families).flatMap((family) =>
+    weights.flatMap((weight) => [`${weight} 16px "${family}"`, `italic ${weight} 16px "${family}"`]),
+  );
   return Promise.all(
-    Array.from(families).map((family) =>
-      document.fonts.load(`16px "${family}"`).catch(() => null),
-    ),
+    specs.map((spec) => document.fonts.load(spec).catch(() => null)),
   ).then(() => document.fonts.ready);
 }
 
@@ -8590,13 +8593,57 @@ export default function DesignStudioPanel({
     try {
       const exportDesign = designRef.current;
       const targetPage = getActivePage(exportDesign, activePageIdRef.current);
-      const exportElement = findExportCanvasForPage(targetPage.id);
-      if (!exportElement) throw new Error('Could not find the design canvas for export.');
 
+      // CHANGE X: the PNG comes off the vector model, the same one the PDF is
+      // drawn from, rather than off a photograph of the canvas.
+      //
+      // html2canvas does not lay text out. It asks the browser where each run
+      // sits, then draws the string itself at a baseline it derives from its
+      // own hidden probe - and that probe disagrees with the browser by around
+      // half an em, growing with type size. Boxes were always exact and only
+      // the words moved, which is what made it read as text drifting out of its
+      // frame rather than as a broken export. Rendering the PDF and rasterising
+      // it makes the PNG and the PDF the same artefact at two resolutions.
+      const features = collectDesignVectorFeatures(exportDesign);
+      const blocker = getVectorExportBlocker(features);
+
+      if (!blocker) {
+        try {
+          const { renderDesignPdfBlob } = await import('@/components/content/DesignPdfDocument');
+          const { rasterisePdfPageToBlob } = await import('@/lib/content/pdf-raster');
+          const input = await buildVectorPdfInput(exportDesign);
+          const pageIndex = input.pages.findIndex((page) => page.id === targetPage.id);
+          const pdfBlob = await renderDesignPdfBlob({
+            ...input,
+            pages: input.pages.slice(Math.max(0, pageIndex), Math.max(0, pageIndex) + 1),
+          });
+          const blob = await rasterisePdfPageToBlob(await pdfBlob.arrayBuffer(), 1, exportPixelScale);
+          downloadBlob(
+            blob,
+            `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}@${exportPixelScale}x.png`,
+          );
+          const fidelityNotice = getExportFidelityNotice(features);
+          setExportState({
+            busy: false,
+            message: `PNG exported at ${exportDesign.width * exportPixelScale}x${exportDesign.height * exportPixelScale}.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
+            tone: 'info',
+          });
+          return;
+        } catch (vectorError) {
+          console.warn('Vector PNG failed, falling back to the canvas capture:', vectorError);
+        }
+      }
+
+      // The raster path stays for designs the vector lane cannot draw - a font
+      // with no embeddable file, say. Its text sits low, so it is the worse
+      // picture, but a worse picture beats no export.
       await waitForNextDesignPaint();
       await preloadAllDesignFonts();
       await waitForNextDesignPaint();
       await new Promise((resolve) => window.setTimeout(resolve, 350));
+
+      const exportElement = findExportCanvasForPage(targetPage.id);
+      if (!exportElement) throw new Error('Could not find the design canvas for export.');
 
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await captureDesignCanvas(exportElement, exportDesign, html2canvas, {
@@ -8610,10 +8657,10 @@ export default function DesignStudioPanel({
         blob,
         `${slugifyFileName(`${exportDesign.title}-${targetPage.name}`)}@${exportPixelScale}x.png`,
       );
-      const fidelityNotice = getExportFidelityNotice(collectDesignVectorFeatures(exportDesign));
+      const fidelityNotice = getExportFidelityNotice(features);
       setExportState({
         busy: false,
-        message: `PNG exported at ${exportedWidth}x${exportedHeight}.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
+        message: `PNG exported at ${exportedWidth}x${exportedHeight}${blocker ? ` using the image lane: ${blocker}` : ''}.${fidelityNotice ? ` ${fidelityNotice}` : ''}`,
         tone: 'info',
       });
     } catch (error) {
