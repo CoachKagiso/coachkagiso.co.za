@@ -503,6 +503,11 @@ export type CarouselSlide = {
   footnote?: string;
 };
 
+type CarouselCaptionVariation = {
+  caption: string;
+  angle: string;
+};
+
 type CarouselDraftPayload = {
   kind: 'carousel_draft';
   version: 1;
@@ -523,6 +528,9 @@ type CarouselDraftPayload = {
   slides: CarouselSlide[];
   accessibilityNote?: string;
   createdAt: string;
+  // Auto-generated caption options for the Post caption box. Local tabs until
+  // Save edits persists them; old drafts simply carry none.
+  captionVariations?: CarouselCaptionVariation[];
   // CHANGE N: Kagiso's own closing slide - a follow or promo message that is
   // deliberately separate from the CTA the content itself argues for. Designed
   // in Design Studio, chosen here, appended as the final page on import.
@@ -3084,6 +3092,20 @@ function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem)
 
   if (slides.length < 4) return null;
 
+  const rawVariations = Array.isArray(rawDraft.captionVariations ?? rawDraft.caption_variations)
+    ? (rawDraft.captionVariations ?? rawDraft.caption_variations) as unknown[]
+    : [];
+  const captionVariations = rawVariations
+    .map((item) => {
+      const record = asPlainObject(item);
+      if (!record) return null;
+      const caption = multilineString(record.caption);
+      if (!caption) return null;
+      return { caption, angle: compactString(record.angle) || 'Caption option' };
+    })
+    .filter((item): item is CarouselCaptionVariation => Boolean(item))
+    .slice(0, 3);
+
   return {
     kind: 'carousel_draft',
     version: 1,
@@ -3104,6 +3126,7 @@ function normalizeStoredCarouselDraft(value: unknown, item?: ContentBacklogItem)
     slides,
     accessibilityNote: multilineString(rawDraft.accessibilityNote ?? rawDraft.accessibility_note),
     createdAt: compactString(rawDraft.createdAt ?? rawDraft.created_at) || item?.createdAt || new Date().toISOString(),
+    ...(captionVariations.length > 0 ? { captionVariations } : {}),
     // CHANGE N: survives the vault round-trip. The AI never sets these - they
     // are Kagiso's choice in Carousel Studio.
     ...(compactString(rawDraft.customCtaTemplateId)
@@ -12137,6 +12160,7 @@ function CarouselDraftEditor({
   onSave,
   onDraftChange,
   onActiveSlideChange,
+  adminKey,
 }: {
   record: CarouselDraftRecord;
   isSaving: boolean;
@@ -12145,8 +12169,21 @@ function CarouselDraftEditor({
   onDraftChange?: (draft: CarouselDraftPayload) => void;
   /** Which slide the cursor is in, so the preview can scroll to the same one. */
   onActiveSlideChange?: (slideId: string) => void;
+  /** Signed key for the caption generator route. */
+  adminKey?: string;
 }) {
   const [draft, setDraft] = useState<CarouselDraftPayload>(record.draft);
+  // Caption variations are local tabs until Save edits persists them. Tab
+  // clicks fill the box; typing by hand deselects the tab (-1) so the box is
+  // always the source of truth.
+  const [captionCount, setCaptionCount] = useState<1 | 2 | 3>(2);
+  const [activeCaptionIndex, setActiveCaptionIndex] = useState(() => {
+    const saved = record.draft.captionVariations || [];
+    const at = saved.findIndex((item) => item.caption === record.draft.caption);
+    return at >= 0 ? at : 0;
+  });
+  const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
+  const [captionGenError, setCaptionGenError] = useState<string | null>(null);
   // The preview renders from this rather than from the saved record, so the
   // slide on the right is the slide being typed into.
   useEffect(() => {
@@ -12174,6 +12211,53 @@ function CarouselDraftEditor({
       ...current,
       slides: current.slides.map((slide) => (slide.id === slideId ? { ...slide, ...updates } : slide)),
     }));
+  }
+
+  async function generateCaptions() {
+    if (isGeneratingCaptions || isSaving) return;
+    if (!adminKey) {
+      setCaptionGenError('Saving key missing. Reload Carousel Studio and try again.');
+      return;
+    }
+    setIsGeneratingCaptions(true);
+    setCaptionGenError(null);
+    try {
+      const response = await fetch('/api/content/carousel-caption', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key: adminKey,
+          count: captionCount,
+          platform: draft.platform,
+          pillar: draft.pillar ? pillarMeta[draft.pillar]?.label || draft.pillar : '',
+          register: draft.register || '',
+          topic: draft.topic || draft.title,
+          slides: draft.slides.map((slide) => ({
+            role: slide.role,
+            headline: slide.headline,
+            body: slide.body,
+            cta: slide.cta || '',
+          })),
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || 'Could not generate captions.');
+      const variations = (Array.isArray(data?.captions) ? data.captions : []) as CarouselCaptionVariation[];
+      if (variations.length === 0) throw new Error('The model returned no captions. Try again.');
+      setDraft((current) => ({ ...current, caption: variations[0].caption, captionVariations: variations }));
+      setActiveCaptionIndex(0);
+    } catch (error) {
+      setCaptionGenError(error instanceof Error ? error.message : 'Could not generate captions.');
+    } finally {
+      setIsGeneratingCaptions(false);
+    }
+  }
+
+  function selectCaptionVariation(index: number) {
+    const variation = (draft.captionVariations || [])[index];
+    if (!variation || isSaving) return;
+    setActiveCaptionIndex(index);
+    updateDraftField('caption', variation.caption);
   }
 
   function moveSlide(slideId: string, direction: -1 | 1) {
@@ -12270,9 +12354,78 @@ function CarouselDraftEditor({
         <span className="studio-label">Post caption</span>
         <AutoGrowTextarea
           value={draft.caption}
-          onChange={(next) => updateDraftField('caption', next)}
+          onChange={(next) => {
+            setActiveCaptionIndex(-1);
+            updateDraftField('caption', next);
+          }}
         />
       </label>
+
+      <div className="mt-3 rounded-[8px] border border-[#E4D8CB] bg-[#F8F6F4] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8C7466]">Variations</span>
+            <div className="flex gap-1" role="group" aria-label="How many caption variations to generate">
+              {([1, 2, 3] as const).map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setCaptionCount(count)}
+                  disabled={isGeneratingCaptions || isSaving}
+                  aria-pressed={captionCount === count}
+                  className={`grid h-8 w-8 place-items-center rounded-[8px] border text-[13px] font-bold transition disabled:opacity-40 ${
+                    captionCount === count
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-white text-[#142334] hover:border-[#C9AD98]'
+                  }`}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void generateCaptions()}
+            disabled={isGeneratingCaptions || isSaving}
+            className="studio-ghost-button"
+          >
+            {isGeneratingCaptions ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+            {isGeneratingCaptions ? 'Writing…' : 'Auto-generate caption'}
+          </button>
+        </div>
+        {(draft.captionVariations || []).length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Caption variations">
+            {(draft.captionVariations || []).map((variation, index) => {
+              const isActive = index === activeCaptionIndex;
+              return (
+                <button
+                  key={`${variation.angle}-${index}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => selectCaptionVariation(index)}
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-bold transition ${
+                    isActive
+                      ? 'border-[#142334] bg-[#142334] text-white'
+                      : 'border-[#E4D8CB] bg-white text-[#142334]/70 hover:border-[#C9AD98] hover:text-[#142334]'
+                  }`}
+                >
+                  {index + 1} · {variation.angle.replace(/_/g, ' ')}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {captionGenError && (
+          <p className="mt-2 text-[12px] font-semibold leading-relaxed text-[#A24E37]">{captionGenError}</p>
+        )}
+        {(draft.captionVariations || []).length === 0 && !captionGenError && (
+          <p className="mt-2 text-[11px] leading-relaxed text-[#142334]/50">
+            Writes {captionCount === 1 ? 'one caption' : `${captionCount} caption options`} from the slides above, in Kagiso&apos;s voice. Pick a tab to fill the box, then Save edits.
+          </p>
+        )}
+      </div>
 
       <div className="mt-4 grid gap-3">
         {draft.slides.map((slide, index) => {
@@ -13276,6 +13429,7 @@ function CarouselStudioPanel({
                 onSave={onDraftSave}
                 onDraftChange={handleDraftChange}
                 onActiveSlideChange={setActiveSlideId}
+                adminKey={adminKey}
               />
             )}
           </div>
