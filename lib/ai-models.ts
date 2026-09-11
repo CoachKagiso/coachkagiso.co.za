@@ -30,33 +30,32 @@ export type AiModelOption = {
 };
 
 export const ZAI_TEST_MODEL = 'glm-5.2';
-export const DEFAULT_OPENROUTER_PRIMARY_MODEL = 'z-ai/glm-5.2';
-export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'z-ai/glm-5.2';
+export const DEFAULT_OPENROUTER_PRIMARY_MODEL = 'deepseek/deepseek-v4.1-flash';
+export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'deepseek/deepseek-v4.1-flash';
 
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
 ] = [
-  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 63.1, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true },
-  { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 61, inputPrice: 1.25, outputPrice: 4.25, requiresReasoning: true, supportsVision: true },
-  { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 60.9, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true },
-  { value: 'openai/gpt-5.6-sol', label: 'openai/gpt-5.6-sol', intelligence: 60.9, inputPrice: 2.0, outputPrice: 10.0, supportsVision: true },
-  { value: 'moonshotai/kimi-k3', label: 'moonshotai/kimi-k3', intelligence: 59.7, inputPrice: 2.6, outputPrice: 13.0, supportsVision: true },
+  // Intelligence scores below follow the Artificial Analysis Intelligence Index v4.3 scale
+  // (10-eval composite; top of scale is now 53, so every score dropped vs v4.1).
+  // The old v4.1 value sits beside each score until the new scale feels familiar.
+  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 51, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true }, // v4.1: 63.1
+  { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 48, inputPrice: 1.25, outputPrice: 4.25, requiresReasoning: true, supportsVision: true }, // v4.1: 61
   // GLM-5.3 began refusing the reasoning disable in August 2026. The retry in
   // postAiChat recovers either way, but flagging it keeps the Settings toggle
   // honest - unflagged it read OFF while reasoning was happening anyway - and
   // saves a wasted round trip on every call.
-  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 59.5, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true },
+  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 45, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true }, // v4.1: 59.5
+  { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 44, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true }, // v4.1: 60.9
   // Like its full-size sibling, the Flash variant uses forced thinking - Z.ai
   // rejects `thinking.type: 'disabled'` for both, which surfaces on OpenRouter
   // as a rejected `reasoning: { effort: 'none' }`.
-  { value: 'z-ai/glm-5.3-flash', label: 'z-ai/glm-5.3-flash', intelligence: 59.5, inputPrice: 0.15, outputPrice: 0.50, requiresReasoning: true, supportsVision: true },
-  { value: 'openai/gpt-5.6-terra-pro', label: 'openai/gpt-5.6-terra-pro', intelligence: 56.6, inputPrice: 2.0, outputPrice: 12.0, supportsVision: true },
-  { value: 'google/gemini-3.7-flash', label: 'google/gemini-3.7-flash', intelligence: 56, inputPrice: 0.375, outputPrice: 1.875, requiresReasoning: true, supportsVision: true },
-  { value: 'z-ai/glm-5.2', label: 'z-ai/glm-5.2', intelligence: 52.6, inputPrice: 0.336, outputPrice: 1.056 },
-  { value: 'deepseek/deepseek-v4-flash-0731', label: 'deepseek/deepseek-v4-flash-0731', intelligence: 52, inputPrice: 0.0786, outputPrice: 0.1572 },
-  // Cheap vision endpoint for OCR: the images bill as input, but the pass
-  // emits the full transcript of every slide. Experimental, so treat
-  // availability as temporary.
-  { value: 'deepseek/deepseek-v4-flash-vision-exp', label: 'deepseek/deepseek-v4-flash-vision-exp', inputPrice: 0.22, outputPrice: 0.66, supportsVision: true, experimental: true },
+  { value: 'z-ai/glm-5.3-flash', label: 'z-ai/glm-5.3-flash', intelligence: 42, inputPrice: 0.15, outputPrice: 0.50, requiresReasoning: true, supportsVision: true }, // v4.1: 59.5
+  // Introductory price expires Dec 31, 2026 - list becomes $1.50/$7.50 on Jan 1, 2027.
+  { value: 'google/gemini-3.8-flash', label: 'google/gemini-3.8-flash', intelligence: 41.2, inputPrice: 0.75, outputPrice: 3.75, requiresReasoning: true, supportsVision: true },
+  // Production successor to both retired DeepSeek endpoints (legacy aliases
+  // route to it): native vision input plus optional thinking (low/high/max),
+  // so reasoning stays switchable and no flag is needed.
+  { value: 'deepseek/deepseek-v4.1-flash', label: 'deepseek/deepseek-v4.1-flash', intelligence: 39.5, inputPrice: 0.15, outputPrice: 0.60, supportsVision: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));

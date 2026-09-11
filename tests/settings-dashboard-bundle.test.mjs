@@ -3,7 +3,7 @@ import test from 'node:test';
 import { loadSettingsDashboardBundle } from '../lib/settings-dashboard-bundle.ts';
 
 const defaults = {
-  settings: { ai_config: { primary_model: 'z-ai/glm-5.2' } },
+  settings: { ai_config: { primary_model: 'deepseek/deepseek-v4.1-flash' } },
   emailTemplates: [{ id: 'default-template' }],
 };
 

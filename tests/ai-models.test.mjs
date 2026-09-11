@@ -7,9 +7,9 @@ import {
   OPENROUTER_MODEL_OPTIONS,
 } from '../lib/ai-models.ts';
 
-test('OpenRouter starts with GLM selected instead of a Gemini fallback', () => {
-  assert.equal(DEFAULT_OPENROUTER_PRIMARY_MODEL, 'z-ai/glm-5.2');
-  assert.equal(DEFAULT_OPENROUTER_SECONDARY_MODEL, 'z-ai/glm-5.2');
+test('OpenRouter starts with DeepSeek selected - cheap, vision-capable, switchable reasoning', () => {
+  assert.equal(DEFAULT_OPENROUTER_PRIMARY_MODEL, 'deepseek/deepseek-v4.1-flash');
+  assert.equal(DEFAULT_OPENROUTER_SECONDARY_MODEL, 'deepseek/deepseek-v4.1-flash');
 });
 
 test('both defaults name a model the picker actually offers', () => {

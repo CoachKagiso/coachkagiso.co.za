@@ -5,10 +5,10 @@ import { buildAiConnectionTestBody, getAiProviderRequestOptions, isReasoningActi
 import { getFallbackVisionModel, modelSupportsVision } from '../lib/ai-models.ts';
 
 test('disables OpenRouter reasoning when reasoningEnabled is false (default)', () => {
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'z-ai/glm-5.2'), {
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'deepseek/deepseek-v4.1-flash'), {
     reasoning: { effort: 'none' },
   });
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'moonshotai/kimi-k3'), {
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-opus-5'), {
     reasoning: { effort: 'none' },
   });
   assert.deepEqual(getAiProviderRequestOptions('openrouter', 'x-ai/grok-4.6'), {
@@ -17,14 +17,14 @@ test('disables OpenRouter reasoning when reasoningEnabled is false (default)', (
 });
 
 test('allows OpenRouter model default reasoning when reasoningEnabled is true', () => {
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'z-ai/glm-5.2', true), {});
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'moonshotai/kimi-k3', true), {});
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'deepseek/deepseek-v4.1-flash', true), {});
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-opus-5', true), {});
 });
 
 test('never sends the reasoning disable to an endpoint that mandates reasoning', () => {
   // Toggle off means the cheapest effort the endpoint accepts - never the provider
   // default (max), which would spend the output budget thinking before answering.
-  for (const model of ['google/gemini-3.7-flash', 'z-ai/glm-5.3', 'z-ai/glm-5.3-flash', 'meta/muse-spark-1.3']) {
+  for (const model of ['google/gemini-3.8-flash', 'z-ai/glm-5.3', 'z-ai/glm-5.3-flash', 'meta/muse-spark-1.3']) {
     assert.deepEqual(getAiProviderRequestOptions('openrouter', model), {
       reasoning: { effort: 'low' },
     });
@@ -33,9 +33,9 @@ test('never sends the reasoning disable to an endpoint that mandates reasoning',
 });
 
 test('treats a reasoning-mandatory model as reasoning-active even with the toggle off', () => {
-  assert.equal(isReasoningActive('openrouter', 'google/gemini-3.7-flash', false), true);
-  assert.equal(isReasoningActive('openrouter', 'z-ai/glm-5.2', false), false);
-  assert.equal(isReasoningActive('openrouter', 'z-ai/glm-5.2', true), true);
+  assert.equal(isReasoningActive('openrouter', 'google/gemini-3.8-flash', false), true);
+  assert.equal(isReasoningActive('openrouter', 'deepseek/deepseek-v4.1-flash', false), false);
+  assert.equal(isReasoningActive('openrouter', 'deepseek/deepseek-v4.1-flash', true), true);
   assert.equal(isReasoningActive('zai', 'glm-5.2', true), false);
 });
 
@@ -49,15 +49,15 @@ test('keeps Z.ai thinking disabled regardless of reasoningEnabled', () => {
 });
 
 test('image requests fall back to a vision-capable model when the configured one is text only', () => {
-  assert.equal(modelSupportsVision('z-ai/glm-5.2'), false);
+  assert.equal(modelSupportsVision('z-ai/glm-5.3'), false);
   assert.equal(modelSupportsVision('anthropic/claude-opus-5'), true);
   assert.ok(getFallbackVisionModel(), 'a vision-capable fallback must exist in the catalogue');
   assert.equal(modelSupportsVision(getFallbackVisionModel()), true);
 });
 
 test('the connection probe stays cheap for ordinary models', () => {
-  assert.deepEqual(buildAiConnectionTestBody('z-ai/glm-5.2'), {
-    model: 'z-ai/glm-5.2',
+  assert.deepEqual(buildAiConnectionTestBody('deepseek/deepseek-v4.1-flash'), {
+    model: 'deepseek/deepseek-v4.1-flash',
     messages: [{ role: 'user', content: 'Reply with the word CONNECTED only.' }],
     max_tokens: 20,
     temperature: 0,
@@ -67,7 +67,7 @@ test('the connection probe stays cheap for ordinary models', () => {
 test('the connection probe gives reasoning-mandatory models room to think', () => {
   // A 20-token budget would be spent thinking before a word is visible, so the
   // probe carries headroom and an explicit low effort instead of failing.
-  for (const model of ['meta/muse-spark-1.3', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3', 'google/gemini-3.7-flash']) {
+  for (const model of ['meta/muse-spark-1.3', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3', 'google/gemini-3.8-flash']) {
     const body = buildAiConnectionTestBody(model);
     assert.equal(body.model, model);
     assert.deepEqual(body.reasoning, { effort: 'low' });

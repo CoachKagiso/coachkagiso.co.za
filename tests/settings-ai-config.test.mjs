@@ -4,8 +4,8 @@ import { hasConfiguredOpenRouterKey, mergeOpenRouterKeyForSave, resolveOpenRoute
 import { PRIMARY_MODEL_TOOLS, SECONDARY_MODEL_TOOLS } from '../lib/zai-pinned-tools.ts';
 
 const savedConfig = {
-  primary_model: 'z-ai/glm-5.2',
-  secondary_model: 'z-ai/glm-5.2',
+  primary_model: 'deepseek/deepseek-v4.1-flash',
+  secondary_model: 'deepseek/deepseek-v4.1-flash',
   model_provider: 'openrouter',
   openrouter_api_key: 'saved-openrouter-key',
   test_mode: false,
@@ -14,12 +14,12 @@ const savedConfig = {
 test('keeps the saved OpenRouter key when a model-only settings save leaves it blank', () => {
   const saved = mergeOpenRouterKeyForSave(savedConfig, {
     ...savedConfig,
-    primary_model: 'moonshotai/kimi-k3',
+    primary_model: 'anthropic/claude-opus-5',
     openrouter_api_key: '',
     openrouter_api_key_configured: true,
   });
 
-  assert.equal(saved.primary_model, 'moonshotai/kimi-k3');
+  assert.equal(saved.primary_model, 'anthropic/claude-opus-5');
   assert.equal(saved.openrouter_api_key, 'saved-openrouter-key');
   assert.equal('openrouter_api_key_configured' in saved, false);
 });
