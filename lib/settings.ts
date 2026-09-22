@@ -127,7 +127,7 @@ export const DEFAULT_SERVICES: ServiceSetting[] = [
   { name: 'CV Revamp', slug: 'cv-revamp', price: 400, turnaround: '5 working days', active: true },
   { name: 'Cover Letter', slug: 'cover-letter', price: 150, turnaround: '5 working days', active: true },
   { name: 'LinkedIn Optimisation', slug: 'linkedin-optimisation', price: 300, turnaround: '5 working days', active: true },
-  { name: 'CV + LinkedIn Bundle', slug: 'cv-linkedin-bundle', price: 500, turnaround: '7 working days', active: true },
+  { name: 'CV + LinkedIn Bundle', slug: 'cv-linkedin-bundle', price: 450, turnaround: '7 working days', active: true },
   { name: 'Career Clarity Session', slug: 'career-clarity', price: 800, turnaround: 'Session-based', active: true },
   { name: 'Glow Up VIP Package', slug: 'glow-up-vip', price: 1200, turnaround: '30 days', active: true },
   { name: 'Saturday Masterclass', slug: 'saturday-masterclass', price: 450, turnaround: 'Cohort-based', active: true },

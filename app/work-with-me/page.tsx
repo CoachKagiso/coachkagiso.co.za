@@ -123,9 +123,9 @@ const tracks: Track[] = [
       },
       {
         title: 'CV + LinkedIn Bundle',
-        price: 'R500',
+        price: 'R450',
         tagline: 'Your full job-search toolkit, aligned.',
-        body: 'Everything in the CV Revamp and LinkedIn Optimisation, built together so they tell the same story. Saves R200 on buying both separately.',
+        body: 'Everything in the CV Revamp and LinkedIn Optimisation, built together so they tell the same story. Saves R250 on buying both separately.',
         items: [
           'Full CV Revamp',
           'Full LinkedIn Optimisation',

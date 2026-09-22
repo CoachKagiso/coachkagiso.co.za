@@ -194,7 +194,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               {(service.slug === 'cv-revamp' || service.slug === 'linkedin') && (
                 <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
                   <p className="text-[15px] leading-relaxed text-[#142334]/72">
-                    Need both? The CV + LinkedIn Bundle is R500 and saves you R200.
+                    Need both? The CV + LinkedIn Bundle is R450 and saves you R250.
                   </p>
                   <Link href="/buy/bundle" className="mt-3 inline-flex text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] hover:text-[#142334]">
                     View the bundle <ArrowUpRight className="h-4 w-4" />

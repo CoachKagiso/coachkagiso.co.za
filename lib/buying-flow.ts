@@ -271,7 +271,7 @@ Kagiso`,
   bundle: {
     slug: 'bundle',
     title: 'CV + LinkedIn Bundle',
-    amount: 500,
+    amount: 450,
     turnaround: '7 working days',
     deliveryDays: 7,
     buyCta: 'Get the bundle',
