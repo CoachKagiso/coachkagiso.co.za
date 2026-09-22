@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { enforceHumanizer, getHumanizerRulesBlock } from '../lib/content/humanizer.ts';
+import { enforceHumanizer, enforceHumanizerOnJson, getHumanizerRulesBlock } from '../lib/content/humanizer.ts';
 
 test('the prompt block bans engagement bait', () => {
   const block = getHumanizerRulesBlock('write_post');
@@ -63,4 +63,30 @@ test('LinkedIn output keeps paragraph breaks with at most 2 sentences each', () 
   const wall = 'First sentence here. Second sentence here. Third sentence here. Fourth sentence here. Fifth sentence here. Sixth sentence here.';
   const repaired = enforceHumanizer(wall).text;
   assert.ok((repaired.match(/\n\n/g) || []).length >= 2, 'wall of text must gain breathing space');
+});
+
+test('enforceHumanizerOnJson keeps carousel JSON parseable', () => {
+  const raw = JSON.stringify({
+    kind: 'carousel_draft',
+    title: 'Speak up — or stay invisible',
+    slides: [
+      { headline: 'Don’t wait. Speak first.', body: 'One. Two. Three. Four sentences here. And a fifth.', cta: 'Reflect. Research. Reach out.' },
+      { headline: 'Say “one question” instead', body: 'Don’t: stay quiet.\nDo: add a point.' },
+    ],
+  });
+  const result = enforceHumanizerOnJson(raw);
+  assert.ok(result, 'JSON input takes the structured path');
+  const parsed = JSON.parse(result.text);
+  assert.equal(parsed.slides.length, 2);
+  assert.equal(parsed.slides[0].cta, 'Reflect. Research. Reach out.', 'no paragraph breaks inside values');
+  assert.ok(!parsed.slides[0].body.includes('\n\n'), 'no paragraph breaks inside values');
+  assert.equal(parsed.slides[1].headline, 'Say "one question" instead', 'curly quotes straightened safely');
+  assert.ok(!parsed.title.includes('—'), 'em dash still removed');
+  assert.equal(parsed.slides[1].body, "Don't: stay quiet.\nDo: add a point.");
+});
+
+test('enforceHumanizerOnJson ignores prose and handles fenced JSON', () => {
+  assert.equal(enforceHumanizerOnJson('A normal post. With sentences.'), null);
+  const fenced = enforceHumanizerOnJson('```json\n{"a":"x — y"}\n```');
+  assert.deepEqual(JSON.parse(fenced.text), { a: 'x . y' });
 });

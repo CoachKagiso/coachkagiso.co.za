@@ -2749,10 +2749,50 @@ function extractJsonCandidates(raw: string) {
   return Array.from(new Set(candidates.filter(Boolean)));
 }
 
+// Models sometimes put literal newlines/tabs inside JSON string values, which
+// JSON.parse rejects. Escape control characters only while inside a string.
+function escapeControlCharsInJsonStrings(candidate: string) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const char of candidate) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      } else if (char === '\n') {
+        out += '\\n';
+        continue;
+      } else if (char === '\r') {
+        out += '\\r';
+        continue;
+      } else if (char === '\t') {
+        out += '\\t';
+        continue;
+      }
+    } else if (char === '"') {
+      inString = true;
+    }
+    out += char;
+  }
+  return out;
+}
+
 function parseJsonFromAiOutput(raw: string): unknown | null {
-  for (const candidate of extractJsonCandidates(raw)) {
+  const candidates = extractJsonCandidates(raw);
+  for (const candidate of candidates) {
     try {
       return JSON.parse(candidate);
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(escapeControlCharsInJsonStrings(candidate));
     } catch {
       // Try the next candidate.
     }

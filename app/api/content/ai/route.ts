@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/content/system-prompt';
 import { getContentAiMaxTokens, resolveTemperatureForRegister } from '@/lib/content/ai-limits';
-import { enforceHumanizer, shouldInjectHumanizerRules } from '@/lib/content/humanizer';
+import { enforceHumanizer, enforceHumanizerOnJson, shouldInjectHumanizerRules } from '@/lib/content/humanizer';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { buildAiRequestBody, resolveAiRuntimeConfig, SIMPLE_AI_MODES } from '@/lib/ai-config';
 
@@ -141,7 +141,11 @@ export async function POST(request: Request) {
 
   // Enforced post-filter for prose modes only: strict-JSON outputs must not be
   // sentence-split or they risk structural damage. Same gate as prompt injection.
-  const text = shouldInjectHumanizerRules(body.mode) ? enforceHumanizer(rawText).text.trim() : rawText;
+  // write_post also returns JSON for carousels, so JSON is humanized per string
+  // value instead of as raw text (raw-text passes corrupted the carousel JSON).
+  const text = shouldInjectHumanizerRules(body.mode)
+    ? (enforceHumanizerOnJson(rawText) ?? enforceHumanizer(rawText)).text.trim()
+    : rawText;
 
   if (!text) {
     console.error(`${runtime.provider} returned empty content:`, responseText);

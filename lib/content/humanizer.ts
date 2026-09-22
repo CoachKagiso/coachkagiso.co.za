@@ -246,12 +246,19 @@ function joinFragmentRuns(text: string): string {
 
 function stripEngagementBait(text: string): { text: string; removed: number } {
   let removed = 0;
-  const cleaned = splitParagraphs(text).map((paragraph) => {
-    const sentences = paragraph.split(/(?<=[.!?…])\s+/);
-    const kept = sentences.filter((sentence) => !ENGAGEMENT_BAIT_PATTERN.test(sentence));
-    removed += sentences.length - kept.length;
-    return kept.join(' ').trim();
-  });
+  // Line-local so single newlines (Don't/Do/Why lines, lists) survive.
+  const cleaned = splitParagraphs(text).map((paragraph) =>
+    paragraph
+      .split('\n')
+      .map((line) => {
+        const sentences = line.split(/(?<=[.!?…])[ \t]+/);
+        const kept = sentences.filter((sentence) => !ENGAGEMENT_BAIT_PATTERN.test(sentence));
+        removed += sentences.length - kept.length;
+        return kept.join(' ').trim();
+      })
+      .filter((line) => line.length > 0)
+      .join('\n'),
+  );
   return { text: joinParagraphs(cleaned), removed };
 }
 
@@ -311,7 +318,7 @@ function swapBannedVocab(text: string): { text: string; count: number } {
  * then fragment joining. Safe to run on prose; do NOT run on strict-JSON
  * outputs (callers gate on shouldInjectHumanizerRules, same as the prompt).
  */
-export function enforceHumanizer(text: string): HumanizeResult {
+export function enforceHumanizer(text: string, options: { paragraphBreaks?: boolean } = {}): HumanizeResult {
   const changes: { pattern: string; count: number }[] = [];
   const mechanical = applyMechanicalHumanizerPasses(text);
   let out = mechanical.text;
@@ -329,11 +336,58 @@ export function enforceHumanizer(text: string): HumanizeResult {
   out = joinFragmentRuns(out);
   if (out !== beforeFragments) changes.push({ pattern: 'fragment_run', count: 1 });
 
-  const breaks = ensureParagraphBreaks(out);
-  out = breaks.text;
-  if (breaks.added > 0) changes.push({ pattern: 'paragraph_breaks', count: breaks.added });
+  if (options.paragraphBreaks !== false) {
+    const breaks = ensureParagraphBreaks(out);
+    out = breaks.text;
+    if (breaks.added > 0) changes.push({ pattern: 'paragraph_breaks', count: breaks.added });
+  }
 
   return { text: out, changes };
+}
+
+function parseStructuredOutput(text: string): unknown {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (!/^[[{]/.test(trimmed)) return undefined;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * JSON-safe variant for prose modes that sometimes return structured output
+ * (write_post for carousels). Running enforceHumanizer over the raw JSON text
+ * inserts literal newlines and bare quotes inside string values, which breaks
+ * JSON.parse on the client. Instead, humanize each string value in place and
+ * re-serialize. Paragraph breaks are skipped: they are for LinkedIn walls of
+ * text, not slide headlines or CTAs.
+ * Returns null when the text is not JSON so the caller can use the prose path.
+ */
+export function enforceHumanizerOnJson(text: string): HumanizeResult | null {
+  const parsed = parseStructuredOutput(text);
+  if (parsed === undefined || parsed === null || typeof parsed !== 'object') return null;
+
+  const totals = new Map<string, number>();
+  const walk = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const result = enforceHumanizer(value, { paragraphBreaks: false });
+      for (const change of result.changes) {
+        totals.set(change.pattern, (totals.get(change.pattern) || 0) + change.count);
+      }
+      return result.text;
+    }
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, walk(entry)]));
+    }
+    return value;
+  };
+
+  return {
+    text: JSON.stringify(walk(parsed), null, 2),
+    changes: Array.from(totals, ([pattern, count]) => ({ pattern, count })),
+  };
 }
 
 export function applyMechanicalHumanizerPasses(text: string): HumanizeResult {
