@@ -68,8 +68,33 @@ export function getMasterclassPriceNote(now = new Date()) {
     : `The early bird window has closed. Standard price is R${MASTERCLASS_STANDARD_AMOUNT}.`;
 }
 
+export const BUNDLE_SPECIAL_AMOUNT = 450;
+export const BUNDLE_STANDARD_AMOUNT = 500;
+export const BUNDLE_SPECIAL_ENDS_AT = '2026-10-03T00:00:00+02:00';
+export const BUNDLE_SPECIAL_ENDS_LABEL = 'Friday 2 October';
+
+export function isBundleSpecialOpen(now = new Date()) {
+  return now.getTime() < new Date(BUNDLE_SPECIAL_ENDS_AT).getTime();
+}
+
+export function getBundleCheckoutAmount(now = new Date()) {
+  return isBundleSpecialOpen(now) ? BUNDLE_SPECIAL_AMOUNT : BUNDLE_STANDARD_AMOUNT;
+}
+
+export function getBundleSaving(now = new Date()) {
+  return asyncServices['cv-revamp'].amount + asyncServices.linkedin.amount - getBundleCheckoutAmount(now);
+}
+
+export function getBundleSpecialNote(now = new Date()) {
+  return isBundleSpecialOpen(now)
+    ? `Month-end special until ${BUNDLE_SPECIAL_ENDS_LABEL}. After that, the standard price is R${BUNDLE_STANDARD_AMOUNT}.`
+    : '';
+}
+
 export function getServiceCheckoutAmount(service: Pick<AsyncService, 'slug' | 'amount'>, now = new Date()) {
-  return service.slug === 'masterclass' ? getMasterclassCheckoutAmount(now) : service.amount;
+  if (service.slug === 'masterclass') return getMasterclassCheckoutAmount(now);
+  if (service.slug === 'bundle') return getBundleCheckoutAmount(now);
+  return service.amount;
 }
 
 export type BookingPageConfig = {
@@ -271,7 +296,7 @@ Kagiso`,
   bundle: {
     slug: 'bundle',
     title: 'CV + LinkedIn Bundle',
-    amount: 450,
+    amount: BUNDLE_STANDARD_AMOUNT,
     turnaround: '7 working days',
     deliveryDays: 7,
     buyCta: 'Get the bundle',
@@ -553,9 +578,11 @@ export function formatCurrency(amount: number) {
 }
 
 export function formatServicePriceLabel(slug: AsyncServiceSlug, now = new Date()) {
-  return slug === 'masterclass'
-    ? getMasterclassPriceLabel(now)
-    : formatCurrency(asyncServices[slug].amount);
+  if (slug === 'masterclass') return getMasterclassPriceLabel(now);
+  if (slug === 'bundle' && isBundleSpecialOpen(now)) {
+    return `R${BUNDLE_SPECIAL_AMOUNT} month-end special until ${BUNDLE_SPECIAL_ENDS_LABEL} (then R${BUNDLE_STANDARD_AMOUNT})`;
+  }
+  return formatCurrency(getServiceCheckoutAmount(asyncServices[slug], now));
 }
 
 export function formatServiceCatalogueLines(
@@ -611,6 +638,6 @@ export function buildCvCoachMoveLabelUnion() {
 
 export function buildCvCoachMoveRulesPrompt() {
   return CV_COACH_MOVE_SLUGS
-    .map((slug, index) => `${index + 1}. "${asyncServices[slug].title}" (${formatCurrency(asyncServices[slug].amount)}) - ${cvCoachMoveGuidance[slug]}`)
+    .map((slug, index) => `${index + 1}. "${asyncServices[slug].title}" (${formatCurrency(getServiceCheckoutAmount(asyncServices[slug]))}) - ${cvCoachMoveGuidance[slug]}`)
     .join('\n');
 }

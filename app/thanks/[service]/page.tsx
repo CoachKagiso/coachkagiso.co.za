@@ -4,7 +4,7 @@ import { CheckCircle2, Clock3, FileText, LockKeyhole, MessageCircle } from 'luci
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Reveal from '@/components/Reveal';
-import { asyncServices, getAsyncService, type AsyncService } from '@/lib/buying-flow';
+import { asyncServices, getAsyncService, getServiceCheckoutAmount, type AsyncService } from '@/lib/buying-flow';
 import { getBookingPaymentId, getBookingPaymentSecret, verifyBookingPaymentToken } from '@/lib/booking-payment';
 import { isPayFastSandboxMode } from '@/lib/payfast';
 import { getUpgradeOfferByToken, markUpgradeCreditUsed } from '@/lib/upgrade-credits';
@@ -89,7 +89,7 @@ async function confirmSandboxReturn(serviceSlug: string, paymentId?: string, upg
     {
       payment_id: paymentId,
       service_slug: service.slug,
-      amount: upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : service.amount,
+      amount: upgradeOffer?.valid ? upgradeOffer.credit.discounted_amount : getServiceCheckoutAmount(service),
       status: 'confirmed',
       confirmed_at: now,
     },

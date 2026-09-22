@@ -640,7 +640,7 @@ export const insights: Insight[] = [
         body: [
           "Sometimes the formatting is fine and the document itself is the problem - the roles aren't framed right, the achievements are buried, the summary reads like a job description instead of a human being.",
           "That's what the [CV Revamp (R400)](/buy/cv-revamp) is for. I rewrite your CV from scratch, ATS-optimised and positioned for the roles you're actually targeting.",
-          "Or, if your LinkedIn profile and CV need to tell the same story - because they usually don't - the [CV + LinkedIn Bundle (R450)](/buy/bundle) covers both.",
+          "Or, if your LinkedIn profile and CV need to tell the same story - because they usually don't - the [CV + LinkedIn Bundle (R500)](/buy/bundle) covers both.",
         ],
       },
     ],
@@ -956,7 +956,7 @@ export const insights: Insight[] = [
           'The profile gets the recruiter to click. What happens after that, the first message, the interview, the way you position yourself, the story you tell about your career, that is a different layer of work entirely.',
           'If you have been getting profile views but not converting them to conversations, or getting conversations but not converting them to interviews, the issue is not your headline. It is your positioning. Your story. The clarity of where you are going and why.',
           'That is what the [Career Clarity Session (R800)](/book/clarity) is for. Seventy-five minutes of focused work on where you are, where you are going, and how to talk about it, on LinkedIn, in interviews, and everywhere else.',
-          'Or, if your CV and LinkedIn both need work and you want them to tell the same story, the [CV + LinkedIn Bundle (R450)](/buy/bundle) covers both.',
+          'Or, if your CV and LinkedIn both need work and you want them to tell the same story, the [CV + LinkedIn Bundle (R500)](/buy/bundle) covers both.',
           'If you require a [LinkedIn profile optimisation](/buy/linkedin) where I rewrite your profile for you, that is also available. You may connect with me for more information.',
           'Your career matters. Keep elevating.',
         ],

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
+  BUNDLE_SPECIAL_AMOUNT,
+  BUNDLE_STANDARD_AMOUNT,
   MASTERCLASS_EARLY_BIRD_AMOUNT,
   MASTERCLASS_STANDARD_AMOUNT,
   asyncServices,
@@ -114,7 +116,10 @@ export async function POST(request: Request) {
       : service.slug === 'masterclass' &&
           (signedCheckoutAmount === MASTERCLASS_EARLY_BIRD_AMOUNT || signedCheckoutAmount === MASTERCLASS_STANDARD_AMOUNT)
         ? signedCheckoutAmount
-        : getServiceCheckoutAmount(service);
+        : service.slug === 'bundle' &&
+            (signedCheckoutAmount === BUNDLE_SPECIAL_AMOUNT || signedCheckoutAmount === BUNDLE_STANDARD_AMOUNT)
+          ? signedCheckoutAmount
+          : getServiceCheckoutAmount(service);
 
   if (service.slug === 'cv-revamp' && upgradeToken && !upgradeOffer?.valid) {
     console.warn('PayFast ITN rejected: invalid upgrade credit', {

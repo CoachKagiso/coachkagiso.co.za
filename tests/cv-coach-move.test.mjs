@@ -6,6 +6,8 @@ import {
   asyncServices,
   buildCvCoachMoveLabelUnion,
   buildCvCoachMoveRulesPrompt,
+  getBundleCheckoutAmount,
+  getServiceCheckoutAmount,
   formatServiceCatalogueLines,
   getCvCoachMoveLabels,
   isCvCoachMoveLabel,
@@ -33,7 +35,7 @@ test('bookings and events are not recommendable coach moves', () => {
 
 test('the rules prompt quotes real prices and never the invented ones', () => {
   const prompt = buildCvCoachMoveRulesPrompt();
-  for (const price of ['R150', 'R400', 'R300', 'R500']) {
+  for (const price of ['R150', 'R400', 'R300', `R${getBundleCheckoutAmount()}`]) {
     assert.ok(prompt.includes(price), `expected ${price} in the coach move prompt`);
   }
   assert.equal(prompt.includes('R350'), false, 'R350 LinkedIn Profile price must be gone');
@@ -84,4 +86,14 @@ test('the catalogue lines use the masterclass price label, not the bare amount',
 
 test('the catalogue defaults to every service', () => {
   assert.equal(formatServiceCatalogueLines().length, Object.keys(asyncServices).length);
+});
+
+test('bundle is R450 until the special ends, then R500', () => {
+  const lastMinute = new Date('2026-10-02T23:59:00+02:00');
+  const cutOver = new Date('2026-10-03T00:00:00+02:00');
+  assert.equal(getBundleCheckoutAmount(lastMinute), 450);
+  assert.equal(getBundleCheckoutAmount(cutOver), 500);
+  assert.equal(getServiceCheckoutAmount(asyncServices.bundle, lastMinute), 450);
+  assert.equal(getServiceCheckoutAmount(asyncServices.bundle, cutOver), 500);
+  assert.equal(getServiceCheckoutAmount(asyncServices['cv-revamp'], cutOver), 400);
 });

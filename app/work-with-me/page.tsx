@@ -18,7 +18,14 @@ import ParallaxWord from '@/components/ParallaxWord';
 import WorkTrackNav from '@/components/WorkTrackNav';
 import LinkedInHeadlineBuilderForm from '@/components/LinkedInHeadlineBuilderForm';
 import { ContourField, FlowRibbon, GeoArchPattern } from '@/components/DecorativeMotifs';
-import { getMasterclassPriceLabel, getMasterclassPriceNote } from '@/lib/buying-flow';
+import {
+  formatCurrency,
+  getBundleCheckoutAmount,
+  getBundleSaving,
+  getBundleSpecialNote,
+  getMasterclassPriceLabel,
+  getMasterclassPriceNote,
+} from '@/lib/buying-flow';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 type Service = {
@@ -123,9 +130,9 @@ const tracks: Track[] = [
       },
       {
         title: 'CV + LinkedIn Bundle',
-        price: 'R450',
+        price: 'R500',
         tagline: 'Your full job-search toolkit, aligned.',
-        body: 'Everything in the CV Revamp and LinkedIn Optimisation, built together so they tell the same story. Saves R250 on buying both separately.',
+        body: 'Everything in the CV Revamp and LinkedIn Optimisation, built together so they tell the same story. Saves R200 on buying both separately.',
         items: [
           'Full CV Revamp',
           'Full LinkedIn Optimisation',
@@ -250,7 +257,21 @@ export default function WorkWithMePage() {
                 : service,
             ),
           }
-        : track,
+        : track.id === 'show-up'
+          ? {
+              ...track,
+              services: track.services.map((service) =>
+                service.title === 'CV + LinkedIn Bundle'
+                  ? {
+                      ...service,
+                      price: formatCurrency(getBundleCheckoutAmount()),
+                      body: `Everything in the CV Revamp and LinkedIn Optimisation, built together so they tell the same story. Saves R${getBundleSaving()} on buying both separately.`,
+                      note: getBundleSpecialNote() || service.note,
+                    }
+                  : service,
+              ),
+            }
+          : track,
     );
 
   return (

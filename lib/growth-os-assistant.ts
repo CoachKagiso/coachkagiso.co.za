@@ -4,6 +4,7 @@ import { isDiagnosticLeadStatus, type DiagnosticLeadStatus, type DiagnosticSubmi
 import type { InboundEmailReply } from '@/lib/inbound-email-replies';
 import type { SentEmail } from '@/lib/sent-emails';
 import { buildAssistantCapabilityManifest } from '@/lib/assistant-capabilities';
+import { formatServicePriceLabel } from '@/lib/buying-flow';
 import {
   DEFAULT_ASSISTANT_PREFERENCES,
   assistantPersonalityProfiles,
@@ -837,7 +838,7 @@ ${context.emailContext.recentOutboundEmails.length > 0
 KAGISO'S SERVICES:
 - Career Clarity Session: R800, 75 min 1-on-1
 - Glow Up VIP Package: R1,200, 30-day reset
-- CV + LinkedIn Bundle: R450, 7 working days
+- CV + LinkedIn Bundle: ${formatServicePriceLabel('bundle')}, 7 working days
 - Saturday Masterclass: R450 early bird, 2-hour online
 - CV Revamp: R400, 5 working days
 - LinkedIn Optimisation: R300, 5 working days

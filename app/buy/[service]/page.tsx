@@ -9,7 +9,17 @@ import Footer from '@/components/Footer';
 import PageFaq from '@/components/PageFaq';
 import PaymentBranding from '@/components/payment/PaymentBranding';
 import Reveal from '@/components/Reveal';
-import { asyncServices, formatCurrency, getAsyncService, getServiceCheckoutAmount } from '@/lib/buying-flow';
+import {
+  BUNDLE_STANDARD_AMOUNT,
+  asyncServices,
+  formatCurrency,
+  getAsyncService,
+  getBundleCheckoutAmount,
+  getBundleSaving,
+  getBundleSpecialNote,
+  getServiceCheckoutAmount,
+  isBundleSpecialOpen,
+} from '@/lib/buying-flow';
 import {
   getBookingPaymentId,
   getBookingPaymentSecret,
@@ -65,6 +75,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const hasAppliedUpgrade = Boolean(appliedUpgradeCredit);
   const serviceCheckoutAmount = getServiceCheckoutAmount(service);
   const checkoutAmount = appliedUpgradeCredit?.discounted_amount ?? serviceCheckoutAmount;
+  const isBundleSpecial = service.slug === 'bundle' && isBundleSpecialOpen();
   const bookingClaims = service.checkoutAccess === 'accepted_booking'
     ? verifyBookingPaymentToken(bookingToken, getBookingPaymentSecret())
     : null;
@@ -194,7 +205,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
               {(service.slug === 'cv-revamp' || service.slug === 'linkedin') && (
                 <div className="mt-8 border border-[#C9AD98]/50 bg-[#F7F1EC] p-5">
                   <p className="text-[15px] leading-relaxed text-[#142334]/72">
-                    Need both? The CV + LinkedIn Bundle is R450 and saves you R250.
+                    Need both? The CV + LinkedIn Bundle is {formatCurrency(getBundleCheckoutAmount())} and saves you R{getBundleSaving()}.
                   </p>
                   <Link href="/buy/bundle" className="mt-3 inline-flex text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] hover:text-[#142334]">
                     View the bundle <ArrowUpRight className="h-4 w-4" />
@@ -221,9 +232,21 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
                     Includes your upgrade credit. This upgrade link expires in 7 days.
                   </p>
                 </div>
+              ) : isBundleSpecial ? (
+                <div className="mt-5">
+                  <p className="text-[15px] uppercase tracking-[0.12em] text-white/48 line-through">
+                    {formatCurrency(BUNDLE_STANDARD_AMOUNT)}
+                  </p>
+                  <p className="mt-2 font-serif text-[62px] leading-none text-white">
+                    {formatCurrency(serviceCheckoutAmount)}
+                  </p>
+                  <p className="mt-3 text-[14px] leading-relaxed text-white/68">
+                    {getBundleSpecialNote()}
+                  </p>
+                </div>
               ) : (
                 <p className="mt-5 font-serif text-[62px] leading-none text-white">
-                  {formatCurrency(service.amount)}
+                  {formatCurrency(serviceCheckoutAmount)}
                 </p>
               )}
               <p className="mt-4 text-[15px] leading-relaxed text-white/68">
