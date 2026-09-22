@@ -40,12 +40,14 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // The old v4.1 value sits beside each score until the new scale feels familiar.
   { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 51, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true }, // v4.1: 63.1
   { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 48, inputPrice: 1.25, outputPrice: 4.25, requiresReasoning: true, supportsVision: true }, // v4.1: 61
-  // GLM-5.3 began refusing the reasoning disable in August 2026. The retry in
-  // postAiChat recovers either way, but flagging it keeps the Settings toggle
-  // honest - unflagged it read OFF while reasoning was happening anyway - and
-  // saves a wasted round trip on every call.
-  { value: 'z-ai/glm-5.3', label: 'z-ai/glm-5.3', intelligence: 45, inputPrice: 1.40, outputPrice: 4.40, requiresReasoning: true }, // v4.1: 59.5
-  { value: 'x-ai/grok-4.6', label: 'x-ai/grok-4.6', intelligence: 44, inputPrice: 2.0, outputPrice: 6.0, supportsVision: true }, // v4.1: 60.9
+  // AA v4.3 top open-weights score. Reasoning is opt-in (no flag needed).
+  // Single Xiaomi provider on OpenRouter - launch-week throughput was volatile,
+  // so treat availability as less proven than the price implies.
+  { value: 'xiaomi/mimo-v2.6-pro', label: 'xiaomi/mimo-v2.6-pro', intelligence: 46, inputPrice: 0.435, outputPrice: 0.87, supportsVision: true },
+  // OpenRouter marks reasoning mandatory (default high) even though xAI docs
+  // describe it as switchable, so the flag stays until a disable succeeds.
+  // Note 2x long-context pricing on prompts >= 200k tokens.
+  { value: 'x-ai/grok-4.7', label: 'x-ai/grok-4.7', intelligence: 46, inputPrice: 1.60, outputPrice: 4.80, requiresReasoning: true, supportsVision: true },
   // Like its full-size sibling, the Flash variant uses forced thinking - Z.ai
   // rejects `thinking.type: 'disabled'` for both, which surfaces on OpenRouter
   // as a rejected `reasoning: { effort: 'none' }`.
@@ -56,6 +58,9 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // route to it): native vision input plus optional thinking (low/high/max),
   // so reasoning stays switchable and no flag is needed.
   { value: 'deepseek/deepseek-v4.1-flash', label: 'deepseek/deepseek-v4.1-flash', intelligence: 39.5, inputPrice: 0.15, outputPrice: 0.60, supportsVision: true },
+  // No AA v4.3 score published yet, so unscored with the badge hidden rather
+  // than estimated. Reasoning is opt-in via the `reasoning enabled` boolean.
+  { value: 'xiaomi/mimo-v2.6-flash', label: 'xiaomi/mimo-v2.6-flash', intelligence: undefined, inputPrice: 0.14, outputPrice: 0.28, supportsVision: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
