@@ -19,3 +19,14 @@ tmp/
 output/
 # Supabase CLI machine-local state
 supabase/.temp/
+
+# Privacy guard: never commit real financial / customer data
+*Transaction_History*.csv
+*transaction_history*.csv
+*PayFast*.csv
+*payfast*.csv
+docs/*.csv
+*invoice*.pdf
+*invoice*.html
+*invoice*.png
+!docs/The-South-African-CV-Checklist.pdf
