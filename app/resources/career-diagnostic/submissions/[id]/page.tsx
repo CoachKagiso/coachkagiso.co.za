@@ -415,7 +415,6 @@ export default async function DiagnosticSubmissionSummaryPage({
                               <input
                                 type="date"
                                 name="next_follow_up_at"
-                                min={getSastDateKey()}
                                 data-next-follow-up-input
                                 defaultValue={formatDateInput(submission.next_follow_up_at)}
                                 className="mt-3 h-11 w-full rounded-[8px] border border-[#D8C8BB] bg-white px-3 text-[14px] outline-none focus:border-[#142334]"
