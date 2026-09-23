@@ -14,12 +14,12 @@ const savedConfig = {
 test('keeps the saved OpenRouter key when a model-only settings save leaves it blank', () => {
   const saved = mergeOpenRouterKeyForSave(savedConfig, {
     ...savedConfig,
-    primary_model: 'anthropic/claude-opus-5',
+    primary_model: 'anthropic/claude-opus-5.5',
     openrouter_api_key: '',
     openrouter_api_key_configured: true,
   });
 
-  assert.equal(saved.primary_model, 'anthropic/claude-opus-5');
+  assert.equal(saved.primary_model, 'anthropic/claude-opus-5.5');
   assert.equal(saved.openrouter_api_key, 'saved-openrouter-key');
   assert.equal('openrouter_api_key_configured' in saved, false);
 });

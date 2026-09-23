@@ -8,9 +8,6 @@ test('disables OpenRouter reasoning when reasoningEnabled is false (default)', (
   assert.deepEqual(getAiProviderRequestOptions('openrouter', 'deepseek/deepseek-v4.1-flash'), {
     reasoning: { effort: 'none' },
   });
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-opus-5'), {
-    reasoning: { effort: 'none' },
-  });
   assert.deepEqual(getAiProviderRequestOptions('openrouter', 'xiaomi/mimo-v2.6-pro'), {
     reasoning: { effort: 'none' },
   });
@@ -18,13 +15,13 @@ test('disables OpenRouter reasoning when reasoningEnabled is false (default)', (
 
 test('allows OpenRouter model default reasoning when reasoningEnabled is true', () => {
   assert.deepEqual(getAiProviderRequestOptions('openrouter', 'deepseek/deepseek-v4.1-flash', true), {});
-  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-opus-5', true), {});
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-opus-5.5', true), {});
 });
 
 test('never sends the reasoning disable to an endpoint that mandates reasoning', () => {
   // Toggle off means the cheapest effort the endpoint accepts - never the provider
   // default (max), which would spend the output budget thinking before answering.
-  for (const model of ['google/gemini-3.8-flash', 'x-ai/grok-4.7', 'z-ai/glm-5.3-flash', 'meta/muse-spark-1.3']) {
+  for (const model of ['anthropic/claude-opus-5.5', 'google/gemini-3.8-flash', 'x-ai/grok-4.7', 'z-ai/glm-5.3-flash', 'meta/muse-spark-1.3']) {
     assert.deepEqual(getAiProviderRequestOptions('openrouter', model), {
       reasoning: { effort: 'low' },
     });
@@ -52,7 +49,7 @@ test('image requests fall back to a vision-capable model when the configured one
   // Every production model currently reads images, so a retired id stands in
   // for the text-only case the fallback exists for.
   assert.equal(modelSupportsVision('retired/text-only-model'), false);
-  assert.equal(modelSupportsVision('anthropic/claude-opus-5'), true);
+  assert.equal(modelSupportsVision('anthropic/claude-opus-5.5'), true);
   assert.ok(getFallbackVisionModel(), 'a vision-capable fallback must exist in the catalogue');
   assert.equal(modelSupportsVision(getFallbackVisionModel()), true);
 });
@@ -69,7 +66,7 @@ test('the connection probe stays cheap for ordinary models', () => {
 test('the connection probe gives reasoning-mandatory models room to think', () => {
   // A 20-token budget would be spent thinking before a word is visible, so the
   // probe carries headroom and an explicit low effort instead of failing.
-  for (const model of ['meta/muse-spark-1.3', 'z-ai/glm-5.3-flash', 'x-ai/grok-4.7', 'google/gemini-3.8-flash']) {
+  for (const model of ['anthropic/claude-opus-5.5', 'meta/muse-spark-1.3', 'z-ai/glm-5.3-flash', 'x-ai/grok-4.7', 'google/gemini-3.8-flash']) {
     const body = buildAiConnectionTestBody(model);
     assert.equal(body.model, model);
     assert.deepEqual(body.reasoning, { effort: 'low' });

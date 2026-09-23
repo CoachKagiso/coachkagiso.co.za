@@ -10,13 +10,13 @@ const defaults = {
 test('keeps persisted settings when email templates fail to load', async () => {
   const result = await loadSettingsDashboardBundle({
     defaults,
-    loadSettings: async () => ({ ai_config: { primary_model: 'anthropic/claude-opus-5' } }),
+    loadSettings: async () => ({ ai_config: { primary_model: 'anthropic/claude-opus-5.5' } }),
     loadEmailTemplates: async () => {
       throw new Error('Email template schema is unavailable');
     },
   });
 
-  assert.equal(result.settings.ai_config.primary_model, 'anthropic/claude-opus-5');
+  assert.equal(result.settings.ai_config.primary_model, 'anthropic/claude-opus-5.5');
   assert.deepEqual(result.emailTemplates, defaults.emailTemplates);
 });
 

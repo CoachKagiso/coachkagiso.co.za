@@ -38,7 +38,10 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // Intelligence scores below follow the Artificial Analysis Intelligence Index v4.3 scale
   // (10-eval composite; top of scale is now 53, so every score dropped vs v4.1).
   // The old v4.1 value sits beside each score until the new scale feels familiar.
-  { value: 'anthropic/claude-opus-5', label: 'anthropic/claude-opus-5', intelligence: 51, inputPrice: 5.0, outputPrice: 25.0, supportsVision: true }, // v4.1: 63.1
+  // AA v4.3.2 max-effort 58 (top of scale); Opus 5 was 51 on v4.3 (63.1 on v4.1).
+  // 20% cheaper than Opus 5 ($4/$20 vs $5/$25). Adaptive-only thinking is
+  // mandatory on OpenRouter, so the disable is never sent - see migration guide.
+  { value: 'anthropic/claude-opus-5.5', label: 'anthropic/claude-opus-5.5', intelligence: 58, inputPrice: 4.0, outputPrice: 20.0, requiresReasoning: true, supportsVision: true },
   { value: 'meta/muse-spark-1.3', label: 'meta/muse-spark-1.3', intelligence: 48, inputPrice: 1.25, outputPrice: 4.25, requiresReasoning: true, supportsVision: true }, // v4.1: 61
   // AA v4.3 top open-weights score. Reasoning is opt-in (no flag needed).
   // Single Xiaomi provider on OpenRouter - launch-week throughput was volatile,
