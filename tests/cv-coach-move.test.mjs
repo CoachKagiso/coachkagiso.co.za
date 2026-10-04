@@ -89,8 +89,8 @@ test('the catalogue defaults to every service', () => {
 });
 
 test('bundle is R450 until the special ends, then R500', () => {
-  const lastMinute = new Date('2026-10-02T23:59:00+02:00');
-  const cutOver = new Date('2026-10-03T00:00:00+02:00');
+  const lastMinute = new Date('2026-10-10T23:59:00+02:00');
+  const cutOver = new Date('2026-10-11T00:00:00+02:00');
   assert.equal(getBundleCheckoutAmount(lastMinute), 450);
   assert.equal(getBundleCheckoutAmount(cutOver), 500);
   assert.equal(getServiceCheckoutAmount(asyncServices.bundle, lastMinute), 450);

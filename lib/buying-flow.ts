@@ -70,8 +70,8 @@ export function getMasterclassPriceNote(now = new Date()) {
 
 export const BUNDLE_SPECIAL_AMOUNT = 450;
 export const BUNDLE_STANDARD_AMOUNT = 500;
-export const BUNDLE_SPECIAL_ENDS_AT = '2026-10-03T00:00:00+02:00';
-export const BUNDLE_SPECIAL_ENDS_LABEL = 'Friday 2 October';
+export const BUNDLE_SPECIAL_ENDS_AT = '2026-10-11T00:00:00+02:00';
+export const BUNDLE_SPECIAL_ENDS_LABEL = 'Saturday 10 October';
 
 export function isBundleSpecialOpen(now = new Date()) {
   return now.getTime() < new Date(BUNDLE_SPECIAL_ENDS_AT).getTime();
