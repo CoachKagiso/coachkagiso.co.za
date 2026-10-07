@@ -11,6 +11,11 @@ test('disables OpenRouter reasoning when reasoningEnabled is false (default)', (
   assert.deepEqual(getAiProviderRequestOptions('openrouter', 'xiaomi/mimo-v2.6-pro'), {
     reasoning: { effort: 'none' },
   });
+  // Haiku 5.5 shares Opus 5.5's adaptive thinking but can still be switched off,
+  // so it must NOT be lumped in with the reasoning-mandatory endpoints.
+  assert.deepEqual(getAiProviderRequestOptions('openrouter', 'anthropic/claude-haiku-5.5'), {
+    reasoning: { effort: 'none' },
+  });
 });
 
 test('allows OpenRouter model default reasoning when reasoningEnabled is true', () => {
@@ -50,6 +55,7 @@ test('image requests fall back to a vision-capable model when the configured one
   // for the text-only case the fallback exists for.
   assert.equal(modelSupportsVision('retired/text-only-model'), false);
   assert.equal(modelSupportsVision('anthropic/claude-opus-5.5'), true);
+  assert.equal(modelSupportsVision('anthropic/claude-haiku-5.5'), true);
   assert.ok(getFallbackVisionModel(), 'a vision-capable fallback must exist in the catalogue');
   assert.equal(modelSupportsVision(getFallbackVisionModel()), true);
 });

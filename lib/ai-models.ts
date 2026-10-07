@@ -35,9 +35,9 @@ export const DEFAULT_OPENROUTER_SECONDARY_MODEL = 'deepseek/deepseek-v4.1-flash'
 
 export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
 ] = [
-  // Intelligence scores below follow the Artificial Analysis Intelligence Index v4.3 scale
-  // (10-eval composite; top of scale is now 53, so every score dropped vs v4.1).
-  // The old v4.1 value sits beside each score until the new scale feels familiar.
+  // Intelligence scores below follow the Artificial Analysis Intelligence Index v4.3.2 scale
+  // (10-eval composite; the leader now scores 58, so scores are not comparable 1:1 with the
+  // older 60s-scale figures quoted in the v4.1 comments).
   // AA v4.3.2 max-effort 58 (top of scale); Opus 5 was 51 on v4.3 (63.1 on v4.1).
   // 20% cheaper than Opus 5 ($4/$20 vs $5/$25). Adaptive-only thinking is
   // mandatory on OpenRouter, so the disable is never sent - see migration guide.
@@ -51,6 +51,11 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // describe it as switchable, so the flag stays until a disable succeeds.
   // Note 2x long-context pricing on prompts >= 200k tokens.
   { value: 'x-ai/grok-4.7', label: 'x-ai/grok-4.7', intelligence: 46, inputPrice: 1.60, outputPrice: 4.80, requiresReasoning: true, supportsVision: true },
+  // First Haiku with adjustable effort, and by far the strongest option under $1/M.
+  // Thinking is adaptive but CAN be disabled, so it takes no requiresReasoning flag -
+  // the opposite of its Opus 5.5 sibling, which rejects the disable outright.
+  // Note the 5x price step once a prompt passes 100k tokens ($0.50/$2.50).
+  { value: 'anthropic/claude-haiku-5.5', label: 'anthropic/claude-haiku-5.5', intelligence: 43, inputPrice: 0.10, outputPrice: 0.50, supportsVision: true },
   // Like its full-size sibling, the Flash variant uses forced thinking - Z.ai
   // rejects `thinking.type: 'disabled'` for both, which surfaces on OpenRouter
   // as a rejected `reasoning: { effort: 'none' }`.
@@ -61,9 +66,9 @@ export const OPENROUTER_MODEL_OPTIONS: AiModelOption[
   // route to it): native vision input plus optional thinking (low/high/max),
   // so reasoning stays switchable and no flag is needed.
   { value: 'deepseek/deepseek-v4.1-flash', label: 'deepseek/deepseek-v4.1-flash', intelligence: 39.5, inputPrice: 0.15, outputPrice: 0.60, supportsVision: true },
-  // No AA v4.3 score published yet, so unscored with the badge hidden rather
-  // than estimated. Reasoning is opt-in via the `reasoning enabled` boolean.
-  { value: 'xiaomi/mimo-v2.6-flash', label: 'xiaomi/mimo-v2.6-flash', intelligence: undefined, inputPrice: 0.14, outputPrice: 0.28, supportsVision: true },
+  // Cheapest production option, so it is the automatic vision fallback while its
+  // reasoning stays opt-in via the `reasoning enabled` boolean.
+  { value: 'xiaomi/mimo-v2.6-flash', label: 'xiaomi/mimo-v2.6-flash', intelligence: 38, inputPrice: 0.14, outputPrice: 0.28, supportsVision: true },
 ];
 
 const openRouterModelValues = new Set(OPENROUTER_MODEL_OPTIONS.map((option) => option.value));
