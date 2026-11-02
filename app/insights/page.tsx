@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import InsightsIndex from '@/components/InsightsIndex';
+import { getPublishedInsights } from '@/lib/published-insights';
+
+// Evaluate the schedule per request, including after a deployment has been idle.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Career Insights & Advice South Africa',
@@ -22,7 +26,7 @@ export default function InsightsPage() {
   return (
     <>
       <Navbar />
-      <InsightsIndex />
+      <InsightsIndex insights={getPublishedInsights()} />
       <Footer />
     </>
   );

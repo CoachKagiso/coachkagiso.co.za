@@ -10,6 +10,8 @@ export type InsightBodyBlock =
     };
 
 export type Insight = {
+  publishAt?: string;
+  status?: 'draft' | 'scheduled';
   slug: string;
   title: string;
   dek: string;

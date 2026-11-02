@@ -5,7 +5,7 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight, ClipboardCheck, Clock, Compass, FileText, Search } from 'lucide-react';
-import { Insight, insightTags, insights } from '@/lib/insights';
+import type { Insight } from '@/lib/insights';
 
 function ArticleTile({ article, index }: { article: Insight; index: number }) {
   return (
@@ -115,7 +115,8 @@ const freeTools = [
   },
 ];
 
-export default function InsightsIndex() {
+export default function InsightsIndex({ insights }: { insights: Insight[] }) {
+  const insightTags = Array.from(new Set(insights.flatMap((article) => article.tags)));
   const [activeTag, setActiveTag] = useState('All');
   const featured = insights.find((article) => article.featured) ?? insights[0];
 
@@ -134,7 +135,7 @@ export default function InsightsIndex() {
       return sortFeaturedFirst(insights);
     }
     return sortFeaturedFirst(insights.filter((article) => article.tags.includes(activeTag)));
-  }, [activeTag]);
+  }, [activeTag, insights]);
 
   return (
     <main className="font-sans bg-[#FCFBFA] text-[#142334] overflow-hidden">

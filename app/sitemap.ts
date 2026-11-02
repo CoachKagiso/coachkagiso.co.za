@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next';
-import { insights } from '@/lib/insights';
+import { getPublishedInsights } from '@/lib/published-insights';
 import { asyncServices, bookingPages } from '@/lib/buying-flow';
 
 const BASE_URL = 'https://coachkagiso.co.za';
+export const dynamic = 'force-dynamic';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -72,9 +73,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   // Insight / blog article pages
-  const insightPages: MetadataRoute.Sitemap = insights.map((insight) => ({
+  const insightPages: MetadataRoute.Sitemap = getPublishedInsights(now.getTime()).map((insight) => ({
     url: `${BASE_URL}/insights/${insight.slug}`,
-    lastModified: now,
+    lastModified: insight.publishAt ? new Date(insight.publishAt) : now,
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }));

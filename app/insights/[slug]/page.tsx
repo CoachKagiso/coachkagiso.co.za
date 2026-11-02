@@ -9,7 +9,10 @@ import { AuditBreakLeadMagnet } from '@/components/ArticleLeadMagnets';
 import ArticleShareActions from '@/components/ArticleShareActions';
 import { ArticleFaqJsonLd, ArticleJsonLd, BreadcrumbJsonLd } from '@/app/JsonLd';
 import BackToTopButton from '@/components/BackToTopButton';
-import { getInsightBySlug, getRelatedInsights, insights, type Insight, type InsightBodyBlock } from '@/lib/insights';
+import type { Insight, InsightBodyBlock } from '@/lib/insights';
+import { getInsightBySlug, getRelatedInsights } from '@/lib/published-insights';
+
+export const dynamic = 'force-dynamic';
 
 type ArticlePageProps = {
   params: Promise<{
@@ -528,12 +531,6 @@ function ArticleBodyBlock({ block }: { block: InsightBodyBlock }) {
   );
 }
 
-export function generateStaticParams() {
-  return insights.map((insight) => ({
-    slug: insight.slug,
-  }));
-}
-
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { slug } = await params;
   const article = getInsightBySlug(slug);
@@ -563,7 +560,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
           alt: article.imageAlt,
         },
       ],
-      publishedTime: article.date,
+      publishedTime: article.publishAt ?? article.date,
       authors: ['Coach Kagiso'],
       tags: article.tags,
     },
@@ -593,7 +590,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         title={article.metaTitle ?? article.title}
         description={article.metaDescription ?? article.dek}
         slug={article.slug}
-        datePublished={article.date}
+        datePublished={article.publishAt ?? article.date}
         image={article.image}
       />
       {article.faqs && <ArticleFaqJsonLd items={article.faqs} />}
