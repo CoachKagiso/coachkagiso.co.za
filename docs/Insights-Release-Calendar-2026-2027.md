@@ -10,14 +10,21 @@ The eight complete drafts use a conversational voice, short paragraphs, practica
 |---|---|
 | Thursday 5 November 2026 | [Why am I applying for jobs but getting no interviews?](../content/insights/no-interviews.md) |
 | Thursday 19 November 2026 | [How to ask for a promotion when you're already doing more than your job](../content/insights/promotion-conversation.md) |
-| Thursday 3 December 2026 | [How to prepare for a job interview using the experience you already have](../content/insights/interview-preparation.md) |
+| Thursday 3 December 2026 | [How to network for a job when you don't know anyone in your industry](../content/insights/networking.md) |
 | Thursday 17 December 2026 | [Changing careers at 30, 35 or 40: how to test a move before you leave](../content/insights/career-change.md) |
-| Thursday 7 January 2027 | [What are your salary expectations? How to answer in a South African interview](../content/insights/salary-expectations.md) |
+| Thursday 7 January 2027 | [How to prepare for a job interview using the experience you already have](../content/insights/interview-preparation.md) |
 | Thursday 21 January 2027 | ["Tell me about yourself": how to build a clear interview answer](../content/insights/tell-me-about-yourself.md) |
-| Thursday 4 February 2027 | [How to network for a job when you don't know anyone in your industry](../content/insights/networking.md) |
+| Thursday 4 February 2027 | [What are your salary expectations? How to answer in a South African interview](../content/insights/salary-expectations.md) |
 | Thursday 18 February 2027 | [Which short course is worth your time? Start with the job you want](../content/insights/short-course.md) |
 
-This is two articles per month, on the first and third Thursday. The first month balances job seekers and employed professionals. The later articles build on guides that will already be available when their links appear.
+This is two articles per month, on the first and third Thursday, ordered to follow the South African hiring year:
+
+- **November:** people are still applying before the year-end slowdown, and year-end reviews and budgets make it a good moment to raise promotion.
+- **December:** networking goes out while people are still at work and attending year-end functions; career change lands when people on leave have time to reflect.
+- **January:** interview preparation and the opening answer arrive as hiring picks up after the holidays and the 13th cheque.
+- **February:** salary expectations follow, as January interviews turn into offers; the short course closes the batch alongside new-year learning plans.
+
+Each article only links to guides that are already live on its release date.
 
 ## How automatic release works
 

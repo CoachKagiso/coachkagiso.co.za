@@ -34,8 +34,8 @@
       "Leadership",
       "Visibility"
     ],
-    "image": "/images/insights/career-planning-when-stuck.jpg",
-    "imageAlt": "Woman in a grey blazer sitting at a desk beside a laptop, looking away in thought",
+    "image": "/images/insights/first-time-manager-guide.jpeg",
+    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them",
     "leadMagnet": {
       "eyebrow": "Free personal brand audit",
       "title": "Does the way people see your work match the role you want?",
@@ -46,19 +46,28 @@
     }
   },
   {
-    "file": "interview-preparation.md",
-    "slug": "interview-preparation-south-africa",
+    "file": "networking.md",
+    "slug": "network-for-a-job-without-connections",
     "publishAt": "2026-12-03T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
-    "category": "Interview preparation",
+    "dek": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
+    "category": "Personal branding",
     "tags": [
-      "Interviews",
-      "Job Search",
-      "Personal Brand"
+      "Networking",
+      "LinkedIn",
+      "Visibility",
+      "Job Search"
     ],
-    "image": "/images/insights/first-time-manager-guide.jpeg",
-    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them"
+    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
+    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
+    "leadMagnet": {
+      "eyebrow": "Free LinkedIn headline builder",
+      "title": "Will your headline make sense when they look you up?",
+      "body": "Download before-and-after LinkedIn headline rewrites and a simple formula for describing the work you do and the work you want.",
+      "cta": "Get the PDF",
+      "href": "/resources/linkedin-headline-swipe-file",
+      "afterHeading": "Be clear enough for someone to help"
+    }
   },
   {
     "file": "career-change.md",
@@ -84,19 +93,19 @@
     }
   },
   {
-    "file": "salary-expectations.md",
-    "slug": "salary-expectations-interview-south-africa",
+    "file": "interview-preparation.md",
+    "slug": "interview-preparation-south-africa",
     "publishAt": "2027-01-07T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
+    "dek": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
     "category": "Interview preparation",
     "tags": [
       "Interviews",
-      "Salary",
-      "Job Search"
+      "Job Search",
+      "Personal Brand"
     ],
-    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
-    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant"
+    "image": "/images/insights/first-time-manager-guide.jpeg",
+    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them"
   },
   {
     "file": "tell-me-about-yourself.md",
@@ -110,32 +119,23 @@
       "Personal Brand",
       "Job Search"
     ],
-    "image": "/images/insights/first-time-manager-guide.jpeg",
-    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them"
+    "image": "/images/insights/career-planning-when-stuck.jpg",
+    "imageAlt": "Woman in a grey blazer sitting at a desk beside a laptop, looking away in thought"
   },
   {
-    "file": "networking.md",
-    "slug": "network-for-a-job-without-connections",
+    "file": "salary-expectations.md",
+    "slug": "salary-expectations-interview-south-africa",
     "publishAt": "2027-02-04T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
-    "category": "Personal branding",
+    "dek": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
+    "category": "Interview preparation",
     "tags": [
-      "Networking",
-      "LinkedIn",
-      "Visibility",
+      "Interviews",
+      "Salary",
       "Job Search"
     ],
-    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
-    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
-    "leadMagnet": {
-      "eyebrow": "Free LinkedIn headline builder",
-      "title": "Will your headline make sense when they look you up?",
-      "body": "Download before-and-after LinkedIn headline rewrites and a simple formula for describing the work you do and the work you want.",
-      "cta": "Get the PDF",
-      "href": "/resources/linkedin-headline-swipe-file",
-      "afterHeading": "Be clear enough for someone to help"
-    }
+    "image": "/images/insights/linkedin-headline-article.jpg",
+    "imageAlt": "Person typing on a laptop at a wooden desk, with a cup of coffee and an open notebook beside them"
   },
   {
     "file": "short-course.md",
@@ -149,7 +149,7 @@
       "Career Growth",
       "Career Planning"
     ],
-    "image": "/images/insights/linkedin-headline-article.jpg",
-    "imageAlt": "Person typing on a laptop at a wooden desk, with a cup of coffee and an open notebook beside them"
+    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
+    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant"
   }
 ]

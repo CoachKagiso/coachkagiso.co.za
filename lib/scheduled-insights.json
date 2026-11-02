@@ -114,8 +114,8 @@
       "Leadership",
       "Visibility"
     ],
-    "image": "/images/insights/career-planning-when-stuck.jpg",
-    "imageAlt": "Woman in a grey blazer sitting at a desk beside a laptop, looking away in thought",
+    "image": "/images/insights/first-time-manager-guide.jpeg",
+    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them",
     "leadMagnet": {
       "eyebrow": "Free personal brand audit",
       "title": "Does the way people see your work match the role you want?",
@@ -199,94 +199,103 @@
     ]
   },
   {
-    "slug": "interview-preparation-south-africa",
+    "slug": "network-for-a-job-without-connections",
     "publishAt": "2026-12-03T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
-    "category": "Interview preparation",
+    "dek": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
+    "category": "Personal branding",
     "tags": [
-      "Interviews",
-      "Job Search",
-      "Personal Brand"
+      "Networking",
+      "LinkedIn",
+      "Visibility",
+      "Job Search"
     ],
-    "image": "/images/insights/first-time-manager-guide.jpeg",
-    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them",
-    "title": "How to prepare for a job interview using the experience you already have",
-    "metaTitle": "How to prepare for a job interview using the experience you already have",
-    "metaDescription": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
+    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
+    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
+    "leadMagnet": {
+      "eyebrow": "Free LinkedIn headline builder",
+      "title": "Will your headline make sense when they look you up?",
+      "body": "Download before-and-after LinkedIn headline rewrites and a simple formula for describing the work you do and the work you want.",
+      "cta": "Get the PDF",
+      "href": "/resources/linkedin-headline-swipe-file",
+      "afterHeading": "Be clear enough for someone to help"
+    },
+    "title": "How to network for a job when you don't know anyone in your industry",
+    "metaTitle": "How to network for a job when you don't know anyone in your industry",
+    "metaDescription": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
     "date": "3 December 2026",
     "readTime": "6 min read",
     "sections": [
       {
         "heading": "Start here",
         "body": [
-          "The interview invitation arrives and, for a moment, you're relieved. Someone wants to speak to you.",
-          "Then you start preparing. You find a list of common questions, open another tab, watch a video and suddenly have forty possible answers to remember. By the time someone asks you to describe yourself, you've forgotten how you normally speak.",
-          "Let's make this more manageable. Start with the job and a few real examples from your experience. You'll have something solid to talk about even when the question comes in a form you didn't expect.",
-          "You don't need to become a different person for the interview. You do need to make your experience understandable to someone who wasn't there."
+          "\"You need to network.\"",
+          "People say it as though there is a room somewhere where useful contacts are waiting for you to arrive. Meanwhile, you're trying to work out who to message and how to avoid sounding as though you're asking a stranger to solve your life.",
+          "If networking feels awkward, start smaller. You can ask a thoughtful question, reconnect with someone you already know or join a conversation about work that interests you. You don't need a large circle before you can begin.",
+          "The first aim is to understand the work and build a relationship that both people are comfortable with. A job lead may come from that. It may not. The conversation can still help you make a better decision."
         ]
       },
       {
-        "heading": "Read the advert as a description of someone's working day",
+        "heading": "Be clear enough for someone to help",
         "body": [
-          "Go back to the job description. What will this person be expected to handle? Perhaps they'll deal with customer complaints, organise deliveries, check records or coordinate a small team.",
-          "Choose the responsibilities that seem central to the role. For each one, ask yourself: \"When have I done this, or something close to it?\"",
-          "An employer asking for \"attention to detail\" might need someone who catches mistakes before an order goes out. Saying you're detail-oriented doesn't give them much to assess. Describing how you spotted a mismatch, checked it and corrected the order does.",
-          "Make a simple note with two columns: \"What the role needs\" and \"An example I can discuss\". If one requirement has no example beside it, think about what you do know and how you'd explain the gap honestly. Don't create experience to fill the space."
+          "\"I'm looking for anything\" is an honest description of how desperate a job search can feel. It's also difficult for another person to act on.",
+          "Give them a starting point: the kind of work you're exploring, the experience you bring and the question you have.",
+          "For example: \"I'm looking into office support roles. I've handled scheduling and customer queries, and I'd like to understand what employers expect from junior administrators.\"",
+          "That doesn't lock you into one career forever. It makes this particular conversation easier. If you're exploring several directions, have a clear question for each rather than asking one person to advise on everything.",
+          "Your [LinkedIn profile](/insights/linkedin-profile-optimisation-south-africa-2026) can back up the message. When someone looks you up, they should be able to understand the experience you're referring to."
         ]
       },
       {
-        "heading": "Choose stories you remember clearly",
+        "heading": "Begin closer to home than you think",
         "body": [
-          "Think of a time you solved a problem, worked through a disagreement, learned something unfamiliar or corrected a mistake. Choose examples where you can explain your own part.",
-          "If you're early in your career, your examples may come from a group assignment, volunteering, part-time work or helping in a family business. Say where the experience came from. It can demonstrate a useful skill without being presented as a full-time job.",
-          "You might have heard of STAR. It stands for situation, task, action and result. In ordinary language: what was happening, what needed doing, what you did and how it turned out.",
-          "Use that structure to keep yourself on track. You don't need to announce each letter or make every answer sound like it came out of a textbook."
+          "Make a short list of people you've studied with, worked with, volunteered alongside or met through a professional event. You may not have spoken for a while. That's okay; acknowledge it naturally.",
+          "You can also look for alumni groups, professional associations and public events relevant to your interests. Check whether there is a free or online option before committing money or travel time. You don't need to buy access to an expensive conference to have a useful conversation.",
+          "Choose people because there is a sensible connection to your question. A person doing the work you want to understand may be more useful than the most senior person you can find."
         ]
       },
       {
-        "heading": "Give your actions enough space",
+        "heading": "Send a message that is easy to answer",
         "body": [
-          "Here's an illustrative example for a customer support interview:",
-          "\"A customer contacted us because a delivery hadn't arrived when expected. I checked the order record and found that the address had been captured incorrectly. I confirmed the details with the customer, contacted dispatch and agreed on a new delivery time. I then called the customer back with the update. The order was delivered, and I flagged the capture error to my supervisor so we could check how it had happened.\"",
-          "That answer gives the interviewer something to ask about. How did you handle the customer's frustration? What did you do while waiting for dispatch? What would you change next time?",
-          "Notice that the example doesn't end with a made-up satisfaction score. A result can be an issue resolved, a deadline met or a mistake caught. If you have reliable numbers, use them. If you don't, explain the outcome you actually know.",
-          "When reviewing your own answers, check how much time you spend describing the background. A short explanation is usually enough. Leave room for the decisions you made and the actions you took."
+          "The examples below are fictional messages you can adapt. Replace the details with your own and write in a way you'd actually speak.",
+          "To a former colleague: \"Hi Lerato, it's been a while. I hope you're well. I'm exploring coordinator roles and remembered that you moved into operations. Would you be comfortable telling me which skills helped you make that move? I'm trying to understand what I should work on next.\"",
+          "To someone from your college or university: \"Hi Thabo, I noticed we both studied at the same institution. I've recently completed my qualification and I'm exploring office support roles. If you have a moment, I'd appreciate your view on one thing: what do new starters often underestimate about the work?\"",
+          "To someone whose public work you've followed: \"Hi Ayesha, your post about training new staff caught my attention. I'm in customer support and have been helping colleagues learn our system. I'm considering training coordination. Would you be open to one or two questions about the day-to-day work? No problem if you're unable to.\"",
+          "Each message explains the connection and makes a small request. There is no need for a long introduction, flattery or an unexpected CV attachment."
         ]
       },
       {
-        "heading": "Practise speaking, not only writing",
+        "heading": "If they say yes, respect the time they've offered",
         "body": [
-          "An answer that looks clear on a page can become a very long story out loud. Record yourself answering one question on your phone. Listen once, without picking apart every pause.",
-          "Could someone follow what happened? Did you explain your contribution? Did you answer the question? Choose one thing to improve and try again.",
-          "Keep brief notes rather than memorising a script. You want to remember the example well enough to adapt it. If the interviewer asks about teamwork, you'll explain how you worked with others. If they ask about a mistake, you may use the same experience but focus on what went wrong and how you responded.",
-          "If you lose your place in the interview, you can pause: \"Let me give you a clearer example.\" You can also ask them to repeat or clarify a question. A short pause gives you a chance to answer the question they actually asked."
+          "Prepare a few questions you couldn't easily answer by reading their profile. Ask what the work involves, how people usually enter the field or which skill would be useful to practise first.",
+          "If you agree on a fifteen-minute call, keep an eye on the time. You can say, \"We're nearly at the time we agreed. May I ask one last question?\" Let them decide whether to continue.",
+          "Listen closely enough to ask a follow-up about what they've said. You don't have to work through a script of questions if the conversation has already answered them.",
+          "Avoid asking for confidential details about their employer, applicants or colleagues. You can learn a lot about a field without putting someone in an uncomfortable position."
         ]
       },
       {
-        "heading": "Prepare an opening and a few questions of your own",
+        "heading": "When is it okay to ask about opportunities?",
         "body": [
-          "For \"Tell me about yourself\", practise a brief introduction that connects your current experience to the role. Give them a useful starting point, then let the conversation develop. You don't need your entire life story in the first answer.",
-          "Read the employer's official website and the information they've sent you. Look for what the organisation does, who it serves and where this job fits. You don't need to pretend you've admired the company since childhood.",
-          "Prepare questions you genuinely want answered. \"What would you want the person in this role to have achieved after three months?\" can help you understand expectations. \"What is the biggest challenge the team is dealing with?\" may tell you something the advert doesn't.",
-          "If salary comes up, be clear about the basis of any figure you discuss and ask what the package includes. It's reasonable to need details before you can compare an opportunity properly."
+          "If there is a specific vacancy and the conversation makes it appropriate, you can ask about the application process: \"I noticed the coordinator vacancy on your company's careers page. Do you know whether applications should go directly through that page?\"",
+          "A referral is a bigger request. The person may not know your work well enough to recommend you, or their employer may have a particular process. Give them an easy way to say no.",
+          "\"If you feel you know my work well enough, would you be comfortable referring me? I understand if you'd prefer that I apply directly.\"",
+          "Apply through the required route either way. A conversation doesn't replace the employer's process, and knowing someone doesn't guarantee an interview."
         ]
       },
       {
-        "heading": "Sort out the practical details early",
+        "heading": "Follow up without chasing",
         "body": [
-          "Confirm the time, location and format. For an in-person interview, check the route and allow for transport delays. Keep the contact person's details somewhere you can find them quickly.",
-          "For a video interview, test the link, microphone and camera. Charge your device and think about what you'll do if your connection drops. If data or a private space is a problem, raise it early and ask what options are available.",
-          "Have your CV, the advert and a few brief notes nearby. If you plan to take notes during the conversation, say so. Keep confidential material from previous employers out of any work samples you share."
+          "If an initial message gets no reply, one brief follow-up after a week or two is a reasonable personal approach. You could say, \"Just following up on my message in case it got buried. I understand if now isn't a good time.\"",
+          "Then leave it there. People may be busy, away or unable to help. Repeated messages can turn a small request into pressure.",
+          "After a useful conversation, send a specific thank-you. \"Your explanation of the reporting work helped me understand what I need to practise\" means more than a copied paragraph of praise.",
+          "If you later use their advice, a short update can keep the relationship going naturally. You can also share something useful when it fits, but you don't need to manufacture a favour to repay them immediately."
         ]
       },
       {
-        "heading": "If the interview is tomorrow",
+        "heading": "Make room for this in your actual week",
         "body": [
-          "You can still prepare usefully. Read the advert, choose a few relevant examples and say your opening answer out loud. Check the employer's website, prepare two questions and confirm the logistics. Then give yourself time to rest.",
-          "Afterwards, make a quick note of the questions you found difficult and the next steps you were given. If the stated response date passes, a polite follow-up is reasonable. An unanswered message doesn't tell you exactly what happened inside the organisation.",
-          "For now, pick one experience and practise explaining it clearly. That's a much better starting point than trying to memorise forty perfect answers.",
-          "If you'd like support preparing for a particular role, [book a free discovery call](/book/discovery). We can use your own examples and the actual job description, so the practice feels relevant to the conversation you're about to have."
+          "Try a small routine you can sustain: choose one person, read enough to make a relevant approach and send a thoughtful message. Keep a note of any reply and the next step you agreed on.",
+          "Continue applying for suitable roles. Networking is another route to information and relationships, not a reason to stop the rest of your search. If applications are going quiet, the [job-search check](/insights/applying-for-jobs-no-interviews-south-africa) can help you review that part too.",
+          "If you want your profile to explain the direction you're moving in before people look you up, [LinkedIn Optimisation](/buy/linkedin) is built for that. For your first message, though, keep it simple. Choose one person and one question you genuinely want to understand."
         ]
       }
     ]
@@ -402,101 +411,94 @@
     ]
   },
   {
-    "slug": "salary-expectations-interview-south-africa",
+    "slug": "interview-preparation-south-africa",
     "publishAt": "2027-01-07T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
+    "dek": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
     "category": "Interview preparation",
     "tags": [
       "Interviews",
-      "Salary",
-      "Job Search"
+      "Job Search",
+      "Personal Brand"
     ],
-    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
-    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
-    "title": "What are your salary expectations? How to answer in a South African interview",
-    "metaTitle": "What are your salary expectations? How to answer in a South African interview",
-    "metaDescription": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
+    "image": "/images/insights/first-time-manager-guide.jpeg",
+    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them",
+    "title": "How to prepare for a job interview using the experience you already have",
+    "metaTitle": "How to prepare for a job interview using the experience you already have",
+    "metaDescription": "You don't need forty perfect answers. Prepare real examples, practise saying them aloud and arrive knowing what you want to ask too.",
     "date": "7 January 2027",
     "readTime": "6 min read",
     "sections": [
       {
         "heading": "Start here",
         "body": [
-          "The conversation is going well. You've explained your experience, asked a thoughtful question and started imagining yourself in the role.",
-          "Then someone asks what you'd like to earn.",
-          "Suddenly you're trying to calculate your value, your monthly expenses and the risk of saying the wrong thing, all while looking perfectly relaxed on a video call.",
-          "You can prepare for this part too. You need a researched range, a clear understanding of what the numbers mean and a few words you feel comfortable saying. You don't need to guess the one magical figure that makes an employer say yes."
+          "The interview invitation arrives and, for a moment, you're relieved. Someone wants to speak to you.",
+          "Then you start preparing. You find a list of common questions, open another tab, watch a video and suddenly have forty possible answers to remember. By the time someone asks you to describe yourself, you've forgotten how you normally speak.",
+          "Let's make this more manageable. Start with the job and a few real examples from your experience. You'll have something solid to talk about even when the question comes in a form you didn't expect.",
+          "You don't need to become a different person for the interview. You do need to make your experience understandable to someone who wasn't there."
         ]
       },
       {
-        "heading": "Make sure you're discussing the same kind of number",
+        "heading": "Read the advert as a description of someone's working day",
         "body": [
-          "Before comparing figures, clarify whether you're talking about monthly or annual pay, and whether the figure is gross salary or cost to company.",
-          "Gross pay is pay before deductions. Net pay is what remains after deductions. Cost to company, usually shortened to CTC, describes the employer's total package cost and may include contributions or benefits that won't arrive as cash in your account. The exact breakdown matters.",
-          "You can simply ask: \"Is that figure monthly CTC, and could you talk me through what's included?\"",
-          "There's no embarrassment in checking. Comparing your current take-home pay with a proposed CTC figure can make an offer look better than it is. If a term on a payslip or offer letter is unfamiliar, ask HR what it means before you compare figures."
+          "Go back to the job description. What will this person be expected to handle? Perhaps they'll deal with customer complaints, organise deliveries, check records or coordinate a small team.",
+          "Choose the responsibilities that seem central to the role. For each one, ask yourself: \"When have I done this, or something close to it?\"",
+          "An employer asking for \"attention to detail\" might need someone who catches mistakes before an order goes out. Saying you're detail-oriented doesn't give them much to assess. Describing how you spotted a mismatch, checked it and corrected the order does.",
+          "Make a simple note with two columns: \"What the role needs\" and \"An example I can discuss\". If one requirement has no example beside it, think about what you do know and how you'd explain the gap honestly. Don't create experience to fill the space."
         ]
       },
       {
-        "heading": "Research the role you're moving into",
+        "heading": "Choose stories you remember clearly",
         "body": [
-          "Look at recent adverts with salary ranges for comparable work. Match the responsibilities, experience level and location as closely as you can. A familiar title doesn't always mean a similar job.",
-          "Published salary guides can help you establish a starting point. Large job boards and specialist recruiters publish salary guides from time to time, often for a particular field. Check when the information was collected and whether the figures are monthly, annual, gross or CTC.",
-          "Keep a few notes: the source, its date, the kind of role and the stated range. If your research produces very different figures, investigate why. You may be comparing different levels of responsibility or very different packages.",
-          "Your current salary is one piece of information. The scope of the new role also matters, particularly if you've been underpaid or are taking on significantly different work. Avoid building your whole expectation around a fixed percentage increase."
+          "Think of a time you solved a problem, worked through a disagreement, learned something unfamiliar or corrected a mistake. Choose examples where you can explain your own part.",
+          "If you're early in your career, your examples may come from a group assignment, volunteering, part-time work or helping in a family business. Say where the experience came from. It can demonstrate a useful skill without being presented as a full-time job.",
+          "You might have heard of STAR. It stands for situation, task, action and result. In ordinary language: what was happening, what needed doing, what you did and how it turned out.",
+          "Use that structure to keep yourself on track. You don't need to announce each letter or make every answer sound like it came out of a textbook."
         ]
       },
       {
-        "heading": "Decide what would work for you before the call",
+        "heading": "Give your actions enough space",
         "body": [
-          "Privately, work out what you need to understand before accepting an offer. That includes the package itself and costs that may change, such as transport or childcare.",
-          "Keep your preferred range separate from the lowest offer you could realistically accept. You don't have to volunteer your minimum at the start of the conversation. And don't give a range whose lower end you already know won't work for you.",
-          "The figure you discuss with the employer should have a reason behind it: the role, your relevant experience and the evidence you've gathered. Your household costs matter to your decision, but the employer will also be assessing the position's budget and responsibilities."
+          "Here's an illustrative example for a customer support interview:",
+          "\"A customer contacted us because a delivery hadn't arrived when expected. I checked the order record and found that the address had been captured incorrectly. I confirmed the details with the customer, contacted dispatch and agreed on a new delivery time. I then called the customer back with the update. The order was delivered, and I flagged the capture error to my supervisor so we could check how it had happened.\"",
+          "That answer gives the interviewer something to ask about. How did you handle the customer's frustration? What did you do while waiting for dispatch? What would you change next time?",
+          "Notice that the example doesn't end with a made-up satisfaction score. A result can be an issue resolved, a deadline met or a mistake caught. If you have reliable numbers, use them. If you don't, explain the outcome you actually know.",
+          "When reviewing your own answers, check how much time you spend describing the background. A short explanation is usually enough. Leave room for the decisions you made and the actions you took."
         ]
       },
       {
-        "heading": "If they ask before you've heard enough about the role",
+        "heading": "Practise speaking, not only writing",
         "body": [
-          "Try: \"I'd like to understand the responsibilities and package a little better before giving you a firm expectation. Could you share the range budgeted for the role?\"",
-          "They may share it. They may ask you to give your expectation first. If you've done the research, you can give a range and explain what it's based on, while making clear that the full package still needs discussion.",
-          "You don't need to turn the conversation into a battle over who says a number first. Your aim is to find out whether the opportunity could work for both sides."
+          "An answer that looks clear on a page can become a very long story out loud. Record yourself answering one question on your phone. Listen once, without picking apart every pause.",
+          "Could someone follow what happened? Did you explain your contribution? Did you answer the question? Choose one thing to improve and try again.",
+          "Keep brief notes rather than memorising a script. You want to remember the example well enough to adapt it. If the interviewer asks about teamwork, you'll explain how you worked with others. If they ask about a mistake, you may use the same experience but focus on what went wrong and how you responded.",
+          "If you lose your place in the interview, you can pause: \"Let me give you a clearer example.\" You can also ask them to repeat or clarify a question. A short pause gives you a chance to answer the question they actually asked."
         ]
       },
       {
-        "heading": "If you're ready to give a range",
+        "heading": "Prepare an opening and a few questions of your own",
         "body": [
-          "Here's a fictional example of the wording, not a salary recommendation: \"Based on the responsibilities we've discussed and the comparable roles I've researched, I'm looking at R30,000 to R34,000 monthly CTC. I'd like to understand the benefits and how the package is structured before making a final decision.\"",
-          "Use figures supported by your own research. Be prepared to explain the experience you bring, especially if you're asking for the upper end of the employer's range.",
-          "If they ask about your current package and you choose to discuss it, describe it accurately. Don't inflate a figure or invent benefits to strengthen your position. You can still explain why your expectation for the new role differs."
+          "For \"Tell me about yourself\", practise a brief introduction that connects your current experience to the role. Give them a useful starting point, then let the conversation develop. You don't need your entire life story in the first answer.",
+          "Read the employer's official website and the information they've sent you. Look for what the organisation does, who it serves and where this job fits. You don't need to pretend you've admired the company since childhood.",
+          "Prepare questions you genuinely want answered. \"What would you want the person in this role to have achieved after three months?\" can help you understand expectations. \"What is the biggest challenge the team is dealing with?\" may tell you something the advert doesn't.",
+          "If salary comes up, be clear about the basis of any figure you discuss and ask what the package includes. It's reasonable to need details before you can compare an opportunity properly."
         ]
       },
       {
-        "heading": "Compare the whole offer",
+        "heading": "Sort out the practical details early",
         "body": [
-          "Imagine two fictional offers, each described as R30,000 monthly CTC. One includes R3,000 in employer retirement contributions within that total. The other has a different benefits structure. Those headline figures don't tell you what your gross cash pay or take-home pay would be.",
-          "Ask for a written breakdown. Check what is guaranteed, what depends on performance and which contributions sit inside the quoted total. A possible bonus shouldn't quietly become part of your guaranteed monthly budget.",
-          "Write down these questions for each offer:",
-          {
-            "type": "list",
-            "items": [
-              "What is the guaranteed gross cash pay?",
-              "Which benefits and employer contributions are included in the CTC figure?",
-              "What deductions would apply to me?",
-              "Is any commission or bonus guaranteed, and what are its conditions?",
-              "What extra costs would I take on to do the job?"
-            ]
-          },
-          "Ask payroll or HR to clarify the parts you don't understand. An estimated payslip can be helpful, although your actual deductions depend on your circumstances. Don't assume that dividing annual CTC by twelve gives your monthly take-home pay."
+          "Confirm the time, location and format. For an in-person interview, check the route and allow for transport delays. Keep the contact person's details somewhere you can find them quickly.",
+          "For a video interview, test the link, microphone and camera. Charge your device and think about what you'll do if your connection drops. If data or a private space is a problem, raise it early and ask what options are available.",
+          "Have your CV, the advert and a few brief notes nearby. If you plan to take notes during the conversation, say so. Keep confidential material from previous employers out of any work samples you share."
         ]
       },
       {
-        "heading": "If the offer is below what you expected",
+        "heading": "If the interview is tomorrow",
         "body": [
-          "You can be appreciative and still ask a question: \"Thank you for the offer. I'm interested in the role. Based on the scope and the experience I'd bring, I was hoping for a package closer to ___. Is there flexibility?\"",
-          "Give them time to respond. If the salary can't change, ask about other terms that matter to you. Those might include working arrangements, development support or the timing and criteria for a review. A promised future review is not a guaranteed increase, so understand what is actually being offered.",
-          "You may decide the offer works for you. You may decide it doesn't. Either way, try to make the decision with the details in writing rather than the excitement or pressure of the call.",
-          "For help with the rest of the conversation, read the [interview preparation guide](/insights/interview-preparation-south-africa). If you'd like to practise discussing your experience and expectations, [book a free discovery call](/book/discovery)."
+          "You can still prepare usefully. Read the advert, choose a few relevant examples and say your opening answer out loud. Check the employer's website, prepare two questions and confirm the logistics. Then give yourself time to rest.",
+          "Afterwards, make a quick note of the questions you found difficult and the next steps you were given. If the stated response date passes, a polite follow-up is reasonable. An unanswered message doesn't tell you exactly what happened inside the organisation.",
+          "For now, pick one experience and practise explaining it clearly. That's a much better starting point than trying to memorise forty perfect answers.",
+          "If you'd like support preparing for a particular role, [book a free discovery call](/book/discovery). We can use your own examples and the actual job description, so the practice feels relevant to the conversation you're about to have."
         ]
       }
     ]
@@ -512,8 +514,8 @@
       "Personal Brand",
       "Job Search"
     ],
-    "image": "/images/insights/first-time-manager-guide.jpeg",
-    "imageAlt": "Two colleagues talking across a table in a bright office, with a notebook open between them",
+    "image": "/images/insights/career-planning-when-stuck.jpg",
+    "imageAlt": "Woman in a grey blazer sitting at a desk beside a laptop, looking away in thought",
     "title": "\"Tell me about yourself\": how to build a clear interview answer",
     "metaTitle": "\"Tell me about yourself\": how to build a clear interview answer",
     "metaDescription": "A clear opening answer helps the interviewer understand your experience. Build yours with examples for graduates, experienced candidates and career changers.",
@@ -602,103 +604,101 @@
     ]
   },
   {
-    "slug": "network-for-a-job-without-connections",
+    "slug": "salary-expectations-interview-south-africa",
     "publishAt": "2027-02-04T08:00:00+02:00",
     "status": "scheduled",
-    "dek": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
-    "category": "Personal branding",
+    "dek": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
+    "category": "Interview preparation",
     "tags": [
-      "Networking",
-      "LinkedIn",
-      "Visibility",
+      "Interviews",
+      "Salary",
       "Job Search"
     ],
-    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
-    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
-    "leadMagnet": {
-      "eyebrow": "Free LinkedIn headline builder",
-      "title": "Will your headline make sense when they look you up?",
-      "body": "Download before-and-after LinkedIn headline rewrites and a simple formula for describing the work you do and the work you want.",
-      "cta": "Get the PDF",
-      "href": "/resources/linkedin-headline-swipe-file",
-      "afterHeading": "Be clear enough for someone to help"
-    },
-    "title": "How to network for a job when you don't know anyone in your industry",
-    "metaTitle": "How to network for a job when you don't know anyone in your industry",
-    "metaDescription": "Start with one person and a question you genuinely want answered. Practical messages and follow-ups for building professional connections without the awkward pitch.",
+    "image": "/images/insights/linkedin-headline-article.jpg",
+    "imageAlt": "Person typing on a laptop at a wooden desk, with a cup of coffee and an open notebook beside them",
+    "title": "What are your salary expectations? How to answer in a South African interview",
+    "metaTitle": "What are your salary expectations? How to answer in a South African interview",
+    "metaDescription": "The salary question doesn't have to become a guessing game. Prepare a researched range, understand the package and find words you're comfortable saying.",
     "date": "4 February 2027",
     "readTime": "6 min read",
     "sections": [
       {
         "heading": "Start here",
         "body": [
-          "\"You need to network.\"",
-          "People say it as though there is a room somewhere where useful contacts are waiting for you to arrive. Meanwhile, you're trying to work out who to message and how to avoid sounding as though you're asking a stranger to solve your life.",
-          "If networking feels awkward, start smaller. You can ask a thoughtful question, reconnect with someone you already know or join a conversation about work that interests you. You don't need a large circle before you can begin.",
-          "The first aim is to understand the work and build a relationship that both people are comfortable with. A job lead may come from that. It may not. The conversation can still help you make a better decision."
+          "The conversation is going well. You've explained your experience, asked a thoughtful question and started imagining yourself in the role.",
+          "Then someone asks what you'd like to earn.",
+          "Suddenly you're trying to calculate your value, your monthly expenses and the risk of saying the wrong thing, all while looking perfectly relaxed on a video call.",
+          "You can prepare for this part too. You need a researched range, a clear understanding of what the numbers mean and a few words you feel comfortable saying. You don't need to guess the one magical figure that makes an employer say yes."
         ]
       },
       {
-        "heading": "Be clear enough for someone to help",
+        "heading": "Make sure you're discussing the same kind of number",
         "body": [
-          "\"I'm looking for anything\" is an honest description of how desperate a job search can feel. It's also difficult for another person to act on.",
-          "Give them a starting point: the kind of work you're exploring, the experience you bring and the question you have.",
-          "For example: \"I'm looking into office support roles. I've handled scheduling and customer queries, and I'd like to understand what employers expect from junior administrators.\"",
-          "That doesn't lock you into one career forever. It makes this particular conversation easier. If you're exploring several directions, have a clear question for each rather than asking one person to advise on everything.",
-          "Your [LinkedIn profile](/insights/linkedin-profile-optimisation-south-africa-2026) can back up the message. When someone looks you up, they should be able to understand the experience you're referring to."
+          "Before comparing figures, clarify whether you're talking about monthly or annual pay, and whether the figure is gross salary or cost to company.",
+          "Gross pay is pay before deductions. Net pay is what remains after deductions. Cost to company, usually shortened to CTC, describes the employer's total package cost and may include contributions or benefits that won't arrive as cash in your account. The exact breakdown matters.",
+          "You can simply ask: \"Is that figure monthly CTC, and could you talk me through what's included?\"",
+          "There's no embarrassment in checking. Comparing your current take-home pay with a proposed CTC figure can make an offer look better than it is. If a term on a payslip or offer letter is unfamiliar, ask HR what it means before you compare figures."
         ]
       },
       {
-        "heading": "Begin closer to home than you think",
+        "heading": "Research the role you're moving into",
         "body": [
-          "Make a short list of people you've studied with, worked with, volunteered alongside or met through a professional event. You may not have spoken for a while. That's okay; acknowledge it naturally.",
-          "You can also look for alumni groups, professional associations and public events relevant to your interests. Check whether there is a free or online option before committing money or travel time. You don't need to buy access to an expensive conference to have a useful conversation.",
-          "Choose people because there is a sensible connection to your question. A person doing the work you want to understand may be more useful than the most senior person you can find."
+          "Look at recent adverts with salary ranges for comparable work. Match the responsibilities, experience level and location as closely as you can. A familiar title doesn't always mean a similar job.",
+          "Published salary guides can help you establish a starting point. Large job boards and specialist recruiters publish salary guides from time to time, often for a particular field. Check when the information was collected and whether the figures are monthly, annual, gross or CTC.",
+          "Keep a few notes: the source, its date, the kind of role and the stated range. If your research produces very different figures, investigate why. You may be comparing different levels of responsibility or very different packages.",
+          "Your current salary is one piece of information. The scope of the new role also matters, particularly if you've been underpaid or are taking on significantly different work. Avoid building your whole expectation around a fixed percentage increase."
         ]
       },
       {
-        "heading": "Send a message that is easy to answer",
+        "heading": "Decide what would work for you before the call",
         "body": [
-          "The examples below are fictional messages you can adapt. Replace the details with your own and write in a way you'd actually speak.",
-          "To a former colleague: \"Hi Lerato, it's been a while. I hope you're well. I'm exploring coordinator roles and remembered that you moved into operations. Would you be comfortable telling me which skills helped you make that move? I'm trying to understand what I should work on next.\"",
-          "To someone from your college or university: \"Hi Thabo, I noticed we both studied at the same institution. I've recently completed my qualification and I'm exploring office support roles. If you have a moment, I'd appreciate your view on one thing: what do new starters often underestimate about the work?\"",
-          "To someone whose public work you've followed: \"Hi Ayesha, your post about training new staff caught my attention. I'm in customer support and have been helping colleagues learn our system. I'm considering training coordination. Would you be open to one or two questions about the day-to-day work? No problem if you're unable to.\"",
-          "Each message explains the connection and makes a small request. There is no need for a long introduction, flattery or an unexpected CV attachment."
+          "Privately, work out what you need to understand before accepting an offer. That includes the package itself and costs that may change, such as transport or childcare.",
+          "Keep your preferred range separate from the lowest offer you could realistically accept. You don't have to volunteer your minimum at the start of the conversation. And don't give a range whose lower end you already know won't work for you.",
+          "The figure you discuss with the employer should have a reason behind it: the role, your relevant experience and the evidence you've gathered. Your household costs matter to your decision, but the employer will also be assessing the position's budget and responsibilities."
         ]
       },
       {
-        "heading": "If they say yes, respect the time they've offered",
+        "heading": "If they ask before you've heard enough about the role",
         "body": [
-          "Prepare a few questions you couldn't easily answer by reading their profile. Ask what the work involves, how people usually enter the field or which skill would be useful to practise first.",
-          "If you agree on a fifteen-minute call, keep an eye on the time. You can say, \"We're nearly at the time we agreed. May I ask one last question?\" Let them decide whether to continue.",
-          "Listen closely enough to ask a follow-up about what they've said. You don't have to work through a script of questions if the conversation has already answered them.",
-          "Avoid asking for confidential details about their employer, applicants or colleagues. You can learn a lot about a field without putting someone in an uncomfortable position."
+          "Try: \"I'd like to understand the responsibilities and package a little better before giving you a firm expectation. Could you share the range budgeted for the role?\"",
+          "They may share it. They may ask you to give your expectation first. If you've done the research, you can give a range and explain what it's based on, while making clear that the full package still needs discussion.",
+          "You don't need to turn the conversation into a battle over who says a number first. Your aim is to find out whether the opportunity could work for both sides."
         ]
       },
       {
-        "heading": "When is it okay to ask about opportunities?",
+        "heading": "If you're ready to give a range",
         "body": [
-          "If there is a specific vacancy and the conversation makes it appropriate, you can ask about the application process: \"I noticed the coordinator vacancy on your company's careers page. Do you know whether applications should go directly through that page?\"",
-          "A referral is a bigger request. The person may not know your work well enough to recommend you, or their employer may have a particular process. Give them an easy way to say no.",
-          "\"If you feel you know my work well enough, would you be comfortable referring me? I understand if you'd prefer that I apply directly.\"",
-          "Apply through the required route either way. A conversation doesn't replace the employer's process, and knowing someone doesn't guarantee an interview."
+          "Here's a fictional example of the wording, not a salary recommendation: \"Based on the responsibilities we've discussed and the comparable roles I've researched, I'm looking at R30,000 to R34,000 monthly CTC. I'd like to understand the benefits and how the package is structured before making a final decision.\"",
+          "Use figures supported by your own research. Be prepared to explain the experience you bring, especially if you're asking for the upper end of the employer's range.",
+          "If they ask about your current package and you choose to discuss it, describe it accurately. Don't inflate a figure or invent benefits to strengthen your position. You can still explain why your expectation for the new role differs."
         ]
       },
       {
-        "heading": "Follow up without chasing",
+        "heading": "Compare the whole offer",
         "body": [
-          "If an initial message gets no reply, one brief follow-up after a week or two is a reasonable personal approach. You could say, \"Just following up on my message in case it got buried. I understand if now isn't a good time.\"",
-          "Then leave it there. People may be busy, away or unable to help. Repeated messages can turn a small request into pressure.",
-          "After a useful conversation, send a specific thank-you. \"Your explanation of the reporting work helped me understand what I need to practise\" means more than a copied paragraph of praise.",
-          "If you later use their advice, a short update can keep the relationship going naturally. You can also share something useful when it fits, but you don't need to manufacture a favour to repay them immediately."
+          "Imagine two fictional offers, each described as R30,000 monthly CTC. One includes R3,000 in employer retirement contributions within that total. The other has a different benefits structure. Those headline figures don't tell you what your gross cash pay or take-home pay would be.",
+          "Ask for a written breakdown. Check what is guaranteed, what depends on performance and which contributions sit inside the quoted total. A possible bonus shouldn't quietly become part of your guaranteed monthly budget.",
+          "Write down these questions for each offer:",
+          {
+            "type": "list",
+            "items": [
+              "What is the guaranteed gross cash pay?",
+              "Which benefits and employer contributions are included in the CTC figure?",
+              "What deductions would apply to me?",
+              "Is any commission or bonus guaranteed, and what are its conditions?",
+              "What extra costs would I take on to do the job?"
+            ]
+          },
+          "Ask payroll or HR to clarify the parts you don't understand. An estimated payslip can be helpful, although your actual deductions depend on your circumstances. Don't assume that dividing annual CTC by twelve gives your monthly take-home pay."
         ]
       },
       {
-        "heading": "Make room for this in your actual week",
+        "heading": "If the offer is below what you expected",
         "body": [
-          "Try a small routine you can sustain: choose one person, read enough to make a relevant approach and send a thoughtful message. Keep a note of any reply and the next step you agreed on.",
-          "Continue applying for suitable roles. Networking is another route to information and relationships, not a reason to stop the rest of your search. If applications are going quiet, the [job-search check](/insights/applying-for-jobs-no-interviews-south-africa) can help you review that part too.",
-          "If you want your profile to explain the direction you're moving in before people look you up, [LinkedIn Optimisation](/buy/linkedin) is built for that. For your first message, though, keep it simple. Choose one person and one question you genuinely want to understand."
+          "You can be appreciative and still ask a question: \"Thank you for the offer. I'm interested in the role. Based on the scope and the experience I'd bring, I was hoping for a package closer to ___. Is there flexibility?\"",
+          "Give them time to respond. If the salary can't change, ask about other terms that matter to you. Those might include working arrangements, development support or the timing and criteria for a review. A promised future review is not a guaranteed increase, so understand what is actually being offered.",
+          "You may decide the offer works for you. You may decide it doesn't. Either way, try to make the decision with the details in writing rather than the excitement or pressure of the call.",
+          "For help with the rest of the conversation, read the [interview preparation guide](/insights/interview-preparation-south-africa). If you'd like to practise discussing your experience and expectations, [book a free discovery call](/book/discovery)."
         ]
       }
     ]
@@ -714,8 +714,8 @@
       "Career Growth",
       "Career Planning"
     ],
-    "image": "/images/insights/linkedin-headline-article.jpg",
-    "imageAlt": "Person typing on a laptop at a wooden desk, with a cup of coffee and an open notebook beside them",
+    "image": "/images/insights/linkedin-optimisation-playbook.jpg",
+    "imageAlt": "Laptop showing a LinkedIn profile on a wooden desk beside a coffee mug and a pot plant",
     "title": "Which short course is worth your time? Start with the job you want",
     "metaTitle": "Which short course is worth your time? Start with the job you want",
     "metaDescription": "Before you pay for another certificate, check what you'll learn, what it costs and how you'll use it. Choose a course that supports the work you want to do.",
