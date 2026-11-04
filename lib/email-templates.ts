@@ -589,7 +589,7 @@ I know you're tired. I know you've been carrying a lot. And I know that one more
 
 So I'm not going to do that.
 
-If you ever want to just talk through what's going on without any pressure to fix it all in one conversation, I do a 75-minute Career Clarity Session. No homework. No big commitment. Just space to think out loud with someone who gets it.
+If you ever want to just talk through what's going on without any pressure to fix it all in one conversation, I do a 60-minute Career Clarity Session. No homework. No big commitment. Just space to think out loud with someone who gets it.
 
 It's here if you want it: [BOOKING LINK]
 

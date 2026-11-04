@@ -836,7 +836,7 @@ ${context.emailContext.recentOutboundEmails.length > 0
   : 'No logged outbound emails are in the current context.'}
 
 KAGISO'S SERVICES:
-- Career Clarity Session: R800, 75 min 1-on-1
+- Career Clarity Session: R800, 60 min 1-on-1
 - Glow Up VIP Package: R1,200, 30-day reset
 - CV + LinkedIn Bundle: ${formatServicePriceLabel('bundle')}, 7 working days
 - Saturday Masterclass: R450 early bird, 2-hour online

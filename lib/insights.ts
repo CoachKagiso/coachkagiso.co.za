@@ -957,7 +957,7 @@ export const insights: Insight[] = [
           'A well-optimised LinkedIn profile gets you found. It does not guarantee you get hired.',
           'The profile gets the recruiter to click. What happens after that, the first message, the interview, the way you position yourself, the story you tell about your career, that is a different layer of work entirely.',
           'If you have been getting profile views but not converting them to conversations, or getting conversations but not converting them to interviews, the issue is not your headline. It is your positioning. Your story. The clarity of where you are going and why.',
-          'That is what the [Career Clarity Session (R800)](/book/clarity) is for. Seventy-five minutes of focused work on where you are, where you are going, and how to talk about it, on LinkedIn, in interviews, and everywhere else.',
+          'That is what the [Career Clarity Session (R800)](/book/clarity) is for. Sixty minutes of focused work on where you are, where you are going, and how to talk about it, on LinkedIn, in interviews, and everywhere else.',
           'Or, if your CV and LinkedIn both need work and you want them to tell the same story, the [CV + LinkedIn Bundle (R500)](/buy/bundle) covers both.',
           'If you require a [LinkedIn profile optimisation](/buy/linkedin) where I rewrite your profile for you, that is also available. You may connect with me for more information.',
           'Your career matters. Keep elevating.',
@@ -1240,7 +1240,7 @@ export const insights: Insight[] = [
         body: [
           'If you have read this article and you are still unsure which skill to prioritise, that is a clarity problem before it is a learning problem.',
           'The question is not "what should I learn?" The question is "what is actually blocking my next move?" Those are different questions with different answers.',
-          'The [Career Clarity Session (R800)](/book/clarity) is 75 minutes of focused work on exactly that: where you are, where you want to go, and which specific gaps are standing between the two. Once you have that clarity, the right learning resource becomes obvious.',
+          'The [Career Clarity Session (R800)](/book/clarity) is 60 minutes of focused work on exactly that: where you are, where you want to go, and which specific gaps are standing between the two. Once you have that clarity, the right learning resource becomes obvious.',
           'Your career matters. Keep elevating.',
         ],
       },
@@ -1475,7 +1475,7 @@ export const insights: Insight[] = [
         body: [
           'The first month is about credibility and relationships. Month two is where you start building. Month three is where real leadership begins.',
           'If you want a structured framework for the full 90 days, the [First 90 Days Checklist](/resources/downloads#first-90-days-checklist) covers exactly that. It includes weekly actions, key questions to ask, and SA-specific guidance. It is free to download.',
-          'And if you are navigating something more specific, the [Career Clarity Session (R800)](/book/clarity) is a 75-minute one-on-one.',
+          'And if you are navigating something more specific, the [Career Clarity Session (R800)](/book/clarity) is a 60-minute one-on-one.',
           'That might be a complicated team dynamic, a promotion that came faster than expected, or uncertainty about where your career is heading.',
           'We work through exactly that.',
           'Your career matters. Keep elevating.',

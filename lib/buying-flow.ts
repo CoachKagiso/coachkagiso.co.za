@@ -369,12 +369,12 @@ Kagiso`,
     amount: 800,
     kind: 'booking',
     checkoutAccess: 'accepted_booking',
-    turnaround: '75-minute private session',
+    turnaround: '60-minute private session',
     deliveryDays: 1,
     buyCta: 'Pay to confirm my session',
     folder: 'career-clarity',
     requiresCvUpload: false,
-    summary: 'Your chosen time is held. Complete payment to confirm your 75-minute Career Clarity Session.',
+    summary: 'Your chosen time is held. Complete payment to confirm your 60-minute Career Clarity Session.',
     fields: [],
     faqs: [
       {
@@ -521,7 +521,7 @@ export const bookingPages: Record<BookingSlug, BookingPageConfig> = {
     title: 'Career Clarity Session',
     envKey: 'NEXT_PUBLIC_CAL_CLARITY_URL',
     fallbackUrl: 'https://cal.com/coachkagiso/career-clarity',
-    description: 'Book your 75-minute clarity session and choose a time that works for you.',
+    description: 'Book your 60-minute clarity session and choose a time that works for you.',
     faqs: [
       {
         question: 'What do I leave with after the clarity session?',
