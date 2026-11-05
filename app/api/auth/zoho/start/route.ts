@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isDiagnosticAdminAuthorized } from '@/lib/diagnostic-submissions';
 import { getSiteUrl } from '@/lib/env';
+import { ZOHO_OAUTH_STATE_COOKIE, ZOHO_OAUTH_STATE_MAX_AGE_SECONDS, createZohoOAuthState } from '@/lib/zoho-oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,5 +36,18 @@ export async function GET(request: Request) {
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent');
 
-  return NextResponse.redirect(authUrl);
+  // The callback is public, because Zoho redirects the browser there, so it only
+  // proceeds for a flow that started here: it must see this state in its cookie.
+  const state = createZohoOAuthState();
+  authUrl.searchParams.set('state', state);
+
+  const response = NextResponse.redirect(authUrl);
+  response.cookies.set(ZOHO_OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/api/auth/zoho',
+    maxAge: ZOHO_OAUTH_STATE_MAX_AGE_SECONDS,
+  });
+  return response;
 }

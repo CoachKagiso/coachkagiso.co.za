@@ -80,7 +80,10 @@ export async function POST(request: Request) {
 
   const service = asyncServices[serviceSlug as keyof typeof asyncServices];
 
-  if (!paymentId || !service) {
+  // /api/payfast/checkout hands out passphrase-signed fields for any payment ID,
+  // so a valid signature alone does not prove PayFast sent this. Those fields never
+  // include payment_status, which every genuine ITN carries.
+  if (!paymentId || !service || !paymentStatus) {
     console.warn('PayFast ITN rejected: missing payment data', {
       hasPaymentId: Boolean(paymentId),
       serviceSlug,

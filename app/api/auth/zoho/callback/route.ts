@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSiteUrl } from '@/lib/env';
+import {
+  ZOHO_OAUTH_STATE_COOKIE,
+  readCookieValue,
+  resolveZohoAccountsBaseUrl,
+  zohoOAuthStateMatches,
+} from '@/lib/zoho-oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +90,19 @@ export async function GET(request: Request) {
     });
   }
 
+  // Only continue a flow started from the admin-only start route in this browser.
+  if (
+    !zohoOAuthStateMatches(
+      readCookieValue(request.headers.get('cookie'), ZOHO_OAUTH_STATE_COOKIE),
+      url.searchParams.get('state'),
+    )
+  ) {
+    return renderPage({
+      title: 'Zoho connection could not be verified',
+      body: 'This link did not come from a Zoho connection started in this browser. Please restart it from the dashboard setup link.',
+    });
+  }
+
   const clientId = process.env.ZOHO_MAIL_CLIENT_ID?.trim();
   const clientSecret = process.env.ZOHO_MAIL_CLIENT_SECRET?.trim();
 
@@ -95,10 +114,10 @@ export async function GET(request: Request) {
     });
   }
 
-  const accountsBaseUrl =
-    url.searchParams.get('accounts-server') ||
-    process.env.ZOHO_ACCOUNTS_BASE_URL ||
-    'https://accounts.zoho.com';
+  const accountsBaseUrl = resolveZohoAccountsBaseUrl(
+    url.searchParams.get('accounts-server'),
+    process.env.ZOHO_ACCOUNTS_BASE_URL,
+  );
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     client_id: clientId,
