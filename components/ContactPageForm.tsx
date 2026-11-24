@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
+import FilterDropdown from '@/components/FilterDropdown';
 import { ArrowUpRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 const serviceOptions = [
@@ -118,7 +119,7 @@ export default function ContactPageForm() {
             pattern="^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$"
             title="Please use letters only. Spaces, apostrophes, and hyphens are allowed."
             autoComplete="name"
-            className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+            className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
           />
         </div>
         <div className="space-y-2">
@@ -132,7 +133,7 @@ export default function ContactPageForm() {
             name="email"
             maxLength={120}
             autoComplete="email"
-            className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+            className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
           />
         </div>
       </div>
@@ -152,63 +153,91 @@ export default function ContactPageForm() {
             autoComplete="tel"
             placeholder="Optional"
             onChange={sanitizePhone}
-            className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+            className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
           />
         </div>
         <div className="space-y-2">
-          <label htmlFor="reply-method" className="text-[12px] font-semibold text-[#142334] uppercase tracking-[0.18em]">
+          <label htmlFor="reply-method" className="text-sm font-medium text-[var(--brand-ink)]">
             Best way to reply <span className="text-[#C9AD98]">*</span>
           </label>
-          <select required id="reply-method" name="reply-method" className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]">
-            <option value="">Choose one</option>
-            <option value="email">Email</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="either">Either is fine</option>
-          </select>
+          <FilterDropdown
+            publicForm
+            required
+            id="reply-method"
+            name="reply-method"
+            ariaLabel="Best way to reply"
+            value=""
+            options={[
+              { value: '', label: 'Choose one', disabled: true },
+              { value: 'email', label: 'Email' },
+              { value: 'whatsapp', label: 'WhatsApp' },
+              { value: 'either', label: 'Either is fine' },
+            ]}
+          />
         </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <label htmlFor="service" className="text-[12px] font-semibold text-[#142334] uppercase tracking-[0.18em]">
+          <label htmlFor="service" className="text-sm font-medium text-[var(--brand-ink)]">
             What are you asking about? <span className="text-[#C9AD98]">*</span>
           </label>
-          <select required id="service" name="service" className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]">
-            <option value="">Choose one</option>
-            {serviceOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          <FilterDropdown
+            publicForm
+            required
+            id="service"
+            name="service"
+            ariaLabel="What are you asking about?"
+            value=""
+            options={[
+              { value: '', label: 'Choose one', disabled: true },
+              ...serviceOptions.map((option) => ({ value: option, label: option })),
+            ]}
+          />
         </div>
         <div className="space-y-2">
-          <label htmlFor="timeline" className="text-[12px] font-semibold text-[#142334] uppercase tracking-[0.18em]">
+          <label htmlFor="timeline" className="text-sm font-medium text-[var(--brand-ink)]">
             Timeline <span className="text-[#C9AD98]">*</span>
           </label>
-          <select required id="timeline" name="timeline" className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]">
-            <option value="">Choose one</option>
-            <option value="urgent">Urgent, within 48 hours</option>
-            <option value="this-week">This week</option>
-            <option value="this-month">This month</option>
-            <option value="exploring">Just exploring for now</option>
-          </select>
+          <FilterDropdown
+            publicForm
+            required
+            id="timeline"
+            name="timeline"
+            ariaLabel="Timeline"
+            value=""
+            options={[
+              { value: '', label: 'Choose one', disabled: true },
+              { value: 'urgent', label: 'Urgent, within 48 hours' },
+              { value: 'this-week', label: 'This week' },
+              { value: 'this-month', label: 'This month' },
+              { value: 'exploring', label: 'Just exploring for now' },
+            ]}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="career-stage" className="text-[12px] font-semibold text-[#142334] uppercase tracking-[0.18em]">
+        <label htmlFor="career-stage" className="text-sm font-medium text-[var(--brand-ink)]">
           Where are you right now? <span className="text-[#C9AD98]">*</span>
         </label>
-        <select required id="career-stage" name="career-stage" className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]">
-          <option value="">Choose one</option>
-          <option value="graduate">Graduate or job seeker</option>
-          <option value="employed">Employed and looking for growth</option>
-          <option value="pivot">Considering a career pivot</option>
-          <option value="new-role">Preparing for a new role</option>
-          <option value="leadership">Stepping into leadership</option>
-          <option value="not-sure">I am not sure how to describe it</option>
-        </select>
+        <FilterDropdown
+          publicForm
+          required
+          id="career-stage"
+          name="career-stage"
+          ariaLabel="Where are you right now?"
+          value=""
+          options={[
+            { value: '', label: 'Choose one', disabled: true },
+            { value: 'graduate', label: 'Graduate or job seeker' },
+            { value: 'employed', label: 'Employed and looking for growth' },
+            { value: 'pivot', label: 'Considering a career pivot' },
+            { value: 'new-role', label: 'Preparing for a new role' },
+            { value: 'leadership', label: 'Stepping into leadership' },
+            { value: 'not-sure', label: 'I am not sure how to describe it' },
+          ]}
+        />
       </div>
 
       <div className="space-y-2">
@@ -222,7 +251,7 @@ export default function ContactPageForm() {
           rows={5}
           maxLength={1200}
           placeholder="Tell me what you want help with, what role or goal is involved, and anything that feels time-sensitive."
-          className="w-full resize-none border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+          className="w-full resize-none rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
         ></textarea>
         {state === 'error' && (
           <p role="alert" className="text-[13px] leading-relaxed text-red-700">
