@@ -157,9 +157,9 @@ export default function Footer() {
                 <Mail className="h-4 w-4 text-[#C9AD98]" />
                 hello@coachkagiso.co.za
               </a>
-              <a href="https://wa.me/27695124398" className="inline-flex items-center gap-3 text-[14px] text-white/70 hover:text-white transition">
+              <a href="https://wa.me/27815280514" className="inline-flex items-center gap-3 text-[14px] text-white/70 hover:text-white transition">
                 <MessageCircle className="h-4 w-4 text-[#C9AD98]" />
-                069 512 4398
+                081 528 0514
               </a>
               <div className="flex gap-3 pt-2">
                 <a href="https://linkedin.com/in/coach-kagiso" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-10 w-10 rounded-full border border-white/20 flex items-center justify-center text-white/80 hover:border-[#C9AD98] hover:text-[#C9AD98] transition">

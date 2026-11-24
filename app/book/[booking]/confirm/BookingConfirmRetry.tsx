@@ -26,7 +26,7 @@ export default function BookingConfirmRetry() {
   return (
     <p className="mt-5 text-[15px] leading-relaxed text-[#142334]/68">
       This is taking longer than usual. Your time is still held. Check your inbox for the payment link, or
-      WhatsApp Kagiso on 069 512 4398 and she will send it to you directly.
+      WhatsApp Kagiso on 081 528 0514 and she will send it to you directly.
     </p>
   );
 }

@@ -515,13 +515,13 @@
                   - generic [ref=e527]: Email
                   - generic [ref=e528]: hello@coachkagiso.co.za
               - img [ref=e529]
-            - link "WhatsApp 069 512 4398" [ref=e532] [cursor=pointer]:
-              - /url: https://wa.me/27695124398
+            - link "WhatsApp 081 528 0514" [ref=e532] [cursor=pointer]:
+              - /url: https://wa.me/27815280514
               - generic [ref=e533]:
                 - img [ref=e535]
                 - generic [ref=e537]:
                   - generic [ref=e538]: WhatsApp
-                  - generic [ref=e539]: 069 512 4398
+                  - generic [ref=e539]: 081 528 0514
               - img [ref=e540]
           - paragraph [ref=e543]: I usually reply within 24 hours on weekdays. If it is urgent, WhatsApp is the quickest route.
           - link "Open the detailed contact form" [ref=e544] [cursor=pointer]:
@@ -648,10 +648,10 @@
                 - /url: mailto:hello@coachkagiso.co.za
                 - img [ref=e622]
                 - text: hello@coachkagiso.co.za
-              - link "069 512 4398" [ref=e625] [cursor=pointer]:
-                - /url: https://wa.me/27695124398
+              - link "081 528 0514" [ref=e625] [cursor=pointer]:
+                - /url: https://wa.me/27815280514
                 - img [ref=e626]
-                - text: 069 512 4398
+                - text: 081 528 0514
               - generic [ref=e628]:
                 - link "LinkedIn" [ref=e629] [cursor=pointer]:
                   - /url: https://linkedin.com/in/coach-kagiso
