@@ -130,7 +130,7 @@ export default async function BookingConfirmPage({ params, searchParams }: Booki
                     <p className="text-[16px] font-semibold text-[#142334]">Check your inbox for the payment link</p>
                     <p className="mt-1 text-[15px] leading-relaxed text-[#142334]/68">
                       Your {service.title} booking is confirmed on the calendar and the private checkout link is on
-                      its way by email. If it has not arrived in a few minutes, WhatsApp Kagiso on 069 512 4398.
+                      its way by email. If it has not arrived in a few minutes, WhatsApp Kagiso on 081 528 0514.
                     </p>
                   </div>
                 </div>

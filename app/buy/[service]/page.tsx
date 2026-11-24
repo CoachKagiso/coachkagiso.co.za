@@ -100,7 +100,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
   const contactEmail = getContactEmail();
   const manualMessage = `Hi Kagiso, I want to book ${service.title} for ${formatCurrency(checkoutAmount)}. Please send me the next step while online checkout is being activated.`;
   const manualEmailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(`Purchase request: ${service.title}`)}&body=${encodeURIComponent(`${manualMessage}\n\nService: ${service.title}\nAmount: ${formatCurrency(checkoutAmount)}`)}`;
-  const manualWhatsAppHref = `https://wa.me/27695124398?text=${encodeURIComponent(manualMessage)}`;
+  const manualWhatsAppHref = `https://wa.me/27815280514?text=${encodeURIComponent(manualMessage)}`;
   const fields = isPayFastPaymentMode || null;
 
   return (
@@ -340,7 +340,7 @@ export default async function BuyPage({ params, searchParams }: BuyPageProps) {
 
               {!isManualPaymentMode && (
                 <a
-                  href="https://wa.me/27695124398"
+                  href="https://wa.me/27815280514"
                   className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/72 transition hover:text-white"
                 >
                   <MessageCircle className="h-4 w-4 text-[#C9AD98]" />

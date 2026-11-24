@@ -33,7 +33,7 @@ export function OrganizationJsonLd() {
     ],
     priceRange: 'R150 – R1,200',
     email: 'hello@coachkagiso.co.za',
-    telephone: '+27695124398',
+    telephone: '+27815280514',
     address: {
       '@type': 'PostalAddress',
       addressRegion: 'Gauteng',
@@ -41,7 +41,7 @@ export function OrganizationJsonLd() {
     },
     sameAs: [
       'https://www.linkedin.com/in/coachkagiso',
-      'https://wa.me/27695124398',
+      'https://wa.me/27815280514',
     ],
   };
 

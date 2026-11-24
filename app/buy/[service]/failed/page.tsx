@@ -44,7 +44,7 @@ export default async function FailedPage({ params }: FailedPageProps) {
             Try payment again <ArrowUpRight className="h-4 w-4" />
           </Link>
           <a
-            href="https://wa.me/27695124398"
+            href="https://wa.me/27815280514"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-[#142334]/25 px-7 py-3.5 text-[12px] font-semibold uppercase tracking-[0.17em] text-[#142334] transition hover:bg-[#142334] hover:text-white"
           >
             <MessageCircle className="h-4 w-4" />

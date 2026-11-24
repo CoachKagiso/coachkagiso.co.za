@@ -264,7 +264,7 @@ export default async function ThanksPage({ params, searchParams }: ThanksPagePro
                 </div>
               </div>
               <a
-                href="https://wa.me/27695124398"
+                href="https://wa.me/27815280514"
                 className="mt-7 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#C9AD98] transition hover:text-[#142334]"
               >
                 <MessageCircle className="h-4 w-4" />

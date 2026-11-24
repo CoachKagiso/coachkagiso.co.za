@@ -106,8 +106,8 @@
           - generic [ref=e80]:
             - link "hello@coachkagiso.co.za" [ref=e81] [cursor=pointer]:
               - /url: mailto:hello@coachkagiso.co.za
-            - link "069 512 4398" [ref=e85] [cursor=pointer]:
-              - /url: https://wa.me/27695124398
+            - link "081 528 0514" [ref=e85] [cursor=pointer]:
+              - /url: https://wa.me/27815280514
             - generic [ref=e88]:
               - link "LinkedIn" [ref=e89] [cursor=pointer]:
                 - /url: https://linkedin.com/in/coach-kagiso

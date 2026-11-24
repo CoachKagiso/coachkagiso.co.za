@@ -16,8 +16,8 @@ const contactRoutes = [
   },
   {
     label: 'WhatsApp',
-    value: '069 512 4398',
-    href: 'https://wa.me/27695124398',
+    value: '081 528 0514',
+    href: 'https://wa.me/27815280514',
     icon: MessageCircle,
   },
 ];
