@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
+import FilterDropdown from '@/components/FilterDropdown';
 import { ArrowUpRight, CheckCircle2, Loader2, Mail, MessageCircle } from 'lucide-react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { FlowRibbon, FloralMark } from '@/components/DecorativeMotifs';
@@ -199,7 +200,7 @@ export default function ContactForm() {
                         pattern="^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$"
                         title="Please use letters only. Spaces, apostrophes, and hyphens are allowed."
                         autoComplete="name"
-                        className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+                        className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                       />
                     </div>
                     <div className="space-y-2">
@@ -213,7 +214,7 @@ export default function ContactForm() {
                         name="email"
                         maxLength={120}
                         autoComplete="email"
-                        className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+                        className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                       />
                     </div>
                   </div>
@@ -233,26 +234,25 @@ export default function ContactForm() {
                         autoComplete="tel"
                         placeholder="Optional"
                         onChange={sanitizePhone}
-                        className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+                        className="w-full rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label htmlFor="quick-support" className="text-[12px] font-semibold text-[#142334] uppercase tracking-[0.18em]">
+                      <label htmlFor="quick-support" className="text-sm font-medium text-[var(--brand-ink)]">
                         What do you need? <span className="text-[#C9AD98]">*</span>
                       </label>
-                      <select
+                      <FilterDropdown
+                        publicForm
                         required
                         id="quick-support"
                         name="support"
-                        className="w-full border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
-                      >
-                        <option value="">Choose one</option>
-                        {quickSupportOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                        ariaLabel="What do you need?"
+                        value=""
+                        options={[
+                          { value: '', label: 'Choose one', disabled: true },
+                          ...quickSupportOptions.map((option) => ({ value: option, label: option })),
+                        ]}
+                      />
                     </div>
                   </div>
 
@@ -267,7 +267,7 @@ export default function ContactForm() {
                       rows={4}
                       maxLength={700}
                       placeholder="One or two lines is enough. Tell me what you want help with."
-                      className="w-full resize-none border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
+                      className="w-full resize-none rounded-[10px] border border-[#CDC6C3] bg-[#FCFBFA] px-4 py-3.5 outline-none transition focus:border-[#142334]"
                     ></textarea>
                     {state === 'error' && (
                       <p role="alert" className="text-[13px] leading-relaxed text-red-700">
